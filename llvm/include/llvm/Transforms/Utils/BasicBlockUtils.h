@@ -127,6 +127,7 @@ struct CriticalEdgeSplittingOptions {
   bool KeepOneInputPHIs = false;
   bool PreserveLCSSA = false;
   bool IgnoreUnreachableDests = false;
+  bool SplitDetachContinue = false;
 
   CriticalEdgeSplittingOptions(DominatorTree *DT = nullptr,
                                LoopInfo *LI = nullptr,
@@ -151,6 +152,11 @@ struct CriticalEdgeSplittingOptions {
 
   CriticalEdgeSplittingOptions &setIgnoreUnreachableDests() {
     IgnoreUnreachableDests = true;
+    return *this;
+  }
+
+  CriticalEdgeSplittingOptions &setSplitDetachContinue() {
+    SplitDetachContinue = true;
     return *this;
   }
 };

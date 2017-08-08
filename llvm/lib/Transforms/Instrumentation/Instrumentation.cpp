@@ -107,6 +107,7 @@ void llvm::initializeInstrumentation(PassRegistry &Registry) {
   initializeModuleAddressSanitizerLegacyPassPass(Registry);
   initializeBoundsCheckingLegacyPassPass(Registry);
   initializeControlHeightReductionLegacyPassPass(Registry);
+  initializeCilkSanitizerPass(Registry);
   initializeGCOVProfilerLegacyPassPass(Registry);
   initializePGOInstrumentationGenLegacyPassPass(Registry);
   initializePGOInstrumentationUseLegacyPassPass(Registry);
@@ -119,6 +120,7 @@ void llvm::initializeInstrumentation(PassRegistry &Registry) {
   initializeThreadSanitizerLegacyPassPass(Registry);
   initializeModuleSanitizerCoverageLegacyPassPass(Registry);
   initializeDataFlowSanitizerPass(Registry);
+  initializeComprehensiveStaticInstrumentationPass(Registry);
 }
 
 /// LLVMInitializeInstrumentation - C binding for

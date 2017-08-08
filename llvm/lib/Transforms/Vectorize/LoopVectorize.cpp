@@ -2963,6 +2963,11 @@ BasicBlock *InnerLoopVectorizer::createVectorizedLoopSkeleton() {
   LoopExitBlock = OrigLoop->getExitBlock();
   assert(LoopExitBlock && "Must have an exit block");
   assert(LoopVectorPreHeader && "Invalid loop structure");
+  assert(!isa<SyncInst>(LoopVectorPreHeader->getTerminator()) &&
+         "Loop preheader terminated by sync.");
+  // if (isa<SyncInst>(LoopVectorPreHeader->getTerminator()))
+  //   LoopVectorPreHeader =
+  //       SplitEdge(LoopVectorPreHeader, LoopScalarBody, DT, LI);
 
   LoopMiddleBlock =
       SplitBlock(LoopVectorPreHeader, LoopVectorPreHeader->getTerminator(), DT,
