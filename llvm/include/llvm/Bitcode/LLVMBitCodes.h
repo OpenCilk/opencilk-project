@@ -617,6 +617,9 @@ enum FunctionCodes {
                                   //             operation, align, vol,
                                   //             ordering, synchscope]
   FUNC_CODE_BLOCKADDR_USERS = 60, // BLOCKADDR_USERS: [value...]
+  FUNC_CODE_INST_DETACH = 61,     // DETACH: [bb#,bb#] or [bb#,bb#,bb#]
+  FUNC_CODE_INST_REATTACH = 62,   // REATTACH: [bb#]
+  FUNC_CODE_INST_SYNC = 63,       // SYNC: [bb#]
 };
 
 enum UseListCodes {

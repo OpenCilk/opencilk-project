@@ -4119,6 +4119,11 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock,
     // successor block.
     if (DestBlock->getUniquePredecessor() != I->getParent())
       return false;
+    // We can't generally move an instruction that reads from memory past a
+    // detach or reattach.
+    if (isa<DetachInst>(I->getParent()->getTerminator()) ||
+        isa<ReattachInst>(I->getParent()->getTerminator()))
+      return false;
     for (BasicBlock::iterator Scan = std::next(I->getIterator()),
                               E = I->getParent()->end();
          Scan != E; ++Scan)

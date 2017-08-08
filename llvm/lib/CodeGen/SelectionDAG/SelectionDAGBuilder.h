@@ -58,6 +58,7 @@ class Constant;
 class ConstrainedFPIntrinsic;
 class DbgValueInst;
 class DataLayout;
+class DetachInst;
 class DIExpression;
 class DILocalVariable;
 class DILocation;
@@ -74,6 +75,7 @@ class LLVMContext;
 class LoadInst;
 class MachineBasicBlock;
 class PHINode;
+class ReattachInst;
 class ResumeInst;
 class ReturnInst;
 class SDDbgValue;
@@ -81,6 +83,7 @@ class SelectionDAG;
 class StoreInst;
 class SwiftErrorValueTracking;
 class SwitchInst;
+class SyncInst;
 class TargetLibraryInfo;
 class TargetMachine;
 class Type;
@@ -508,6 +511,9 @@ private:
   void visitCatchRet(const CatchReturnInst &I);
   void visitCatchPad(const CatchPadInst &I);
   void visitCleanupPad(const CleanupPadInst &CPI);
+  void visitDetach(const DetachInst& I);
+  void visitReattach(const ReattachInst& I);
+  void visitSync(const SyncInst& I);
 
   BranchProbability getEdgeProbability(const MachineBasicBlock *Src,
                                        const MachineBasicBlock *Dst) const;

@@ -433,6 +433,7 @@ int main(int argc, char **argv) {
   initializeCore(Registry);
   initializeScalarOpts(Registry);
   initializeVectorization(Registry);
+  initializeTapirOpts(Registry);
   initializeIPO(Registry);
   initializeAnalysis(Registry);
   initializeTransformUtils(Registry);
