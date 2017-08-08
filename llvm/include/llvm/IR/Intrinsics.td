@@ -1264,6 +1264,13 @@ def int_coro_subfn_addr : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty, llvm_i8_ty],
                                      ReadOnly<ArgIndex<0>>,
                                      NoCapture<ArgIndex<0>>]>;
 
+///===-------------------------- Tapir Intrinsics --------------------------===//
+//
+def int_syncregion_start : Intrinsic<[llvm_token_ty], [],
+                                     [IntrArgMemOnly]>;
+
+def int_detached_rethrow : Intrinsic<[], [], [Throws]>;
+
 ///===-------------------------- Other Intrinsics --------------------------===//
 //
 def int_trap : Intrinsic<[], [], [IntrNoReturn, IntrCold]>,

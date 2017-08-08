@@ -1489,6 +1489,15 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
         }))
       return nullptr;
     break;
+  case Intrinsic::syncregion_start: {
+    int NumUsers = 0;
+    for (User *U : II->users())
+      if (isa<DetachInst>(U) || isa<ReattachInst>(U) || isa<SyncInst>(U))
+        ++NumUsers;
+    if (!NumUsers)
+      return eraseInstFromFunction(CI);
+    break;
+  }
   case Intrinsic::assume: {
     Value *IIOperand = II->getArgOperand(0);
     SmallVector<OperandBundleDef, 4> OpBundles;

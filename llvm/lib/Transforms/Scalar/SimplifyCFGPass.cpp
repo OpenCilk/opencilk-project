@@ -40,6 +40,8 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -191,6 +193,72 @@ static bool mergeEmptyReturnBlocks(Function &F, DomTreeUpdater *DTU) {
   return Changed;
 }
 
+static bool removeUselessSyncs(Function &F, DomTreeUpdater *DTU) {
+  bool Changed = false;
+  // Scan all the blocks in the function
+ check:
+  for (BasicBlock &BB : make_early_inc_range(F)) {
+    if (DTU && DTU->isBBPendingDeletion(&BB))
+      continue;
+    if (SyncInst *Sync = dyn_cast<SyncInst>(BB.getTerminator())) {
+      // Walk the CFG backwards to try to find a reaching detach instruction.
+      bool ReachingDetach = false;
+      SmallPtrSet<BasicBlock *, 32> Visited;
+      SmallVector<BasicBlock *, 32> WorkList;
+      WorkList.push_back(&BB);
+      while (!WorkList.empty()) {
+        BasicBlock *PBB = WorkList.pop_back_val();
+        if (!Visited.insert(PBB).second)
+          continue;
+
+        for (pred_iterator PI = pred_begin(PBB), PE = pred_end(PBB);
+             PI != PE; ++PI) {
+          BasicBlock *Pred = *PI;
+          TerminatorInst *PT = Pred->getTerminator();
+          // Stop the traversal at the entry block of a detached CFG.
+          if (DetachInst *DI = dyn_cast<DetachInst>(PT)) {
+            if (DI->getDetached() == PBB)
+              continue;
+            else // DI->getContinue() == PBB
+              // This detach reaches the sync through the continuation edge.
+              ReachingDetach = true;
+          }
+          if (ReachingDetach)
+            break;
+
+          // Ignore predecessors via a reattach, which belong to child detached
+          // contexts.
+          if (isa<ReattachInst>(PT))
+            continue;
+
+          // For a predecessor terminated by a sync instruction, check the sync
+          // region it belongs to.  If the sync belongs to a different sync
+          // region, add the block that starts that region.  Otherwise, ignore
+          // the predecessor.
+          if (SyncInst *SI = dyn_cast<SyncInst>(PT)) {
+            if (SI->getSyncRegion() != Sync->getSyncRegion())
+              for (User *U : SI->getSyncRegion()->users())
+                if (isa<DetachInst>(U))
+                  WorkList.push_back(cast<Instruction>(U)->getParent());
+            continue;
+          }
+
+          WorkList.push_back(Pred);
+        }
+      }
+
+      // If no detach reaches this sync, then this sync can be removed.
+      if (!ReachingDetach) {
+        BasicBlock* Succ = Sync->getSuccessor(0);
+        ReplaceInstWithInst(Sync, BranchInst::Create(Succ));
+        Changed = true;
+        if (MergeBlockIntoPredecessor(Succ, DTU)) goto check;
+      }
+    }
+  }
+  return Changed;
+}
+
 /// Call SimplifyCFG on all the blocks in the function,
 /// iterating until no more changes are made.
 static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
@@ -241,6 +309,7 @@ static bool simplifyFunctionCFGImpl(Function &F, const TargetTransformInfo &TTI,
   bool EverChanged = removeUnreachableBlocks(F, DT ? &DTU : nullptr);
   EverChanged |= mergeEmptyReturnBlocks(F, DT ? &DTU : nullptr);
   EverChanged |= iterativelySimplifyCFG(F, TTI, DT ? &DTU : nullptr, Options);
+  EverChanged |= removeUselessSyncs(F, DT ? &DTU : nullptr);
 
   // If neither pass changed anything, we're done.
   if (!EverChanged) return false;
@@ -256,6 +325,7 @@ static bool simplifyFunctionCFGImpl(Function &F, const TargetTransformInfo &TTI,
   do {
     EverChanged = iterativelySimplifyCFG(F, TTI, DT ? &DTU : nullptr, Options);
     EverChanged |= removeUnreachableBlocks(F, DT ? &DTU : nullptr);
+    EverChanged |= removeUselessSyncs(F, DT ? &DTU : nullptr);
   } while (EverChanged);
 
   return true;

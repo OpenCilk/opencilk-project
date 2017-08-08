@@ -3538,6 +3538,11 @@ static bool TryToSinkInstruction(Instruction *I, BasicBlock *DestBlock) {
     // successor block.
     if (DestBlock->getUniquePredecessor() != I->getParent())
       return false;
+    // We can't generally move an instruction that reads from memory past a
+    // detach or reattach.
+    if (isa<DetachInst>(I->getParent()->getTerminator()) ||
+        isa<ReattachInst>(I->getParent()->getTerminator()))
+      return false;
     for (BasicBlock::iterator Scan = I->getIterator(),
                               E = I->getParent()->end();
          Scan != E; ++Scan)
@@ -3681,6 +3686,10 @@ bool InstCombinerImpl::run() {
             auto *Term = UserParent->getTerminator();
             ShouldSink = isa<ReturnInst>(Term) || isa<UnreachableInst>(Term);
           }
+          // Don't sink if the successor follows through a sync instruction,
+          // because that's a pessimization.
+          if (ShouldSink)
+            ShouldSink = ShouldSink && !isa<SyncInst>(BB->getTerminator());
           if (ShouldSink) {
             assert(DT.dominates(BB, UserParent) &&
                    "Dominance relation broken?");

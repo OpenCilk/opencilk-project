@@ -174,6 +174,25 @@ struct SanitizerCoverageOptions {
   SanitizerCoverageOptions() = default;
 };
 
+// Insert CilkSanitizer (Cilk determinacy race detection) instrumentation
+ModulePass *createCilkSanitizerPass();
+
+// Options for comprehensive static instrumentation
+struct CSIOptions {
+  bool InstrumentFuncEntryExit = true;
+  bool InstrumentBasicBlocks = true;
+  bool InstrumentMemoryAccesses = true;
+  bool InstrumentCalls = true;
+  bool InstrumentAtomics = true;
+  bool InstrumentMemIntrinsics = true;
+
+  CSIOptions() = default;
+};
+
+// Insert ComprehensiveStaticInstrumentation instrumentation
+ModulePass *createComprehensiveStaticInstrumentationPass(
+    const CSIOptions &Options = CSIOptions());
+
 /// Calculate what to divide by to scale counts.
 ///
 /// Given the maximum count, calculate a divisor that will scale all the

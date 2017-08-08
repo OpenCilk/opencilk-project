@@ -81,3 +81,8 @@ bindings/go/llvm/workdir
 .sw?
 #OS X specific files.
 .DS_store
+
+build/*
+build
+build-debug/*
+build-debug

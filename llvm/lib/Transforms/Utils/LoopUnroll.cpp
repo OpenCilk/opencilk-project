@@ -334,6 +334,10 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   // Are we eliminating the loop control altogether?
   bool CompletelyUnroll = ULO.Count == ULO.TripCount;
 
+  // Disallow partial unrolling of Tapir loops.
+  if (getTaskIfTapirLoop(L, TI) && !CompletelyUnroll)
+    return LoopUnrollResult::Unmodified;
+
   // We assume a run-time trip count if the compiler cannot
   // figure out the loop trip count and the unroll-runtime
   // flag is specified.
