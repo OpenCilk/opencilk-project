@@ -1694,6 +1694,13 @@ def int_coro_subfn_addr : DefaultAttrsIntrinsic<
     [IntrReadMem, IntrArgMemOnly, ReadOnly<ArgIndex<0>>,
      NoCapture<ArgIndex<0>>]>;
 
+///===-------------------------- Tapir Intrinsics --------------------------===//
+//
+def int_syncregion_start : Intrinsic<[llvm_token_ty], [],
+                                     [IntrArgMemOnly]>;
+
+def int_detached_rethrow : Intrinsic<[], [], [Throws]>;
+
 ///===-------------------------- Other Intrinsics --------------------------===//
 //
 // TODO: We should introduce a new memory kind fo traps (and other side effects 

@@ -3024,6 +3024,8 @@ void InnerLoopVectorizer::createVectorLoopSkeleton(StringRef Prefix) {
   LoopScalarBody = OrigLoop->getHeader();
   LoopVectorPreHeader = OrigLoop->getLoopPreheader();
   assert(LoopVectorPreHeader && "Invalid loop structure");
+  assert(!isa<SyncInst>(LoopVectorPreHeader->getTerminator()) &&
+         "Loop preheader terminated by sync.");
   LoopExitBlock = OrigLoop->getUniqueExitBlock(); // may be nullptr
   assert((LoopExitBlock || Cost->requiresScalarEpilogue(VF.isVector())) &&
          "multiple exit loop without required epilogue?");

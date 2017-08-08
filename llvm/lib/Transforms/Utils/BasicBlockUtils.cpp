@@ -782,7 +782,18 @@ BasicBlock *llvm::SplitEdge(BasicBlock *BB, BasicBlock *Succ, DominatorTree *DT,
   // block.
   assert(BB->getTerminator()->getNumSuccessors() == 1 &&
          "Should have a single succ!");
-  return SplitBlock(BB, BB->getTerminator(), DT, LI, MSSAU, BBName);
+  BasicBlock *NewBB =
+      SplitBlock(BB, BB->getTerminator(), DT, LI, MSSAU, BBName);
+  if (SyncInst *OldSI = dyn_cast<SyncInst>(NewBB->getTerminator())) {
+    // Make sure the original BB is terminated by the sync.
+    SyncInst *SI = SyncInst::Create(NewBB, OldSI->getSyncRegion(),
+                                    BB->getTerminator());
+    BranchInst::Create(Succ, OldSI);
+    SI->setDebugLoc(OldSI->getDebugLoc());
+    BB->getTerminator()->eraseFromParent();
+    OldSI->eraseFromParent();
+  }
+  return NewBB;
 }
 
 void llvm::setUnwindEdgeTo(Instruction *TI, BasicBlock *Succ) {
