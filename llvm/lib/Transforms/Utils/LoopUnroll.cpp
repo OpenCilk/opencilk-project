@@ -356,6 +356,10 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   // of the unrolled body exits.
   const bool CompletelyUnroll = ULO.Count == MaxTripCount;
 
+  // Disallow partial unrolling of Tapir loops.
+  if (getTaskIfTapirLoop(L, TI) && !CompletelyUnroll)
+    return LoopUnrollResult::Unmodified;
+
   const bool PreserveOnlyFirst = CompletelyUnroll && MaxOrZero;
 
   // There's no point in performing runtime unrolling if this unroll count

@@ -590,6 +590,9 @@ enum FunctionCodes {
   FUNC_CODE_INST_ATOMICRMW = 59, // ATOMICRMW: [ptrty, ptr, valty, val,
                                  //             operation, align, vol,
                                  //             ordering, synchscope]
+  FUNC_CODE_INST_DETACH = 60,    // DETACH: [bb#,bb#] or [bb#,bb#,bb#]
+  FUNC_CODE_INST_REATTACH = 61,  // REATTACH [bb#]
+  FUNC_CODE_INST_SYNC = 62,      // SYNC: [bb#]
 };
 
 enum UseListCodes {

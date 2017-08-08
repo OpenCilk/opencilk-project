@@ -62,6 +62,7 @@ class SROALegacyPass;
 ///    this form. By doing so, it will enable promotion of vector aggregates to
 ///    SSA vector values.
 class SROAPass : public PassInfoMixin<SROAPass> {
+  bool FunctionContainsDetach = false;
   LLVMContext *C = nullptr;
   DominatorTree *DT = nullptr;
   AssumptionCache *AC = nullptr;
