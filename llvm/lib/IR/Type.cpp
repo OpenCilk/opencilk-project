@@ -497,6 +497,13 @@ bool StructType::containsHomogeneousScalableVectorTypes() const {
   return true;
 }
 
+StructType *StructType::getOrCreate(LLVMContext &Context, StringRef Name) {
+  StructType *Ty = Context.pImpl->NamedStructTypes.lookup(Name);
+  if (!Ty)
+    Ty = StructType::create(Context, Name);
+  return Ty;
+}
+
 void StructType::setBody(ArrayRef<Type*> Elements, bool isPacked) {
   assert(isOpaque() && "Struct body already set!");
 
