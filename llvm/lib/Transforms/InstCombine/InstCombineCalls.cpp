@@ -4218,6 +4218,15 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
         }))
       return nullptr;
     break;
+  case Intrinsic::syncregion_start: {
+    int NumUsers = 0;
+    for (User *U : II->users())
+      if (isa<DetachInst>(U) || isa<ReattachInst>(U) || isa<SyncInst>(U))
+        ++NumUsers;
+    if (!NumUsers)
+      return eraseInstFromFunction(CI);
+    break;
+  }
   case Intrinsic::assume: {
     Value *IIOperand = II->getArgOperand(0);
     // Remove an assume if it is followed by an identical assume.

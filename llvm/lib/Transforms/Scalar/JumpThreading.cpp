@@ -1342,7 +1342,8 @@ bool JumpThreadingPass::SimplifyPartiallyRedundantLoad(LoadInst *LoadI) {
       }
     }
 
-    if (!PredAvailable) {
+    if (!PredAvailable ||
+        isa<ReattachInst>(PredBB->getTerminator())) {
       OneUnavailablePred = PredBB;
       continue;
     }
@@ -1385,6 +1386,9 @@ bool JumpThreadingPass::SimplifyPartiallyRedundantLoad(LoadInst *LoadI) {
   // unconditional branch, we know that it isn't a critical edge.
   if (PredsScanned.size() == AvailablePreds.size()+1 &&
       OneUnavailablePred->getTerminator()->getNumSuccessors() == 1) {
+    // If the predecessor is a reattach, we can't split the edge
+    if (isa<ReattachInst>(OneUnavailablePred->getTerminator()))
+      return false;
     UnavailablePred = OneUnavailablePred;
   } else if (PredsScanned.size() != AvailablePreds.size()) {
     // Otherwise, we had multiple unavailable predecessors or we had a critical
@@ -1398,9 +1402,10 @@ bool JumpThreadingPass::SimplifyPartiallyRedundantLoad(LoadInst *LoadI) {
     // Add all the unavailable predecessors to the PredsToSplit list.
     for (BasicBlock *P : predecessors(LoadBB)) {
       // If the predecessor is an indirect goto, we can't split the edge.
-      // Same for CallBr.
+      // Same for CallBr, Reattach.
       if (isa<IndirectBrInst>(P->getTerminator()) ||
-          isa<CallBrInst>(P->getTerminator()))
+          isa<CallBrInst>(P->getTerminator()) ||
+          isa<ReattachInst>(P->getTerminator()))
         return false;
 
       if (!AvailablePredSet.count(P))
@@ -1902,7 +1907,7 @@ bool JumpThreadingPass::MaybeMergeBasicBlockIntoOnlyPred(BasicBlock *BB) {
 
   const Instruction *TI = SinglePred->getTerminator();
   if (TI->isExceptionalTerminator() || TI->getNumSuccessors() != 1 ||
-      SinglePred == BB || hasAddressTakenAndUsed(BB))
+      isa<SyncInst>(TI) || SinglePred == BB || hasAddressTakenAndUsed(BB))
     return false;
 
   // If SinglePred was a loop header, BB becomes one.
