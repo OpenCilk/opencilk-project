@@ -151,6 +151,8 @@ void initializeDominatorTreeWrapperPassPass(PassRegistry&);
 void initializeDwarfEHPrepareLegacyPassPass(PassRegistry &);
 void initializeEarlyCSELegacyPassPass(PassRegistry&);
 void initializeEarlyCSEMemSSALegacyPassPass(PassRegistry&);
+void initializeEarlyCSERhinoLegacyPassPass(PassRegistry&);
+void initializeEarlyCSEMemSSARhinoLegacyPassPass(PassRegistry&);
 void initializeEarlyIfConverterPass(PassRegistry&);
 void initializeEarlyIfPredicatorPass(PassRegistry &);
 void initializeEarlyMachineLICMPass(PassRegistry&);
