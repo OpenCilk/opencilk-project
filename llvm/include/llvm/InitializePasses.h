@@ -185,7 +185,7 @@ void initializeLowerGlobalDtorsLegacyPassPass(PassRegistry &);
 void initializeLowerIntrinsicsPass(PassRegistry&);
 void initializeLowerInvokeLegacyPassPass(PassRegistry&);
 void initializeLowerSwitchLegacyPassPass(PassRegistry &);
-void initializeLowerTapirToCilkPass(PassRegistry&);
+void initializeLowerTapirToTargetPass(PassRegistry&);
 void initializeKCFIPass(PassRegistry &);
 void initializeMIRAddFSDiscriminatorsPass(PassRegistry &);
 void initializeMIRCanonicalizerPass(PassRegistry &);
