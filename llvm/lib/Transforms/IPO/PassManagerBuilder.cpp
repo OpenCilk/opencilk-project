@@ -44,11 +44,11 @@
 using namespace llvm;
 
 PassManagerBuilder::PassManagerBuilder() {
-    InstrumentCilk = false;
+    tapirTarget = nullptr;
+    DisableTapirOpts = false;
+    Rhino = false;
     OptLevel = 2;
     SizeLevel = 0;
-    ParallelLevel = 0;
-    Rhino = false;
     LibraryInfo = nullptr;
     Inliner = nullptr;
     DisableUnrollLoops = false;
@@ -307,10 +307,10 @@ void PassManagerBuilder::populateModulePassManager(
       Inliner = nullptr;
     }
 
-    if (ParallelLevel > 0) {
+    if (tapirTarget) {
       MPM.add(createInferFunctionAttrsLegacyPass());
       // MPM.add(createUnifyFunctionExitNodesPass());
-      MPM.add(createLowerTapirToCilkPass(ParallelLevel == 2, InstrumentCilk));
+      MPM.add(createLowerTapirToTargetPass(tapirTarget));
       // The lowering pass may leave cruft around.  Clean it up.
       MPM.add(createCFGSimplificationPass());
       MPM.add(createInferFunctionAttrsLegacyPass());
@@ -333,13 +333,16 @@ void PassManagerBuilder::populateModulePassManager(
   addInitialAliasAnalysisPasses(MPM);
 
   bool RerunAfterTapirLowering = false;
-  bool TapirHasBeenLowered = (ParallelLevel == 0);
-  if (ParallelLevel == 3) // -fdetach
-    MPM.add(createLowerTapirToCilkPass(false, InstrumentCilk));
+  bool TapirHasBeenLowered = (tapirTarget == nullptr);
+
+  if (tapirTarget && DisableTapirOpts) {// -fdetach
+    MPM.add(createLowerTapirToTargetPass(tapirTarget));
+    TapirHasBeenLowered = true;
+  }
 
   do {
     RerunAfterTapirLowering =
-       !TapirHasBeenLowered && (ParallelLevel > 0) && !PrepareForThinLTO;
+       !TapirHasBeenLowered && tapirTarget && !PrepareForThinLTO;
       
   // Infer attributes about declarations if possible.
   MPM.add(createInferFunctionAttrsLegacyPass());
@@ -481,21 +484,21 @@ void PassManagerBuilder::populateModulePassManager(
     // relies on the rotated form.  Disable header duplication at -Oz.
     MPM.add(createLoopRotatePass(SizeLevel == 2 ? 0 : -1));
 
-    MPM.add(createLoopSpawningPass());
+    MPM.add(createLoopSpawningPass(tapirTarget));
 
     // The LoopSpawning pass may leave cruft around.  Clean it up.
     MPM.add(createLoopDeletionPass());
     MPM.add(createCFGSimplificationPass());
     MPM.add(createInstructionCombiningPass());
 
-    // Now lower Tapir to Cilk runtime calls.
+    // Now lower Tapir to Target runtime calls.
     //
     // TODO: Make this sequence of passes check the library info for the Cilk
     // RTS.
 
     MPM.add(createInferFunctionAttrsLegacyPass());
     // MPM.add(createUnifyFunctionExitNodesPass());
-    MPM.add(createLowerTapirToCilkPass(ParallelLevel == 2, InstrumentCilk));
+    MPM.add(createLowerTapirToTargetPass(tapirTarget));
     // The lowering pass may leave cruft around.  Clean it up.
     MPM.add(createCFGSimplificationPass());
     MPM.add(createInferFunctionAttrsLegacyPass());
