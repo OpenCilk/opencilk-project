@@ -103,7 +103,7 @@ namespace {
       (void) llvm::createLoopPredicationPass();
       (void) llvm::createLoopSimplifyPass();
       (void) llvm::createLoopSimplifyCFGPass();
-      (void) llvm::createLoopSpawningPass();
+      (void) llvm::createLoopSpawningPass(nullptr);
       (void) llvm::createLoopStrengthReducePass();
       (void) llvm::createLoopUnrollPass();
       (void) llvm::createLoopRotatePass();
@@ -112,7 +112,7 @@ namespace {
       (void) llvm::createLowerGlobalDtorsLegacyPass();
       (void) llvm::createLowerInvokePass();
       (void) llvm::createLowerSwitchPass();
-      (void) llvm::createLowerTapirToCilkPass(false,false);
+      (void) llvm::createLowerTapirToTargetPass(nullptr);
       (void) llvm::createNaryReassociatePass();
       (void) llvm::createObjCARCContractPass();
       (void) llvm::createPromoteMemoryToRegisterPass();
