@@ -2720,6 +2720,40 @@ void ASTStmtReader::VisitOMPTargetParallelGenericLoopDirective(
 }
 
 //===----------------------------------------------------------------------===//
+// Cilk spawn, Cilk sync, Cilk for
+//===----------------------------------------------------------------------===//
+
+void ASTStmtReader::VisitCilkSpawnStmt(CilkSpawnStmt *S) {
+  VisitStmt(S);
+  S->setSpawnLoc(ReadSourceLocation());
+  S->setSpawnedStmt(Record.readSubStmt());
+}
+
+void ASTStmtReader::VisitCilkSpawnExpr(CilkSpawnExpr *E) {
+  VisitExpr(E);
+  E->setSpawnLoc(ReadSourceLocation());
+  E->setSpawnedExpr(Record.readSubExpr());
+}
+
+void ASTStmtReader::VisitCilkSyncStmt(CilkSyncStmt *S) {
+  VisitStmt(S);
+  S->setSyncLoc(ReadSourceLocation());
+}
+
+void ASTStmtReader::VisitCilkForStmt(CilkForStmt *S) {
+  VisitStmt(S);
+  S->setInit(Record.readSubStmt());
+  S->setCond(Record.readSubExpr());
+  // S->setConditionVariable(Record.getContext(), ReadDeclAs<VarDecl>());
+  S->setInc(Record.readSubExpr());
+  S->setLoopVariable(Record.getContext(), ReadDeclAs<VarDecl>());
+  S->setBody(Record.readSubStmt());
+  S->setCilkForLoc(ReadSourceLocation());
+  S->setLParenLoc(ReadSourceLocation());
+  S->setRParenLoc(ReadSourceLocation());
+}
+
+//===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//
 
@@ -2919,6 +2953,22 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
 
     case EXPR_SYCL_UNIQUE_STABLE_NAME:
       S = SYCLUniqueStableNameExpr::CreateEmpty(Context);
+      break;
+
+    case STMT_CILKSPAWN:
+      S = new (Context) CilkSpawnStmt(Empty);
+      break;
+
+    case EXPR_CILKSPAWN:
+      S = new (Context) CilkSpawnExpr(Empty);
+      break;
+      
+    case STMT_CILKSYNC:
+      S = new (Context) CilkSyncStmt(Empty);
+      break;
+
+    case STMT_CILKFOR:
+      S = new (Context) CilkForStmt(Empty);
       break;
 
     case EXPR_PREDEFINED:

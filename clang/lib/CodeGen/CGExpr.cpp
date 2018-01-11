@@ -399,6 +399,12 @@ static Address createReferenceTemporary(CodeGenFunction &CGF,
     // promoted. This is easier on the optimizer and generally emits fewer
     // instructions.
     QualType Ty = Inner->getType();
+    if (CGF.IsSpawned) {
+      CGF.PushDetachScope();
+      return CGF.CurDetachScope->CreateDetachedMemTemp(Ty,
+                                                       M->getStorageDuration(),
+                                                       "det.ref.tmp");
+    }
     if (CGF.CGM.getCodeGenOpts().MergeAllConstants &&
         (Ty->isArrayType() || Ty->isRecordType()) &&
         CGF.CGM.isTypeConstant(Ty, true))
@@ -524,6 +530,7 @@ EmitMaterializeTemporaryExpr(const MaterializeTemporaryExpr *M) {
       EmitAnyExprToMem(E, Object, Qualifiers(), /*IsInit*/true);
     }
   } else {
+    if (!IsSpawned) {
     switch (M->getStorageDuration()) {
     case SD_Automatic:
       if (auto *Size = EmitLifetimeStart(
@@ -1336,6 +1343,9 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitCXXUuidofLValue(cast<CXXUuidofExpr>(E));
   case Expr::LambdaExprClass:
     return EmitAggExprToLValue(E);
+  case Expr::CilkSpawnExprClass:
+    PushDetachScope();
+    return EmitLValue(cast<CilkSpawnExpr>(E)->getSpawnedExpr());
 
   case Expr::ExprWithCleanupsClass: {
     const auto *cleanups = cast<ExprWithCleanups>(E);
@@ -4988,11 +4998,15 @@ RValue CodeGenFunction::EmitCallExpr(const CallExpr *E,
   CGCallee callee = EmitCallee(E->getCallee());
 
   if (callee.isBuiltin()) {
+    // if (IsSpawned)
+    //   llvm::dbgs() << "Detached call to builtin!\n";
     return EmitBuiltinExpr(callee.getBuiltinDecl(), callee.getBuiltinID(),
                            E, ReturnValue);
   }
 
   if (callee.isPseudoDestructor()) {
+    // if (IsSpawned)
+    //   llvm::dbgs() << "Detached call to psudeodestructor!\n";
     return EmitCXXPseudoDestructorExpr(callee.getPseudoDestructorExpr());
   }
 
@@ -5153,6 +5167,28 @@ LValue CodeGenFunction::EmitBinaryOperatorLValue(const BinaryOperator *E) {
       break;
     }
 
+    if (isa<CilkSpawnExpr>(E->getRHS()->IgnoreImplicit())) {
+      // Emit the LHS before the RHS.
+      LValue LV = EmitCheckedLValue(E->getLHS(), TCK_Store);
+
+      // Set up to perform a detach.
+      assert(!IsSpawned &&
+             "_Cilk_spawn statement found in spawning environment.");
+      IsSpawned = true;
+
+      // Emit the expression.
+      RValue RV = EmitAnyExpr(E->getRHS());
+      EmitStoreThroughLValue(RV, LV);
+
+      // Finish the detach.
+      assert(CurDetachScope && CurDetachScope->IsDetachStarted() &&
+             "Processing _Cilk_spawn of expression did not produce a detach.");
+      PopDetachScope();
+      IsSpawned = false;
+
+      return LV;
+    }
+
     RValue RV = EmitAnyExpr(E->getRHS());
     LValue LV = EmitCheckedLValue(E->getLHS(), TCK_Store);
     if (RV.isScalar())
@@ -5304,6 +5340,8 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
   // function type or a block pointer type.
   assert(CalleeType->isFunctionPointerType() &&
          "Call must have function pointer type!");
+
+  IsSpawnedScope SpawnScp(this);
 
   const Decl *TargetDecl =
       OrigCallee.getAbstractInfo().getCalleeDecl().getDecl();
@@ -5481,6 +5519,8 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
         Address(Cast, Handle->getType(), CGM.getPointerAlign()));
     Callee.setFunctionPointer(Stub);
   }
+
+  SpawnScp.RestoreOldScope();
   llvm::CallBase *CallOrInvoke = nullptr;
   RValue Call = EmitCall(FnInfo, Callee, ReturnValue, Args, &CallOrInvoke,
                          E == MustTailCall, E->getExprLoc());

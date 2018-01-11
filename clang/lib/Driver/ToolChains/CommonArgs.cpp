@@ -1043,6 +1043,8 @@ collectSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
         HelperStaticRuntimes.push_back("hwasan-preinit");
     }
   }
+  if (SanArgs.needsCilksanRt())
+    SharedRuntimes.push_back("cilksan");
 
   // The stats_client library is also statically linked into DSOs.
   if (SanArgs.needsStatsRt() && SanArgs.linkRuntimes())

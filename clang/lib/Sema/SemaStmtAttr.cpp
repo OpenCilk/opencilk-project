@@ -80,12 +80,20 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
       llvm::StringSwitch<StringRef>(PragmaNameLoc->Ident->getName())
           .Cases("unroll", "nounroll", "unroll_and_jam", "nounroll_and_jam",
                  PragmaNameLoc->Ident->getName())
+          .Cases("cilk", PragmaNameLoc->Ident->getName())
           .Default("clang loop");
+
+  if ((PragmaName == "cilk") &&
+      (St->getStmtClass() != Stmt::CilkForStmtClass)) {
+    S.Diag(St->getLocStart(), diag::err_pragma_cilk_precedes_noncilk)
+      << "#pragma cilk";
+    return nullptr;
+  }
 
   // This could be handled automatically by adding a Subjects definition in
   // Attr.td, but that would make the diagnostic behavior worse in this case
   // because the user spells this attribute as a pragma.
-  if (!isa<DoStmt, ForStmt, CXXForRangeStmt, WhileStmt>(St)) {
+  if (!isa<DoStmt, ForStmt, CXXForRangeStmt, WhileStmt, CilkFor>(St)) {
     std::string Pragma = "#pragma " + std::string(PragmaName);
     S.Diag(St->getBeginLoc(), diag::err_pragma_loop_precedes_nonloop) << Pragma;
     return nullptr;
@@ -116,6 +124,19 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
       SetHints(LoopHintAttr::UnrollAndJamCount, LoopHintAttr::Numeric);
     else
       SetHints(LoopHintAttr::UnrollAndJam, LoopHintAttr::Enable);
+  } else if (PragmaName == "cilk") {
+    Spelling = LoopHintAttr::Pragma_cilk;
+    Option = llvm::StringSwitch<LoopHintAttr::OptionType>(
+                 OptionLoc->Ident->getName())
+                 .Case("grainsize", LoopHintAttr::TapirGrainsize)
+                 .Default(LoopHintAttr::TapirGrainsize);
+    if (Option == LoopHintAttr::TapirGrainsize) {
+      assert(ValueExpr && "Attribute must have a valid value expression.");
+      if (S.CheckLoopHintExpr(ValueExpr, St->getLocStart()))
+        return nullptr;
+      State = LoopHintAttr::Numeric;
+    } else
+      llvm_unreachable("bad loop hint");
   } else {
     // #pragma clang loop ...
     assert(OptionLoc && OptionLoc->Ident &&
@@ -325,6 +346,9 @@ CheckForIncompatibleAttributes(Sema &S,
     // The vector predication only has a state form that is exposed by
     // #pragma clang loop vectorize_predicate (enable | disable).
     VectorizePredicate,
+    // The Tapir grainsize only has a numeric form that describes the
+    // amount to coarsen the parallel loop.
+    TapirGrainsize,
     // This serves as a indicator to how many category are listed in this enum.
     NumberOfCategories
   };
@@ -368,6 +392,8 @@ CheckForIncompatibleAttributes(Sema &S,
     case LoopHintAttr::PipelineDisabled:
     case LoopHintAttr::PipelineInitiationInterval:
       Category = Pipeline;
+    case LoopHintAttr::TapirGrainsize:
+      Category = TapirGrainsize;
       break;
     case LoopHintAttr::VectorizePredicate:
       Category = VectorizePredicate;

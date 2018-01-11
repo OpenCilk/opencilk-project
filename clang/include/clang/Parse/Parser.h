@@ -204,6 +204,7 @@ class Parser : public CodeCompletionHandler {
   std::unique_ptr<PragmaHandler> MSFenvAccess;
   std::unique_ptr<PragmaHandler> MSAllocText;
   std::unique_ptr<PragmaHandler> CUDAForceHostDeviceHandler;
+  std::unique_ptr<PragmaHandler> CilkHintHandler;
   std::unique_ptr<PragmaHandler> OptimizeHandler;
   std::unique_ptr<PragmaHandler> LoopHintHandler;
   std::unique_ptr<PragmaHandler> UnrollHintHandler;
@@ -2119,6 +2120,9 @@ private:
   StmtResult ParseContinueStatement();
   StmtResult ParseBreakStatement();
   StmtResult ParseReturnStatement();
+  StmtResult ParseCilkSpawnStatement();
+  StmtResult ParseCilkSyncStatement();
+  StmtResult ParseCilkForStatement(SourceLocation *TrailingElseLoc);
   StmtResult ParseAsmStatement(bool &msAsm);
   StmtResult ParseMicrosoftAsmStatement(SourceLocation AsmLoc);
   StmtResult ParsePragmaLoopHint(StmtVector &Stmts, ParsedStmtContext StmtCtx,

@@ -83,6 +83,7 @@ public:
     return needsHwasanRt() && HwasanUseAliases;
   }
   bool needsTsanRt() const { return Sanitizers.has(SanitizerKind::Thread); }
+  bool needsCilksanRt() const { return Sanitizers.has(SanitizerKind::Cilk); }
   bool needsMsanRt() const { return Sanitizers.has(SanitizerKind::Memory); }
   bool needsFuzzer() const { return Sanitizers.has(SanitizerKind::Fuzzer); }
   bool needsLsanRt() const {

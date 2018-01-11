@@ -35,6 +35,9 @@
 /* Multilib basename for libdir. */
 #define CLANG_INSTALL_LIBDIR_BASENAME "${CLANG_INSTALL_LIBDIR_BASENAME}"
 
+/* Default Tapir runtime used by -ftapir. */
+#define CLANG_DEFAULT_TAPIR_RUNTIME "${CLANG_DEFAULT_TAPIR_RUNTIME}"
+
 /* Relative directory for resource files */
 #define CLANG_RESOURCE_DIR "${CLANG_RESOURCE_DIR}"
 

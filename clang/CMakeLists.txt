@@ -247,6 +247,9 @@ set(CLANG_DEFAULT_OPENMP_RUNTIME "libomp" CACHE STRING
 
 set(CLANG_SYSTEMZ_DEFAULT_ARCH "z10" CACHE STRING "SystemZ Default Arch")
 
+set(CLANG_DEFAULT_TAPIR_RUNTIME "cilk" CACHE STRING
+  "Default Tapir runtime used by -ftapir.")
+
 set(CLANG_VENDOR ${PACKAGE_VENDOR} CACHE STRING
   "Vendor-specific text for showing with version information.")
 

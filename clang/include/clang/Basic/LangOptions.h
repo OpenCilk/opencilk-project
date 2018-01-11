@@ -24,6 +24,7 @@
 #include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Transforms/Tapir/TapirTypes.h"
 #include <optional>
 #include <string>
 #include <vector>
@@ -383,6 +384,8 @@ public:
 public:
   /// The used language standard.
   LangStandard::Kind LangStd;
+
+  llvm::TapirTargetType Tapir;
 
   /// Set of enabled sanitizers.
   SanitizerSet Sanitize;

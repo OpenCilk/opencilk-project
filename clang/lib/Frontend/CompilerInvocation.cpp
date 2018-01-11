@@ -87,6 +87,7 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/Tapir/TapirTypes.h"
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -575,6 +576,9 @@ static unsigned getOptimizationLevel(ArgList &Args, InputKind IK,
        IK.getLanguage() == Language::OpenCLCXX) &&
       !Args.hasArg(OPT_cl_opt_disable))
     DefaultOpt = llvm::CodeGenOpt::Default;
+
+  if (Args.hasArg(OPT_ftapir) || Args.hasArg(OPT_frhino))
+    DefaultOpt = 2;
 
   if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
     if (A->getOption().matches(options::OPT_O0))
@@ -3589,6 +3593,7 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.PIE = Args.hasArg(OPT_pic_is_pie);
     parseSanitizerKinds("-fsanitize=", Args.getAllArgValues(OPT_fsanitize_EQ),
                         Diags, Opts.Sanitize);
+    getLangOpts()->ComprehensiveStaticInstrumentation = Args.hasArg(OPT_fcsi);
 
     return Diags.getNumErrors() == NumErrorsBefore;
   }
@@ -3990,6 +3995,9 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.NoSanitizeFiles.insert(Opts.NoSanitizeFiles.end(),
                               systemIgnorelists.begin(),
                               systemIgnorelists.end());
+
+  // -fcsi
+  Opts.ComprehensiveStaticInstrumentation = Args.hasArg(OPT_fcsi);
 
   if (Arg *A = Args.getLastArg(OPT_fclang_abi_compat_EQ)) {
     Opts.setClangABICompat(LangOptions::ClangABI::Latest);
@@ -4513,6 +4521,38 @@ bool CompilerInvocation::CreateFromArgsImpl(
       Res.getCodeGenOpts().MisExpect = true;
     }
   }
+
+  LangOpts.Rhino = Args.hasArg(OPT_frhino);
+  LangOpts.Detach = Args.hasArg(OPT_fdetach);
+  LangOpts.Cilk = Args.hasArg(OPT_fcilkplus);
+
+  // FIXME: Fix -ftapir=* parsing to use conventional mechanisms for handling
+  // arguments.
+  if (Args.hasArg(OPT_ftapir)) {
+    if (Arg *A = Args.getLastArg(OPT_ftapir)) {
+      StringRef Name = A->getValue();
+      if (Name == "none")
+        LangOpts.Tapir = llvm::TapirTargetType::None;
+      else if (Name == "cilk") {
+        LangOpts.Tapir = llvm::TapirTargetType::Cilk;
+        LangOpts.Cilk |= true;
+      } else if (Name == "cilkr") {
+        LangOpts.Tapir = llvm::TapirTargetType::CilkR;
+        LangOpts.Cilk |= true;
+      } else if (Name == "openmp")
+        LangOpts.Tapir = llvm::TapirTargetType::OpenMP;
+      else if (Name == "serial")
+        LangOpts.Tapir = llvm::TapirTargetType::Serial;
+      else
+        Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args) <<
+          Name;
+    }
+  }
+
+  if (Args.hasArg(OPT_fcilkplus) && !Args.hasArg(OPT_ftapir))
+    LangOpts.Tapir = llvm::TapirTargetType::Cilk;
+  if (LangOpts.Cilk && (LangOpts.ObjC1 || LangOpts.ObjC2))
+    Diags.Report(diag::err_drv_cilk_objc);
 
   if (LangOpts.CUDA) {
     // During CUDA device-side compilation, the aux triple is the

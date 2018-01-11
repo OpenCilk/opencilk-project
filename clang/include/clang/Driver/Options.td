@@ -1905,6 +1905,9 @@ def fsanitize_undefined_strip_path_components_EQ : Joined<["-"], "fsanitize-unde
   HelpText<"Strip (or keep only, if negative) a given number of path components "
            "when emitting check metadata.">,
   MarshallingInfoInt<CodeGenOpts<"EmitCheckPathComponentsToStrip">, "0", "int">;
+def fcsi : Flag<["-"], "fcsi">, Group<f_clang_Group>,
+           MetaVarName<"<check>">,
+           HelpText<"Turn on Comprehensive Static Instrumentation.">;
 
 } // end -f[no-]sanitize* flags
 
@@ -2443,6 +2446,12 @@ def fno_knr_functions : Flag<["-"], "fno-knr-functions">, Group<f_Group>,
   MarshallingInfoFlag<LangOpts<"DisableKNRFunctions">>,
   HelpText<"Disable support for K&R C function declarations">,
   Flags<[CC1Option, CoreOption]>;
+
+def ftapir : Joined<["-"], "ftapir=">, Group<f_Group>, Flags<[CC1Option]>,
+    HelpText<"Choose the backend for Tapir instructions (i.e., parallel runtime)">, Values<"cilk,cilkr,openmp,serial,none">;
+def fcilkplus : Flag<["-"], "fcilkplus">, Group<f_Group>, Flags<[CC1Option]>, HelpText<"Enable Cilk Plus extensions">;
+def frhino    : Flag <["-"], "frhino">, Group<f_Group>, Flags<[CC1Option]>, HelpText<"Enable Rhino extension to Tapir">;
+def fdetach   : Flag <["-"], "fdetach">, Group<f_Group>, Flags<[CC1Option]>, HelpText<"Disable memory optimizations and immediately lower">;
 
 def fmudflapth : Flag<["-"], "fmudflapth">, Group<f_Group>;
 def fmudflap : Flag<["-"], "fmudflap">, Group<f_Group>;
