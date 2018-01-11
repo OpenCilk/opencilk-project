@@ -141,6 +141,8 @@ void tools::PS4cpu::Link::ConstructJob(Compilation &C, const JobAction &JA,
 
   AddLinkerInputs(ToolChain, Inputs, Args, CmdArgs, JA);
 
+  ToolChain.AddTapirRuntimeLibArgs(Args, CmdArgs);
+
   if (Args.hasArg(options::OPT_pthread)) {
     CmdArgs.push_back("-lpthread");
   }
