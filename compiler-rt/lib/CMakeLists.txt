@@ -66,6 +66,19 @@ if(COMPILER_RT_BUILD_MEMPROF AND COMPILER_RT_HAS_SANITIZER_COMMON)
   compiler_rt_build_runtime(memprof)
 endif()
 
+if(COMPILER_RT_BUILD_CSI)
+  compiler_rt_build_runtime(csi)
+endif()
+
+if(COMPILER_RT_BUILD_CILKTOOLS)
+  compiler_rt_build_runtime(cilksan)
+  if(NOT COMPILER_RT_HAS_SNAPPY)
+    mesage(FATAL_ERROR
+      "The snappy compression library is required to build Cilksan.")
+  endif()
+  compiler_rt_build_runtime(cilkscale)
+endif()
+
 # It doesn't normally make sense to build runtimes when a sanitizer is enabled,
 # so we don't add_subdirectory the runtimes in that case. However, the opposite
 # is true for fuzzers that exercise parts of the runtime. So we add the fuzzer
