@@ -112,6 +112,15 @@ public:
 
   enum FileType { FT_Object, FT_Static, FT_Shared };
 
+  enum TapirRuntimeLibType {
+    TRLT_None,
+    TRLT_Serial,
+    TRLT_Cilk,
+    TRLT_OpenMP,
+    TRLT_CilkR,
+    TRLT_Unknown
+  };
+
 private:
   friend class RegisterEffectiveTriple;
 
@@ -606,6 +615,16 @@ public:
   /// Returns true when it's possible to split LTO unit to use whole
   /// program devirtualization and CFI santiizers.
   virtual bool canSplitThinLTOUnit() const { return true; }
+
+  // GetTapirRuntimeLibType - Determine the runtime library type to use with
+  // Tapir.
+  virtual TapirRuntimeLibType
+  GetTapirRuntimeLibType(const llvm::opt::ArgList &Args) const;
+
+  /// AddTapirRuntimeLibArgs - Add the specific linker arguments to use for the
+  /// given Tapir runtime library type.
+  virtual void AddTapirRuntimeLibArgs(const llvm::opt::ArgList &Args,
+                                      llvm::opt::ArgStringList &CmdArgs) const;
 };
 
 /// Set a ToolChain's effective triple. Reset it when the registration object
