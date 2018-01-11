@@ -217,6 +217,12 @@ def MSDependentExistsStmt : StmtNode<Stmt>;
 // OpenCL Extensions.
 def AsTypeExpr : StmtNode<Expr>;
 
+// Cilk Plus Extensions.
+def CilkSyncStmt : Stmt;
+def CilkSpawnStmt : Stmt;
+def CilkSpawnExpr : DStmt<Expr>;
+def CilkForStmt : Stmt;
+
 // OpenMP Directives.
 def OMPCanonicalLoop : StmtNode<Stmt>;
 def OMPExecutableDirective : StmtNode<Stmt, 1>;

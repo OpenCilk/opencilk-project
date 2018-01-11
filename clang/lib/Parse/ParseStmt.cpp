@@ -81,6 +81,7 @@ StmtResult Parser::ParseStatement(SourceLocation *TrailingElseLoc,
 ///         while-statement
 ///         do-statement
 ///         for-statement
+/// [CP]    cilk_for-statement
 ///
 ///       expression-statement:
 ///         expression[opt] ';'
@@ -91,6 +92,8 @@ StmtResult Parser::ParseStatement(SourceLocation *TrailingElseLoc,
 ///         'break' ';'
 ///         'return' expression[opt] ';'
 /// [GNU]   'goto' '*' expression ';'
+/// [CP]    '_Cilk_spawn' statement ';'
+/// [CP]    '_Cilk_sync' ';'
 ///
 /// [OBC] objc-throw-statement:
 /// [OBC]   '@' 'throw' expression ';'
@@ -463,6 +466,32 @@ Retry:
     ProhibitAttributes(CXX11Attrs);
     ProhibitAttributes(GNUAttrs);
     return HandlePragmaCaptured();
+
+  case tok::kw__Cilk_spawn:              // [CP] _Cilk_spawn statement
+    // if (!getLangOpts().Cilk) {
+    //   Diag(Tok, diag::err_cilkplus_disable);
+    //   SkipUntil(tok::semi);
+    //   return StmtError();
+    // }
+    return ParseCilkSpawnStatement();
+
+  case tok::kw__Cilk_sync:               // [CP] _Cilk_sync statement
+    // if (!getLangOpts().Cilk) {
+    //   Diag(Tok, diag::err_cilkplus_disable);
+    //   SkipUntil(tok::semi);
+    //   return StmtError();
+    // }
+    Res = ParseCilkSyncStatement();
+    SemiError = "_Cilk_sync";
+    break;
+
+  case tok::kw__Cilk_for:
+    // if (!getLangOpts().Cilk) {
+    //   Diag(Tok, diag::err_cilkplus_disable);
+    //   SkipUntil(tok::semi);
+    //   return StmtError();
+    // }
+    return ParseCilkForStatement(TrailingElseLoc);
 
   case tok::annot_pragma_openmp:
     // Prohibit attributes that are not OpenMP attributes, but only before

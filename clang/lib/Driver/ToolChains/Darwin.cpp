@@ -657,6 +657,8 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddAllArgs(CmdArgs, options::OPT_L);
 
+  getToolChain().AddTapirRuntimeLibArgs(Args, CmdArgs);
+
   AddLinkerInputs(getToolChain(), Inputs, Args, CmdArgs, JA);
   // Build the input file for -filelist (list of linker input files) in case we
   // need it later
@@ -1501,6 +1503,11 @@ void DarwinClang::AddLinkRuntimeLibArgs(const ArgList &Args,
       assert(Sanitize.needsSharedRt() &&
              "Static sanitizer runtimes not supported");
       AddLinkSanitizerLibArgs(Args, CmdArgs, "tsan");
+    }
+    if (Sanitize.needsCilksanRt()) {
+      assert(Sanitize.needsSharedRt() &&
+             "Static sanitizer runtimes not supported");
+      AddLinkSanitizerLibArgs(Args, CmdArgs, "cilk");
     }
     if (Sanitize.needsFuzzer() && !Args.hasArg(options::OPT_dynamiclib)) {
       AddLinkSanitizerLibArgs(Args, CmdArgs, "fuzzer", /*shared=*/false);
@@ -3317,6 +3324,7 @@ SanitizerMask Darwin::getSupportedSanitizers() const {
       (isTargetMacOSBased() || isTargetIOSSimulator() ||
        isTargetTvOSSimulator() || isTargetWatchOSSimulator())) {
     Res |= SanitizerKind::Thread;
+    Res |= SanitizerKind::Cilk;
   }
   return Res;
 }

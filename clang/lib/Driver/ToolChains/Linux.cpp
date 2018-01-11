@@ -812,6 +812,7 @@ SanitizerMask Linux::getSupportedSanitizers() const {
     Res |= SanitizerKind::HWAddress;
   }
   if (IsX86_64 || IsAArch64) {
+    Res |= SanitizerKind::Cilk;
     Res |= SanitizerKind::KernelHWAddress;
   }
   // Work around "Cannot represent a difference across sections".
