@@ -28,6 +28,9 @@ void LoopHintAttr::printPrettyPragma(raw_ostream &OS,
            SpellingIndex == Pragma_unroll_and_jam) {
     OS << ' ' << getValueString(Policy);
     return;
+  } else if (SpellingIndex == Pragma_cilk) {
+    OS << getOptionName(option) << getValueString(Policy);
+    return;
   }
 
   assert(SpellingIndex == Pragma_clang_loop && "Unexpected spelling");
@@ -77,6 +80,8 @@ LoopHintAttr::getDiagnosticName(const PrintingPolicy &Policy) const {
   else if (SpellingIndex == Pragma_unroll_and_jam)
     return "#pragma unroll_and_jam" +
            (option == UnrollAndJamCount ? getValueString(Policy) : "");
+  else if (SpellingIndex == Pragma_cilk)
+    return getOptionName(option) + getValueString(Policy);
 
   assert(SpellingIndex == Pragma_clang_loop && "Unexpected spelling");
   return getOptionName(option) + getValueString(Policy);

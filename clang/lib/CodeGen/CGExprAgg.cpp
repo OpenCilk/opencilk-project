@@ -157,6 +157,7 @@ public:
   void VisitBinAssign(const BinaryOperator *E);
   void VisitBinComma(const BinaryOperator *E);
   void VisitBinCmp(const BinaryOperator *E);
+  void VisitCilkSpawnExpr(CilkSpawnExpr *E);
   void VisitCXXRewrittenBinaryOperator(CXXRewrittenBinaryOperator *E) {
     Visit(E->getSemanticForm());
   }
@@ -913,6 +914,11 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
   }
 }
 
+void AggExprEmitter::VisitCilkSpawnExpr(CilkSpawnExpr *E) {
+  CGF.PushDetachScope();
+  Visit(E->getSpawnedExpr());
+}
+
 void AggExprEmitter::VisitCallExpr(const CallExpr *E) {
   if (E->getCallReturnType(CGF.getContext())->isReferenceType()) {
     EmitAggLoadOfLValue(E);
@@ -1193,6 +1199,12 @@ void AggExprEmitter::VisitBinAssign(const BinaryOperator *E) {
 
   LValue LHS = CGF.EmitLValue(E->getLHS());
 
+  if (isa<CilkSpawnExpr>(E->getRHS()->IgnoreImplicit())) {
+    assert(!CGF.IsSpawned &&
+           "_Cilk_spawn expression found in spawning environment.");
+    CGF.IsSpawned = true;
+  }
+
   // If we have an atomic type, evaluate into the destination and then
   // do an atomic copy.
   if (LHS.getType()->isAtomicType() ||
@@ -1200,6 +1212,12 @@ void AggExprEmitter::VisitBinAssign(const BinaryOperator *E) {
     EnsureDest(E->getRHS()->getType());
     Visit(E->getRHS());
     CGF.EmitAtomicStore(Dest.asRValue(), LHS, /*isInit*/ false);
+    if (CGF.IsSpawned) {
+      assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
+             "Processing _Cilk_spawn of expression did not produce a detach.");
+      CGF.IsSpawned = false;
+      CGF.PopDetachScope();
+    }
     return;
   }
 
@@ -1221,6 +1239,13 @@ void AggExprEmitter::VisitBinAssign(const BinaryOperator *E) {
       E->getType().isDestructedType() == QualType::DK_nontrivial_c_struct)
     CGF.pushDestroy(QualType::DK_nontrivial_c_struct, Dest.getAddress(),
                     E->getType());
+
+  if (CGF.IsSpawned) {
+    assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
+           "Processing _Cilk_spawn of expression did not produce a detach.");
+    CGF.IsSpawned = false;
+    CGF.PopDetachScope();
+  }
 }
 
 void AggExprEmitter::

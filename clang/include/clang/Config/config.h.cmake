@@ -38,6 +38,9 @@
 /* Default architecture for SystemZ. */
 #define CLANG_SYSTEMZ_DEFAULT_ARCH "${CLANG_SYSTEMZ_DEFAULT_ARCH}"
 
+/* Default Tapir runtime used by -ftapir. */
+#define CLANG_DEFAULT_TAPIR_RUNTIME "${CLANG_DEFAULT_TAPIR_RUNTIME}"
+
 /* Multilib suffix for libdir. */
 #define CLANG_LIBDIR_SUFFIX "${CLANG_LIBDIR_SUFFIX}"
 

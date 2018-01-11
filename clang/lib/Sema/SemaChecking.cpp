@@ -13449,6 +13449,17 @@ public:
     notePostMod(O, UO, UK_ModAsSideEffect);
   }
 
+  void VisitCilkSpawnExpr(CilkSpawnExpr *E) {
+    Object O = getObject(E->getSpawnedExpr(), true);
+    if (!O)
+      return VisitExpr(E);
+
+    // Cilk_spawn removes sequencing of the spawned expression.
+    // notePreUse(O, E);
+    Visit(E->getSpawnedExpr());
+    // notePostUse(O, E);
+  }
+
   void VisitBinLOr(const BinaryOperator *BO) {
     // C++11 [expr.log.or]p2:
     //  If the second expression is evaluated, every value computation and

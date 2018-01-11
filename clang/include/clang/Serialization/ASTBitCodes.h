@@ -1958,6 +1958,12 @@ public:
 
       // FixedPointLiteral
       EXPR_FIXEDPOINT_LITERAL,
+
+      // Cilk Plus
+      STMT_CILKSPAWN,
+      EXPR_CILKSPAWN,
+      STMT_CILKSYNC,
+      STMT_CILKFOR,
     };
 
     /// The kinds of designators that can occur in a
