@@ -42,6 +42,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/Tapir/TapirTypes.h"
 #include "llvm/Support/ScopedPrinter.h"
 #include <atomic>
 #include <memory>
@@ -82,6 +83,9 @@ static unsigned getOptimizationLevel(ArgList &Args, InputKind IK,
                                      DiagnosticsEngine &Diags) {
   unsigned DefaultOpt = 0;
   if (IK.getLanguage() == InputKind::OpenCL && !Args.hasArg(OPT_cl_opt_disable))
+    DefaultOpt = 2;
+
+  if (Args.hasArg(OPT_ftapir) || Args.hasArg(OPT_frhino))
     DefaultOpt = 2;
 
   if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
@@ -741,7 +745,7 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
       }
     }
   }
-	// Handle -fembed-bitcode option.
+  // Handle -fembed-bitcode option.
   if (Arg *A = Args.getLastArg(OPT_fembed_bitcode_EQ)) {
     StringRef Name = A->getValue();
     unsigned Model = llvm::StringSwitch<unsigned>(Name)
@@ -1924,6 +1928,7 @@ static const StringRef GetInputKindName(InputKind IK) {
   llvm_unreachable("unknown input language");
 }
 
+#include <iostream>
 static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
                           const TargetOptions &TargetOpts,
                           PreprocessorOptions &PPOpts,
@@ -2166,6 +2171,7 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.PascalStrings = Args.hasArg(OPT_fpascal_strings);
   Opts.VtorDispMode = getLastArgIntValue(Args, OPT_vtordisp_mode_EQ, 1, Diags);
   Opts.Borland = Args.hasArg(OPT_fborland_extensions);
+
   Opts.WritableStrings = Args.hasArg(OPT_fwritable_strings);
   Opts.ConstStrings = Args.hasFlag(OPT_fconst_strings, OPT_fno_const_strings,
                                    Opts.ConstStrings);
@@ -2540,6 +2546,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       getLastArgIntValue(Args, OPT_fsanitize_address_field_padding, 0, Diags);
   Opts.SanitizerBlacklistFiles = Args.getAllArgValues(OPT_fsanitize_blacklist);
 
+  // -fcsi
+  Opts.ComprehensiveStaticInstrumentation = Args.hasArg(OPT_fcsi);
+
   // -fxray-instrument
   Opts.XRayInstrument =
       Args.hasFlag(OPT_fxray_instrument, OPT_fnoxray_instrument, false);
@@ -2790,6 +2799,8 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
     LangOpts.PIE = Args.hasArg(OPT_pic_is_pie);
     parseSanitizerKinds("-fsanitize=", Args.getAllArgValues(OPT_fsanitize_EQ),
                         Diags, LangOpts.Sanitize);
+    Res.getLangOpts()->ComprehensiveStaticInstrumentation =
+      Args.hasArg(OPT_fcsi);
   } else {
     // Other LangOpts are only initialzed when the input is not AST or LLVM IR.
     // FIXME: Should we really be calling this for an InputKind::Asm input?
@@ -2798,6 +2809,38 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
     if (Res.getFrontendOpts().ProgramAction == frontend::RewriteObjC)
       LangOpts.ObjCExceptions = 1;
   }
+
+  LangOpts.Rhino = Args.hasArg(OPT_frhino);
+  LangOpts.Detach = Args.hasArg(OPT_fdetach);
+  LangOpts.Cilk = Args.hasArg(OPT_fcilkplus);
+
+  // FIXME: Fix -ftapir=* parsing to use conventional mechanisms for handling
+  // arguments.
+  if (Args.hasArg(OPT_ftapir)) {
+    if (Arg *A = Args.getLastArg(OPT_ftapir)) {
+      StringRef Name = A->getValue();
+      if (Name == "none")
+        LangOpts.Tapir = llvm::TapirTargetType::None;
+      else if (Name == "cilk") {
+        LangOpts.Tapir = llvm::TapirTargetType::Cilk;
+        LangOpts.Cilk |= true;
+      } else if (Name == "cilkr") {
+        LangOpts.Tapir = llvm::TapirTargetType::CilkR;
+        LangOpts.Cilk |= true;
+      } else if (Name == "openmp")
+        LangOpts.Tapir = llvm::TapirTargetType::OpenMP;
+      else if (Name == "serial")
+        LangOpts.Tapir = llvm::TapirTargetType::Serial;
+      else
+        Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args) <<
+          Name;
+    }
+  }
+
+  if (Args.hasArg(OPT_fcilkplus) && !Args.hasArg(OPT_ftapir))
+    LangOpts.Tapir = llvm::TapirTargetType::Cilk;
+  if (LangOpts.Cilk && (LangOpts.ObjC1 || LangOpts.ObjC2))
+    Diags.Report(diag::err_drv_cilk_objc);
 
   if (LangOpts.CUDA) {
     // During CUDA device-side compilation, the aux triple is the

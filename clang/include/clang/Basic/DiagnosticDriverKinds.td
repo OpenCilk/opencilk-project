@@ -181,6 +181,10 @@ def err_drv_mg_requires_m_or_mm : Error<
   "option '-MG' requires '-M' or '-MM'">;
 def err_drv_unknown_objc_runtime : Error<
   "unknown or ill-formed Objective-C runtime '%0'">;
+def err_drv_cilk_objc : Error<
+  "Cilk Plus does not support Objective-C">;
+def err_drv_cilk_unsupported: Error<
+  "Cilk Plus not yet supported for this target">;
 def err_drv_emit_llvm_link : Error<
    "-emit-llvm cannot be used when linking">;
 def err_drv_optimization_remark_pattern : Error<
@@ -362,4 +366,7 @@ def warn_drv_experimental_isel_incomplete : Warning<
 def warn_drv_experimental_isel_incomplete_opt : Warning<
   "-fexperimental-isel support is incomplete for this architecture at the current optimization level">,
   InGroup<ExperimentalISel>;
+
+def err_drv_invalid_tapir_argument : Error<
+  "invalid tapir argument '%0'">;
 }

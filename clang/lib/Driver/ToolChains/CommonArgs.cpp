@@ -512,7 +512,7 @@ static void addSanitizerRuntime(const ToolChain &TC, const ArgList &Args,
   // Wrap any static runtimes that must be forced into executable in
   // whole-archive.
   if (IsWhole) CmdArgs.push_back("-whole-archive");
-  CmdArgs.push_back(TC.getCompilerRTArgString(Args, Sanitizer, IsShared));
+    CmdArgs.push_back(TC.getCompilerRTArgString(Args, Sanitizer, IsShared));
   if (IsWhole) CmdArgs.push_back("-no-whole-archive");
 
   if (IsShared) {
@@ -584,6 +584,8 @@ collectSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
     if (SanArgs.needsHwasanRt())
       SharedRuntimes.push_back("hwasan");
   }
+  if (SanArgs.needsCilksanRt())
+    SharedRuntimes.push_back("cilksan");
 
   // The stats_client library is also statically linked into DSOs.
   if (SanArgs.needsStatsRt())

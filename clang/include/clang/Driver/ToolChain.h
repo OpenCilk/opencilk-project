@@ -91,6 +91,15 @@ public:
     RM_DisabledImplicitly
   };
 
+  enum TapirRuntimeLibType {
+    TRLT_None,
+    TRLT_Serial,
+    TRLT_Cilk,
+    TRLT_OpenMP,
+    TRLT_CilkR,
+    TRLT_Unknown
+  };
+
 private:
   const Driver &D;
   llvm::Triple Triple;
@@ -519,6 +528,17 @@ public:
 
   /// \brief Return sanitizers which are enabled by default.
   virtual SanitizerMask getDefaultSanitizers() const { return 0; }
+
+  // GetTapirRuntimeLibType - Determine the runtime library type to use with
+  // Tapir.
+  virtual TapirRuntimeLibType GetTapirRuntimeLibType(
+      const llvm::opt::ArgList &Args) const;
+
+  /// AddTapirRuntimeLibArgs - Add the specific linker arguments to use for the
+  /// given Tapir runtime library type.
+  virtual void AddTapirRuntimeLibArgs(const llvm::opt::ArgList &Args,
+                                      llvm::opt::ArgStringList &CmdArgs) const;
+
 };
 
 /// Set a ToolChain's effective triple. Reset it when the registration object
