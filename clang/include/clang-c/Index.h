@@ -2140,7 +2140,23 @@ enum CXCursorKind {
    */
   CXCursor_OMPScopeDirective = 306,
 
-  CXCursor_LastStmt = CXCursor_OMPScopeDirective,
+  /** A _Cilk_spawn statement.
+   */
+  CXCursor_CilkSpawnStmt = 307,
+
+  /** Wrapper for an expression preceded by _Cilk_spawn.
+   */
+  CXCursor_CilkSpawnExpr = 308,
+
+  /** A _Cilk_sync statement.
+   */
+  CXCursor_CilkSyncStmt = 309,
+
+  /** A _Cilk_for statement.
+   */
+  CXCursor_CilkForStmt = 310,
+
+  CXCursor_LastStmt = CXCursor_CilkForStmt,
 
   /**
    * Cursor that represents the translation unit itself.
