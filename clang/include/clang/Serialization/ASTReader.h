@@ -873,7 +873,6 @@ private:
   struct PragmaPackStackEntry {
     unsigned Value;
     SourceLocation Location;
-    SourceLocation PushLocation;
     StringRef SlotLabel;
   };
   llvm::SmallVector<PragmaPackStackEntry, 2> PragmaPackStack;

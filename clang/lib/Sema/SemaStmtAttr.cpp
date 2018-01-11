@@ -88,16 +88,25 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   bool PragmaUnrollAndJam = PragmaNameLoc->Ident->getName() == "unroll_and_jam";
   bool PragmaNoUnrollAndJam =
       PragmaNameLoc->Ident->getName() == "nounroll_and_jam";
+  bool PragmaCilk = PragmaNameLoc->Ident->getName() == "cilk";
+  if (PragmaCilk &&
+      St->getStmtClass() != Stmt::CilkForStmtClass) {
+    S.Diag(St->getLocStart(), diag::err_pragma_cilk_precedes_noncilk)
+      << "#pragma cilk";
+    return nullptr;
+  }
   if (St->getStmtClass() != Stmt::DoStmtClass &&
       St->getStmtClass() != Stmt::ForStmtClass &&
       St->getStmtClass() != Stmt::CXXForRangeStmtClass &&
-      St->getStmtClass() != Stmt::WhileStmtClass) {
+      St->getStmtClass() != Stmt::WhileStmtClass &&
+      St->getStmtClass() != Stmt::CilkForStmtClass) {
     const char *Pragma =
         llvm::StringSwitch<const char *>(PragmaNameLoc->Ident->getName())
             .Case("unroll", "#pragma unroll")
             .Case("nounroll", "#pragma nounroll")
             .Case("unroll_and_jam", "#pragma unroll_and_jam")
             .Case("nounroll_and_jam", "#pragma nounroll_and_jam")
+            .Case("cilk", "#pragma cilk")
             .Default("#pragma clang loop");
     S.Diag(St->getBeginLoc(), diag::err_pragma_loop_precedes_nonloop) << Pragma;
     return nullptr;
@@ -135,6 +144,19 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
       Option = LoopHintAttr::UnrollAndJam;
       State = LoopHintAttr::Enable;
     }
+  } else if (PragmaCilk) {
+    Spelling = LoopHintAttr::Pragma_cilk;
+    Option = llvm::StringSwitch<LoopHintAttr::OptionType>(
+                 OptionLoc->Ident->getName())
+                 .Case("grainsize", LoopHintAttr::TapirGrainsize)
+                 .Default(LoopHintAttr::TapirGrainsize);
+    if (Option == LoopHintAttr::TapirGrainsize) {
+      assert(ValueExpr && "Attribute must have a valid value expression.");
+      if (S.CheckLoopHintExpr(ValueExpr, St->getLocStart()))
+        return nullptr;
+      State = LoopHintAttr::Numeric;
+    } else
+      llvm_unreachable("bad loop hint");
   } else {
     // #pragma clang loop ...
     assert(OptionLoc && OptionLoc->Ident &&
@@ -187,12 +209,12 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 static void
 CheckForIncompatibleAttributes(Sema &S,
                                const SmallVectorImpl<const Attr *> &Attrs) {
-  // There are 6 categories of loop hints attributes: vectorize, interleave,
-  // unroll, unroll_and_jam, pipeline and distribute. Except for distribute they
-  // come in two variants: a state form and a numeric form.  The state form
-  // selectively defaults/enables/disables the transformation for the loop
-  // (for unroll, default indicates full unrolling rather than enabling the
-  // transformation). The numeric form form provides an integer hint (for
+  // There are 7 categories of loop hints attributes: vectorize, interleave,
+  // unroll, unroll_and_jam, pipeline, distribute, and (Tapir) grainsize. Except
+  // for distribute they come in two variants: a state form and a numeric form.
+  // The state form selectively defaults/enables/disables the transformation for
+  // the loop (for unroll, default indicates full unrolling rather than enabling
+  // the transformation). The numeric form form provides an integer hint (for
   // example, unroll count) to the transformer. The following array accumulates
   // the hints encountered while iterating through the attributes to check for
   // compatibility.
@@ -200,7 +222,8 @@ CheckForIncompatibleAttributes(Sema &S,
     const LoopHintAttr *StateAttr;
     const LoopHintAttr *NumericAttr;
   } HintAttrs[] = {{nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr},
-                   {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr}};
+                   {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr},
+                   {nullptr, nullptr}};
 
   for (const auto *I : Attrs) {
     const LoopHintAttr *LH = dyn_cast<LoopHintAttr>(I);
@@ -216,7 +239,8 @@ CheckForIncompatibleAttributes(Sema &S,
       Unroll,
       UnrollAndJam,
       Distribute,
-      Pipeline
+      Pipeline,
+      TapirGrainsize
     } Category;
     switch (Option) {
     case LoopHintAttr::Vectorize:
@@ -242,6 +266,8 @@ CheckForIncompatibleAttributes(Sema &S,
     case LoopHintAttr::PipelineDisabled:
     case LoopHintAttr::PipelineInitiationInterval:
       Category = Pipeline;
+    case LoopHintAttr::TapirGrainsize:
+      Category = TapirGrainsize;
       break;
     };
 
