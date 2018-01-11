@@ -223,7 +223,23 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
   case Stmt::SEHLeaveStmtClass:
     K = CXCursor_SEHLeaveStmt;
     break;
-  
+    
+  case Stmt::CilkSpawnStmtClass:
+    K = CXCursor_CilkSpawnStmt;
+    break;
+
+  case Stmt::CilkSpawnExprClass:
+    K = CXCursor_CilkSpawnExpr;
+    break;
+
+  case Stmt::CilkSyncStmtClass:
+    K = CXCursor_CilkSyncStmt;
+    break;
+
+  case Stmt::CilkForStmtClass:
+    K = CXCursor_CilkForStmt;
+    break;
+
   case Stmt::ArrayTypeTraitExprClass:
   case Stmt::AsTypeExprClass:
   case Stmt::AtomicExprClass:

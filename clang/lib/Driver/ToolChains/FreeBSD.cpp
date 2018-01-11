@@ -415,6 +415,7 @@ SanitizerMask FreeBSD::getSupportedSanitizers() const {
   if (IsX86_64 || IsMIPS64) {
     Res |= SanitizerKind::Leak;
     Res |= SanitizerKind::Thread;
+    Res |= SanitizerKind::Cilk;
   }
   if (IsX86 || IsX86_64) {
     Res |= SanitizerKind::Function;

@@ -195,6 +195,10 @@ def err_drv_unknown_objc_runtime : Error<
   "unknown or ill-formed Objective-C runtime '%0'">;
 def err_drv_gnustep_objc_runtime_incompatible_binary : Error<
   "GNUstep Objective-C runtime version %0 incompatible with target binary format">;
+def err_drv_cilk_objc : Error<
+  "Cilk Plus does not support Objective-C">;
+def err_drv_cilk_unsupported: Error<
+  "Cilk Plus not yet supported for this target">;
 def err_drv_emit_llvm_link : Error<
    "-emit-llvm cannot be used when linking">;
 def err_drv_optimization_remark_pattern : Error<
@@ -392,4 +396,7 @@ def warn_drv_experimental_isel_incomplete_opt : Warning<
 def warn_drv_moutline_unsupported_opt : Warning<
   "The '%0' architecture does not support -moutline; flag ignored">,
   InGroup<OptionIgnored>;
+
+def err_drv_invalid_tapir_argument : Error<
+  "invalid tapir argument '%0'">;
 }

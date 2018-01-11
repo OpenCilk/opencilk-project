@@ -2932,7 +2932,7 @@ ExprResult Sema::BuildDeclarationNameExpr(
       if (BD->getDeclContext()->isFunctionOrMethod() &&
           BD->getDeclContext() != CurContext)
         diagnoseUncapturableValueReference(*this, Loc, BD, CurContext);
-      break;
+     break;
     }
 
     case Decl::Function: {

@@ -58,8 +58,17 @@ struct LoopAttributes {
   /// llvm.unroll.
   unsigned UnrollCount;
 
+  /// tapir.loop.grainsize.
+  unsigned TapirGrainsize;
+
   /// Value for llvm.loop.distribute.enable metadata.
   LVEnableState DistributeEnable;
+
+  /// \brief Tapir-loop spawning strategy.
+  enum LSStrategy { Sequential, DAC };
+
+  /// \brief Value for tapir.loop.spawn.strategy metadata.
+  LSStrategy SpawnStrategy;
 };
 
 /// Information used when generating a structured loop.
@@ -151,6 +160,14 @@ public:
 
   /// Set the unroll count for the next loop pushed.
   void setUnrollCount(unsigned C) { StagedAttrs.UnrollCount = C; }
+
+  /// \brief Set the Tapir-loop spawning strategy for the next loop pushed.
+  void setSpawnStrategy(const LoopAttributes::LSStrategy &Strat) {
+    StagedAttrs.SpawnStrategy = Strat;
+  }
+
+  /// \brief Set the Tapir-loop grainsize for the next loop pushed.
+  void setTapirGrainsize(unsigned C) { StagedAttrs.TapirGrainsize = C; }
 
 private:
   /// Returns true if there is LoopInfo on the stack.
