@@ -1026,8 +1026,7 @@ static Error UnbundleFiles() {
   return Error::success();
 }
 
-static void PrintVersion() {
-  raw_ostream &OS = outs();
+static void PrintVersion(raw_ostream &OS) {
   OS << clang::getClangToolFullVersion("clang-offload-bundler") << '\n';
 }
 
