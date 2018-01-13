@@ -1376,6 +1376,29 @@ def err_acc_invalid_reduction_operator
             "'&', '|', '^', '&&', or '||'">;
 def err_acc_incorrect_bind_arg : Error<"expected identifier or string literal">;
 
+// Cilk Plus
+def err_cilkplus_disable: Error<
+  "Cilk Plus support disabled - compile with -fcilkplus">;
+def err_cilk_for_missing_control_variable: Error<
+  "missing control variable declaration and initialization in 'cilk_for'">;
+def err_cilk_for_missing_condition: Error<
+  "missing loop condition expression in 'cilk_for'">;
+def err_cilk_for_missing_increment: Error<
+  "missing loop increment expression in 'cilk_for'">;
+def err_cilk_for_missing_semi: Error<
+  "expected ';' in 'cilk_for'">;
+def err_cilk_for_forrange_loop_not_supported: Error<
+  "'cilk_for' not supported on for-range loops">;
+def err_cilk_for_foreach_loop_not_supported: Error<
+  "'cilk_for' not supported on for-each loops">;
+def err_pragma_cilk_invalid_option : Error<
+  "%select{invalid|missing}0 option%select{ %1|}0; expected grainsize">;
+def err_pragma_cilk_grainsize_missing_argument : Error<
+  "missing argument; expected an integer value">;
+def warn_cilk_for_following_grainsize: Warning<
+  "'#pragma cilk' ignored, because it is not followed by a 'cilk_for' loop">,
+  InGroup<SourceUsesCilkPlus>;
+
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<
   "unexpected '#pragma omp ...' in program">, InGroup<SourceUsesOpenMP>, DefaultIgnore;
