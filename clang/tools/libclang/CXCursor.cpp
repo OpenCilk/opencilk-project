@@ -223,7 +223,7 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
   case Stmt::SEHLeaveStmtClass:
     K = CXCursor_SEHLeaveStmt;
     break;
-    
+
   case Stmt::CilkSpawnStmtClass:
     K = CXCursor_CilkSpawnStmt;
     break;
