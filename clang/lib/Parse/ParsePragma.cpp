@@ -690,11 +690,16 @@ void Parser::HandlePragmaPack() {
   ExprResult Alignment;
   if (Info->Alignment.is(tok::numeric_constant)) {
     Alignment = Actions.ActOnNumericConstant(Info->Alignment);
-    if (Alignment.isInvalid())
+    if (Alignment.isInvalid()) {
+      ConsumeAnnotationToken();
       return;
+    }
   }
   Actions.ActOnPragmaPack(PragmaLoc, Info->Action, Info->SlotLabel,
                           Alignment.get());
+  // Consume the token after processing the pragma to enable pragma-specific
+  // #include warnings.
+  ConsumeAnnotationToken();
 }
 
 void Parser::HandlePragmaMSStruct() {
