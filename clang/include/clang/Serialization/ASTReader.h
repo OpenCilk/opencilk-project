@@ -899,6 +899,7 @@ private:
   struct PragmaAlignPackStackEntry {
     Sema::AlignPackInfo Value;
     SourceLocation Location;
+    SourceLocation PushLocation;
     StringRef SlotLabel;
   };
   llvm::SmallVector<PragmaAlignPackStackEntry, 2> PragmaAlignPackStack;

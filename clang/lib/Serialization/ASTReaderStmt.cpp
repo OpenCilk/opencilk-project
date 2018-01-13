@@ -2962,7 +2962,7 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
     case EXPR_CILKSPAWN:
       S = new (Context) CilkSpawnExpr(Empty);
       break;
-      
+
     case STMT_CILKSYNC:
       S = new (Context) CilkSyncStmt(Empty);
       break;
