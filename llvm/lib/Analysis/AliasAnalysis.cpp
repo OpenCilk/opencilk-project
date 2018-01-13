@@ -210,8 +210,6 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I, const CallBase *Call2,
       if (!Visited.insert(BB).second)
         continue;
 
-      // for (BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ++I)
-      // {
       for (Instruction &DI : *BB) {
         // Fail fast if we encounter an invalid CFG.
         assert(!(D == &DI) &&
@@ -224,16 +222,18 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I, const CallBase *Call2,
         if (isa<LoadInst>(DI) || isa<StoreInst>(DI) ||
             isa<AtomicCmpXchgInst>(DI) || isa<AtomicRMWInst>(DI) ||
             DI.isFenceLike() || ImmutableCallSite(&DI))
-          Result = ModRefInfo(Result | getModRefInfo(&DI, Call));
+          Result = unionModRef(Result, getModRefInfo(&DI, Call));
         if (&DI == Call.getInstruction())
           return ModRefInfo::NoModRef;
       }
 
       // Add successors
       const TerminatorInst *T = BB->getTerminator();
-      if (!isa<ReattachInst>(T) || T->getSuccessor(0) != D->getContinue())
-        for (unsigned idx = 0, max = T->getNumSuccessors(); idx < max; ++idx)
-          WorkList.push_back(T->getSuccessor(idx));
+      if (const ReattachInst *RI = dyn_cast<ReattachInst>(T))
+        if (D->getSyncRegion() == RI->getSyncRegion())
+          continue;
+      for (unsigned idx = 0, max = T->getNumSuccessors(); idx < max; ++idx)
+        WorkList.push_back(T->getSuccessor(idx));
     }
     return Result;
   }
@@ -443,6 +443,83 @@ MemoryEffects AAResults::getMemoryEffects(const Function *F) {
   return Result;
 }
 
+MemoryEffects AAResults::getMemoryEffects(const DetachInst *D,
+                                          AAQueryInfo &AAQI) {
+  MemoryEffects Result = MemoryEffects::none();
+  SmallPtrSet<const BasicBlock *, 32> Visited;
+  SmallVector<const BasicBlock *, 32> WorkList;
+  WorkList.push_back(D->getDetached());
+  while (!WorkList.empty()) {
+    const BasicBlock *BB = WorkList.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+
+    for (const Instruction &I : *BB) {
+      // Fail fast if we encounter an invalid CFG.
+      assert(!(D == &I) &&
+             "Invalid CFG found: Detached CFG reaches its own Detach.");
+
+      if (auto CS = ImmutableCallSite(&I))
+        Result |= getMemoryEffects(CS, AAQI);
+
+      // Early-exit the moment we reach the top of the lattice.
+      if (Result == MemoryEffects::unknown())
+        return Result;
+    }
+
+    // Add successors
+    const TerminatorInst *T = BB->getTerminator();
+    if (const ReattachInst *RI = dyn_cast<ReattachInst>(T))
+      if (D->getSyncRegion() == RI->getSyncRegion())
+        continue;
+
+    for (unsigned idx = 0, max = T->getNumSuccessors(); idx < max; ++idx)
+      WorkList.push_back(T->getSuccessor(idx));
+  }
+
+  return Result;
+}
+
+MemoryEffects AAResults::getMemoryEffects(const SyncInst *S,
+                                          AAQueryInfo &AAQI) {
+  MemoryEffects Result = MemoryEffects::none();
+  SmallPtrSet<const BasicBlock *, 32> Visited;
+  SmallVector<const BasicBlock *, 32> WorkList;
+  WorkList.push_back(S->getParent());
+  while (!WorkList.empty()) {
+    const BasicBlock *BB = WorkList.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+
+    if (const DetachInst *D = dyn_cast<DetachInst>(BB->getTerminator()))
+      Result |= getMemoryEffects(D, AAQI);
+
+    // Early-exit the moment we reach the top of the lattice.
+    if (Result == MemoryEffects::unknown())
+      return Result;
+
+    // Add predecessors
+    // for (const_pred_iterator PI = pred_begin(BB), E = pred_end(BB);
+    //      PI != E; ++PI) {
+    //   const BasicBlock *Pred = *PI;
+    for (const BasicBlock *Pred : predecessors(BB)) {
+      const TerminatorInst *PT = Pred->getTerminator();
+      // Ignore reattached predecessors and predecessors that end in syncs,
+      // because this sync does not wait on those predecessors.
+      if (isa<ReattachInst>(PT) || isa<SyncInst>(PT))
+	continue;
+      // If this block is detached, ignore the predecessor that detaches it.
+      if (const DetachInst *Det = dyn_cast<DetachInst>(PT))
+        if (Det->getDetached() == BB)
+          continue;
+
+      WorkList.push_back(Pred);
+    }
+  }
+
+  return Result;
+}
+
 raw_ostream &llvm::operator<<(raw_ostream &OS, AliasResult AR) {
   switch (AR) {
   case AliasResult::NoAlias:
@@ -645,6 +722,10 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I,
   if (OptLoc == std::nullopt) {
     if (const auto *Call = dyn_cast<CallBase>(I))
       return getMemoryEffects(Call, AAQIP).getModRef();
+    if (const auto *D = dyn_cast<DetachInst>(I))
+      return getMemoryEffects(D, AAQIP).getModRef();
+    if (const auto *S = dyn_cast<SyncInst>(I))
+      return getMemoryEffects(S, AAQIP).getModRef();
   }
 
   const MemoryLocation &Loc = OptLoc.value_or(MemoryLocation());
@@ -682,49 +763,49 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I,
 }
 
 ModRefInfo AAResults::getModRefInfo(const DetachInst *D,
-                                    const MemoryLocation &Loc) {
-  ModRefInfo Result = MRI_NoModRef;
+                                    const MemoryLocation &Loc,
+                                    AAQueryInfo &AAQI) {
+  ModRefInfo Result = ModRefInfo::NoModRef;
   SmallPtrSet<const BasicBlock *, 32> Visited;
   SmallVector<const BasicBlock *, 32> WorkList;
-  WorkList.push_back(D->getSuccessor(0));
+  WorkList.push_back(D->getDetached());
   while (!WorkList.empty()) {
     const BasicBlock *BB = WorkList.pop_back_val();
     if (!Visited.insert(BB).second)
       continue;
 
-    for (BasicBlock::const_iterator I = BB->begin(), E = BB->end(); I != E; ++I) {
+    for (const Instruction &I : *BB) {
       // Ignore sync instructions in this analysis
       if (isa<SyncInst>(I))
 	continue;
 
       // Fail fast if we encounter an invalid CFG.
-      assert(!(D == &*I) &&
-             "Invalid CFG found: Detached CFG reaches its own Detach instruction.");
+      assert(!(D == &I) &&
+             "Invalid CFG found: Detached CFG reaches its own Detach.");
 
-      if (!Loc.Ptr)
-        Result = ModRefInfo(Result | getModRefInfo(&*I));
-      else
-        Result = ModRefInfo(Result | getModRefInfo(&*I, Loc));
+      Result = unionModRef(Result, getModRefInfo(&I, Loc));
 
       // Early-exit the moment we reach the top of the lattice.
-      if (Result == MRI_ModRef)
+      if (isModAndRefSet(Result))
 	return Result;
     }
 
     // Add successors
     const TerminatorInst *T = BB->getTerminator();
-    if (!isa<ReattachInst>(T) ||
-	T->getSuccessor(0) != D->getSuccessor(1))
-      for (unsigned idx = 0, max = T->getNumSuccessors(); idx < max; ++idx)
-	WorkList.push_back(T->getSuccessor(idx));
+    if (const ReattachInst *RI = dyn_cast<ReattachInst>(T))
+      if (D->getSyncRegion() == RI->getSyncRegion())
+        continue;
+    for (unsigned idx = 0, max = T->getNumSuccessors(); idx < max; ++idx)
+      WorkList.push_back(T->getSuccessor(idx));
   }
 
   return Result;
 }
 
 ModRefInfo AAResults::getModRefInfo(const SyncInst *S,
-                                    const MemoryLocation &Loc) {
-  ModRefInfo Result = MRI_NoModRef;
+                                    const MemoryLocation &Loc,
+                                    AAQueryInfo &AAQI) {
+  ModRefInfo Result = ModRefInfo::NoModRef;
   SmallPtrSet<const BasicBlock *, 32> Visited;
   SmallVector<const BasicBlock *, 32> WorkList;
   WorkList.push_back(S->getParent());
@@ -733,26 +814,25 @@ ModRefInfo AAResults::getModRefInfo(const SyncInst *S,
     if (!Visited.insert(BB).second)
       continue;
 
-    const TerminatorInst *T = BB->getTerminator();
-    if (isa<DetachInst>(T)) {
-      Result = ModRefInfo(Result | getModRefInfo(T, Loc));
+    if (const DetachInst *D = dyn_cast<DetachInst>(BB->getTerminator())) {
+      Result = unionModRef(Result, getModRefInfo(D, Loc));
 
       // Early-exit the moment we reach the top of the lattice.
-      if (Result == MRI_ModRef)
+      if (isModAndRefSet(Result))
 	return Result;
     }
 
     // Add predecessors
-    for (const_pred_iterator PI = pred_begin(BB), E = pred_end(BB);
-	 PI != E; ++PI) {
-      const BasicBlock *Pred = *PI;
+    // for (const_pred_iterator PI = pred_begin(BB), E = pred_end(BB);
+    //      PI != E; ++PI) {
+    //   const BasicBlock *Pred = *PI;
+    for (const BasicBlock *Pred : predecessors(BB)) {
       const TerminatorInst *PT = Pred->getTerminator();
-      // Ignore reattached predecessors and predecessors that end in
-      // syncs, because this sync does not wait on those predecessors.
+      // Ignore reattached predecessors and predecessors that end in syncs,
+      // because this sync does not wait on those predecessors.
       if (isa<ReattachInst>(PT) || isa<SyncInst>(PT))
 	continue;
-      // If this block is detached, ignore the predecessor that
-      // detaches it.
+      // If this block is detached, ignore the predecessor that detaches it.
       if (const DetachInst *Det = dyn_cast<DetachInst>(PT))
         if (Det->getDetached() == BB)
           continue;
