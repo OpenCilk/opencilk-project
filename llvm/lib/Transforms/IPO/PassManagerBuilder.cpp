@@ -765,7 +765,7 @@ void PassManagerBuilder::populateModulePassManager(
   do {
     RerunAfterTapirLowering =
        !TapirHasBeenLowered && tapirTarget && !PrepareForThinLTO;
-      
+
   // Infer attributes about declarations if possible.
   MPM.add(createInferFunctionAttrsLegacyPass());
 
