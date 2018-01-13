@@ -914,8 +914,7 @@ static bool UnbundleFiles() {
   return false;
 }
 
-static void PrintVersion() {
-  raw_ostream &OS = outs();
+static void PrintVersion(raw_ostream &OS) {
   OS << clang::getClangToolFullVersion("clang-offload-bundler") << '\n';
 }
 
