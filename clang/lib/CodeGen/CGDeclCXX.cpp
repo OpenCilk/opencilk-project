@@ -469,7 +469,7 @@ llvm::Function *CodeGenModule::CreateGlobalInitOrCleanUpFunction(
 
   if (getLangOpts().Sanitize.has(SanitizerKind::Cilk) &&
       !isInSanitizerBlacklist(SanitizerKind::Cilk, Fn, Loc))
-    Fn->addFnAttr(llvm::Attribute::SanitizeThread);
+    Fn->addFnAttr(llvm::Attribute::SanitizeCilk);
 
   if (getLangOpts().Sanitize.has(SanitizerKind::Memory) &&
       !isInNoSanitizeList(SanitizerKind::Memory, Fn, Loc))
