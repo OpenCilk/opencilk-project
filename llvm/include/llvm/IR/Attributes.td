@@ -276,6 +276,9 @@ def SanitizeMemTag : EnumAttr<"sanitize_memtag", [FnAttr]>;
 def SpeculativeLoadHardening : EnumAttr<"speculative_load_hardening",
                                         [FnAttr]>;
 
+/// CilkSanitizer is on.
+def SanitizeCilk : EnumAttr<"sanitize_cilk", [FnAttr]>;
+
 /// Argument is swift error.
 def SwiftError : EnumAttr<"swifterror", [ParamAttr]>;
 

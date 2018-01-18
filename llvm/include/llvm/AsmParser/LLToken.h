@@ -323,7 +323,7 @@ enum Kind {
   // Tapir types
   kw_detach,
   kw_reattach,
-  kw_sync,
+  kw_tsync,
 
   // Metadata types.
   kw_distinct,

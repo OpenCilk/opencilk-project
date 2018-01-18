@@ -715,6 +715,7 @@ enum AttributeKindCodes {
   ATTR_KIND_FNRETTHUNK_EXTERN = 84,
   ATTR_KIND_SKIP_PROFILE = 85,
   ATTR_KIND_MEMORY = 86,
+  ATTR_KIND_SANITIZE_CILK = 87,
 };
 
 enum ComdatSelectionKindCodes {

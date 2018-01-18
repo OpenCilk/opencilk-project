@@ -6295,7 +6295,7 @@ int LLParser::parseInstruction(Instruction *&Inst, BasicBlock *BB,
     return parseDetach(Inst, PFS);
   case lltok::kw_reattach:
     return parseReattach(Inst, PFS);
-  case lltok::kw_sync:
+  case lltok::kw_tsync:
     return parseSync(Inst, PFS);
   // Unary Operators.
   case lltok::kw_fneg: {
