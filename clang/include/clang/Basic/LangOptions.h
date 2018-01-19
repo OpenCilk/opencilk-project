@@ -19,6 +19,7 @@
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/ObjCRuntime.h"
 #include "clang/Basic/Sanitizers.h"
+#include "clang/Basic/Tapir.h"
 #include "clang/Basic/TargetCXXABI.h"
 #include "clang/Basic/Visibility.h"
 #include "llvm/ADT/FloatingPointMode.h"
@@ -489,6 +490,9 @@ public:
   /// The plaform-specific path separator is the backslash(\) for Windows and
   /// forward slash (/) elsewhere.
   bool UseTargetPathSeparator = false;
+
+  /// Runtime target for Tapir.
+  TapirTargetType TapirTarget = TapirTargetType::None;
 
   LangOptions();
 
