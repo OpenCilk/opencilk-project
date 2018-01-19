@@ -428,7 +428,4 @@ def warn_drv_msp430_hwmult_no_device : Warning<"no MCU device specified, but "
   "'-mhwmult' is set to 'auto', assuming no hardware multiply. Use -mmcu to "
   "specify a MSP430 device, or -mhwmult to set hardware multiply type "
   "explicitly.">, InGroup<InvalidCommandLineArgument>;
-
-def err_drv_invalid_tapir_argument : Error<
-  "invalid tapir argument '%0'">;
 }
