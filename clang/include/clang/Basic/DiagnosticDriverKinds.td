@@ -396,7 +396,4 @@ def warn_drv_experimental_isel_incomplete_opt : Warning<
 def warn_drv_moutline_unsupported_opt : Warning<
   "The '%0' architecture does not support -moutline; flag ignored">,
   InGroup<OptionIgnored>;
-
-def err_drv_invalid_tapir_argument : Error<
-  "invalid tapir argument '%0'">;
 }
