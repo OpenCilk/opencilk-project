@@ -79,11 +79,7 @@
 #include "llvm/Transforms/Utils/Debugify.h"
 #include "llvm/Transforms/Utils/EntryExitInstrumenter.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
-#include "llvm/Transforms/Tapir/TapirTypes.h"
 #include "llvm/Transforms/Tapir/TapirUtils.h"
-#include "llvm/Transforms/Tapir/CilkABI.h"
-#include "llvm/Transforms/Tapir/CilkRABI.h"
-#include "llvm/Transforms/Tapir/OpenMPABI.h"
 #include <memory>
 #include <optional>
 using namespace clang;
