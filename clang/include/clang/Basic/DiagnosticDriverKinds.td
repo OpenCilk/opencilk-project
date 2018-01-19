@@ -366,7 +366,4 @@ def warn_drv_experimental_isel_incomplete : Warning<
 def warn_drv_experimental_isel_incomplete_opt : Warning<
   "-fexperimental-isel support is incomplete for this architecture at the current optimization level">,
   InGroup<ExperimentalISel>;
-
-def err_drv_invalid_tapir_argument : Error<
-  "invalid tapir argument '%0'">;
 }
