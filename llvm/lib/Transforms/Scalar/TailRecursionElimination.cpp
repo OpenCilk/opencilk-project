@@ -930,6 +930,12 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
         ReplaceInstWithInst(RetBlock->getTerminator(),
                             SyncInst::Create(NewRetBlock, SyncRegion));
       }
+    } else {
+      // Restore the sync that was eliminated.
+      BasicBlock *RetBlock = RI->getParent();
+      BasicBlock *NewRetBlock = SplitBlock(RetBlock, RI, &DTU);
+      ReplaceInstWithInst(RetBlock->getTerminator(),
+                          SyncInst::Create(NewRetBlock, SyncRegion));
     }
 
     return EliminatedCall;
