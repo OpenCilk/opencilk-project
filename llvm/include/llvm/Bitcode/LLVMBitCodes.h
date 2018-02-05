@@ -716,6 +716,7 @@ enum AttributeKindCodes {
   ATTR_KIND_SKIP_PROFILE = 85,
   ATTR_KIND_MEMORY = 86,
   ATTR_KIND_SANITIZE_CILK = 87,
+  ATTR_KIND_STEALABLE = 88,
 };
 
 enum ComdatSelectionKindCodes {

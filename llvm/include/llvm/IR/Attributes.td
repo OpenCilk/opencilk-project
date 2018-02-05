@@ -279,6 +279,11 @@ def SpeculativeLoadHardening : EnumAttr<"speculative_load_hardening",
 /// CilkSanitizer is on.
 def SanitizeCilk : EnumAttr<"sanitize_cilk", [FnAttr]>;
 
+/// From the Cilk perspective, a continuation in the function can be
+/// stolen.  This attribute is used ensure correct code generation for
+/// such functions.
+def Stealable : EnumAttr<"stealable", [FnAttr]>;
+
 /// Argument is swift error.
 def SwiftError : EnumAttr<"swifterror", [ParamAttr]>;
 
