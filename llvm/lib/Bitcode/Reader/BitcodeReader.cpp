@@ -1501,6 +1501,8 @@ static Attribute::AttrKind getAttrFromCode(uint64_t Code) {
     return Attribute::SafeStack;
   case bitc::ATTR_KIND_SHADOWCALLSTACK:
     return Attribute::ShadowCallStack;
+  case bitc::ATTR_KIND_STEALABLE:
+    return Attribute::Stealable;
   case bitc::ATTR_KIND_STRICT_FP:
     return Attribute::StrictFP;
   case bitc::ATTR_KIND_STRUCT_RET:
