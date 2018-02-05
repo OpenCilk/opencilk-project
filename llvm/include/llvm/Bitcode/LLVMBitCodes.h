@@ -675,6 +675,7 @@ enum AttributeKindCodes {
   ATTR_KIND_NO_SANITIZE_COVERAGE = 76,
   ATTR_KIND_ELEMENTTYPE = 77,
   ATTR_KIND_SANITIZE_CILK = 78,
+  ATTR_KIND_STEALABLE = 79,
 };
 
 enum ComdatSelectionKindCodes {
