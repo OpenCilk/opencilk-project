@@ -1360,7 +1360,8 @@ def int_coro_subfn_addr : DefaultAttrsIntrinsic<
 def int_syncregion_start : Intrinsic<[llvm_token_ty], [],
                                      [IntrArgMemOnly]>;
 
-def int_detached_rethrow : Intrinsic<[], [], [Throws]>;
+def int_detached_rethrow : Intrinsic<[], [llvm_any_ty],
+                                     [IntrArgMemOnly, Throws]>;
 
 ///===-------------------------- Other Intrinsics --------------------------===//
 //
