@@ -1961,10 +1961,14 @@ def fretain_comments_from_system_headers : Flag<["-"], "fretain-comments-from-sy
   MarshallingInfoFlag<LangOpts<"RetainCommentsFromSystemHeaders">>;
 
 def ftapir_EQ : Joined<["-"], "ftapir=">, Group<f_Group>, Flags<[CC1Option]>,
-    HelpText<"Choose the backend for Tapir instructions (i.e., parallel runtime)">, Values<"cilk,cilkr,openmp,serial">;
-def fcilkplus : Flag<["-"], "fcilkplus">, Group<f_Group>, Flags<[CC1Option]>, HelpText<"Enable Cilk Plus extensions">;
-def frhino    : Flag <["-"], "frhino">, Group<f_Group>, Flags<[CC1Option]>, HelpText<"Enable Rhino extension to Tapir">;
-def fdetach   : Flag <["-"], "fdetach">, Group<f_Group>, Flags<[CC1Option]>, HelpText<"Disable memory optimizations and immediately lower">;
+  HelpText<"Choose the backend parallel runtime for Tapir instructions">,
+  Values<"none,serial,cilk,openmp,cilkr">;
+def fcilkplus : Flag<["-"], "fcilkplus">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Enable Cilk Plus extensions">;
+def frhino : Flag <["-"], "frhino">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Enable Rhino extension to Tapir">;
+def fdetach : Flag <["-"], "fdetach">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Disable memory optimizations and immediately lower">;
 
 def fmudflapth : Flag<["-"], "fmudflapth">, Group<f_Group>;
 def fmudflap : Flag<["-"], "fmudflap">, Group<f_Group>;
