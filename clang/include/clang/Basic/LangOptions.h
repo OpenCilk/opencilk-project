@@ -305,7 +305,7 @@ public:
   bool IsHeaderFile = false;
 
   /// \brief Runtime target for Tapir.
-  TapirTargetType TapirTarget = TapirTargetType::None;
+  TapirTargetType TapirTarget = TapirTargetType::Last_TapirTargetType;
 
   LangOptions();
 
