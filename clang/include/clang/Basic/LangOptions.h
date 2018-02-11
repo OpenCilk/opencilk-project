@@ -537,7 +537,7 @@ public:
   std::string OpenACCMacroOverride;
 
   /// Runtime target for Tapir.
-  TapirTargetType TapirTarget = TapirTargetType::None;
+  TapirTargetType TapirTarget = TapirTargetType::Last_TapirTargetType;
 
   LangOptions();
 
