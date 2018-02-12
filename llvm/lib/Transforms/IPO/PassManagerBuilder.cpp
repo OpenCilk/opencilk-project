@@ -551,7 +551,6 @@ void PassManagerBuilder::populateModulePassManager(
 
     if (tapirTarget) {
       MPM.add(createInferFunctionAttrsLegacyPass());
-      // MPM.add(createUnifyFunctionExitNodesPass());
       MPM.add(createLowerTapirToTargetPass(tapirTarget));
       // The lowering pass may leave cruft around.  Clean it up.
       MPM.add(createCFGSimplificationPass());
