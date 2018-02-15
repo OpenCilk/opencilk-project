@@ -77,7 +77,6 @@
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
-#include "llvm/Transforms/Tapir/TapirUtils.h"
 #include <algorithm>
 #include <cassert>
 #include <climits>
