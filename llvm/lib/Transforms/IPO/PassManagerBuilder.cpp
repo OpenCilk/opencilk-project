@@ -486,9 +486,7 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createLoopSpawningPass());
 
     // The LoopSpawning pass may leave cruft around.  Clean it up.
-    MPM.add(createLoopDeletionPass());
-    MPM.add(createCFGSimplificationPass());
-    MPM.add(createInstructionCombiningPass());
+    addFunctionSimplificationPasses(MPM);
 
     // Now lower Tapir to Target runtime calls.
     //
