@@ -602,6 +602,7 @@ public:
     case Intrinsic::coro_suspend:
     case Intrinsic::coro_param:
     case Intrinsic::coro_subfn_addr:
+    case Intrinsic::syncregion_start:
       // These intrinsics don't actually represent code after lowering.
       return 0;
     }
@@ -1116,6 +1117,11 @@ public:
       return TargetTTI->getVectorInstrCost(Opcode, U->getOperand(0)->getType(),
                                            Idx);
     }
+    case Instruction::Detach:
+      // Ideally, we'd determine the number of arguments of the detached task.
+      // But because that computation is expensive, we settle for 30x the basic
+      // cost of a function call.
+      return 30 * TTI::TCC_Basic;
     }
     // By default, just classify everything as 'basic'.
     return TTI::TCC_Basic;
@@ -1128,6 +1134,10 @@ public:
 
     if (isa<LoadInst>(I))
       return 4;
+
+    // Mark a detach instruction to be 30x the cost of a function call.
+    if (isa<DetachInst>(I))
+      return 1200;
 
     Type *DstTy = I->getType();
 
