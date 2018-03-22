@@ -703,6 +703,7 @@ public:
     case Intrinsic::coro_subfn_addr:
     case Intrinsic::threadlocal_address:
     case Intrinsic::experimental_widenable_condition:
+    case Intrinsic::syncregion_start:
       // These intrinsics don't actually represent code after lowering.
       return 0;
     }
@@ -1366,6 +1367,11 @@ public:
       Type *DstTy = Operands[0]->getType();
       return TargetTTI->getVectorInstrCost(*EEI, DstTy, CostKind, Idx);
     }
+    case Instruction::Detach:
+      // Ideally, we'd determine the number of arguments of the detached task.
+      // But because that computation is expensive, we settle for 30x the basic
+      // cost of a function call.
+      return 30 * TTI::TCC_Basic;
     }
 
     // By default, just classify everything as 'basic' or -1 to represent that
