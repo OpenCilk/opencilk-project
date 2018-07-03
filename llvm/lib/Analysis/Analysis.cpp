@@ -73,6 +73,7 @@ void llvm::initializeAnalysis(PassRegistry &Registry) {
   initializeScopedNoAliasAAWrapperPassPass(Registry);
   initializeLCSSAVerificationPassPass(Registry);
   initializeMemorySSAWrapperPassPass(Registry);
+  initializeTaskInfoWrapperPassPass(Registry);
 }
 
 LLVMBool LLVMVerifyModule(LLVMModuleRef M, LLVMVerifierFailureAction Action,
