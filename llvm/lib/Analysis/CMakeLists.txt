@@ -125,6 +125,7 @@ add_llvm_component_library(LLVMAnalysis
   StackSafetyAnalysis.cpp
   SyncDependenceAnalysis.cpp
   SyntheticCountsUtils.cpp
+  TapirTaskInfo.cpp
   TargetLibraryInfo.cpp
   TargetTransformInfo.cpp
   Trace.cpp
