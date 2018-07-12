@@ -221,6 +221,11 @@ checkFunctionMemoryAccess(Function &F, bool ThisBody, AAResults &AAR,
       if (ArgMR != ModRefInfo::NoModRef)
         addArgLocs(ME, Call, ArgMR, AAR);
       continue;
+    } else if (isa<SyncInst>(I) || isa<DetachInst>(I) || isa<ReattachInst>(I)) {
+      // Tapir instructions only access memory accessed by other instructions in
+      // the function.  Hence we let the other instructions determine the
+      // attribute of this function.
+      continue;
     }
 
     ModRefInfo MR = ModRefInfo::NoModRef;
