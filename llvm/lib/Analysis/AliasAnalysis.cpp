@@ -499,9 +499,6 @@ MemoryEffects AAResults::getMemoryEffects(const SyncInst *S,
       return Result;
 
     // Add predecessors
-    // for (const_pred_iterator PI = pred_begin(BB), E = pred_end(BB);
-    //      PI != E; ++PI) {
-    //   const BasicBlock *Pred = *PI;
     for (const BasicBlock *Pred : predecessors(BB)) {
       const TerminatorInst *PT = Pred->getTerminator();
       // Ignore reattached predecessors and predecessors that end in syncs,
@@ -724,8 +721,6 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I,
       return getMemoryEffects(Call, AAQIP).getModRef();
     if (const auto *D = dyn_cast<DetachInst>(I))
       return getMemoryEffects(D, AAQIP).getModRef();
-    if (const auto *S = dyn_cast<SyncInst>(I))
-      return getMemoryEffects(S, AAQIP).getModRef();
   }
 
   const MemoryLocation &Loc = OptLoc.value_or(MemoryLocation());
@@ -805,6 +800,10 @@ ModRefInfo AAResults::getModRefInfo(const DetachInst *D,
 ModRefInfo AAResults::getModRefInfo(const SyncInst *S,
                                     const MemoryLocation &Loc,
                                     AAQueryInfo &AAQI) {
+  // If no memory location pointer is given, treat the sync like a fence.
+  if (!Loc.Ptr)
+    return ModRefInfo::ModRef;
+
   ModRefInfo Result = ModRefInfo::NoModRef;
   SmallPtrSet<const BasicBlock *, 32> Visited;
   SmallVector<const BasicBlock *, 32> WorkList;
@@ -823,9 +822,6 @@ ModRefInfo AAResults::getModRefInfo(const SyncInst *S,
     }
 
     // Add predecessors
-    // for (const_pred_iterator PI = pred_begin(BB), E = pred_end(BB);
-    //      PI != E; ++PI) {
-    //   const BasicBlock *Pred = *PI;
     for (const BasicBlock *Pred : predecessors(BB)) {
       const TerminatorInst *PT = Pred->getTerminator();
       // Ignore reattached predecessors and predecessors that end in syncs,
