@@ -770,9 +770,6 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I,
     if (const auto *D = dyn_cast<DetachInst>(I)) {
       return createModRefInfo(getModRefBehavior(D));
     }
-    if (const auto *S = dyn_cast<SyncInst>(I)) {
-      return createModRefInfo(getModRefBehavior(S));
-    }
   }
 
   const MemoryLocation &Loc = OptLoc.getValueOr(MemoryLocation());
@@ -848,6 +845,10 @@ ModRefInfo AAResults::getModRefInfo(const DetachInst *D,
 
 ModRefInfo AAResults::getModRefInfo(const SyncInst *S,
                                     const MemoryLocation &Loc) {
+  // If no memory location pointer is given, treat the sync like a fence.
+  if (!Loc.Ptr)
+    return ModRefInfo::ModRef;
+
   ModRefInfo Result = ModRefInfo::NoModRef;
   SmallPtrSet<const BasicBlock *, 32> Visited;
   SmallVector<const BasicBlock *, 32> WorkList;
