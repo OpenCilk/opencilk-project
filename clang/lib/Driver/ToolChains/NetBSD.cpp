@@ -265,6 +265,8 @@ void netbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         ToolChain.getCompilerRTPath().c_str()));
   }
 
+  addCSIRuntime(getToolChain(), Args, CmdArgs);
+
   unsigned Major, Minor, Micro;
   ToolChain.getTriple().getOSVersion(Major, Minor, Micro);
   bool useLibgcc = true;
