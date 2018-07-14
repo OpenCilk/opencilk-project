@@ -272,6 +272,8 @@ void netbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back(Args.MakeArgString(ToolChain.getCompilerRTPath()));
   }
 
+  addCSIRuntime(getToolChain(), Args, CmdArgs);
+
   VersionTuple OsVersion = Triple.getOSVersion();
   bool useLibgcc = true;
   if (OsVersion >= VersionTuple(7) || OsVersion.getMajor() == 0) {

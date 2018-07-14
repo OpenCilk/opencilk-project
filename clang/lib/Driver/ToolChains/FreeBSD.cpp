@@ -288,6 +288,7 @@ void freebsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   unsigned Major = ToolChain.getTriple().getOSMajorVersion();
   bool Profiling = Args.hasArg(options::OPT_pg) && Major != 0 && Major < 14;
+  addCSIRuntime(ToolChain, Args, CmdArgs);
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs,
                    options::OPT_r)) {
     // Use the static OpenMP runtime with -static-openmp
