@@ -35,6 +35,9 @@ bool addSanitizerRuntimes(const ToolChain &TC, const llvm::opt::ArgList &Args,
 void linkSanitizerRuntimeDeps(const ToolChain &TC,
                               llvm::opt::ArgStringList &CmdArgs);
 
+bool addCSIRuntime(const ToolChain &TC, const llvm::opt::ArgList &Args,
+                   llvm::opt::ArgStringList &CmdArgs);
+
 void AddRunTimeLibs(const ToolChain &TC, const Driver &D,
                     llvm::opt::ArgStringList &CmdArgs,
                     const llvm::opt::ArgList &Args);
