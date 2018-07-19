@@ -28,6 +28,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/StackSafetyAnalysis.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/BinaryFormat/MachO.h"
@@ -655,7 +656,7 @@ char ASanGlobalsMetadataWrapperPass::ID = 0;
 /// AddressSanitizer: instrument the code in module to find memory bugs.
 struct AddressSanitizer {
   AddressSanitizer(Module &M, const GlobalsMetadata *GlobalsMD,
-                   const StackSafetyGlobalInfo *SSGI,
+                   const StackSafetyGlobalInfo *SSGI, TaskInfo &TI,
                    bool CompileKernel = false, bool Recover = false,
                    bool UseAfterScope = false,
                    AsanDetectStackUseAfterReturnMode UseAfterReturn =
@@ -666,7 +667,7 @@ struct AddressSanitizer {
         UseAfterScope(UseAfterScope || ClUseAfterScope),
         UseAfterReturn(ClUseAfterReturn.getNumOccurrences() ? ClUseAfterReturn
                                                             : UseAfterReturn),
-        GlobalsMD(*GlobalsMD), SSGI(SSGI) {
+        TI(TI), GlobalsMD(*GlobalsMD), SSGI(SSGI) {
     C = &(M.getContext());
     LongSize = M.getDataLayout().getPointerSizeInBits();
     IntptrTy = Type::getIntNTy(*C, LongSize);
@@ -769,6 +770,9 @@ private:
   FunctionCallee AsanPtrCmpFunction, AsanPtrSubFunction;
   Constant *AsanShadowGlobal;
 
+  // Analyses
+  TaskInfo &TI;
+
   // These arrays is indexed by AccessIsWrite, Experiment and log2(AccessSize).
   FunctionCallee AsanErrorCallback[2][2][kNumberOfAccessSizes];
   FunctionCallee AsanMemoryAccessCallback[2][2][kNumberOfAccessSizes];
@@ -810,6 +814,7 @@ public:
     if (ClUseStackSafety)
       AU.addRequired<StackSafetyGlobalInfoWrapperPass>();
     AU.addRequired<TargetLibraryInfoWrapperPass>();
+    AU.addRequired<TaskInfoWrapperPass>();
   }
 
   bool runOnFunction(Function &F) override {
@@ -819,9 +824,10 @@ public:
         ClUseStackSafety
             ? &getAnalysis<StackSafetyGlobalInfoWrapperPass>().getResult()
             : nullptr;
+    TaskInfo &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
     const TargetLibraryInfo *TLI =
         &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
-    AddressSanitizer ASan(*F.getParent(), &GlobalsMD, SSGI, CompileKernel,
+    AddressSanitizer ASan(*F.getParent(), &GlobalsMD, SSGI, TI, CompileKernel,
                           Recover, UseAfterScope, UseAfterReturn);
     return ASan.instrumentFunction(F, TLI);
   }
@@ -1275,8 +1281,9 @@ PreservedAnalyses AddressSanitizerPass::run(Function &F,
   auto &MAMProxy = AM.getResult<ModuleAnalysisManagerFunctionProxy>(F);
   Module &M = *F.getParent();
   if (auto *R = MAMProxy.getCachedResult<ASanGlobalsMetadataAnalysis>(M)) {
+    TaskInfo &TI = AM.getResult<TaskAnalysis>(F);
     const TargetLibraryInfo *TLI = &AM.getResult<TargetLibraryAnalysis>(F);
-    AddressSanitizer Sanitizer(M, R, nullptr, Options.CompileKernel,
+    AddressSanitizer Sanitizer(M, R, nullptr, TI, Options.CompileKernel,
                                Options.Recover, Options.UseAfterScope,
                                Options.UseAfterReturn);
     if (Sanitizer.instrumentFunction(F, TLI))
@@ -1351,6 +1358,7 @@ INITIALIZE_PASS_BEGIN(
 INITIALIZE_PASS_DEPENDENCY(ASanGlobalsMetadataWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(StackSafetyGlobalInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_END(
     AddressSanitizerLegacyPass, "asan",
     "AddressSanitizer: detects use-after-free and out-of-bounds bugs.", false,
@@ -1471,11 +1479,6 @@ bool AddressSanitizer::isInterestingAlloca(const AllocaInst &AI) {
   if (PreviouslySeenAllocaInfo != ProcessedAllocas.end())
     return PreviouslySeenAllocaInfo->getSecond();
 
-  bool FunctionContainsDetach = false;
-  {
-    for (const BasicBlock &BB : *(AI.getParent()->getParent()))
-      FunctionContainsDetach |= isa<DetachInst>(BB.getTerminator());
-  }
   bool IsInteresting =
       (AI.getAllocatedType()->isSized() &&
        // alloca() may be called with 0 size, ignore it.
@@ -1484,7 +1487,7 @@ bool AddressSanitizer::isInterestingAlloca(const AllocaInst &AI) {
        // Promotable allocas are common under -O0.
        (!ClSkipPromotableAllocas || !isAllocaPromotable(&AI)) &&
        (!ClSkipPromotableAllocas ||
-        (!FunctionContainsDetach || !isAllocaParallelPromotable(&AI, *DT))) &&
+        (TI.isSerial() || !TI.isAllocaParallelPromotable(&AI))) &&
        // inalloca allocas are not treated as static, and we don't want
        // dynamic alloca instrumentation for them as well.
        !AI.isUsedWithInAlloca() &&

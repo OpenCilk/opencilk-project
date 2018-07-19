@@ -41,6 +41,7 @@
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/PtrUseVisitor.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constant.h"
@@ -4070,8 +4071,7 @@ bool SROAPass::presplitLoadsAndStores(AllocaInst &AI, AllocaSlices &AS) {
       // a direct store) as needing to be resplit because it is no longer
       // promotable.
       if (AllocaInst *OtherAI = dyn_cast<AllocaInst>(StoreBasePtr)) {
-        assert((!FunctionContainsDetach ||
-                isAllocaParallelPromotable(OtherAI, *DT)) &&
+        assert(TI->isAllocaParallelPromotable(OtherAI) &&
                "Alloca must be promotable");
         ResplitPromotableAllocas.insert(OtherAI);
         Worklist.insert(OtherAI);
@@ -4196,8 +4196,7 @@ bool SROAPass::presplitLoadsAndStores(AllocaInst &AI, AllocaSlices &AS) {
     if (!SplitLoads) {
       if (AllocaInst *OtherAI = dyn_cast<AllocaInst>(LoadBasePtr)) {
         assert(OtherAI != &AI && "We can't re-split our own alloca!");
-        assert((!FunctionContainsDetach ||
-                isAllocaParallelPromotable(OtherAI, *DT)) &&
+        assert(TI->isAllocaParallelPromotable(OtherAI) &&
                "Alloca must be promotable");
         ResplitPromotableAllocas.insert(OtherAI);
         Worklist.insert(OtherAI);
@@ -4368,8 +4367,7 @@ AllocaInst *SROAPass::rewritePartition(AllocaInst &AI, AllocaSlices &AS,
     }
 
   // Check if any detaches block promotion.
-  Promotable &= (!FunctionContainsDetach ||
-                 isAllocaParallelPromotable(NewAI, *DT));
+  Promotable &= TI->isAllocaParallelPromotable(NewAI);
 
   if (Promotable) {
     for (Use *U : AS.getDeadUsesIfPromotable()) {
@@ -4381,8 +4379,7 @@ AllocaInst *SROAPass::rewritePartition(AllocaInst &AI, AllocaSlices &AS,
     }
     if (PHIUsers.empty() && SelectUsers.empty()) {
       // Promote the alloca.
-        assert((!FunctionContainsDetach ||
-              isAllocaParallelPromotable(NewAI, *DT)) &&
+      assert(TI->isAllocaParallelPromotable(NewAI) &&
              "Alloca must be promotable");
       PromotableAllocas.push_back(NewAI);
     } else {
@@ -4727,31 +4724,26 @@ bool SROAPass::promoteAllocas(Function &F) {
   NumPromoted += PromotableAllocas.size();
 
   LLVM_DEBUG(dbgs() << "Promoting allocas with mem2reg...\n");
-  PromoteMemToReg(PromotableAllocas, *DT, AC);
+  PromoteMemToReg(PromotableAllocas, *DT, AC, TI);
   PromotableAllocas.clear();
   return true;
 }
 
 PreservedAnalyses SROAPass::runImpl(Function &F, DominatorTree &RunDT,
-                                    AssumptionCache &RunAC) {
+                                    AssumptionCache &RunAC, TaskInfo &RunTI) {
   LLVM_DEBUG(dbgs() << "SROA function: " << F.getName() << "\n");
   C = &F.getContext();
   DT = &RunDT;
   AC = &RunAC;
+  TI = &RunTI;
 
   // Scan the function to get its entry block and all entry blocks of detached
   // CFG's.  We can perform this scan for entry blocks once for the function,
   // because this pass preserves the CFG.
   SmallVector<BasicBlock *, 4> EntryBlocks;
-  FunctionContainsDetach = false;
-  EntryBlocks.push_back(&F.getEntryBlock());
-  for (BasicBlock &BB : F)
-    if (BasicBlock *Pred = BB.getUniquePredecessor())
-      if (DetachInst *DI = dyn_cast<DetachInst>(Pred->getTerminator())) {
-        FunctionContainsDetach = true;
-        if (DI->getDetached() == &BB)
-          EntryBlocks.push_back(&BB);
-      }
+  FunctionContainsDetach = !TI->isSerial();
+  for (Task *T : depth_first(TI->getRootTask()))
+    EntryBlocks.push_back(T->getEntry());
 
   for (BasicBlock *BB : EntryBlocks) {
     BasicBlock &EntryBB = *BB;
@@ -4806,7 +4798,8 @@ PreservedAnalyses SROAPass::runImpl(Function &F, DominatorTree &RunDT,
 
 PreservedAnalyses SROAPass::run(Function &F, FunctionAnalysisManager &AM) {
   return runImpl(F, AM.getResult<DominatorTreeAnalysis>(F),
-                 AM.getResult<AssumptionAnalysis>(F));
+                 AM.getResult<AssumptionAnalysis>(F),
+                 AM.getResult<TaskAnalysis>(F));
 }
 
 /// A legacy pass for the legacy pass manager that wraps the \c SROA pass.
@@ -4830,13 +4823,15 @@ public:
 
     auto PA = Impl.runImpl(
         F, getAnalysis<DominatorTreeWrapperPass>().getDomTree(),
-        getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F));
+        getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F),
+        getAnalysis<TaskInfoWrapperPass>().getTaskInfo());
     return !PA.areAllPreserved();
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<AssumptionCacheTracker>();
     AU.addRequired<DominatorTreeWrapperPass>();
+    AU.addRequired<TaskInfoWrapperPass>();
     AU.addPreserved<GlobalsAAWrapperPass>();
     AU.setPreservesCFG();
   }
@@ -4852,5 +4847,6 @@ INITIALIZE_PASS_BEGIN(SROALegacyPass, "sroa",
                       "Scalar Replacement Of Aggregates", false, false)
 INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_END(SROALegacyPass, "sroa", "Scalar Replacement Of Aggregates",
                     false, false)
