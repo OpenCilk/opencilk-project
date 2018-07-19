@@ -276,6 +276,7 @@ FUNCTION_ANALYSIS("stack-safety-local", StackSafetyAnalysis())
 FUNCTION_ANALYSIS("targetir",
                   TM ? TM->getTargetIRAnalysis() : TargetIRAnalysis())
 FUNCTION_ANALYSIS("targetlibinfo", TargetLibraryAnalysis())
+FUNCTION_ANALYSIS("tasks", TaskAnalysis())
 FUNCTION_ANALYSIS("uniformity", UniformityInfoAnalysis())
 FUNCTION_ANALYSIS("verify", VerifierAnalysis())
 
