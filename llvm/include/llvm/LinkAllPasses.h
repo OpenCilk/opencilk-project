@@ -239,6 +239,7 @@ namespace {
       (void) llvm::createUnifyLoopExitsPass();
       (void) llvm::createFixIrreduciblePass();
       (void)llvm::createFunctionSpecializationPass();
+      (void) llvm::createTaskSimplifyPass();
 
       (void)new llvm::IntervalPartition();
       (void)new llvm::ScalarEvolutionWrapperPass();
