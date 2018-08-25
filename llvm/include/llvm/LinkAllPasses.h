@@ -44,6 +44,7 @@
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Tapir.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include "llvm/Transforms/Vectorize/LoadStoreVectorizer.h"
 #include <cstdlib>
@@ -96,7 +97,7 @@ namespace {
       (void) llvm::createLowerGlobalDtorsLegacyPass();
       (void) llvm::createLowerInvokePass();
       (void) llvm::createLowerSwitchPass();
-      (void) llvm::createLowerTapirToTargetPass(nullptr);
+      (void) llvm::createLowerTapirToTargetPass(llvm::TapirTargetID::None);
       (void) llvm::createNaryReassociatePass();
       (void) llvm::createObjCARCContractPass();
       (void) llvm::createPromoteMemoryToRegisterPass();
