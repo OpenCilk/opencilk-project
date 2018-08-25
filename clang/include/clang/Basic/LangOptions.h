@@ -492,7 +492,7 @@ public:
   bool UseTargetPathSeparator = false;
 
   /// Runtime target for Tapir.
-  TapirTargetType TapirTarget = TapirTargetType::Last_TapirTargetType;
+  TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
 
   LangOptions();
 
