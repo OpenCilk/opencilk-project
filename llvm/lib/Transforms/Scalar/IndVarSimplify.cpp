@@ -42,6 +42,7 @@
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -84,6 +85,7 @@
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/SimplifyIndVar.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include <cassert>
 #include <cstdint>
 #include <utility>
@@ -147,6 +149,7 @@ class IndVarSimplify {
   TargetLibraryInfo *TLI;
   const TargetTransformInfo *TTI;
   std::unique_ptr<MemorySSAUpdater> MSSAU;
+  TaskInfo *TI;
 
   SmallVector<WeakTrackingVH, 16> DeadInsts;
   bool WidenIndVars;
@@ -172,8 +175,9 @@ class IndVarSimplify {
 public:
   IndVarSimplify(LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
                  const DataLayout &DL, TargetLibraryInfo *TLI,
-                 TargetTransformInfo *TTI, MemorySSA *MSSA, bool WidenIndVars)
-      : LI(LI), SE(SE), DT(DT), DL(DL), TLI(TLI), TTI(TTI),
+                 TargetTransformInfo *TTI, MemorySSA *MSSA, TaskInfo *TI,
+                 bool WidenIndVars)
+      : LI(LI), SE(SE), DT(DT), DL(DL), TLI(TLI), TTI(TTI), TI(TI),
         WidenIndVars(WidenIndVars) {
     if (MSSA)
       MSSAU = std::make_unique<MemorySSAUpdater>(MSSA);
@@ -654,6 +658,12 @@ bool IndVarSimplify::simplifyAndExtend(Loop *L,
 //===----------------------------------------------------------------------===//
 //  linearFunctionTestReplace and its kin. Rewrite the loop exit condition.
 //===----------------------------------------------------------------------===//
+
+static Instruction *getExitingTerminator(Loop *L, TaskInfo *TI) {
+  if (getTaskIfTapirLoop(L, TI))
+    return L->getLoopLatch()->getTerminator();
+  return L->getExitingBlock()->getTerminator();
+}
 
 /// Given an Value which is hoped to be part of an add recurance in the given
 /// loop, return the associated Phi node if so.  Otherwise, return null.  Note
@@ -1748,6 +1758,8 @@ bool IndVarSimplify::run(Loop *L) {
   const SCEV *BackedgeTakenCount;
   if (VerifyIndvars)
     BackedgeTakenCount = SE->getBackedgeTakenCount(L);
+  if (getTaskIfTapirLoop(L, TI))
+    BackedgeTakenCount = SE->getExitCount(L, L->getLoopLatch());
 #endif
 
   bool Changed = false;
@@ -1926,7 +1938,10 @@ PreservedAnalyses IndVarSimplifyPass::run(Loop &L, LoopAnalysisManager &AM,
   Function *F = L.getHeader()->getParent();
   const DataLayout &DL = F->getParent()->getDataLayout();
 
+  const auto &FAM =
+    AM.getResult<FunctionAnalysisManagerLoopProxy>(L, AR).getManager();
   IndVarSimplify IVS(&AR.LI, &AR.SE, &AR.DT, DL, &AR.TLI, &AR.TTI, AR.MSSA,
+                     FAM.getCachedResult<TaskAnalysis>(*F),
                      WidenIndVars && AllowIVWidening);
   if (!IVS.run(&L))
     return PreservedAnalyses::all();
@@ -1958,13 +1973,14 @@ struct IndVarSimplifyLegacyPass : public LoopPass {
     auto *TLI = TLIP ? &TLIP->getTLI(*L->getHeader()->getParent()) : nullptr;
     auto *TTIP = getAnalysisIfAvailable<TargetTransformInfoWrapperPass>();
     auto *TTI = TTIP ? &TTIP->getTTI(*L->getHeader()->getParent()) : nullptr;
+    auto *TI = &getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
     const DataLayout &DL = L->getHeader()->getModule()->getDataLayout();
     auto *MSSAAnalysis = getAnalysisIfAvailable<MemorySSAWrapperPass>();
     MemorySSA *MSSA = nullptr;
     if (MSSAAnalysis)
       MSSA = &MSSAAnalysis->getMSSA();
 
-    IndVarSimplify IVS(LI, SE, DT, DL, TLI, TTI, MSSA, AllowIVWidening);
+    IndVarSimplify IVS(LI, SE, DT, DL, TLI, TTI, MSSA, TI, AllowIVWidening);
     return IVS.run(L);
   }
 
@@ -1972,6 +1988,7 @@ struct IndVarSimplifyLegacyPass : public LoopPass {
     AU.setPreservesCFG();
     AU.addPreserved<MemorySSAWrapperPass>();
     getLoopAnalysisUsage(AU);
+    AU.addRequired<TaskInfoWrapperPass>();
   }
 };
 
@@ -1982,6 +1999,7 @@ char IndVarSimplifyLegacyPass::ID = 0;
 INITIALIZE_PASS_BEGIN(IndVarSimplifyLegacyPass, "indvars",
                       "Induction Variable Simplification", false, false)
 INITIALIZE_PASS_DEPENDENCY(LoopPass)
+INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_END(IndVarSimplifyLegacyPass, "indvars",
                     "Induction Variable Simplification", false, false)
 
