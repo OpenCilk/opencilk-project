@@ -31,7 +31,7 @@ namespace llvm {
 ///
 template <class BlockT, class LoopT>
 void LoopBase<BlockT, LoopT>::getExitingBlocks(
-    SmallVectorImpl<BlockT *> &ExitingBlocks) const {
+    SmallVectorImpl<BlockT *> &ExitingBlocks, bool IgnoreDetachUnwind) const {
   assert(!isInvalid() && "Loop not in a valid state!");
   for (const auto BB : blocks())
     for (auto *Succ : children<BlockT *>(BB))
@@ -45,7 +45,8 @@ void LoopBase<BlockT, LoopT>::getExitingBlocks(
 /// getExitingBlock - If getExitingBlocks would return exactly one block,
 /// return that block. Otherwise return null.
 template <class BlockT, class LoopT>
-BlockT *LoopBase<BlockT, LoopT>::getExitingBlock() const {
+BlockT *
+LoopBase<BlockT, LoopT>::getExitingBlock(bool IgnoreDetachUnwind) const {
   assert(!isInvalid() && "Loop not in a valid state!");
   auto notInLoop = [&](BlockT *BB) { return !contains(BB); };
   auto isExitBlock = [&](BlockT *BB, bool AllowRepeats) -> BlockT * {
