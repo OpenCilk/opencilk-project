@@ -2691,7 +2691,8 @@ bool LoopAccessLegacyAnalysis::runOnFunction(Function &F) {
   auto &AA = getAnalysis<AAResultsWrapperPass>().getAAResults();
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   auto &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
-  LAIs = std::make_unique<LoopAccessInfoManager>(SE, AA, DT, LI, TLI);
+  auto &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
+  LAIs = std::make_unique<LoopAccessInfoManager>(SE, AA, DT, LI, TI, TLI);
   return false;
 }
 
@@ -2700,6 +2701,7 @@ void LoopAccessLegacyAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequiredTransitive<AAResultsWrapperPass>();
   AU.addRequiredTransitive<DominatorTreeWrapperPass>();
   AU.addRequiredTransitive<LoopInfoWrapperPass>();
+  AU.addRequiredTransitive<TaskInfoWrapperPass>();
 
   AU.setPreservesAll();
 }
@@ -2709,7 +2711,7 @@ LoopAccessInfoManager LoopAccessAnalysis::run(Function &F,
   return LoopAccessInfoManager(
       AM.getResult<ScalarEvolutionAnalysis>(F), AM.getResult<AAManager>(F),
       AM.getResult<DominatorTreeAnalysis>(F), AM.getResult<LoopAnalysis>(F),
-      &AM.getResult<TargetLibraryAnalysis>(F));
+      AM.getResult<TaskAnalysis>(F), &AM.getResult<TargetLibraryAnalysis>(F));
 }
 
 char LoopAccessLegacyAnalysis::ID = 0;
@@ -2721,6 +2723,7 @@ INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_END(LoopAccessLegacyAnalysis, LAA_NAME, laa_name, false, true)
 
 AnalysisKey LoopAccessAnalysis::Key;
