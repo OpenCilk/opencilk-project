@@ -686,6 +686,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
   FPM.addPass(CorrelatedValuePropagationPass());
 
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   if (Level == OptimizationLevel::O3)
     FPM.addPass(AggressiveInstCombinePass());
   FPM.addPass(InstCombinePass());
@@ -703,6 +704,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
 
   FPM.addPass(TailCallElimPass());
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
 
   // Form canonically associated expression trees, and simplify the trees using
   // basic mathematical properties. For example, this will form (nearly)
@@ -761,6 +763,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
       std::move(LPM1), EnableMSSALoopDependency, /*UseBlockFrequencyInfo=*/true,
       DebugLogging));
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   FPM.addPass(InstCombinePass());
   if (EnableLoopFlatten)
     FPM.addPass(LoopFlattenPass());
@@ -821,6 +824,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
     C(FPM, Level);
 
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   FPM.addPass(InstCombinePass());
   invokePeepholeEPCallbacks(FPM, Level);
 
@@ -1126,6 +1130,7 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
   invokePeepholeEPCallbacks(GlobalCleanupPM, Level);
 
   GlobalCleanupPM.addPass(SimplifyCFGPass());
+  GlobalCleanupPM.addPass(TaskSimplifyPass());
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(GlobalCleanupPM)));
 
   // Add all the requested passes for instrumentation PGO, if requested.
@@ -1280,6 +1285,8 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
         std::move(LPM), EnableMSSALoopDependency, /*UseBlockFrequencyInfo=*/true,
         DebugLogging));
     OptimizePM.addPass(SimplifyCFGPass());
+    // Cleanup tasks after the loop optimization passes.
+    OptimizePM.addPass(TaskSimplifyPass());
     OptimizePM.addPass(InstCombinePass());
   }
 
@@ -1371,6 +1378,9 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // LoopSink (and other loop passes since the last simplifyCFG) might have
   // resulted in single-entry-single-exit or empty blocks. Clean up the CFG.
   OptimizePM.addPass(SimplifyCFGPass());
+
+  // Cleanup tasks as well.
+  OptimizePM.addPass(TaskSimplifyPass());
 
   // Optimize PHIs by speculating around them when profitable. Note that this
   // pass needs to be run after any PRE or similar pass as it is essentially
