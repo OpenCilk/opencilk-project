@@ -422,7 +422,8 @@ public:
   /// build them.
   ModulePassManager
   buildThinLTODefaultPipeline(OptimizationLevel Level, bool DebugLogging,
-                              const ModuleSummaryIndex *ImportSummary);
+                              const ModuleSummaryIndex *ImportSummary,
+                              bool LowerTapir = false);
 
   /// Build a pre-link, LTO-targeting default optimization pipeline to a pass
   /// manager.
@@ -452,7 +453,8 @@ public:
   /// build them.
   ModulePassManager buildLTODefaultPipeline(OptimizationLevel Level,
                                             bool DebugLogging,
-                                            ModuleSummaryIndex *ExportSummary);
+                                            ModuleSummaryIndex *ExportSummary,
+                                            bool LowerTapir = false);
 
   /// Build the default `AAManager` with the default alias analysis pipeline
   /// registered.

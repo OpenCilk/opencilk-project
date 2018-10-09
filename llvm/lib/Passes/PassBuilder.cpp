@@ -1361,8 +1361,10 @@ PassBuilder::buildThinLTOPreLinkDefaultPipeline(OptimizationLevel Level,
 
 ModulePassManager PassBuilder::buildThinLTODefaultPipeline(
     OptimizationLevel Level, bool DebugLogging,
-    const ModuleSummaryIndex *ImportSummary) {
+    const ModuleSummaryIndex *ImportSummary, bool LowerTapir) {
   ModulePassManager MPM(DebugLogging);
+  bool RerunAfterTapirLowering = false;
+  bool TapirHasBeenLowered = !LowerTapir;
 
   if (ImportSummary) {
     // These passes import type identifier resolutions for whole-program
@@ -1390,12 +1392,23 @@ ModulePassManager PassBuilder::buildThinLTODefaultPipeline(
   // Force any function attributes we want the rest of the pipeline to observe.
   MPM.addPass(ForceFunctionAttrsPass());
 
+  do {
+    RerunAfterTapirLowering = !TapirHasBeenLowered && LowerTapir;
+
   // Add the core simplification pipeline.
   MPM.addPass(buildModuleSimplificationPipeline(Level, ThinLTOPhase::PostLink,
                                                 DebugLogging));
 
-  // Now add the optimization pipeline.
-  MPM.addPass(buildModuleOptimizationPipeline(Level, DebugLogging));
+    // Now add the optimization pipeline.
+    MPM.addPass(buildModuleOptimizationPipeline(Level, DebugLogging));
+
+    if (!TapirHasBeenLowered) {
+      MPM.addPass(buildTapirLoweringPipeline(Level, ThinLTOPhase::PostLink,
+                                             DebugLogging));
+
+      TapirHasBeenLowered = true;
+    }
+  } while (RerunAfterTapirLowering);
 
   return MPM;
 }
@@ -1412,8 +1425,11 @@ PassBuilder::buildLTOPreLinkDefaultPipeline(OptimizationLevel Level,
 
 ModulePassManager
 PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level, bool DebugLogging,
-                                     ModuleSummaryIndex *ExportSummary) {
+                                     ModuleSummaryIndex *ExportSummary,
+                                     bool LowerTapir) {
   ModulePassManager MPM(DebugLogging);
+  bool RerunAfterTapirLowering = false;
+  bool TapirHasBeenLowered = !LowerTapir;
 
   if (Level == OptimizationLevel::O0) {
     // The WPD and LowerTypeTest passes need to run at -O0 to lower type
@@ -1467,6 +1483,9 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level, bool DebugLogging,
     // they may target at run-time. This should follow IPSCCP.
     MPM.addPass(CalledValuePropagationPass());
   }
+
+  do {
+    RerunAfterTapirLowering = !TapirHasBeenLowered && LowerTapir;
 
   // Now deduce any function attributes based in the current code.
   MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(
@@ -1638,6 +1657,14 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level, bool DebugLogging,
 
   // Now that we have optimized the program, discard unreachable functions.
   MPM.addPass(GlobalDCEPass());
+
+    if (!TapirHasBeenLowered) {
+      MPM.addPass(buildTapirLoweringPipeline(Level, ThinLTOPhase::None,
+                                             DebugLogging));
+
+      TapirHasBeenLowered = true;
+    }
+  } while (RerunAfterTapirLowering);
 
   // FIXME: Maybe enable MergeFuncs conditionally after it's ported.
   return MPM;
