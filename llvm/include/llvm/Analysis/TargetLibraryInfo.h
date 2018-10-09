@@ -17,6 +17,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 
 namespace llvm {
 template <typename T> class ArrayRef;
@@ -52,6 +53,7 @@ class TargetLibraryInfoImpl {
   llvm::DenseMap<unsigned, std::string> CustomNames;
   static StringLiteral const StandardNames[NumLibFuncs];
   bool ShouldExtI32Param, ShouldExtI32Return, ShouldSignExtI32Param;
+  TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
 
   enum AvailabilityState {
     StandardName = 3, // (memset to all ones)
@@ -203,6 +205,22 @@ public:
   /// Returns the largest vectorization factor used in the list of
   /// vector functions.
   unsigned getWidestVF(StringRef ScalarF) const;
+
+  /// Set the target for Tapir lowering.
+  void setTapirTarget(TapirTargetID TargetID) {
+    TapirTarget = TargetID;
+  }
+
+  /// Return the ID of the target for Tapir lowering.
+  TapirTargetID getTapirTarget() const {
+    return TapirTarget;
+  }
+
+  /// Return true if we have a nontrivial target for Tapir lowering.
+  bool hasTapirTarget() const {
+    return (TapirTarget != TapirTargetID::Last_TapirTargetID) &&
+      (TapirTarget != TapirTargetID::None);
+  }
 };
 
 /// Provides information about what library functions are available for
@@ -393,6 +411,16 @@ public:
   /// \copydoc TargetLibraryInfoImpl::getWCharSize()
   unsigned getWCharSize(const Module &M) const {
     return Impl->getWCharSize(M);
+  }
+
+  /// \copydoc TargetLibraryInfoImpl::getTapirTarget()
+  TapirTargetID getTapirTarget() const {
+    return Impl->getTapirTarget();
+  }
+
+  /// \copydoc TargetLibraryInfoImpl::hasTapirTarget()
+  bool hasTapirTarget() const {
+    return Impl->hasTapirTarget();
   }
 
   /// Handle invalidation from the pass manager.
