@@ -138,6 +138,7 @@ void llvm::computeLTOCacheKey(
   AddUnsigned(Conf.CGFileType);
   AddUnsigned(Conf.OptLevel);
   AddUnsigned(Conf.Freestanding);
+  AddUnsigned(static_cast<unsigned>(Conf.TapirTarget));
   AddString(Conf.OptPipeline);
   AddString(Conf.AAPipeline);
   AddString(Conf.OverrideTriple);
