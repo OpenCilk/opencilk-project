@@ -495,9 +495,6 @@ public:
   // received as a result of a standard operator new (-fcheck-new)
   bool CheckNew = false;
 
-  /// Runtime target for Tapir.
-  TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
-
   LangOptions();
 
   /// Set language defaults for the given input language and
