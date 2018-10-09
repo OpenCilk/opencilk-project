@@ -134,6 +134,7 @@ void llvm::computeLTOCacheKey(
   AddUnsigned(Conf.OptLevel);
   AddUnsigned(Conf.UseNewPM);
   AddUnsigned(Conf.Freestanding);
+  AddUnsigned(static_cast<unsigned>(Conf.TapirTarget));
   AddString(Conf.OptPipeline);
   AddString(Conf.AAPipeline);
   AddString(Conf.OverrideTriple);
