@@ -378,8 +378,7 @@ public:
   /// and various LTO pipelines to lower Tapir constructs.  This pipeline is
   /// expected to run late in the parent pipelines.
   ModulePassManager buildTapirLoweringPipeline(OptimizationLevel Level,
-                                               ThinLTOPhase Phase,
-                                               bool DebugLogging = false);
+                                               ThinLTOPhase Phase);
 
   /// Build a per-module default optimization pipeline.
   ///
@@ -423,7 +422,8 @@ public:
   /// build them.
   ModulePassManager
   buildThinLTODefaultPipeline(OptimizationLevel Level,
-                              const ModuleSummaryIndex *ImportSummary);
+                              const ModuleSummaryIndex *ImportSummary,
+                              bool LowerTapir = false);
 
   /// Build a pre-link, LTO-targeting default optimization pipeline to a pass
   /// manager.
@@ -451,7 +451,8 @@ public:
   /// require some transformations for semantic reasons, they should explicitly
   /// build them.
   ModulePassManager buildLTODefaultPipeline(OptimizationLevel Level,
-                                            ModuleSummaryIndex *ExportSummary);
+                                            ModuleSummaryIndex *ExportSummary,
+                                            bool LowerTapir = false);
 
   /// Build an O0 pipeline with the minimal semantically required passes.
   ///
