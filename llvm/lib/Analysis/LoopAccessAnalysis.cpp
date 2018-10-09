@@ -1858,6 +1858,11 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
             !VFDatabase::getMappings(*Call).empty())
           continue;
 
+        // TODO: Determine if we should do something other than ignore Tapir
+        // instructions here.
+        if (isa<DetachInst>(&I) || isa<ReattachInst>(&I) || isa<SyncInst>(&I))
+          continue;
+
         auto *Ld = dyn_cast<LoadInst>(&I);
         if (!Ld) {
           recordAnalysis("CantVectorizeInstruction", Ld)
@@ -1882,6 +1887,11 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
 
       // Save 'store' instructions. Abort if other instructions write to memory.
       if (I.mayWriteToMemory()) {
+        // TODO: Determine if we should do something other than ignore Tapir
+        // instructions here.
+        if (isa<DetachInst>(&I) || isa<ReattachInst>(&I) || isa<SyncInst>(&I))
+          continue;
+
         auto *St = dyn_cast<StoreInst>(&I);
         if (!St) {
           recordAnalysis("CantVectorizeInstruction", St)
