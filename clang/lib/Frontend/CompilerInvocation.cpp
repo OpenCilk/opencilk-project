@@ -31,6 +31,7 @@
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/Options.h"
+#include "clang/Driver/Tapir.h"
 #include "clang/Frontend/CommandLineSourceLoc.h"
 #include "clang/Frontend/DependencyOutputOptions.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
@@ -87,7 +88,7 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/Transforms/Tapir/TapirTypes.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include "llvm/Support/ScopedPrinter.h"
 #include <algorithm>
 #include <atomic>
@@ -1672,6 +1673,18 @@ bool CompilerInvocation::ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args,
         Opts.getDebugInfo() == codegenoptions::DebugInfoConstructor)
       Opts.setDebugInfo(codegenoptions::LimitedDebugInfo);
   }
+
+  // Parse Tapir-related codegen options.
+  TapirTargetID TapirTarget = parseTapirTarget(Args);
+  if (TapirTarget == TapirTargetID::Last_TapirTargetID)
+    if (const Arg *A = Args.getLastArg(OPT_ftapir_EQ))
+      Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args)
+                                                << A->getValue();
+  Opts.setTapirTarget(TapirTarget);
+  // Early outlining of Tapir
+  Opts.TapirEarlyOutline = Args.hasArg(OPT_foutline_tapir_early);
+  // Rhino optimizations of Tapir control-flow construct.
+  Opts.TapirRhino = Args.hasArg(OPT_frhino);
 
   for (const auto &Arg : Args.getAllArgValues(OPT_fdebug_prefix_map_EQ)) {
     auto Split = StringRef(Arg).split('=');
@@ -3770,6 +3783,11 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (T.isOSAIX() && (Args.hasArg(OPT_mignore_xcoff_visibility)))
     Opts.IgnoreXCOFFVisibility = 1;
 
+  Opts.Cilk = Args.hasArg(OPT_fcilkplus);
+
+  if (Opts.Cilk && (Opts.ObjC1 || Opts.ObjC2))
+    Diags.Report(diag::err_drv_cilk_objc);
+
   if (Args.hasArg(OPT_ftrapv)) {
     Opts.setSignedOverflowBehavior(LangOptions::SOB_Trapping);
     // Set the handler, if one is specified.
@@ -4522,19 +4540,6 @@ bool CompilerInvocation::CreateFromArgsImpl(
       Res.getCodeGenOpts().MisExpect = true;
     }
   }
-
-  LangOpts.Cilk = Args.hasArg(OPT_fcilkplus);
-  LangOpts.Detach = Args.hasArg(OPT_fdetach);
-  LangOpts.Rhino = Args.hasArg(OPT_frhino);
-  TapirTargetID TapirTarget = parseTapirTarget(Args);
-  if (TapirTarget == TapirTargetID::Last_TapirTargetID)
-    if (const Arg *A = Args.getLastArg(OPT_ftapir_EQ))
-      Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args)
-                                                << A->getValue();
-  LangOpts.TapirTarget = TapirTarget;
-
-  if (LangOpts.Cilk && (LangOpts.ObjC1 || LangOpts.ObjC2))
-    Diags.Report(diag::err_drv_cilk_objc);
 
   if (LangOpts.CUDA) {
     // During CUDA device-side compilation, the aux triple is the
