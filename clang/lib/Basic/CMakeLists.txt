@@ -65,7 +65,6 @@ add_clang_library(clangBasic
   SourceLocation.cpp
   SourceManager.cpp
   Stack.cpp
-  Tapir.cpp
   TargetID.cpp
   TargetInfo.cpp
   Targets.cpp
