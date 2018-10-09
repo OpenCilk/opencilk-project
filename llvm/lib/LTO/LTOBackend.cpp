@@ -153,6 +153,11 @@ createTargetMachine(const Config &Conf, const Target *TheTarget, Module &M) {
       CodeModel, Conf.CGOptLevel));
 }
 
+static bool hasTapirTarget(const Config &Conf) {
+  return (Conf.TapirTarget != TapirTargetID::Last_TapirTargetID) &&
+         (Conf.TapirTarget != TapirTargetID::None);
+}
+
 static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
                            unsigned OptLevel, bool IsThinLTO,
                            ModuleSummaryIndex *ExportSummary,
@@ -218,9 +223,10 @@ static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
 
   if (IsThinLTO)
     MPM = PB.buildThinLTODefaultPipeline(OL, Conf.DebugPassManager,
-                                         ImportSummary);
+                                         ImportSummary, hasTapirTarget(Conf));
   else
-    MPM = PB.buildLTODefaultPipeline(OL, Conf.DebugPassManager, ExportSummary);
+    MPM = PB.buildLTODefaultPipeline(OL, Conf.DebugPassManager, ExportSummary,
+                                     hasTapirTarget(Conf));
   MPM.run(Mod, MAM);
 
   // FIXME (davide): verify the output.
@@ -277,6 +283,7 @@ static void runOldPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
 
   PassManagerBuilder PMB;
   PMB.LibraryInfo = new TargetLibraryInfoImpl(Triple(TM->getTargetTriple()));
+  PMB.LibraryInfo->setTapirTarget(Conf.TapirTarget);
   PMB.Inliner = createFunctionInliningPass();
   PMB.ExportSummary = ExportSummary;
   PMB.ImportSummary = ImportSummary;
@@ -293,6 +300,7 @@ static void runOldPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
     PMB.EnablePGOCSInstrUse = true;
     PMB.PGOInstrUse = Conf.CSIRProfile;
   }
+  PMB.TapirTarget = Conf.TapirTarget;
   if (IsThinLTO)
     PMB.populateThinLTOPassManager(passes);
   else
