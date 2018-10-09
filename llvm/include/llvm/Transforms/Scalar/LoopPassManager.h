@@ -47,6 +47,7 @@
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Dominators.h"
@@ -273,6 +274,7 @@ public:
                                        AM.getResult<ScalarEvolutionAnalysis>(F),
                                        AM.getResult<TargetLibraryAnalysis>(F),
                                        AM.getResult<TargetIRAnalysis>(F),
+                                       AM.getResult<TaskAnalysis>(F),
                                        MSSA};
 
     // Setup the loop analysis manager from its proxy. It is important that
