@@ -276,7 +276,8 @@ public:
   /// addPreLinkLTODefaultPipeline, and the two coordinate closely.
   ModulePassManager
   buildThinLTODefaultPipeline(OptimizationLevel Level,
-                              const ModuleSummaryIndex *ImportSummary);
+                              const ModuleSummaryIndex *ImportSummary,
+                              bool LowerTapir = false);
 
   /// Build a pre-link, LTO-targeting default optimization pipeline to a pass
   /// manager.
@@ -294,7 +295,8 @@ public:
   /// when IR coming into the LTO phase was first run through \c
   /// addPreLinkLTODefaultPipeline, and the two coordinate closely.
   ModulePassManager buildLTODefaultPipeline(OptimizationLevel Level,
-                                            ModuleSummaryIndex *ExportSummary);
+                                            ModuleSummaryIndex *ExportSummary,
+                                            bool LowerTapir = false);
 
   /// Build an O0 pipeline with the minimal semantically required passes.
   ///
