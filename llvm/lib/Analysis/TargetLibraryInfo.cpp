@@ -35,6 +35,22 @@ static cl::opt<TargetLibraryInfoImpl::VectorLibrary> ClVectorLibrary(
                clEnumValN(TargetLibraryInfoImpl::SLEEFGNUABI, "sleefgnuabi",
                           "SIMD Library for Evaluating Elementary Functions")));
 
+static cl::opt<TapirTargetID> ClTapirTarget(
+    "tapir-target", cl::Hidden, cl::desc("Target runtime for Tapir"),
+    cl::init(TapirTargetID::Cilk),
+    cl::values(clEnumValN(TapirTargetID::None,
+                          "none", "None"),
+               clEnumValN(TapirTargetID::Serial,
+                          "serial", "Serial code"),
+               clEnumValN(TapirTargetID::Cilk,
+                          "cilk", "Cilk Plus"),
+               clEnumValN(TapirTargetID::OpenMP,
+                          "openmp", "OpenMP"),
+               clEnumValN(TapirTargetID::CilkR,
+                          "cilkr", "CilkR"),
+               clEnumValN(TapirTargetID::Cheetah,
+                          "cheetah", "Cheetah")));
+
 StringLiteral const TargetLibraryInfoImpl::StandardNames[LibFunc::NumLibFuncs] =
     {
 #define TLI_DEFINE_STRING
@@ -855,6 +871,8 @@ static void initialize(TargetLibraryInfoImpl &TLI, const Triple &T,
   }
 
   TLI.addVectorizableFunctionsFromVecLib(ClVectorLibrary, T);
+
+  TLI.setTapirTarget(ClTapirTarget);
 }
 
 TargetLibraryInfoImpl::TargetLibraryInfoImpl() {
@@ -876,7 +894,7 @@ TargetLibraryInfoImpl::TargetLibraryInfoImpl(const TargetLibraryInfoImpl &TLI)
       ShouldExtI32Return(TLI.ShouldExtI32Return),
       ShouldSignExtI32Param(TLI.ShouldSignExtI32Param),
       ShouldSignExtI32Return(TLI.ShouldSignExtI32Return),
-      SizeOfInt(TLI.SizeOfInt) {
+      SizeOfInt(TLI.SizeOfInt), TapirTarget(TLI.TapirTarget) {
   memcpy(AvailableArray, TLI.AvailableArray, sizeof(AvailableArray));
   VectorDescs = TLI.VectorDescs;
   ScalarDescs = TLI.ScalarDescs;
@@ -888,7 +906,7 @@ TargetLibraryInfoImpl::TargetLibraryInfoImpl(TargetLibraryInfoImpl &&TLI)
       ShouldExtI32Return(TLI.ShouldExtI32Return),
       ShouldSignExtI32Param(TLI.ShouldSignExtI32Param),
       ShouldSignExtI32Return(TLI.ShouldSignExtI32Return),
-      SizeOfInt(TLI.SizeOfInt) {
+      SizeOfInt(TLI.SizeOfInt), TapirTarget(TLI.TapirTarget) {
   std::move(std::begin(TLI.AvailableArray), std::end(TLI.AvailableArray),
             AvailableArray);
   VectorDescs = TLI.VectorDescs;
@@ -902,6 +920,7 @@ TargetLibraryInfoImpl &TargetLibraryInfoImpl::operator=(const TargetLibraryInfoI
   ShouldSignExtI32Param = TLI.ShouldSignExtI32Param;
   ShouldSignExtI32Return = TLI.ShouldSignExtI32Return;
   SizeOfInt = TLI.SizeOfInt;
+  TapirTarget = TLI.TapirTarget;
   memcpy(AvailableArray, TLI.AvailableArray, sizeof(AvailableArray));
   return *this;
 }
@@ -913,6 +932,7 @@ TargetLibraryInfoImpl &TargetLibraryInfoImpl::operator=(TargetLibraryInfoImpl &&
   ShouldSignExtI32Param = TLI.ShouldSignExtI32Param;
   ShouldSignExtI32Return = TLI.ShouldSignExtI32Return;
   SizeOfInt = TLI.SizeOfInt;
+  TapirTarget = TLI.TapirTarget;
   std::move(std::begin(TLI.AvailableArray), std::end(TLI.AvailableArray),
             AvailableArray);
   return *this;

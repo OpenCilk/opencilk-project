@@ -15,6 +15,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include <optional>
 
 namespace llvm {
@@ -55,6 +56,7 @@ class TargetLibraryInfoImpl {
   static StringLiteral const StandardNames[NumLibFuncs];
   bool ShouldExtI32Param, ShouldExtI32Return, ShouldSignExtI32Param, ShouldSignExtI32Return;
   unsigned SizeOfInt;
+  TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
 
   enum AvailabilityState {
     StandardName = 3, // (memset to all ones)
@@ -224,6 +226,22 @@ public:
   /// conventions.
   static bool isCallingConvCCompatible(CallBase *CI);
   static bool isCallingConvCCompatible(Function *Callee);
+
+  /// Set the target for Tapir lowering.
+  void setTapirTarget(TapirTargetID TargetID) {
+    TapirTarget = TargetID;
+  }
+
+  /// Return the ID of the target for Tapir lowering.
+  TapirTargetID getTapirTarget() const {
+    return TapirTarget;
+  }
+
+  /// Return true if we have a nontrivial target for Tapir lowering.
+  bool hasTapirTarget() const {
+    return (TapirTarget != TapirTargetID::Last_TapirTargetID) &&
+      (TapirTarget != TapirTargetID::None);
+  }
 };
 
 /// Provides information about what library functions are available for
@@ -506,6 +524,16 @@ public:
   /// \copydoc TargetLibraryInfoImpl::getIntSize()
   unsigned getIntSize() const {
     return Impl->getIntSize();
+  }
+
+  /// \copydoc TargetLibraryInfoImpl::getTapirTarget()
+  TapirTargetID getTapirTarget() const {
+    return Impl->getTapirTarget();
+  }
+
+  /// \copydoc TargetLibraryInfoImpl::hasTapirTarget()
+  bool hasTapirTarget() const {
+    return Impl->hasTapirTarget();
   }
 
   /// Handle invalidation from the pass manager.
