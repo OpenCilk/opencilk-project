@@ -30,6 +30,7 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
@@ -174,6 +175,7 @@ void llvm::getLoopAnalysisUsage(AnalysisUsage &AU) {
   AU.addPreserved<SCEVAAWrapperPass>();
   AU.addRequired<ScalarEvolutionWrapperPass>();
   AU.addPreserved<ScalarEvolutionWrapperPass>();
+  AU.addRequired<TaskInfoWrapperPass>();
   // FIXME: When all loop passes preserve MemorySSA, it can be required and
   // preserved here instead of the individual handling in each pass.
 }
@@ -196,6 +198,7 @@ void llvm::initializeLoopPassPass(PassRegistry &Registry) {
   INITIALIZE_PASS_DEPENDENCY(GlobalsAAWrapperPass)
   INITIALIZE_PASS_DEPENDENCY(SCEVAAWrapperPass)
   INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
+  INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
   INITIALIZE_PASS_DEPENDENCY(MemorySSAWrapperPass)
 }
 
