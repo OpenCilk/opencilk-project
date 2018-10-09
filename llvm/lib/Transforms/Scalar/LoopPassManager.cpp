@@ -13,6 +13,7 @@
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeProfiler.h"
@@ -208,6 +209,7 @@ PreservedAnalyses FunctionToLoopPassAdaptor::run(Function &F,
                                      AM.getResult<ScalarEvolutionAnalysis>(F),
                                      AM.getResult<TargetLibraryAnalysis>(F),
                                      AM.getResult<TargetIRAnalysis>(F),
+                                     AM.getResult<TaskAnalysis>(F),
                                      BFI,
                                      MSSA};
 
@@ -327,6 +329,7 @@ PreservedAnalyses FunctionToLoopPassAdaptor::run(Function &F,
     PA.preserve<BlockFrequencyAnalysis>();
   if (UseMemorySSA)
     PA.preserve<MemorySSAAnalysis>();
+  PA.preserve<TaskAnalysis>();
   return PA;
 }
 
