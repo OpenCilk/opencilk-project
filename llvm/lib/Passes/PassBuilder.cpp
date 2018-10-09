@@ -712,6 +712,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
   FPM.addPass(CorrelatedValuePropagationPass());
 
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   if (Level == OptimizationLevel::O3)
     FPM.addPass(AggressiveInstCombinePass());
   FPM.addPass(InstCombinePass());
@@ -729,6 +730,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
 
   FPM.addPass(TailCallElimPass());
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
 
   // Form canonically associated expression trees, and simplify the trees using
   // basic mathematical properties. For example, this will form (nearly)
@@ -798,6 +800,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
                                               EnableMSSALoopDependency,
                                               /*UseBlockFrequencyInfo=*/true));
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   FPM.addPass(InstCombinePass());
   if (EnableLoopFlatten)
     FPM.addPass(createFunctionToLoopPassAdaptor(LoopFlattenPass()));
@@ -861,6 +864,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
 
   FPM.addPass(SimplifyCFGPass(
       SimplifyCFGOptions().hoistCommonInsts(true).sinkCommonInsts(true)));
+  FPM.addPass(TaskSimplifyPass());
   FPM.addPass(InstCombinePass());
   invokePeepholeEPCallbacks(FPM, Level);
 
@@ -1174,6 +1178,7 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
   invokePeepholeEPCallbacks(GlobalCleanupPM, Level);
 
   GlobalCleanupPM.addPass(SimplifyCFGPass());
+  GlobalCleanupPM.addPass(TaskSimplifyPass());
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(GlobalCleanupPM)));
 
   // Add all the requested passes for instrumentation PGO, if requested.
@@ -1256,6 +1261,8 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
         std::move(LPM), EnableMSSALoopDependency,
         /*UseBlockFrequencyInfo=*/true));
     FPM.addPass(SimplifyCFGPass());
+    // Cleanup tasks after the loop optimization passes.
+    FPM.addPass(TaskSimplifyPass());
     FPM.addPass(InstCombinePass());
   }
 
@@ -1456,6 +1463,9 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   OptimizePM.addPass(SimplifyCFGPass());
 
   OptimizePM.addPass(CoroCleanupPass());
+
+  // Cleanup tasks as well.
+  OptimizePM.addPass(TaskSimplifyPass());
 
   // Add the core optimizing pipeline.
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(OptimizePM)));
