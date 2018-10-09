@@ -901,8 +901,8 @@ static void generateMachineCodeOrAssemblyImpl(clang::DiagnosticsEngine &diags,
       createTargetTransformInfoWrapperPass(tm.getTargetIRAnalysis()));
 
   llvm::Triple triple(llvmModule.getTargetTriple());
-  llvm::TargetLibraryInfoImpl *tlii =
-      llvm::driver::createTLII(triple, codeGenOpts.getVecLib());
+  llvm::TargetLibraryInfoImpl *tlii = llvm::driver::createTLII(
+      triple, codeGenOpts.getVecLib(), codeGenOpts.getTapirTarget());
   codeGenPasses.add(new llvm::TargetLibraryInfoWrapperPass(*tlii));
 
   llvm::CodeGenFileType cgft = (act == BackendActionTy::Backend_EmitAssembly)
@@ -959,8 +959,8 @@ void CodeGenAction::runOptimizationPipeline(llvm::raw_pwrite_stream &os) {
   // Register the target library analysis directly and give it a customized
   // preset TLI depending on -fveclib
   llvm::Triple triple(llvmModule->getTargetTriple());
-  llvm::TargetLibraryInfoImpl *tlii =
-      llvm::driver::createTLII(triple, opts.getVecLib());
+  llvm::TargetLibraryInfoImpl *tlii = llvm::driver::createTLII(
+      triple, opts.getVecLib(), opts.getTapirTarget());
   fam.registerPass([&] { return llvm::TargetLibraryAnalysis(*tlii); });
 
   // Register all the basic analyses with the managers.

@@ -536,9 +536,6 @@ public:
   // implementation on real-world examples.
   std::string OpenACCMacroOverride;
 
-  /// Runtime target for Tapir.
-  TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
-
   LangOptions();
 
   /// Set language defaults for the given input language and
