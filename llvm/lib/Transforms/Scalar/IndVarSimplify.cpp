@@ -1938,11 +1938,8 @@ PreservedAnalyses IndVarSimplifyPass::run(Loop &L, LoopAnalysisManager &AM,
   Function *F = L.getHeader()->getParent();
   const DataLayout &DL = F->getParent()->getDataLayout();
 
-  const auto &FAM =
-    AM.getResult<FunctionAnalysisManagerLoopProxy>(L, AR).getManager();
   IndVarSimplify IVS(&AR.LI, &AR.SE, &AR.DT, DL, &AR.TLI, &AR.TTI, AR.MSSA,
-                     FAM.getCachedResult<TaskAnalysis>(*F),
-                     WidenIndVars && AllowIVWidening);
+                     &AR.TI, WidenIndVars && AllowIVWidening);
   if (!IVS.run(&L))
     return PreservedAnalyses::all();
 
