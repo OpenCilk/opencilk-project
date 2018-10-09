@@ -32,6 +32,7 @@ class ProfileSummaryInfo;
 class OptimizationRemarkEmitter;
 class ScalarEvolution;
 class StringRef;
+class TaskInfo;
 class Value;
 
 using NewLoopsMap = SmallDenseMap<const Loop *, Loop *, 4>;
@@ -80,7 +81,7 @@ struct UnrollLoopOptions {
 
 LoopUnrollResult UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
                             ScalarEvolution *SE, DominatorTree *DT,
-                            AssumptionCache *AC,
+                            AssumptionCache *AC, TaskInfo *TI,
                             const llvm::TargetTransformInfo *TTI,
                             OptimizationRemarkEmitter *ORE, bool PreserveLCSSA,
                             Loop **RemainderLoop = nullptr);
