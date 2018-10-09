@@ -155,9 +155,6 @@ public:
   /// input is a header file (i.e. -x c-header).
   bool IsHeaderFile;
 
-  /// \brief Runtime target for Tapir.
-  TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
-
   LangOptions();
 
   // Define accessors/mutators for language options of enumeration type.
