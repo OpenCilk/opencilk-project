@@ -137,7 +137,7 @@ static bool isLoopNeverExecuted(Loop *L) {
 /// instructions out of the loop.
 static LoopDeletionResult deleteLoopIfDead(Loop *L, DominatorTree &DT,
                                            ScalarEvolution &SE, LoopInfo &LI,
-                                           MemorySSA *MSSA,
+                                           TaskInfo &TI, MemorySSA *MSSA,
                                            OptimizationRemarkEmitter &ORE) {
   assert(L->isLCSSAForm(DT) && "Expected LCSSA!");
 
@@ -173,7 +173,7 @@ static LoopDeletionResult deleteLoopIfDead(Loop *L, DominatorTree &DT,
                                 L->getHeader())
              << "Loop deleted because it never executes";
     });
-    deleteDeadLoop(L, &DT, &SE, &LI, MSSA);
+    deleteDeadLoop(L, &DT, &SE, &LI, &TI, MSSA);
     ++NumDeleted;
     return LoopDeletionResult::Deleted;
   }
@@ -214,7 +214,7 @@ static LoopDeletionResult deleteLoopIfDead(Loop *L, DominatorTree &DT,
                               L->getHeader())
            << "Loop deleted because it is invariant";
   });
-  deleteDeadLoop(L, &DT, &SE, &LI, MSSA);
+  deleteDeadLoop(L, &DT, &SE, &LI, &TI, MSSA);
   ++NumDeleted;
 
   return LoopDeletionResult::Deleted;
@@ -231,7 +231,7 @@ PreservedAnalyses LoopDeletionPass::run(Loop &L, LoopAnalysisManager &AM,
   // pass. Function analyses need to be preserved across loop transformations
   // but ORE cannot be preserved (see comment before the pass definition).
   OptimizationRemarkEmitter ORE(L.getHeader()->getParent());
-  auto Result = deleteLoopIfDead(&L, AR.DT, AR.SE, AR.LI, AR.MSSA, ORE);
+  auto Result = deleteLoopIfDead(&L, AR.DT, AR.SE, AR.LI, AR.TI, AR.MSSA, ORE);
   if (Result == LoopDeletionResult::Unmodified)
     return PreservedAnalyses::all();
 
@@ -277,6 +277,7 @@ bool LoopDeletionLegacyPass::runOnLoop(Loop *L, LPPassManager &LPM) {
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
   LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+  TaskInfo &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
   auto *MSSAAnalysis = getAnalysisIfAvailable<MemorySSAWrapperPass>();
   MemorySSA *MSSA = nullptr;
   if (MSSAAnalysis)
@@ -289,7 +290,7 @@ bool LoopDeletionLegacyPass::runOnLoop(Loop *L, LPPassManager &LPM) {
   LLVM_DEBUG(dbgs() << "Analyzing Loop for deletion: ");
   LLVM_DEBUG(L->dump());
 
-  LoopDeletionResult Result = deleteLoopIfDead(L, DT, SE, LI, MSSA, ORE);
+  LoopDeletionResult Result = deleteLoopIfDead(L, DT, SE, LI, TI, MSSA, ORE);
 
   if (Result == LoopDeletionResult::Deleted)
     LPM.markLoopAsDeleted(*L);
