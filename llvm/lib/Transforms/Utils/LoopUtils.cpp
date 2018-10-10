@@ -470,7 +470,7 @@ llvm::collectChildrenInLoop(DomTreeNode *N, const Loop *CurLoop) {
 }
 
 void llvm::deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
-                          LoopInfo *LI, MemorySSA *MSSA) {
+                          LoopInfo *LI, TaskInfo *TI, MemorySSA *MSSA) {
   assert((!DT || L->isLCSSAForm(*DT)) && "Expected LCSSA!");
   auto *Preheader = L->getLoopPreheader();
   assert(Preheader && "Preheader should exist!");
@@ -684,6 +684,12 @@ void llvm::deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
     }
     LI->destroy(L);
   }
+
+  if (TI && DT)
+    // Recompute task info.
+    // FIXME: Figure out a way to update task info that is less computationally
+    // wasteful.
+    TI->recalculate(*Preheader->getParent(), *DT);
 }
 
 void llvm::breakLoopBackedge(Loop *L, DominatorTree &DT, ScalarEvolution &SE,

@@ -20,6 +20,7 @@
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/DebugInfo.h"
@@ -60,6 +61,7 @@ class LoopRotate {
   DominatorTree *DT;
   ScalarEvolution *SE;
   MemorySSAUpdater *MSSAU;
+  TaskInfo *TaskI;
   const SimplifyQuery &SQ;
   bool RotationOnly;
   bool IsUtilMode;
@@ -69,10 +71,10 @@ public:
   LoopRotate(unsigned MaxHeaderSize, LoopInfo *LI,
              const TargetTransformInfo *TTI, AssumptionCache *AC,
              DominatorTree *DT, ScalarEvolution *SE, MemorySSAUpdater *MSSAU,
-             const SimplifyQuery &SQ, bool RotationOnly, bool IsUtilMode,
-             bool PrepareForLTO)
+             TaskInfo *TaskI, const SimplifyQuery &SQ, bool RotationOnly,
+             bool IsUtilMode, bool PrepareForLTO)
       : MaxHeaderSize(MaxHeaderSize), LI(LI), TTI(TTI), AC(AC), DT(DT), SE(SE),
-        MSSAU(MSSAU), SQ(SQ), RotationOnly(RotationOnly),
+        MSSAU(MSSAU), TaskI(TaskI), SQ(SQ), RotationOnly(RotationOnly),
         IsUtilMode(IsUtilMode), PrepareForLTO(PrepareForLTO) {}
   bool processLoop(Loop *L);
 
@@ -803,6 +805,12 @@ bool LoopRotate::simplifyLoopLatch(Loop *L) {
   if (MSSAU && VerifyMemorySSA)
     MSSAU->getMemorySSA()->verifyMemorySSA();
 
+  if (TaskI && DT)
+    // Recompute task info.
+    // FIXME: Figure out a way to update task info that is less
+    // computationally wasteful.
+    TaskI->recalculate(*DT->getRoot()->getParent(), *DT);
+
   return true;
 }
 
@@ -836,10 +844,11 @@ bool LoopRotate::processLoop(Loop *L) {
 bool llvm::LoopRotation(Loop *L, LoopInfo *LI, const TargetTransformInfo *TTI,
                         AssumptionCache *AC, DominatorTree *DT,
                         ScalarEvolution *SE, MemorySSAUpdater *MSSAU,
-                        const SimplifyQuery &SQ, bool RotationOnly = true,
+                        TaskInfo *TI, const SimplifyQuery &SQ,
+                        bool RotationOnly = true,
                         unsigned Threshold = unsigned(-1),
                         bool IsUtilMode = true, bool PrepareForLTO) {
-  LoopRotate LR(Threshold, LI, TTI, AC, DT, SE, MSSAU, SQ, RotationOnly,
+  LoopRotate LR(Threshold, LI, TTI, AC, DT, SE, MSSAU, TI, SQ, RotationOnly,
                 IsUtilMode, PrepareForLTO);
   return LR.processLoop(L);
 }
