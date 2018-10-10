@@ -593,7 +593,8 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
 
   if (CodeGenOpts.TapirEarlyOutline) PMBuilder.DisableTapirOpts = true;
   if (CodeGenOpts.TapirRhino) PMBuilder.Rhino = true;
-  PMBuilder.TapirTarget = CodeGenOpts.getTapirTarget();
+  if (TLII->hasTapirTarget())
+    PMBuilder.TapirTarget = TLII->getTapirTarget();
 
   PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
   PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
@@ -1294,6 +1295,7 @@ static void runThinLTOBackend(ModuleSummaryIndex *CombinedIndex, Module *M,
   Conf.RemarksWithHotness = CGOpts.DiagnosticsWithHotness;
   Conf.RemarksFilename = CGOpts.OptRecordFile;
   Conf.DwoPath = CGOpts.SplitDwarfFile;
+  Conf.TapirTarget = CGOpts.getTapirTarget();
   switch (Action) {
   case Backend_EmitNothing:
     Conf.PreCodeGenModuleHook = [](size_t Task, const Module &Mod) {
