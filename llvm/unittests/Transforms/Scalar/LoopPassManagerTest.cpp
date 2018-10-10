@@ -14,6 +14,7 @@
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/AsmParser/Parser.h"
@@ -315,6 +316,7 @@ public:
     FAM.registerPass([&] { return ScalarEvolutionAnalysis(); });
     FAM.registerPass([&] { return TargetLibraryAnalysis(); });
     FAM.registerPass([&] { return TargetIRAnalysis(); });
+    FAM.registerPass([&] { return TaskAnalysis(); });
 
     // Register required pass instrumentation analysis.
     LAM.registerPass([&] { return PassInstrumentationAnalysis(); });
