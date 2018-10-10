@@ -52,6 +52,7 @@ define void @one_loop(i1* %ptr) {
 ; CHECK-LOOP-INV-NEXT: Running analysis: TargetLibraryAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: ScalarEvolutionAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: TargetIRAnalysis
+; CHECK-LOOP-INV-NEXT: Running analysis: TaskAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}Loop
 ; CHECK-LOOP-INV-NEXT: Running pass: NoOpLoopPass
 ; CHECK-LOOP-INV-NEXT: Running pass: InvalidateAnalysisPass<{{.*}}LoopAnalysis
@@ -75,6 +76,7 @@ define void @one_loop(i1* %ptr) {
 ; CHECK-SCEV-INV-NEXT: Running analysis: TargetLibraryAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: ScalarEvolutionAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: TargetIRAnalysis
+; CHECK-SCEV-INV-NEXT: Running analysis: TaskAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}Loop
 ; CHECK-SCEV-INV-NEXT: Running pass: NoOpLoopPass
 ; CHECK-SCEV-INV-NEXT: Running pass: InvalidateAnalysisPass<{{.*}}ScalarEvolutionAnalysis
@@ -108,6 +110,7 @@ define void @nested_loops(i1* %ptr) {
 ; CHECK-LOOP-INV-NEXT: Running analysis: TargetLibraryAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: ScalarEvolutionAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: TargetIRAnalysis
+; CHECK-LOOP-INV-NEXT: Running analysis: TaskAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}Loop
 ; CHECK-LOOP-INV-NEXT: Running pass: NoOpLoopPass
 ; CHECK-LOOP-INV-NEXT: Running pass: NoOpLoopPass
@@ -134,6 +137,7 @@ define void @nested_loops(i1* %ptr) {
 ; CHECK-SCEV-INV-NEXT: Running analysis: TargetLibraryAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: ScalarEvolutionAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: TargetIRAnalysis
+; CHECK-SCEV-INV-NEXT: Running analysis: TaskAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}Loop
 ; CHECK-SCEV-INV-NEXT: Running pass: NoOpLoopPass
 ; CHECK-SCEV-INV-NEXT: Running pass: NoOpLoopPass
@@ -177,6 +181,7 @@ define void @dead_loop() {
 ; CHECK-LOOP-INV-NEXT: Running analysis: TargetLibraryAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: ScalarEvolutionAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: TargetIRAnalysis
+; CHECK-LOOP-INV-NEXT: Running analysis: TaskAnalysis
 ; CHECK-LOOP-INV-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}Loop
 ; CHECK-LOOP-INV-NEXT: Running pass: NoOpLoopPass
 ; CHECK-LOOP-INV-NEXT: Running pass: InvalidateAnalysisPass<{{.*}}LoopAnalysis
@@ -200,6 +205,7 @@ define void @dead_loop() {
 ; CHECK-SCEV-INV-NEXT: Running analysis: TargetLibraryAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: ScalarEvolutionAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: TargetIRAnalysis
+; CHECK-SCEV-INV-NEXT: Running analysis: TaskAnalysis
 ; CHECK-SCEV-INV-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}Loop
 ; CHECK-SCEV-INV-NEXT: Running pass: NoOpLoopPass
 ; CHECK-SCEV-INV-NEXT: Running pass: InvalidateAnalysisPass<{{.*}}ScalarEvolutionAnalysis
@@ -221,6 +227,7 @@ define void @dead_loop() {
 ; CHECK-SCEV-INV-AFTER-DELETE-NEXT: Running analysis: TargetLibraryAnalysis
 ; CHECK-SCEV-INV-AFTER-DELETE-NEXT: Running analysis: ScalarEvolutionAnalysis
 ; CHECK-SCEV-INV-AFTER-DELETE-NEXT: Running analysis: TargetIRAnalysis
+; CHECK-SCEV-INV-AFTER-DELETE-NEXT: Running analysis: TaskAnalysis
 ; CHECK-SCEV-INV-AFTER-DELETE-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}Loop
 ; CHECK-SCEV-INV-AFTER-DELETE-NEXT: Running pass: NoOpLoopPass
 ; CHECK-SCEV-INV-AFTER-DELETE-NEXT: Running pass: LoopDeletionPass
