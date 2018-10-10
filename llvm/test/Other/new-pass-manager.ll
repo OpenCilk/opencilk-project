@@ -351,6 +351,7 @@
 ; CHECK-REPEAT-LOOP-PASS-NEXT: Running analysis: TypeBasedAA
 ; CHECK-REPEAT-LOOP-PASS-NEXT: Running analysis: OuterAnalysisManagerProxy
 ; CHECK-REPEAT-LOOP-PASS-NEXT: Running analysis: ScalarEvolutionAnalysis
+; CHECK-REPEAT-LOOP-PASS-NEXT: Running analysis: TaskAnalysis
 ; CHECK-REPEAT-LOOP-PASS-NEXT: Running analysis: InnerAnalysisManagerProxy<{{.*}}>
 ; CHECK-REPEAT-LOOP-PASS-NEXT: Running pass: RepeatedPass
 ; CHECK-REPEAT-LOOP-PASS-NEXT: Running pass: NoOpLoopPass
