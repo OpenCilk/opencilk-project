@@ -40,6 +40,7 @@ class ScalarEvolution;
 class SCEV;
 class SCEVExpander;
 class TargetLibraryInfo;
+class TaskInfo;
 class LPPassManager;
 class Instruction;
 struct RuntimeCheckingPtrGroup;
@@ -173,12 +174,12 @@ bool hoistRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
 ///   - The loop needs to have a Preheader
 ///   - A unique dedicated exit block must exist
 ///
-/// This also updates the relevant analysis information in \p DT, \p SE, \p LI
-/// and \p MSSA if pointers to those are provided.
+/// This also updates the relevant analysis information in \p DT, \p SE, \p LI,
+/// \p TI and \p MSSA if pointers to those are provided.
 /// It also updates the loop PM if an updater struct is provided.
 
 void deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
-                    LoopInfo *LI, MemorySSA *MSSA = nullptr);
+                    LoopInfo *LI, TaskInfo *TI, MemorySSA *MSSA = nullptr);
 
 /// Remove the backedge of the specified loop.  Handles loop nests and general
 /// loop structures subject to the precondition that the loop has no parent

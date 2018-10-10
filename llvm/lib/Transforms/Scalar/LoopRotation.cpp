@@ -59,10 +59,10 @@ PreservedAnalyses LoopRotatePass::run(Loop &L, LoopAnalysisManager &AM,
   Optional<MemorySSAUpdater> MSSAU;
   if (AR.MSSA)
     MSSAU = MemorySSAUpdater(AR.MSSA);
-  bool Changed =
-      LoopRotation(&L, &AR.LI, &AR.TTI, &AR.AC, &AR.DT, &AR.SE,
-                   MSSAU.hasValue() ? MSSAU.getPointer() : nullptr, SQ, false,
-                   Threshold, false, PrepareForLTO || PrepareForLTOOption);
+  bool Changed = LoopRotation(&L, &AR.LI, &AR.TTI, &AR.AC, &AR.DT, &AR.SE,
+                              MSSAU.hasValue() ? MSSAU.getPointer() : nullptr,
+                              &AR.TI, SQ, false, Threshold, false,
+                              PrepareForLTO || PrepareForLTOOption);
 
   if (!Changed)
     return PreservedAnalyses::all();
@@ -113,6 +113,7 @@ public:
     auto *AC = &getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
     auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+    auto &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
     const SimplifyQuery SQ = getBestSimplifyQuery(*this, F);
     Optional<MemorySSAUpdater> MSSAU;
     if (EnableMSSALoopDependency) {
@@ -130,8 +131,8 @@ public:
                         : MaxHeaderSize;
 
     return LoopRotation(L, LI, TTI, AC, &DT, &SE,
-                        MSSAU.hasValue() ? MSSAU.getPointer() : nullptr, SQ,
-                        false, Threshold, false,
+                        MSSAU.hasValue() ? MSSAU.getPointer() : nullptr, &TI,
+                        SQ, false, Threshold, false,
                         PrepareForLTO || PrepareForLTOOption);
   }
 };
