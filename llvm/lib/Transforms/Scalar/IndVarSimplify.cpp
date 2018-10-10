@@ -2120,7 +2120,6 @@ struct IndVarSimplifyLegacyPass : public LoopPass {
     AU.setPreservesCFG();
     AU.addPreserved<MemorySSAWrapperPass>();
     getLoopAnalysisUsage(AU);
-    AU.addRequired<TaskInfoWrapperPass>();
   }
 };
 
@@ -2131,7 +2130,6 @@ char IndVarSimplifyLegacyPass::ID = 0;
 INITIALIZE_PASS_BEGIN(IndVarSimplifyLegacyPass, "indvars",
                       "Induction Variable Simplification", false, false)
 INITIALIZE_PASS_DEPENDENCY(LoopPass)
-INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_END(IndVarSimplifyLegacyPass, "indvars",
                     "Induction Variable Simplification", false, false)
 

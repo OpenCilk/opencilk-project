@@ -144,5 +144,6 @@ PreservedAnalyses llvm::getLoopPassPreservedAnalyses() {
   PA.preserve<LoopAnalysis>();
   PA.preserve<LoopAnalysisManagerFunctionProxy>();
   PA.preserve<ScalarEvolutionAnalysis>();
+  PA.preserve<TaskAnalysis>();
   return PA;
 }
