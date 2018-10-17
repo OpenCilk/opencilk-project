@@ -98,8 +98,6 @@ void initializeDeadMachineInstructionElimPass(PassRegistry&);
 void initializeDebugifyMachineModulePass(PassRegistry &);
 void initializeDelinearizationPass(PassRegistry&);
 void initializeDependenceAnalysisWrapperPassPass(PassRegistry&);
-void initializeDetachSSAPrinterLegacyPassPass(PassRegistry&);
-void initializeDetachSSAWrapperPassPass(PassRegistry&);
 void initializeDetectDeadLanesPass(PassRegistry&);
 void initializeDomOnlyPrinterWrapperPassPass(PassRegistry &);
 void initializeDomOnlyViewerWrapperPassPass(PassRegistry &);
