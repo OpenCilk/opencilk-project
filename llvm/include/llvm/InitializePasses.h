@@ -113,8 +113,6 @@ void initializeDebugifyMachineModulePass(PassRegistry &);
 void initializeDelinearizationPass(PassRegistry&);
 void initializeDemandedBitsWrapperPassPass(PassRegistry&);
 void initializeDependenceAnalysisWrapperPassPass(PassRegistry&);
-void initializeDetachSSAPrinterLegacyPassPass(PassRegistry&);
-void initializeDetachSSAWrapperPassPass(PassRegistry&);
 void initializeDetectDeadLanesPass(PassRegistry&);
 void initializeDivRemPairsLegacyPassPass(PassRegistry&);
 void initializeDomOnlyPrinterWrapperPassPass(PassRegistry &);
