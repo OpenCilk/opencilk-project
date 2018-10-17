@@ -264,10 +264,6 @@ typedef enum {
   LLVMMemoryDefValueKind,
   LLVMMemoryPhiValueKind,
 
-  LLVMDetachUseValueKind,
-  LLVMDetachDefValueKind,
-  LLVMDetachPhiValueKind,
-
   LLVMFunctionValueKind,
   LLVMGlobalAliasValueKind,
   LLVMGlobalIFuncValueKind,
