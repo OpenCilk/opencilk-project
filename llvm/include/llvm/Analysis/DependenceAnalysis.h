@@ -267,6 +267,19 @@ namespace llvm {
     friend class DependenceInfo;
   };
 
+  struct GeneralAccess {
+    enum {
+          READ = 0,
+          WRITE = 1,
+    } Type;
+    Instruction *I = nullptr;
+    Optional<MemoryLocation> Loc;
+
+    bool isValid() const {
+      return (I && Loc);
+    }
+  };
+
   /// DependenceInfo - This class is the main dependence-analysis driver.
   ///
   class DependenceInfo {
@@ -333,6 +346,17 @@ namespace llvm {
 
     Function *getFunction() const { return F; }
 
+    AliasAnalysis *getAA() const { return AA; }
+
+    /// depends - Tests for a dependence between the general accesses SrcA and
+    /// DstA.  Returns NULL if no dependence; otherwise, returns a Dependence
+    /// (or a FullDependence) with as much information as can be gleaned.  The
+    /// flag PossiblyLoopIndependent should be set by the caller if it appears
+    /// that control flow can reach from Src to Dst without traversing a loop
+    /// back edge.
+    std::unique_ptr<Dependence> depends(GeneralAccess *SrcA,
+                                        GeneralAccess *DstA,
+                                        bool PossiblyLoopIndependent);
   private:
     AAResults *AA;
     ScalarEvolution *SE;
@@ -944,6 +968,28 @@ namespace llvm {
     /// Returns true upon success and false otherwise.
     bool tryDelinearizeParametricSize(
         Instruction *Src, Instruction *Dst, const SCEV *SrcAccessFn,
+        const SCEV *DstAccessFn, SmallVectorImpl<const SCEV *> &SrcSubscripts,
+        SmallVectorImpl<const SCEV *> &DstSubscripts);
+
+    /// Given a linear access function, tries to recover subscripts
+    /// for each dimension of the array element access.
+    bool tryDelinearize(GeneralAccess *SrcA, GeneralAccess *DstA,
+                        SmallVectorImpl<Subscript> &Pair);
+
+    /// Tries to delinearize access function for a fixed size multi-dimensional
+    /// array, by deriving subscripts from GEP instructions. Returns true upon
+    /// success and false otherwise.
+    bool tryDelinearizeFixedSize(GeneralAccess *SrcA, GeneralAccess *DstA,
+                                 const SCEV *SrcAccessFn,
+                                 const SCEV *DstAccessFn,
+                                 SmallVectorImpl<const SCEV *> &SrcSubscripts,
+                                 SmallVectorImpl<const SCEV *> &DstSubscripts);
+
+    /// Tries to delinearize access function for a multi-dimensional array with
+    /// symbolic runtime sizes.
+    /// Returns true upon success and false otherwise.
+    bool tryDelinearizeParametricSize(
+        GeneralAccess *SrcA, GeneralAccess *DstA, const SCEV *SrcAccessFn,
         const SCEV *DstAccessFn, SmallVectorImpl<const SCEV *> &SrcSubscripts,
         SmallVectorImpl<const SCEV *> &DstSubscripts);
 
