@@ -21,4 +21,4 @@ entry:
 }
 
 ; CHECK: attributes #0 = { norecurse nounwind readnone ssp uwtable willreturn }
-; CHECK: attributes #1 = { nofree norecurse nounwind ssp uwtable willreturn }
+; CHECK: attributes #1 = { argmemonly nofree norecurse nounwind ssp uwtable willreturn }
