@@ -105,6 +105,8 @@ public:
     // can remain part of the same loop pass manager as LICM.
     AU.addPreserved<LazyBlockFrequencyInfoPass>();
     AU.addPreserved<LazyBranchProbabilityInfoPass>();
+
+    AU.addPreserved<TaskInfoWrapperPass>();
   }
 
   bool runOnLoop(Loop *L, LPPassManager &LPM) override {
