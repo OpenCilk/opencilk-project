@@ -737,6 +737,8 @@ public:
     DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
     ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+    auto *TIWP = getAnalysisIfAvailable<TaskInfoWrapperPass>();
+    TaskInfo *TI = TIWP ? &TIWP->getTaskInfo() : nullptr;
     auto *MSSAA = getAnalysisIfAvailable<MemorySSAWrapperPass>();
     Optional<MemorySSAUpdater> MSSAU;
     if (MSSAA)
@@ -749,6 +751,11 @@ public:
         DeleteCurrentLoop);
     if (DeleteCurrentLoop)
       LPM.markLoopAsDeleted(*L);
+    if (TI && Changed)
+      // Recompute task info.
+      // FIXME: Figure out a way to update task info that is less
+      // computationally wasteful.
+      TI->recalculate(*L->getHeader()->getParent(), DT);
     return Changed;
   }
 
@@ -756,6 +763,7 @@ public:
     AU.addPreserved<MemorySSAWrapperPass>();
     AU.addPreserved<DependenceAnalysisWrapperPass>();
     getLoopAnalysisUsage(AU);
+    AU.addPreserved<TaskInfoWrapperPass>();
   }
 };
 } // end namespace
