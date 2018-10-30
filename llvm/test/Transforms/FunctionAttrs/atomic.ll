@@ -21,4 +21,4 @@ entry:
 }
 
 ; CHECK: attributes #0 = { mustprogress nofree norecurse nosync nounwind readnone ssp uwtable willreturn }
-; CHECK: attributes #1 = { mustprogress nofree norecurse nounwind ssp uwtable willreturn }
+; CHECK: attributes #1 = { argmemonly mustprogress nofree norecurse nounwind ssp uwtable willreturn }
