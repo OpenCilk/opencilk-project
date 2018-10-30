@@ -67,6 +67,9 @@
 ; CHECK-O2-NOT: Manager
 ; CHECK-O2: Induction Variable Simplification
 ; CHECK-O2: Loop Pass Manager
+; CHECK-O2: Tapir Task Information
+; CHECK-O2: Loop Pass Manager
+; CHECK-O2: Loop Pass Manager
 ; CHECK-O2-NOT: Manager
 ; FIXME: It isn't clear that we need yet another loop pass pipeline
 ; and run of LICM here.
