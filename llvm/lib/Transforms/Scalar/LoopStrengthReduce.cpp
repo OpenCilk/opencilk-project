@@ -5769,6 +5769,7 @@ void LoopStrengthReduce::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<IVUsersWrapperPass>();
   AU.addPreserved<IVUsersWrapperPass>();
   AU.addRequired<TargetTransformInfoWrapperPass>();
+  AU.addPreserved<TaskInfoWrapperPass>();
   AU.addPreserved<MemorySSAWrapperPass>();
 }
 
@@ -5886,11 +5887,19 @@ bool LoopStrengthReduce::runOnLoop(Loop *L, LPPassManager & /*LPM*/) {
       *L->getHeader()->getParent());
   auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(
       *L->getHeader()->getParent());
+  auto *TIWP = getAnalysisIfAvailable<TaskInfoWrapperPass>();
+  auto *TI = TIWP ? &TIWP->getTaskInfo() : nullptr;
   auto *MSSAAnalysis = getAnalysisIfAvailable<MemorySSAWrapperPass>();
   MemorySSA *MSSA = nullptr;
   if (MSSAAnalysis)
     MSSA = &MSSAAnalysis->getMSSA();
-  return ReduceLoopStrength(L, IU, SE, DT, LI, TTI, AC, TLI, MSSA);
+  bool Changed = ReduceLoopStrength(L, IU, SE, DT, LI, TTI, AC, TLI, MSSA);
+  if (TI && Changed)
+    // Recompute task info.
+    // FIXME: Figure out a way to update task info that is less computationally
+    // wasteful.
+    TI->recalculate(*L->getHeader()->getParent(), DT);
+  return Changed;
 }
 
 PreservedAnalyses LoopStrengthReducePass::run(Loop &L, LoopAnalysisManager &AM,
