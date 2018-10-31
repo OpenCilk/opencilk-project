@@ -182,7 +182,7 @@ struct SanitizerCoverageOptions {
 };
 
 // Insert CilkSanitizer (Cilk determinacy race detection) instrumentation
-ModulePass *createCilkSanitizerPass();
+ModulePass *createCilkSanitizerLegacyPass();
 
 // Options for comprehensive static instrumentation
 struct CSIOptions {
@@ -198,8 +198,8 @@ struct CSIOptions {
   CSIOptions() = default;
 };
 
-// Insert ComprehensiveStaticInstrumentation instrumentation
-ModulePass *createComprehensiveStaticInstrumentationPass(
+// Insert comprehensive static instrumentation
+ModulePass *createComprehensiveStaticInstrumentationLegacyPass(
     const CSIOptions &Options = CSIOptions());
 
 /// Calculate what to divide by to scale counts.
