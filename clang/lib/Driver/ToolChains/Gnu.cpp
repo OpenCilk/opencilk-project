@@ -537,6 +537,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("--no-demangle");
 
   bool NeedsSanitizerDeps = addSanitizerRuntimes(ToolChain, Args, CmdArgs);
+  bool NeedsCilkSanitizerDeps = needsCilkSanitizerDeps(ToolChain, Args);
   bool NeedsXRayDeps = addXRayRuntime(ToolChain, Args, CmdArgs);
   addLinkerCompressDebugSectionsOption(ToolChain, Args, CmdArgs);
   AddLinkerInputs(ToolChain, Inputs, Args, CmdArgs, JA);
@@ -585,6 +586,9 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
       if (NeedsSanitizerDeps)
         linkSanitizerRuntimeDeps(ToolChain, Args, CmdArgs);
+
+      if (NeedsCilkSanitizerDeps)
+        linkCilkSanitizerRuntimeDeps(ToolChain, CmdArgs);
 
       if (NeedsXRayDeps)
         linkXRayRuntimeDeps(ToolChain, Args, CmdArgs);
