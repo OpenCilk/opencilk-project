@@ -32,6 +32,11 @@ void claimNoWarnArgs(const llvm::opt::ArgList &Args);
 bool addSanitizerRuntimes(const ToolChain &TC, const llvm::opt::ArgList &Args,
                           llvm::opt::ArgStringList &CmdArgs);
 
+bool needsCilkSanitizerDeps(const ToolChain &TC,
+                            const llvm::opt::ArgList &Args);
+void linkCilkSanitizerRuntimeDeps(const ToolChain &TC,
+                                  llvm::opt::ArgStringList &CmdArgs);
+
 void linkSanitizerRuntimeDeps(const ToolChain &TC,
                               llvm::opt::ArgStringList &CmdArgs);
 
