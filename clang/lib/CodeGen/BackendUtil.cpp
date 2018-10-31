@@ -81,9 +81,9 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/CanonicalizeAliases.h"
 #include "llvm/Transforms/Utils/EntryExitInstrumenter.h"
-#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
+#include "llvm/Transforms/Tapir/TapirToTarget.h"
 #include "llvm/Transforms/Utils/UniqueInternalLinkageNames.h"
 #include <memory>
 
@@ -1407,7 +1407,8 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
     } else if (IsLTO) {
       MPM = PB.buildLTOPreLinkDefaultPipeline(Level);
     } else {
-      MPM = PB.buildPerModuleDefaultPipeline(Level);
+      MPM = PB.buildPerModuleDefaultPipeline(Level, false,
+                                             TLII->hasTapirTarget());
     }
 
     if (!CodeGenOpts.MemoryProfileOutput.empty()) {
