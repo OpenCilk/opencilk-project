@@ -52,6 +52,8 @@
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/BoundsChecking.h"
+#include "llvm/Transforms/Instrumentation/CilkSanitizer.h"
+#include "llvm/Transforms/Instrumentation/ComprehensiveStaticInstrumentation.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
@@ -299,7 +301,7 @@ static void addEfficiencySanitizerPass(const PassManagerBuilder &Builder,
 
 static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
                                  legacy::PassManagerBase &PM) {
-  PM.add(createCilkSanitizerPass());
+  PM.add(createCilkSanitizerLegacyPass());
 
   // CilkSanitizer inserts complex instrumentation that mostly follows the logic
   // of the original code, but operates on "shadow" values.  It can benefit from
@@ -317,7 +319,7 @@ static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
 static void
 addComprehensiveStaticInstrumentationPass(const PassManagerBuilder &Builder,
                                           PassManagerBase &PM) {
-  PM.add(createComprehensiveStaticInstrumentationPass());
+  PM.add(createComprehensiveStaticInstrumentationLegacyPass());
 
   // CSI inserts complex instrumentation that mostly follows the logic of the
   // original code, but operates on "shadow" values.  It can benefit from
@@ -978,6 +980,17 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
     bool IsLTO = CodeGenOpts.PrepareForLTO;
 
     if (CodeGenOpts.OptimizationLevel == 0) {
+      // At -O0 we directly run necessary sanitizer passes.  Cilksan and CSI
+      // need to run before Tapir lowering.
+      if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+        MPM.addPass(CilkSanitizerPass());
+      if (LangOpts.ComprehensiveStaticInstrumentation)
+        MPM.addPass(ComprehensiveStaticInstrumentationPass());
+
+      // At -O0 outline Tapir constructs early.
+      if (TLII->hasTapirTarget())
+        MPM.addPass(TapirToTargetPass());
+
       // Build a minimal pipeline based on the semantics required by Clang,
       // which is just that always inlining occurs.
       MPM.addPass(AlwaysInlinerPass());
@@ -1000,6 +1013,25 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
         PB.registerScalarOptimizerLateEPCallback(
             [](FunctionPassManager &FPM, PassBuilder::OptimizationLevel Level) {
               FPM.addPass(BoundsCheckingPass());
+            });
+      // Register the Cilksan and CSI passes.
+      if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+        PB.registerTapirLateEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CilkSanitizer performs significant changes to the CFG before
+              // attempting to analyze and insert instrumentation.  Hence we
+              // invalidate all analysis passes before running CilkSanitizer.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(CilkSanitizerPass());
+            });
+      if (LangOpts.ComprehensiveStaticInstrumentation)
+        PB.registerTapirLateEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CSI performs significant changes to the CFG before attempting
+              // to analyze and insert instrumentation.  Hence we invalidate all
+              // analysis passes before running CSI.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(ComprehensiveStaticInstrumentationPass());
             });
 
       if (IsThinLTO) {
