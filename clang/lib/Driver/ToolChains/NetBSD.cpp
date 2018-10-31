@@ -248,6 +248,7 @@ void netbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddAllArgs(CmdArgs, options::OPT_r);
 
   bool NeedsSanitizerDeps = addSanitizerRuntimes(getToolChain(), Args, CmdArgs);
+  bool NeedsCilkSanitizerDeps = needsCilkSanitizerDeps(getToolChain(), Args);
   AddLinkerInputs(getToolChain(), Inputs, Args, CmdArgs, JA);
 
   addCSIRuntime(getToolChain(), Args, CmdArgs);
@@ -286,6 +287,8 @@ void netbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     }
     if (NeedsSanitizerDeps)
       linkSanitizerRuntimeDeps(getToolChain(), CmdArgs);
+    if (NeedsCilkSanitizerDeps)
+      linkCilkSanitizerRuntimeDeps(getToolChain(), CmdArgs);
     if (Args.hasArg(options::OPT_pthread))
       CmdArgs.push_back("-lpthread");
     CmdArgs.push_back("-lc");
