@@ -534,6 +534,7 @@ namespace llvm {
                                 const Instruction *Dst);
 
     unsigned CommonLevels, SrcLevels, MaxLevels;
+    const Loop *CommonLoop;
 
     /// mapSrcLoop - Given one of the loops containing the source, return
     /// its level index in our numbering scheme.
@@ -546,6 +547,11 @@ namespace llvm {
     /// isLoopInvariant - Returns true if Expression is loop invariant
     /// in LoopNest.
     bool isLoopInvariant(const SCEV *Expression, const Loop *LoopNest) const;
+
+    /// isTrueAtLoopEntry - Returns true if the predicate LHS `Pred` RHS is true
+    /// at entry of L.
+    bool isTrueAtLoopEntry(const Loop *L, ICmpInst::Predicate Pred,
+                           const SCEV *LHS, const SCEV *RHS) const;
 
     /// Makes sure all subscript pairs share the same integer type by
     /// sign-extending as necessary.
@@ -583,7 +589,8 @@ namespace llvm {
     /// extensions and symbolics.
     bool isKnownPredicate(ICmpInst::Predicate Pred,
                           const SCEV *X,
-                          const SCEV *Y) const;
+                          const SCEV *Y,
+                          const Loop *L = nullptr) const;
 
     /// isKnownLessThan - Compare to see if S is less than Size
     /// Another wrapper for isKnownNegative(S - max(Size, 1)) with some extra
