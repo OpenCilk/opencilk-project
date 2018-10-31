@@ -458,7 +458,8 @@ public:
   ///
   /// This should only be used for non-LTO and LTO pre-link pipelines.
   ModulePassManager buildO0DefaultPipeline(OptimizationLevel Level,
-                                           bool LTOPreLink = false);
+                                           bool LTOPreLink = false,
+                                           bool LowerTapir = false);
 
   /// Build the default `AAManager` with the default alias analysis pipeline
   /// registered.

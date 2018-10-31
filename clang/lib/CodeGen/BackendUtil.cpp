@@ -74,6 +74,8 @@
 #include "llvm/Transforms/Instrumentation/MemorySanitizer.h"
 #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
+#include "llvm/Transforms/Instrumentation/CilkSanitizer.h"
+#include "llvm/Transforms/Instrumentation/ComprehensiveStaticInstrumentation.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
@@ -370,7 +372,7 @@ static void addDataFlowSanitizerPass(const PassManagerBuilder &Builder,
 
 static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
                                  legacy::PassManagerBase &PM) {
-  PM.add(createCilkSanitizerPass());
+  PM.add(createCilkSanitizerLegacyPass());
 
   // CilkSanitizer inserts complex instrumentation that mostly follows the logic
   // of the original code, but operates on "shadow" values.  It can benefit from
@@ -388,7 +390,7 @@ static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
 static void
 addComprehensiveStaticInstrumentationPass(const PassManagerBuilder &Builder,
                                           PassManagerBase &PM) {
-  PM.add(createComprehensiveStaticInstrumentationPass());
+  PM.add(createComprehensiveStaticInstrumentationLegacyPass());
 
   // CSI inserts complex instrumentation that mostly follows the logic of the
   // original code, but operates on "shadow" values.  It can benefit from
@@ -1400,8 +1402,29 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
             MPM.addPass(InstrProfiling(*Options, false));
           });
 
+    // Register the Cilksan and CSI passes.
+    if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+      PB.registerTapirLateEPCallback(
+          [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+            // CilkSanitizer performs significant changes to the CFG before
+            // attempting to analyze and insert instrumentation.  Hence we
+            // invalidate all analysis passes before running CilkSanitizer.
+            MPM.addPass(InvalidateAllAnalysesPass());
+            MPM.addPass(CilkSanitizerPass());
+          });
+    if (LangOpts.ComprehensiveStaticInstrumentation)
+      PB.registerTapirLateEPCallback(
+          [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+            // CSI performs significant changes to the CFG before attempting
+            // to analyze and insert instrumentation.  Hence we invalidate all
+            // analysis passes before running CSI.
+            MPM.addPass(InvalidateAllAnalysesPass());
+            MPM.addPass(ComprehensiveStaticInstrumentationPass());
+          });
+
     if (CodeGenOpts.OptimizationLevel == 0) {
-      MPM = PB.buildO0DefaultPipeline(Level, IsLTO || IsThinLTO);
+      MPM = PB.buildO0DefaultPipeline(Level, IsLTO || IsThinLTO,
+                                      TLII->hasTapirTarget());
     } else if (IsThinLTO) {
       MPM = PB.buildThinLTOPreLinkDefaultPipeline(Level);
     } else if (IsLTO) {

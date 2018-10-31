@@ -1942,8 +1942,8 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
 }
 
 ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
-                                                      bool LTOPreLink) {
-  // TODO: Add Tapir lowering to this pipeline.
+                                                      bool LTOPreLink,
+                                                      bool LowerTapir) {
   assert(Level == OptimizationLevel::O0 &&
          "buildO0DefaultPipeline should only be used with O0");
 
@@ -1965,6 +1965,16 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
     C(MPM, Level);
   for (auto &C : PipelineEarlySimplificationEPCallbacks)
     C(MPM, Level);
+
+  // Add passes to run just before Tapir lowering.
+  for (auto &C : TapirLateEPCallbacks)
+    C(MPM, Level);
+  for (auto &C : TapirLoopEndEPCallbacks)
+    C(MPM, Level);
+
+  // At -O0, outline Tapir constructs early.
+  if (LowerTapir)
+    MPM.addPass(TapirToTargetPass());
 
   // Build a minimal pipeline based on the semantics required by LLVM,
   // which is just that always inlining occurs. Further, disable generating
