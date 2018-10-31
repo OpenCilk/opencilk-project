@@ -58,7 +58,7 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Utils.h"
-#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
+#include "llvm/Transforms/Tapir/TapirToTarget.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include <memory>
@@ -1052,7 +1052,8 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
         MPM.addPass(NameAnonGlobalPass());
       } else {
         MPM = PB.buildPerModuleDefaultPipeline(Level,
-                                               CodeGenOpts.DebugPassManager);
+                                               CodeGenOpts.DebugPassManager,
+                                               TLII->hasTapirTarget());
       }
     }
   }
