@@ -1068,16 +1068,14 @@ public:
   class SyncRegion {
     CodeGenFunction &CGF;
     SyncRegion *ParentRegion;
-    llvm::Instruction *SyncRegionStart;
-    RunCleanupsScope *InnerSyncScope;
+    llvm::Instruction *SyncRegionStart = nullptr;
+    RunCleanupsScope *InnerSyncScope = nullptr;
 
     SyncRegion(const SyncRegion &) = delete;
     void operator=(const SyncRegion &) = delete;
   public:
     explicit SyncRegion(CodeGenFunction &CGF)
-        : CGF(CGF), ParentRegion(CGF.CurSyncRegion), SyncRegionStart(nullptr),
-          InnerSyncScope(nullptr)
-    {}
+        : CGF(CGF), ParentRegion(CGF.CurSyncRegion) {}
 
     ~SyncRegion() {
       if (InnerSyncScope)
@@ -1149,13 +1147,11 @@ public:
   /// detached scope.
   class DetachedRethrowHandler {
     CodeGenFunction &CGF;
-    llvm::BasicBlock *DetachedRethrowBlock;
-    llvm::BasicBlock *DetachedRethrowResumeBlock;
+    llvm::BasicBlock *DetachedRethrowBlock = nullptr;
+    llvm::BasicBlock *DetachedRethrowResumeBlock = nullptr;
 
   public:
-    explicit DetachedRethrowHandler(CodeGenFunction &CGF)
-        : CGF(CGF), DetachedRethrowBlock(nullptr),
-          DetachedRethrowResumeBlock(nullptr) {}
+    explicit DetachedRethrowHandler(CodeGenFunction &CGF) : CGF(CGF) {}
 
     llvm::BasicBlock *get();
     bool isUsed() const {
@@ -1185,7 +1181,7 @@ public:
     llvm::BasicBlock *OldEHResumeBlock = nullptr;
     llvm::Value *OldExceptionSlot = nullptr;
     llvm::AllocaInst *OldEHSelectorSlot = nullptr;
-    llvm::AllocaInst *OldNormalCleanupDest = nullptr;
+    Address OldNormalCleanupDest = Address::invalid();
 
     // Saved state in an initialized detach scope.
     llvm::AssertingVH<llvm::Instruction> SavedDetachedAllocaInsertPt = nullptr;
