@@ -190,6 +190,7 @@ void llvm::getLoopAnalysisUsage(AnalysisUsage &AU) {
   AU.addRequired<ScalarEvolutionWrapperPass>();
   AU.addPreserved<ScalarEvolutionWrapperPass>();
   AU.addRequired<TaskInfoWrapperPass>();
+  AU.addPreserved<TaskInfoWrapperPass>();
   // FIXME: When all loop passes preserve MemorySSA, it can be required and
   // preserved here instead of the individual handling in each pass.
 }

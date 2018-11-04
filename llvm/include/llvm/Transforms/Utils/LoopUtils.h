@@ -151,7 +151,8 @@ bool sinkRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
                 BlockFrequencyInfo *, TargetLibraryInfo *,
                 TargetTransformInfo *, Loop *, AliasSetTracker *,
                 MemorySSAUpdater *, ICFLoopSafetyInfo *,
-                SinkAndHoistLICMFlags &, OptimizationRemarkEmitter *);
+                SinkAndHoistLICMFlags &, TaskInfo *,
+                OptimizationRemarkEmitter *);
 
 /// Walk the specified region of the CFG (defined by all blocks
 /// dominated by the specified block, and that are in the current loop) in depth
@@ -164,6 +165,7 @@ bool sinkRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
 bool hoistRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
                  BlockFrequencyInfo *, TargetLibraryInfo *, Loop *,
                  AliasSetTracker *, MemorySSAUpdater *, ScalarEvolution *,
+                 TaskInfo *,
                  ICFLoopSafetyInfo *, SinkAndHoistLICMFlags &,
                  OptimizationRemarkEmitter *);
 
@@ -200,7 +202,7 @@ bool promoteLoopAccessesToScalars(
     SmallVectorImpl<Instruction *> &, SmallVectorImpl<MemoryAccess *> &,
     PredIteratorCache &, LoopInfo *, DominatorTree *, const TargetLibraryInfo *,
     Loop *, AliasSetTracker *, MemorySSAUpdater *, ICFLoopSafetyInfo *,
-    OptimizationRemarkEmitter *);
+    TaskInfo *, OptimizationRemarkEmitter *);
 
 /// Does a BFS from a given node to all of its children inside a given loop.
 /// The returned vector of nodes includes the starting point.
@@ -353,7 +355,7 @@ bool canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
                         Loop *CurLoop, AliasSetTracker *CurAST,
                         MemorySSAUpdater *MSSAU, bool TargetExecutesOncePerLoop,
                         SinkAndHoistLICMFlags *LICMFlags = nullptr,
-                        OptimizationRemarkEmitter *ORE = nullptr);
+                        TaskInfo *TI, OptimizationRemarkEmitter *ORE = nullptr);
 
 /// Returns a Min/Max operation corresponding to MinMaxRecurrenceKind.
 Value *createMinMaxOp(IRBuilderBase &Builder, RecurKind RK, Value *Left,

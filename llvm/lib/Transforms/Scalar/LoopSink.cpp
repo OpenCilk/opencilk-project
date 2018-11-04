@@ -282,7 +282,8 @@ static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
                                           BlockFrequencyInfo &BFI,
                                           ScalarEvolution *SE,
                                           AliasSetTracker *CurAST,
-                                          MemorySSA *MSSA) {
+                                          MemorySSA *MSSA,
+                                          TaskInfo *TI) {
   BasicBlock *Preheader = L.getLoopPreheader();
   assert(Preheader && "Expected loop to have preheader");
 
@@ -330,7 +331,7 @@ static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
     assert(L.hasLoopInvariantOperands(I) &&
            "Insts in a loop's preheader should have loop invariant operands!");
     if (!canSinkOrHoistInst(*I, &AA, &DT, &L, CurAST, MSSAU.get(), false,
-                            LICMFlags.get()))
+                            LICMFlags.get(), TI))
       continue;
     if (sinkInstruction(L, *I, ColdLoopBBs, LoopBlockNumber, LI, DT, BFI,
                         MSSAU.get()))
@@ -357,6 +358,7 @@ PreservedAnalyses LoopSinkPass::run(Function &F, FunctionAnalysisManager &FAM) {
 
   AAResults &AA = FAM.getResult<AAManager>(F);
   DominatorTree &DT = FAM.getResult<DominatorTreeAnalysis>(F);
+  TaskInfo &TI = FAM.getResult<TaskAnalysis>(F);
   BlockFrequencyInfo &BFI = FAM.getResult<BlockFrequencyAnalysis>(F);
 
   MemorySSA *MSSA = EnableMSSAInLoopSink
@@ -394,7 +396,7 @@ PreservedAnalyses LoopSinkPass::run(Function &F, FunctionAnalysisManager &FAM) {
     // unnecessary.
     Changed |= sinkLoopInvariantInstructions(L, AA, LI, DT, BFI,
                                              /*ScalarEvolution*/ nullptr,
-                                             CurAST.get(), MSSA);
+                                             CurAST.get(), MSSA, &TI);
   } while (!PreorderLoops.empty());
 
   if (!Changed)
@@ -435,6 +437,7 @@ struct LegacyLoopSinkPass : public LoopPass {
 
     AAResults &AA = getAnalysis<AAResultsWrapperPass>().getAAResults();
     auto *SE = getAnalysisIfAvailable<ScalarEvolutionWrapperPass>();
+    auto *TI = getAnalysisIfAvailable<TaskInfoWrapperPass>();
     std::unique_ptr<AliasSetTracker> CurAST;
     MemorySSA *MSSA = nullptr;
     if (EnableMSSAInLegacyLoopSink)
@@ -448,7 +451,8 @@ struct LegacyLoopSinkPass : public LoopPass {
         *L, AA, getAnalysis<LoopInfoWrapperPass>().getLoopInfo(),
         getAnalysis<DominatorTreeWrapperPass>().getDomTree(),
         getAnalysis<BlockFrequencyInfoWrapperPass>().getBFI(),
-        SE ? &SE->getSE() : nullptr, CurAST.get(), MSSA);
+        SE ? &SE->getSE() : nullptr, CurAST.get(), MSSA,
+        TI ? &TI->getTaskInfo() : nullptr);
 
     if (MSSA && VerifyMemorySSA)
       MSSA->verifyMemorySSA();

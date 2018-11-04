@@ -4126,13 +4126,13 @@ const SCEV *DependenceInfo::getSplitIteration(const Dependence &Dep,
 }
 
 static
-Value *getPointerOperand(GeneralAccess *A) {
+Value *getGeneralAccessPointerOperand(GeneralAccess *A) {
   return const_cast<Value *>(A->Loc->Ptr);
 }
 
 static
 const SCEV *getElementSize(GeneralAccess *A, ScalarEvolution *SE) {
-  Type *Ty = getPointerOperand(A)->getType();
+  Type *Ty = getGeneralAccessPointerOperand(A)->getType();
   Type *ETy = SE->getEffectiveSCEVType(PointerType::getUnqual(Ty));
   return SE->getSizeOfExpr(ETy, Ty);
 }
@@ -4143,8 +4143,8 @@ const SCEV *getElementSize(GeneralAccess *A, ScalarEvolution *SE) {
 /// for each loop level.
 bool DependenceInfo::tryDelinearize(GeneralAccess *SrcA, GeneralAccess *DstA,
                                     SmallVectorImpl<Subscript> &Pair) {
-  Value *SrcPtr = getPointerOperand(SrcA);
-  Value *DstPtr = getPointerOperand(DstA);
+  Value *SrcPtr = getGeneralAccessPointerOperand(SrcA);
+  Value *DstPtr = getGeneralAccessPointerOperand(DstA);
 
   Loop *SrcLoop = LI->getLoopFor(SrcA->I->getParent());
   Loop *DstLoop = LI->getLoopFor(DstA->I->getParent());
@@ -4365,11 +4365,11 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
     return make_unique<Dependence>(Src, Dst);
   }
 
-  Value *SrcPtr = getPointerOperand(SrcA);
-  Value *DstPtr = getPointerOperand(DstA);
+  Value *SrcPtr = getGeneralAccessPointerOperand(SrcA);
+  Value *DstPtr = getGeneralAccessPointerOperand(DstA);
 
-  switch (underlyingObjectsAlias(AA, F->getParent()->getDataLayout(), DstPtr,
-                                 SrcPtr)) {
+  switch (underlyingObjectsAlias(AA, F->getParent()->getDataLayout(),
+                                 *DstA->Loc, *SrcA->Loc)) {
   case MayAlias:
   case PartialAlias:
     // cannot analyse objects if we don't understand their aliasing.
