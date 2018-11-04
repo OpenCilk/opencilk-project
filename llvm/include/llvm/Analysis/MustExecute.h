@@ -40,6 +40,7 @@ class Instruction;
 class Loop;
 class LoopInfo;
 class PostDominatorTree;
+class TaskInfo;
 
 /// Captures loop safety information.
 /// It keep information for loop blocks may throw exception or otherwise
