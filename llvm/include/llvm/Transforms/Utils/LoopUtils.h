@@ -152,7 +152,7 @@ protected:
 bool sinkRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
                 BlockFrequencyInfo *, TargetLibraryInfo *,
                 TargetTransformInfo *, Loop *CurLoop, MemorySSAUpdater *,
-                ICFLoopSafetyInfo *, SinkAndHoistLICMFlags &,
+                ICFLoopSafetyInfo *, SinkAndHoistLICMFlags &, TaskInfo *,
                 OptimizationRemarkEmitter *, Loop *OutermostLoop = nullptr);
 
 /// Call sinkRegion on loops contained within the specified loop
@@ -161,7 +161,7 @@ bool sinkRegionForLoopNest(DomTreeNode *, AAResults *, LoopInfo *,
                            DominatorTree *, BlockFrequencyInfo *,
                            TargetLibraryInfo *, TargetTransformInfo *, Loop *,
                            MemorySSAUpdater *, ICFLoopSafetyInfo *,
-                           SinkAndHoistLICMFlags &,
+                           SinkAndHoistLICMFlags &, TaskInfo *,
                            OptimizationRemarkEmitter *);
 
 /// Walk the specified region of the CFG (defined by all blocks
@@ -177,8 +177,8 @@ bool sinkRegionForLoopNest(DomTreeNode *, AAResults *, LoopInfo *,
 bool hoistRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
                  BlockFrequencyInfo *, TargetLibraryInfo *, Loop *,
                  MemorySSAUpdater *, ScalarEvolution *, ICFLoopSafetyInfo *,
-                 SinkAndHoistLICMFlags &, OptimizationRemarkEmitter *, bool,
-                 bool AllowSpeculation);
+                 SinkAndHoistLICMFlags &, TaskInfo *,
+                 OptimizationRemarkEmitter *, bool, bool AllowSpeculation);
 
 /// This function deletes dead loops. The caller of this function needs to
 /// guarantee that the loop is infact dead.
@@ -214,7 +214,7 @@ bool promoteLoopAccessesToScalars(
     const SmallSetVector<Value *, 8> &, SmallVectorImpl<BasicBlock *> &,
     SmallVectorImpl<Instruction *> &, SmallVectorImpl<MemoryAccess *> &,
     PredIteratorCache &, LoopInfo *, DominatorTree *, const TargetLibraryInfo *,
-    Loop *, MemorySSAUpdater *, ICFLoopSafetyInfo *,
+    Loop *, MemorySSAUpdater *, ICFLoopSafetyInfo *, TaskInfo *,
     OptimizationRemarkEmitter *, bool AllowSpeculation);
 
 /// Does a BFS from a given node to all of its children inside a given loop.
@@ -351,7 +351,7 @@ bool canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
                         Loop *CurLoop, AliasSetTracker *CurAST,
                         MemorySSAUpdater *MSSAU, bool TargetExecutesOncePerLoop,
                         SinkAndHoistLICMFlags *LICMFlags = nullptr,
-                        OptimizationRemarkEmitter *ORE = nullptr);
+                        TaskInfo *TI, OptimizationRemarkEmitter *ORE = nullptr);
 
 /// Returns the comparison predicate used when expanding a min/max reduction.
 CmpInst::Predicate getMinMaxReductionPredicate(RecurKind RK);
