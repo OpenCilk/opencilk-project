@@ -264,6 +264,7 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
   if (L->getBlocks().size() == 1)
     return false;
 
+  Function *ParentF = L->getHeader()->getParent();
   bool Rotated = false;
   do {
     BasicBlock *OrigHeader = L->getHeader();
@@ -675,6 +676,12 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
 
     if (MSSAU && VerifyMemorySSA)
       MSSAU->getMemorySSA()->verifyMemorySSA();
+
+    if (TaskI && DT)
+      // Recompute task info.
+      // FIXME: Figure out a way to update task info that is less
+      // computationally wasteful.
+      TaskI->recalculate(*ParentF, *DT);
 
     LLVM_DEBUG(dbgs() << "LoopRotation: into "; L->dump());
 
