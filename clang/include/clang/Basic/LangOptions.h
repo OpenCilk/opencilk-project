@@ -19,7 +19,6 @@
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/ObjCRuntime.h"
 #include "clang/Basic/Sanitizers.h"
-#include "clang/Basic/Tapir.h"
 #include "clang/Basic/TargetCXXABI.h"
 #include "clang/Basic/Visibility.h"
 #include "llvm/ADT/FloatingPointMode.h"
@@ -385,8 +384,6 @@ public:
 public:
   /// The used language standard.
   LangStandard::Kind LangStd;
-
-  llvm::TapirTargetType Tapir;
 
   /// Set of enabled sanitizers.
   SanitizerSet Sanitize;
