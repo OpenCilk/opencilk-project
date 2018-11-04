@@ -1631,9 +1631,9 @@ bool GVN::processNonLocalLoad(LoadInst *Load) {
       continue;
     if (isa<DetachInst>(DepInfo.getInst())||
         isa<SyncInst>(DepInfo.getInst())) {
-      DEBUG(dbgs() << "GVN: Cannot process" << *LI <<
-            " due to dependency on" <<
-            *(DepInfo.getInst()) << "\n");
+      LLVM_DEBUG(dbgs() << "GVN: Cannot process" << *LI <<
+                 " due to dependency on" <<
+                 *(DepInfo.getInst()) << "\n");
       return Changed;
     }
   }
