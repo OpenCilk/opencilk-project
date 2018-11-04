@@ -42,6 +42,7 @@ class Loop;
 class LoopInfo;
 class PostDominatorTree;
 class raw_ostream;
+class TaskInfo;
 
 /// Captures loop safety information.
 /// It keep information for loop blocks may throw exception or otherwise
