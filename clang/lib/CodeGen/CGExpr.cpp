@@ -400,9 +400,8 @@ static Address createReferenceTemporary(CodeGenFunction &CGF,
     QualType Ty = Inner->getType();
     if (CGF.IsSpawned) {
       CGF.PushDetachScope();
-      return CGF.CurDetachScope->CreateDetachedMemTemp(Ty,
-                                                       M->getStorageDuration(),
-                                                       "det.ref.tmp");
+      return CGF.CurDetachScope->CreateDetachedMemTemp(
+          Ty, M->getStorageDuration(), "det.ref.tmp");
     }
     if (CGF.CGM.getCodeGenOpts().MergeAllConstants &&
         (Ty->isArrayType() || Ty->isRecordType()) &&
@@ -4850,15 +4849,11 @@ RValue CodeGenFunction::EmitCallExpr(const CallExpr *E,
   CGCallee callee = EmitCallee(E->getCallee());
 
   if (callee.isBuiltin()) {
-    // if (IsSpawned)
-    //   llvm::dbgs() << "Detached call to builtin!\n";
     return EmitBuiltinExpr(callee.getBuiltinDecl(), callee.getBuiltinID(),
                            E, ReturnValue);
   }
 
   if (callee.isPseudoDestructor()) {
-    // if (IsSpawned)
-    //   llvm::dbgs() << "Detached call to psudeodestructor!\n";
     return EmitCXXPseudoDestructorExpr(callee.getPseudoDestructorExpr());
   }
 
