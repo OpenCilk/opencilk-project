@@ -3219,7 +3219,7 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   QualType LoopVarTy = LoopVar->getType();
   // Add declaration to store the old loop var initialization.
   VarDecl *InitVar = BuildForRangeVarDecl(*this, CilkForLoc, LoopVarTy,
-                                           "__init");
+                                          "__init");
   AddInitializerToDecl(InitVar, LoopVarInit, /*DirectInit=*/false);
   FinalizeDeclaration(InitVar);
   CurContext->addHiddenDecl(InitVar);
@@ -3351,7 +3351,7 @@ StmtResult Sema::LiftCilkForLoopLimit(SourceLocation CilkForLoc,
   Decls.insert(LoopVar);
   bool DeclUseInRHS = DeclFinder(*this, Decls, E->getRHS()).FoundDeclInUse();
   bool DeclUseInLHS = DeclFinder(*this, Decls, E->getLHS()).FoundDeclInUse();
-  Expr *ToExtract;
+  Expr *ToExtract = nullptr;
   if ((DeclUseInLHS && DeclUseInRHS) || (!DeclUseInLHS && !DeclUseInRHS))
     return StmtEmpty();
 
@@ -3360,6 +3360,7 @@ StmtResult Sema::LiftCilkForLoopLimit(SourceLocation CilkForLoc,
     ToExtract = E->getRHS();
   else if (DeclUseInRHS)
     ToExtract = E->getLHS();
+  assert(ToExtract && "No Expr to extract.");
 
   // Create a new VarDecl that stores the result of the lifted
   // expression.
@@ -3369,8 +3370,7 @@ StmtResult Sema::LiftCilkForLoopLimit(SourceLocation CilkForLoc,
   QualType EndInitType = ToExtract->getType();
   // Hijacking this method for handling range loops to build the
   // declaration for the end of the loop.
-  VarDecl *EndVar = BuildForRangeVarDecl(*this, EndLoc, EndType,
-                                         "__end");
+  VarDecl *EndVar = BuildForRangeVarDecl(*this, EndLoc, EndType, "__end");
   AddInitializerToDecl(EndVar, ToExtract, /*DirectInit=*/false);
   FinalizeDeclaration(EndVar);
   CurContext->addHiddenDecl(EndVar);
@@ -3390,8 +3390,7 @@ StmtResult Sema::LiftCilkForLoopLimit(SourceLocation CilkForLoc,
 
   // Create a new condition expression that uses the new VarDecl
   // in place of the lifted expression.
-  ExprResult EndRef = BuildDeclRefExpr(EndVar, EndType,
-                                       VK_LValue, EndLoc);
+  ExprResult EndRef = BuildDeclRefExpr(EndVar, EndType, VK_LValue, EndLoc);
   ExprResult NewCondExpr;
   if (DeclUseInLHS)
     NewCondExpr = BuildBinOp(S, E->getOperatorLoc(), E->getOpcode(),
