@@ -137,7 +137,7 @@ static void init_internal() {
   char *e = getenv("CILK_NWORKERS");
   if (!e || 0 != strcmp(e, "1")) {
     // fprintf(err_io, "Setting CILK_NWORKERS to be 1\n");
-    if( setenv("CILK_NWORKERS", "1", 1) ) {
+    if (setenv("CILK_NWORKERS", "1", 1)) {
       fprintf(err_io, "Error setting CILK_NWORKERS to be 1\n");
       exit(1);
     }
@@ -148,7 +148,7 @@ static void init_internal() {
   e = getenv("CILK_FORCE_REDUCE");
   if (!e || 0 != strcmp(e, "1")) {
     // fprintf(err_io, "Setting CILK_FORCE_REDUCE to be 1\n");
-    if( setenv("CILK_FORCE_REDUCE", "1", 1) ) {
+    if (setenv("CILK_FORCE_REDUCE", "1", 1)) {
       fprintf(err_io, "Error setting CILK_FORCE_REDUCE to be 1\n");
       exit(1);
     }
@@ -218,12 +218,13 @@ CILKSAN_API void __csan_func_entry(const csi_id_t func_id,
     return;
 
   CheckingRAII nocheck;
+  cilksan_assert(TOOL_INITIALIZED);
+
   const csan_source_loc_t *srcloc = __csan_get_func_source_loc(func_id);
   DBG_TRACE(DEBUG_CALLBACK, "__csan_func_entry(%d) at %s (%s:%d)\n",
             func_id,
             srcloc->name, srcloc->filename,
             srcloc->line_number);
-  cilksan_assert(TOOL_INITIALIZED);
 
   CilkSanImpl.push_stack_frame((uintptr_t)sp);
 
@@ -337,6 +338,7 @@ CILKSAN_API void __csan_task_exit(const csi_id_t task_exit_id,
                                   const csi_id_t detach_id) {
   if (!should_check())
     return;
+
   CheckingRAII nocheck;
   DBG_TRACE(DEBUG_CALLBACK, "__csan_task_exit(%ld, %ld, %ld)\n",
             task_exit_id, task_id, detach_id);
@@ -352,6 +354,7 @@ CILKSAN_API void __csan_detach_continue(const csi_id_t detach_continue_id,
                                         const csi_id_t detach_id) {
   if (!should_check())
     return;
+
   CheckingRAII nocheck;
   DBG_TRACE(DEBUG_CALLBACK, "__csan_detach_continue(%ld)\n",
             detach_id);
@@ -367,6 +370,7 @@ CILKSAN_API void __csan_detach_continue(const csi_id_t detach_continue_id,
 CILKSAN_API void __csan_sync(csi_id_t sync_id) {
   if (!should_check())
     return;
+
   CheckingRAII nocheck;
   cilksan_assert(TOOL_INITIALIZED);
 
