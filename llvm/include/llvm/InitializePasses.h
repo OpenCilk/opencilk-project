@@ -108,6 +108,7 @@ void initializeDAHPass(PassRegistry&);
 void initializeDCELegacyPassPass(PassRegistry&);
 void initializeDFAJumpThreadingLegacyPassPass(PassRegistry &);
 void initializeDSELegacyPassPass(PassRegistry&);
+void initializeDRFAAWrapperPassPass(PassRegistry&);
 void initializeDeadMachineInstructionElimPass(PassRegistry&);
 void initializeDebugifyMachineModulePass(PassRegistry &);
 void initializeDelinearizationPass(PassRegistry&);

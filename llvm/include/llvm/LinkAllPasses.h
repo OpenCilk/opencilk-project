@@ -19,6 +19,7 @@
 #include "llvm/Analysis/AliasSetTracker.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/CallPrinter.h"
+#include "llvm/Analysis/DataRaceFreeAliasAnalysis.h"
 #include "llvm/Analysis/DomPrinter.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/IntervalPartition.h"
@@ -78,6 +79,7 @@ namespace {
       (void) llvm::createSCEVAAWrapperPass();
       (void) llvm::createTypeBasedAAWrapperPass();
       (void) llvm::createScopedNoAliasAAWrapperPass();
+      (void) llvm::createDRFAAWrapperPass();
       (void) llvm::createBreakCriticalEdgesPass();
       (void) llvm::createCallGraphDOTPrinterPass();
       (void) llvm::createCallGraphViewerPass();
