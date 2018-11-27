@@ -37,6 +37,7 @@ void llvm::initializeAnalysis(PassRegistry &Registry) {
   initializePostDomOnlyPrinterWrapperPassPass(Registry);
   initializeAAResultsWrapperPassPass(Registry);
   initializeGlobalsAAWrapperPassPass(Registry);
+  initializeDRFAAWrapperPassPass(Registry);
   initializeIVUsersWrapperPassPass(Registry);
   initializeIntervalPartitionPass(Registry);
   initializeIRSimilarityIdentifierWrapperPassPass(Registry);
