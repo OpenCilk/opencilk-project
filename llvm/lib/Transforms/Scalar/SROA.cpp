@@ -5210,9 +5210,10 @@ PreservedAnalyses SROAPass::runImpl(Function &F, DominatorTree &RunDT,
 }
 
 PreservedAnalyses SROAPass::run(Function &F, FunctionAnalysisManager &AM) {
-  return runImpl(F, AM.getResult<DominatorTreeAnalysis>(F),
-                 AM.getResult<AssumptionAnalysis>(F),
-                 AM.getResult<TaskAnalysis>(F));
+  auto &RunDT = AM.getResult<DominatorTreeAnalysis>(F);
+  auto &RunAC = AM.getResult<AssumptionAnalysis>(F);
+  auto &RunTI = AM.getResult<TaskAnalysis>(F);
+  return runImpl(F, RunDT, RunAC, RunTI);
 }
 
 void SROAPass::printPipeline(
