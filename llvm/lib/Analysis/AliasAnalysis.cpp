@@ -29,6 +29,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/CaptureTracking.h"
+#include "llvm/Analysis/DataRaceFreeAliasAnalysis.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ObjCARCAliasAnalysis.h"
@@ -963,6 +964,7 @@ char AAResultsWrapperPass::ID = 0;
 INITIALIZE_PASS_BEGIN(AAResultsWrapperPass, "aa",
                       "Function Alias Analysis Results", false, true)
 INITIALIZE_PASS_DEPENDENCY(BasicAAWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(DRFAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(ExternalAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(GlobalsAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(SCEVAAWrapperPass)
@@ -1005,6 +1007,8 @@ bool AAResultsWrapperPass::runOnFunction(Function &F) {
     AAR->addAAResult(WrapperPass->getResult());
   if (auto *WrapperPass = getAnalysisIfAvailable<SCEVAAWrapperPass>())
     AAR->addAAResult(WrapperPass->getResult());
+  if (auto *WrapperPass = getAnalysisIfAvailable<DRFAAWrapperPass>())
+    AAR->addAAResult(WrapperPass->getResult());
 
   // If available, run an external AA providing callback over the results as
   // well.
@@ -1029,6 +1033,7 @@ void AAResultsWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addUsedIfAvailable<TypeBasedAAWrapperPass>();
   AU.addUsedIfAvailable<GlobalsAAWrapperPass>();
   AU.addUsedIfAvailable<SCEVAAWrapperPass>();
+  AU.addUsedIfAvailable<DRFAAWrapperPass>();
   AU.addUsedIfAvailable<ExternalAAWrapperPass>();
 }
 
