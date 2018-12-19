@@ -298,6 +298,49 @@ UseCaptureKind llvm::DetermineUseCaptureKind(
     function_ref<bool(Value *, const DataLayout &)> IsDereferenceableOrNull) {
   Instruction *I = cast<Instruction>(U.getUser());
 
+  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U->getUser())) {
+    switch (CE->getOpcode()) {
+    case Instruction::BitCast:
+    case Instruction::GetElementPtr:
+    case Instruction::Select:
+      // The original value is not captured via this if the new value isn't.
+      return UseCaptureKind::PASSTHROUGH;
+    case Instruction::ICmp: {
+      unsigned Idx = U.getOperandNo();
+      unsigned OtherIdx = 1 - Idx;
+      if (auto *CPN = dyn_cast<ConstantPointerNull>(CE->getOperand(OtherIdx))) {
+        // Don't count comparisons of a no-alias return value against null as
+        // captures. This allows us to ignore comparisons of malloc results
+        // with null, for example.
+        if (CPN->getType()->getAddressSpace() == 0)
+          if (isNoAliasCall(U.get()->stripPointerCasts()))
+            return UseCaptureKind::NO_CAPTURE;
+        if (!I->getFunction()->nullPointerIsDefined()) {
+          auto *O = I->getOperand(Idx)->stripPointerCastsSameRepresentation();
+          // Comparing a dereferenceable_or_null pointer against null cannot
+          // lead to pointer escapes, because if it is not null it must be a
+          // valid (in-bounds) pointer.
+          const DataLayout &DL = I->getModule()->getDataLayout();
+          if (IsDereferenceableOrNull && IsDereferenceableOrNull(O, DL))
+            return UseCaptureKind::NO_CAPTURE;
+        }
+      }
+      // Comparison against value stored in global variable. Given the pointer
+      // does not escape, its value cannot be guessed and stored separately in a
+      // global variable.
+      auto *LI = dyn_cast<LoadInst>(CE->getOperand(OtherIdx));
+      if (LI && isa<GlobalVariable>(LI->getPointerOperand()))
+        return UseCaptureKind::NO_CAPTURE;
+      // Otherwise, be conservative. There are crazy ways to capture pointers
+      // using comparisons.
+      return UseCaptureKind::MAY_CAPTURE;
+    }
+    default:
+      // Something else - be conservative and say it is captured.
+      return UseCaptureKind::MAY_CAPTURE;
+    }
+  }
+
   switch (I->getOpcode()) {
   case Instruction::Call:
   case Instruction::Invoke: {
