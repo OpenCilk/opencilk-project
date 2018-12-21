@@ -1279,6 +1279,29 @@ static SmallVector<StringRef, 4> serializeSanitizerKinds(SanitizerSet S) {
   return Values;
 }
 
+static LangOptions::CSIExtensionPoint
+parseCSIExtensionPoint(StringRef FlagName, ArgList &Args,
+                       DiagnosticsEngine &Diags) {
+  if (Arg *A = Args.getLastArg(OPT_fcsi_EQ)) {
+    StringRef Val = A->getValue();
+    LangOptions::CSIExtensionPoint ParsedExt =
+      llvm::StringSwitch<LangOptions::CSIExtensionPoint>(Val)
+      .Case("first",           LangOptions::CSI_EarlyAsPossible)
+      .Case("early",           LangOptions::CSI_ModuleOptimizerEarly)
+      .Case("last",            LangOptions::CSI_OptimizerLast)
+      .Case("tapirlate",       LangOptions::CSI_TapirLate)
+      .Case("aftertapirloops", LangOptions::CSI_TapirLoopEnd)
+      .Default(LangOptions::CSI_None);
+    if (ParsedExt == LangOptions::CSI_None) {
+      Diags.Report(diag::err_drv_invalid_value) << FlagName << Val;
+      return LangOptions::CSI_None;
+    } else
+      return ParsedExt;
+  } else if (Args.hasArg(OPT_fcsi))
+    // Use TapirLate extension point by default, for backwards compatability.
+    return LangOptions::CSI_TapirLate;
+}
+
 static void parseXRayInstrumentationBundle(StringRef FlagName, StringRef Bundle,
                                            ArgList &Args, DiagnosticsEngine &D,
                                            XRayInstrSet &S) {
@@ -3607,7 +3630,9 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.PIE = Args.hasArg(OPT_pic_is_pie);
     parseSanitizerKinds("-fsanitize=", Args.getAllArgValues(OPT_fsanitize_EQ),
                         Diags, Opts.Sanitize);
-    getLangOpts()->ComprehensiveStaticInstrumentation = Args.hasArg(OPT_fcsi);
+    if (Args.hasArg(OPT_fcsi_EQ) || Args.hasArg(OPT_fcsi))
+      Opts.setComprehensiveStaticInstrumentation(
+          parseCSIExtensionPoint("-fcsi=", Args, Diags));
 
     return Diags.getNumErrors() == NumErrorsBefore;
   }
@@ -4016,7 +4041,9 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
                               systemIgnorelists.end());
 
   // -fcsi
-  Opts.ComprehensiveStaticInstrumentation = Args.hasArg(OPT_fcsi);
+  if (Args.hasArg(OPT_fcsi_EQ) || Args.hasArg(OPT_fcsi))
+    Opts.setComprehensiveStaticInstrumentation(
+        parseCSIExtensionPoint("-fcsi=", Args, Diags));
 
   if (Arg *A = Args.getLastArg(OPT_fclang_abi_compat_EQ)) {
     Opts.setClangABICompat(LangOptions::ClangABI::Latest);
