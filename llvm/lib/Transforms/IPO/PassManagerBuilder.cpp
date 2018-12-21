@@ -311,9 +311,6 @@ void PassManagerBuilder::populateModulePassManager(
       Inliner = nullptr;
     }
 
-    // Add passes to run just before Tapir lowering.
-    addExtensionsToPM(EP_TapirLate, MPM);
-
     if (TapirTargetID::None != TapirTarget) {
       // MPM.add(createAnalyzeTapirPass());
       MPM.add(createLowerTapirToTargetPass());
