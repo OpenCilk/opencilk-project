@@ -1150,7 +1150,7 @@ static bool HasFeature(const Preprocessor &PP, StringRef Feature) {
       .Case("scudo", LangOpts.Sanitize.hasOneOf(SanitizerKind::Scudo))
       .Case("cilk_sanitizer", LangOpts.Sanitize.has(SanitizerKind::Cilk))
       .Case("comprehensive_static_instrumentation",
-            LangOpts.ComprehensiveStaticInstrumentation)
+            LangOpts.getComprehensiveStaticInstrumentation())
       // Objective-C features
       .Case("objc_arr", LangOpts.ObjCAutoRefCount) // FIXME: REMOVE?
       .Case("objc_arc", LangOpts.ObjCAutoRefCount)

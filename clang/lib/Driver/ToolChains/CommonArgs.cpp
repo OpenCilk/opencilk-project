@@ -728,7 +728,7 @@ bool tools::addSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
 bool tools::addCSIRuntime(const ToolChain &TC, const ArgList &Args,
                           ArgStringList &CmdArgs) {
   // Only add the CSI runtime library if -fcsi is specified.
-  if (!Args.hasArg(options::OPT_fcsi))
+  if (!Args.hasArg(options::OPT_fcsi_EQ) && !Args.hasArg(options::OPT_fcsi))
     return false;
 
   CmdArgs.push_back(TC.getCompilerRTArgString(Args, "csi", false));
