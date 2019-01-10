@@ -68,8 +68,6 @@
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include <memory>
-
-#include <iostream>
 using namespace clang;
 using namespace llvm;
 

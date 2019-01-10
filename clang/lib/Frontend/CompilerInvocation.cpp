@@ -2314,7 +2314,6 @@ static const StringRef GetInputKindName(InputKind IK) {
   llvm_unreachable("unknown input language");
 }
 
-#include <iostream>
 static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
                           const TargetOptions &TargetOpts,
                           PreprocessorOptions &PPOpts,
