@@ -187,6 +187,7 @@ struct CSIOptions {
   bool InstrumentTapir = true;
   bool InstrumentAllocas = true;
   bool InstrumentAllocFns = true;
+  bool Interpose = true;
 
   CSIOptions() = default;
 };
