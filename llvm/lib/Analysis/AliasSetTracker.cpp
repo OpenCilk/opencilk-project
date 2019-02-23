@@ -441,6 +441,7 @@ void AliasSetTracker::addUnknown(Instruction *Inst) {
     case Intrinsic::experimental_noalias_scope_decl:
     case Intrinsic::sideeffect:
     case Intrinsic::pseudoprobe:
+    case Intrinsic::syncregion_start:
       return;
     }
   }
