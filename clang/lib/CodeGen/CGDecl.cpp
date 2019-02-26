@@ -717,17 +717,19 @@ static void drillIntoBlockVariable(CodeGenFunction &CGF,
 namespace {
 class SpawnedInitRAII {
   CodeGenFunction &CGF;
-  bool InitIsSpawned;
+  bool InitIsSpawned = false;
+  CodeGenFunction::DetachScope *DetachScpBefore = nullptr;
 public:
-  SpawnedInitRAII(CodeGenFunction &CGF) : CGF(CGF), InitIsSpawned(false) {}
+  SpawnedInitRAII(CodeGenFunction &CGF) : CGF(CGF) {}
   ~SpawnedInitRAII() {
-    if (InitIsSpawned) {
+    if (InitIsSpawned && (CGF.CurDetachScope != DetachScpBefore)) {
       // Finish the detach.
       assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
              "Processing _Cilk_spawn of expression did not produce detach.");
       CGF.IsSpawned = false;
       CGF.PopDetachScope();
     }
+    DetachScpBefore = nullptr;
   }
 
   void setInitIsSpawned() {
@@ -737,7 +739,10 @@ public:
 
     // Prepare to detach.
     CGF.IsSpawned = true;
+    DetachScpBefore = CGF.CurDetachScope;
   }
+
+  bool getInitIsSpawned() const { return InitIsSpawned; }
 };
 } // end anonymous namespace
 
@@ -766,6 +771,10 @@ void CodeGenFunction::EmitScalarInit(const Expr *init, const ValueDecl *D,
                                      LValue lvalue, bool capturedByInit) {
   Qualifiers::ObjCLifetime lifetime = lvalue.getObjCLifetime();
   if (!lifetime) {
+    if (IsSpawned) {
+      EmitScalarExprIntoLValue(init, lvalue, /*isInit*/ true);
+      return;
+    }
     llvm::Value *value = EmitScalarExpr(init);
     if (capturedByInit)
       drillIntoBlockVariable(*this, lvalue, cast<VarDecl>(D));
@@ -1627,6 +1636,8 @@ void CodeGenFunction::EmitExprAsInit(const Expr *init, const ValueDecl *D,
     return;
   }
 
+  // Determine whether this initialization is spanwed, so the emission routines
+  // can properly handle the spawned store of the initialized value.
   SpawnedInitRAII SpawnedInit(*this);
   if (InitIsSpawned(init))
     SpawnedInit.setInitIsSpawned();
@@ -1636,6 +1647,10 @@ void CodeGenFunction::EmitExprAsInit(const Expr *init, const ValueDecl *D,
     EmitScalarInit(init, D, lvalue, capturedByInit);
     return;
   case TEK_Complex: {
+    if (SpawnedInit.getInitIsSpawned()) {
+      EmitComplexExprIntoLValue(init, lvalue, /*init*/ true);
+      return;
+    }
     ComplexPairTy complex = EmitComplexExpr(init);
     if (capturedByInit)
       drillIntoBlockVariable(*this, lvalue, cast<VarDecl>(D));
