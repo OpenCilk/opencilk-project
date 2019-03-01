@@ -564,7 +564,9 @@ public:
   virtual SanitizerMask getSupportedSanitizers() const;
 
   /// Return sanitizers which are enabled by default.
-  virtual SanitizerMask getDefaultSanitizers() const { return 0; }
+  virtual SanitizerMask getDefaultSanitizers() const {
+    return SanitizerMask();
+  }
 
   /// AddTapirRuntimeLibArgs - Add the specific linker arguments to use for the
   /// given Tapir runtime library type.
