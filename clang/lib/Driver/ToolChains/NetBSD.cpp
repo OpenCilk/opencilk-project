@@ -274,6 +274,7 @@ void netbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   addCSIRuntime(getToolChain(), Args, CmdArgs);
+  addCilktoolRuntime(getToolChain(), Args, CmdArgs);
 
   VersionTuple OsVersion = Triple.getOSVersion();
   bool useLibgcc = true;
