@@ -273,6 +273,8 @@ void netbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   addCSIRuntime(getToolChain(), Args, CmdArgs);
+  addCilktoolRuntime(getToolChain(), Args, CmdArgs);
+
   bool useLibgcc = true;
   switch (ToolChain.getArch()) {
   case llvm::Triple::aarch64:
