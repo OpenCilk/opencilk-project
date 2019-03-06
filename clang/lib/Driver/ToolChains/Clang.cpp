@@ -3928,6 +3928,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   else if (Args.hasArg(options::OPT_fcsi))
     Args.AddLastArg(CmdArgs, options::OPT_fcsi);
 
+  if (Args.hasArg(options::OPT_fcilktool_EQ))
+    Args.AddLastArg(CmdArgs, options::OPT_fcilktool_EQ);
+
   const XRayArgs &XRay = getToolChain().getXRayArgs();
   XRay.addArgs(getToolChain(), Args, CmdArgs, InputType);
 
