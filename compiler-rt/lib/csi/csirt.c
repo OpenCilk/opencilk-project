@@ -44,6 +44,9 @@ typedef enum {
     FED_TYPE_ALLOCA,
     FED_TYPE_ALLOCFN,
     FED_TYPE_FREE,
+    FED_TYPE_ARITHMETIC,
+    FED_TYPE_PARAMETER,
+    FED_TYPE_GLOBAL,
     NUM_FED_TYPES // Must be last
 } fed_type_t;
 

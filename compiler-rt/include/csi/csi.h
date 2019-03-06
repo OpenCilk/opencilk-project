@@ -25,6 +25,42 @@ EXTERN_C
 
 typedef int64_t csi_id_t;
 
+enum CSI_IR_variable_category
+  {
+   Constant = 0,
+   Parameter,
+   Global,
+   Callsite,
+   Load,
+   Alloca,
+   AllocFn,
+   Arithmetic
+  };
+typedef int8_t csi_ir_variable_category_t;
+
+enum CSI_arithmetic_opcode
+  {
+   Add = 0,
+   FAdd,
+   Sub,
+   FSub,
+   Mul,
+   FMul,
+   UDiv,
+   SDiv,
+   FDiv,
+   URem,
+   SRem,
+   FRem,
+   Shl,
+   LShr,
+   AShr,
+   And,
+   Or,
+   Xor
+  };
+typedef int8_t csi_opcode_t;
+
 #define UNKNOWN_CSI_ID ((csi_id_t)-1)
 
 typedef struct {
@@ -42,6 +78,9 @@ typedef struct {
   csi_id_t num_alloca;
   csi_id_t num_allocfn;
   csi_id_t num_free;
+  csi_id_t num_arithmetic;
+  csi_id_t num_parameter;
+  csi_id_t num_global;
 } instrumentation_counts_t;
 
 // Property bitfields.
@@ -131,6 +170,22 @@ typedef struct {
   uint64_t _padding : 56;
 } free_prop_t;
 
+typedef struct {
+  // Flags for arithmetic ops
+  unsigned no_signed_wrap : 1;
+  unsigned no_unsigned_wrap : 1;
+  unsigned is_exact : 1;
+  unsigned no_NaNs : 1;
+  unsigned no_infs : 1;
+  unsigned no_signed_zeros : 1;
+  unsigned allow_reciprocal : 1;
+  unsigned allow_contract : 1;
+  unsigned approx_func : 1;
+  unsigned is_in_bounds : 1;
+  // Pad struct to 64 total bits.
+  uint64_t _padding : 53;
+} arithmetic_flags_t;
+
 WEAK void __csi_init();
 
 WEAK void __csi_unit_init(const char *const file_name,
@@ -158,10 +213,16 @@ WEAK void __csi_after_load(const csi_id_t load_id, const void *addr,
                            const int32_t num_bytes, const load_prop_t prop);
 
 WEAK void __csi_before_store(const csi_id_t store_id, const void *addr,
-                             const int32_t num_bytes, const store_prop_t prop);
+                             const int32_t num_bytes,
+                             const csi_ir_variable_category_t operand_cat,
+                             const csi_id_t operand_id,
+                             const store_prop_t prop);
 
 WEAK void __csi_after_store(const csi_id_t store_id, const void *addr,
-                            const int32_t num_bytes, const store_prop_t prop);
+                            const int32_t num_bytes,
+                            const csi_ir_variable_category_t operand_cat,
+                            const csi_id_t operand_id,
+                            const store_prop_t prop);
 
 WEAK void __csi_detach(const csi_id_t detach_id, const int32_t *has_spawned);
 
@@ -196,6 +257,366 @@ WEAK void __csi_before_free(const csi_id_t free_id, const void *ptr,
 WEAK void __csi_after_free(const csi_id_t free_id, const void *ptr,
                            const free_prop_t prop);
 
+// Simple arithmetic ops.
+/* WEAK void __csi_before_arithmetic_half( */
+/*     const csi_id_t arith_id, const csi_opcode_t opcode, */
+/*     const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id, */
+/*     const _Float16 operand0, const csi_ir_variable_category_t operand1_cat, */
+/*     const csi_id_t operand1_id, const _Float16 operand1, */
+/*     const arithmetic_flags_t flags); */
+
+WEAK void __csi_before_arithmetic_float(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const float operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_arithmetic_double(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const double operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_arithmetic_i8(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint8_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint8_t operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_arithmetic_i16(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint16_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint16_t operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_arithmetic_i32(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint32_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint32_t operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_arithmetic_i64(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint64_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint64_t operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_arithmetic_i128(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const __uint128_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const __uint128_t operand1,
+    const arithmetic_flags_t flags);
+
+// Floating-point extension and truncation
+/* WEAK void __csi_before_extend_half_float( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_extend_half_double( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+WEAK void __csi_before_extend_float_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_truncate_double_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+/* WEAK void __csi_before_truncate_double_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const double operand); */
+
+/* WEAK void __csi_before_truncate_float_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const float operand); */
+
+// Conversion from floating-point to unsigned integer
+/* WEAK void __csi_before_convert_half_unsigned_i8( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_unsigned_i16( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_unsigned_i32( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_unsigned_i64( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_unsigned_i128( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+WEAK void __csi_before_convert_float_unsigned_i8(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_unsigned_i16(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_unsigned_i32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_unsigned_i64(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_unsigned_i128(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_double_unsigned_i8(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_unsigned_i16(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_unsigned_i32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_unsigned_i64(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_unsigned_i128(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+// Conversion from floating-point to signed integer
+/* WEAK void __csi_before_convert_half_signed_i8( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_signed_i16( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_signed_i32( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_signed_i64( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+/* WEAK void __csi_before_convert_half_signed_i128( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+WEAK void __csi_before_convert_float_signed_i8(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_signed_i16(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_signed_i32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_signed_i64(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_float_signed_i128(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_convert_double_signed_i8(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_signed_i16(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_signed_i32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_signed_i64(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_convert_double_signed_i128(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+// Conversion from unsigned integer to floating-point
+/* WEAK void __csi_before_convert_unsigned_i8_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const uint8_t operand); */
+
+/* WEAK void __csi_before_convert_unsigned_i16_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const uint16_t operand); */
+
+/* WEAK void __csi_before_convert_unsigned_i32_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const uint32_t operand); */
+
+/* WEAK void __csi_before_convert_unsigned_i64_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const uint64_t operand); */
+
+/* WEAK void __csi_before_convert_unsigned_i128_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const __uint128_t operand); */
+
+WEAK void __csi_before_convert_unsigned_i8_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint8_t operand);
+
+WEAK void __csi_before_convert_unsigned_i16_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint16_t operand);
+
+WEAK void __csi_before_convert_unsigned_i32_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint32_t operand);
+
+WEAK void __csi_before_convert_unsigned_i64_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint64_t operand);
+
+WEAK void __csi_before_convert_unsigned_i128_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const __uint128_t operand);
+
+WEAK void __csi_before_convert_unsigned_i8_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint8_t operand);
+
+WEAK void __csi_before_convert_unsigned_i16_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint16_t operand);
+
+WEAK void __csi_before_convert_unsigned_i32_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint32_t operand);
+
+WEAK void __csi_before_convert_unsigned_i64_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint64_t operand);
+
+WEAK void __csi_before_convert_unsigned_i128_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const __uint128_t operand);
+
+// Conversion from signed integer to floating-point
+/* WEAK void __csi_before_convert_signed_i8_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const int8_t operand); */
+
+/* WEAK void __csi_before_convert_signed_i16_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const int16_t operand); */
+
+/* WEAK void __csi_before_convert_signed_i32_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const int32_t operand); */
+
+/* WEAK void __csi_before_convert_signed_i64_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const int64_t operand); */
+
+/* WEAK void __csi_before_convert_signed_i128_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const __int128_t operand); */
+
+WEAK void __csi_before_convert_signed_i8_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int8_t operand);
+
+WEAK void __csi_before_convert_signed_i16_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int16_t operand);
+
+WEAK void __csi_before_convert_signed_i32_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int32_t operand);
+
+WEAK void __csi_before_convert_signed_i64_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int64_t operand);
+
+WEAK void __csi_before_convert_signed_i128_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const __int128_t operand);
+
+WEAK void __csi_before_convert_signed_i8_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int8_t operand);
+
+WEAK void __csi_before_convert_signed_i16_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int16_t operand);
+
+WEAK void __csi_before_convert_signed_i32_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int32_t operand);
+
+WEAK void __csi_before_convert_signed_i64_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const int64_t operand);
+
+WEAK void __csi_before_convert_signed_i128_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const __int128_t operand);
+
+// PHI node hooks
+WEAK void __csi_phi_i8(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint8_t operand);
+
+WEAK void __csi_phi_i16(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint16_t operand);
+
+WEAK void __csi_phi_i32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint32_t operand);
+
+WEAK void __csi_phi_i64(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint64_t operand);
+
+WEAK void __csi_phi_i128(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const __uint128_t operand);
+
+/* WEAK void __csi_phi_half( */
+/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t operand_id, const _Float16 operand); */
+
+WEAK void __csi_phi_float(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_phi_double(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+
 // This struct is mirrored in ComprehensiveStaticInstrumentation.cpp,
 // FrontEndDataTable::getSourceLocStructType.
 typedef struct {
@@ -227,6 +648,9 @@ const source_loc_t *__csi_get_sync_source_loc(const csi_id_t sync_id);
 const source_loc_t *__csi_get_alloca_source_loc(const csi_id_t alloca_id);
 const source_loc_t *__csi_get_allocfn_source_loc(const csi_id_t allocfn_id);
 const source_loc_t *__csi_get_free_source_loc(const csi_id_t free_id);
+const source_loc_t *__csi_get_arithmetic_source_loc(const csi_id_t arith_id);
+const source_loc_t *__csi_get_parameter_source_loc(const csi_id_t param_id);
+const source_loc_t *__csi_get_global_source_loc(const csi_id_t global_id);
 const sizeinfo_t *__csi_get_bb_sizeinfo(const csi_id_t bb_id);
 
 const char *__csan_get_allocfn_str(const allocfn_prop_t prop);
