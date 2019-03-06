@@ -241,6 +241,12 @@ public:
     CSI_TapirLoopEnd
   };
 
+  enum CilktoolKind {
+    // No Cilktool
+    Cilktool_None = 0,
+    Cilktool_Cilkscale
+  };
+
 public:
   /// Set of enabled sanitizers.
   SanitizerSet Sanitize;
