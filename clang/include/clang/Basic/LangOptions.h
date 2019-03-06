@@ -269,6 +269,12 @@ public:
     CSI_TapirLoopEnd  
   };
 
+  enum CilktoolKind {
+    // No Cilktool
+    Cilktool_None = 0,
+    Cilktool_Cilkscale
+  };
+
 public:
   /// The used language standard.
   LangStandard::Kind LangStd;
