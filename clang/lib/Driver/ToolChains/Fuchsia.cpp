@@ -133,6 +133,7 @@ void fuchsia::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   ToolChain.addProfileRTLibs(Args, CmdArgs);
 
   addCSIRuntime(ToolChain, Args, CmdArgs);
+  addCilktoolRuntime(ToolChain, Args, CmdArgs);
 
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs,
                    options::OPT_r)) {
