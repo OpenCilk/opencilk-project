@@ -186,12 +186,19 @@ typedef struct {
   uint64_t _padding : 53;
 } arithmetic_flags_t;
 
+typedef struct {
+  const csi_ir_variable_category_t operand_cat;
+  const csi_id_t operand_id;
+} operand_id_t;
+
 WEAK void __csi_init();
 
 WEAK void __csi_unit_init(const char *const file_name,
                           const instrumentation_counts_t counts);
 
-WEAK void __csi_func_entry(const csi_id_t func_id, const func_prop_t prop);
+WEAK void __csi_func_entry(const csi_id_t func_id,
+                           const csi_id_t first_param_id, int32_t num_params,
+                           const func_prop_t prop);
 
 WEAK void __csi_func_exit(const csi_id_t func_exit_id, const csi_id_t func_id,
                           const func_exit_prop_t prop);
@@ -201,7 +208,8 @@ WEAK void __csi_bb_entry(const csi_id_t bb_id, const bb_prop_t prop);
 WEAK void __csi_bb_exit(const csi_id_t bb_id, const bb_prop_t prop);
 
 WEAK void __csi_before_call(const csi_id_t call_id, const csi_id_t func_id,
-                            const call_prop_t prop);
+                            const operand_id_t *operand_ids,
+                            int32_t num_operands, const call_prop_t prop);
 
 WEAK void __csi_after_call(const csi_id_t call_id, const csi_id_t func_id,
                            const call_prop_t prop);

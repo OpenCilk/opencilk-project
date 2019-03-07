@@ -35,7 +35,9 @@ WEAK void __csi_after_store(const csi_id_t store_id,
                             const store_prop_t prop) {}
 
 __attribute__((always_inline))
-WEAK void __csi_func_entry(const csi_id_t func_id, const func_prop_t prop) {}
+WEAK void __csi_func_entry(const csi_id_t func_id,
+                           const csi_id_t first_param_id, int32_t num_params,
+                           const func_prop_t prop) {}
 
 __attribute__((always_inline))
 WEAK void __csi_func_exit(const csi_id_t func_exit_id,
@@ -49,6 +51,8 @@ WEAK void __csi_bb_exit(const csi_id_t bb_id, const bb_prop_t prop) {}
 
 __attribute__((always_inline))
 WEAK void __csi_before_call(csi_id_t callsite_id, csi_id_t func_id,
+                            const operand_id_t *operand_ids,
+                            int32_t num_operands,
                             const call_prop_t prop) {}
 
 __attribute__((always_inline))

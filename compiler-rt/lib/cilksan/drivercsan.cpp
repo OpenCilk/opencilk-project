@@ -263,14 +263,14 @@ CILKSAN_API void __csan_func_exit(const csi_id_t func_exit_id,
   // cilksan_do_function_exit();
 }
 
-CILKSAN_API void __csi_before_call(const csi_id_t call_id,
-                                   const csi_id_t func_id,
-                                   const call_prop_t prop) {
+CILKSAN_API void __csan_before_call(const csi_id_t call_id,
+                                    const csi_id_t func_id,
+                                    const call_prop_t prop) {
   if (!should_check())
     return;
 
   CheckingRAII nocheck;
-  DBG_TRACE(DEBUG_CALLBACK, "__csi_before_call(%ld, %ld)\n",
+  DBG_TRACE(DEBUG_CALLBACK, "__csan_before_call(%ld, %ld)\n",
             call_id, func_id);
 
   // Record the address of this call site.
@@ -281,14 +281,14 @@ CILKSAN_API void __csi_before_call(const csi_id_t call_id,
   CilkSanImpl.record_call(call_id, CALL);
 }
 
-CILKSAN_API void __csi_after_call(const csi_id_t call_id,
-                                  const csi_id_t func_id,
-                                  const call_prop_t prop) {
+CILKSAN_API void __csan_after_call(const csi_id_t call_id,
+                                   const csi_id_t func_id,
+                                   const call_prop_t prop) {
   if (!should_check())
     return;
 
   CheckingRAII nocheck;
-  DBG_TRACE(DEBUG_CALLBACK, "__csi_after_call(%ld, %ld)\n",
+  DBG_TRACE(DEBUG_CALLBACK, "__csan_after_call(%ld, %ld)\n",
             call_id, func_id);
 
   // Pop the call off of the call stack.
