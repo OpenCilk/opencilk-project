@@ -493,16 +493,16 @@ void __csi_after_alloca(const csi_id_t alloca_id, const void *addr,
 static std::unordered_map<uintptr_t, size_t> malloc_sizes;
 
 CILKSAN_API
-void __csan_after_allocfn(const csi_id_t allocfn_id, const void *addr,
-                          size_t size, size_t num, size_t alignment,
-                          const void *oldaddr, const allocfn_prop_t prop) {
+void __csi_after_allocfn(const csi_id_t allocfn_id, const void *addr,
+                         size_t size, size_t num, size_t alignment,
+                         const void *oldaddr, const allocfn_prop_t prop) {
   cilksan_assert(TOOL_INITIALIZED);
   if (!should_check())
     return;
 
   CheckingRAII nocheck;
 
-  // std::cerr << "Called memory function " << __csan_get_allocfn_str(prop) << "\n";
+  // std::cerr << "Called memory function " << __csi_get_allocfn_str(prop) << "\n";
 
   // TODO: Use alignment information
   // Record the PC for this allocation-function call
@@ -526,7 +526,7 @@ void __csan_after_allocfn(const csi_id_t allocfn_id, const void *addr,
 
 // __csan_after_free is called after any call to free or delete.
 CILKSAN_API
-void __csan_after_free(const csi_id_t free_id, const void *ptr,
+void __csi_after_free(const csi_id_t free_id, const void *ptr,
                        const free_prop_t prop) {
   cilksan_assert(TOOL_INITIALIZED);
   if (!should_check())
