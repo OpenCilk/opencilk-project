@@ -41,7 +41,10 @@ WEAK void __csi_func_entry(const csi_id_t func_id,
 
 __attribute__((always_inline))
 WEAK void __csi_func_exit(const csi_id_t func_exit_id,
-                          const csi_id_t func_id, const func_exit_prop_t prop) {}
+                          const csi_id_t func_id,
+                          const csi_ir_variable_category_t return_cat,
+                          const csi_id_t return_id,
+                          const func_exit_prop_t prop) {}
 
 __attribute__((always_inline))
 WEAK void __csi_bb_entry(const csi_id_t bb_id, const bb_prop_t prop) {}
