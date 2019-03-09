@@ -27,7 +27,9 @@ typedef int64_t csi_id_t;
 
 enum CSI_IR_variable_category
   {
-   Constant = 0,
+   None = 0, // Used for cases where no operand is present, e.g., returns from
+             // functions that return void.
+   Constant,
    Parameter,
    Global,
    Callsite,
@@ -201,6 +203,8 @@ WEAK void __csi_func_entry(const csi_id_t func_id,
                            const func_prop_t prop);
 
 WEAK void __csi_func_exit(const csi_id_t func_exit_id, const csi_id_t func_id,
+                          const csi_ir_variable_category_t return_cat,
+                          const csi_id_t return_id,
                           const func_exit_prop_t prop);
 
 WEAK void __csi_bb_entry(const csi_id_t bb_id, const bb_prop_t prop);
