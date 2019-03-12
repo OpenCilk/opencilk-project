@@ -476,3 +476,132 @@ __attribute__((always_inline)) WEAK void __csi_phi_float(
 __attribute__((always_inline)) WEAK void __csi_phi_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const double operand) {}
+
+// Hooks for builtin functions
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_float_float_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_float_float_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_double_double_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_double_double_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_float_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const float operand2) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_float_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const float operand2) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_before_builtin_double_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const double operand2) {}
+
+__attribute__((always_inline)) WEAK
+void __csi_after_builtin_double_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const double operand2) {}

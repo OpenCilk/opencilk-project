@@ -63,6 +63,53 @@ enum CSI_arithmetic_opcode
   };
 typedef int8_t csi_opcode_t;
 
+enum CSI_builtin_func_op
+  {
+   F_Fma = 0,
+   F_Sqrt,
+   F_Cbrt,
+   F_Sin,
+   F_Cos,
+   F_Tan,
+   F_SinPi,
+   F_CosPi,
+   F_SinCosPi,
+   F_ASin,
+   F_ACos,
+   F_ATan,
+   F_ATan2,
+   F_Sinh,
+   F_Cosh,
+   F_Tanh,
+   F_ASinh,
+   F_ACosh,
+   F_ATanh,
+   F_Log,
+   F_Log2,
+   F_Log10,
+   F_Logb,
+   F_Log1p,
+   F_Exp,
+   F_Exp2,
+   F_Exp10,
+   F_Expm1,
+   F_Fabs,
+   F_Floor,
+   F_Ceil,
+   F_Fmod,
+   F_Trunc,
+   F_Rint,
+   F_NearbyInt,
+   F_Round,
+   F_Canonicalize,
+   F_Pow,
+   F_CopySign,
+   F_MinNum,  // Same as FMin
+   F_MaxNum,  // Same as FMax
+   F_Ldexp,
+  };
+typedef int8_t csi_builtin_func_op_t;
+
 #define UNKNOWN_CSI_ID ((csi_id_t)-1)
 
 typedef struct {
@@ -627,6 +674,119 @@ WEAK void __csi_phi_float(
 WEAK void __csi_phi_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const double operand);
+
+// Hooks for builtin functions
+WEAK void __csi_before_builtin_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_after_builtin_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const float operand);
+
+WEAK void __csi_before_builtin_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_after_builtin_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const double operand);
+
+WEAK void __csi_before_builtin_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1);
+
+WEAK void __csi_after_builtin_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1);
+
+WEAK void __csi_before_builtin_float_float_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1);
+
+WEAK void __csi_after_builtin_float_float_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1);
+
+WEAK void __csi_before_builtin_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1);
+
+WEAK void __csi_after_builtin_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1);
+
+WEAK void __csi_before_builtin_double_double_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1);
+
+WEAK void __csi_after_builtin_double_double_i32(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const int32_t operand1);
+
+WEAK void __csi_before_builtin_float_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const float operand2);
+
+WEAK void __csi_after_builtin_float_float_float_float(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const float operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const float operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const float operand2);
+
+WEAK void __csi_before_builtin_double_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const double operand2);
+
+WEAK void __csi_after_builtin_double_double_double_double(
+    const csi_id_t call_id, const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand0_cat,
+    const csi_id_t operand0_id, const double operand0,
+    const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const double operand1,
+    const csi_ir_variable_category_t operand2_cat,
+    const csi_id_t operand2_id, const double operand2);
 
 
 // This struct is mirrored in ComprehensiveStaticInstrumentation.cpp,
