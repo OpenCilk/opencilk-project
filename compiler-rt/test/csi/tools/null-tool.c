@@ -1465,6 +1465,35 @@ __attribute__((always_inline)) WEAK void __csi_phi_v8double(
 
 ///-----------------------------------------------------------------------------
 /// Hooks for builtin functions
+__attribute__((always_inline)) WEAK void __csi_before_memset(
+    const csi_id_t call_id, const void *addr, const size_t num_bytes,
+    const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id) {}
+
+__attribute__((always_inline)) WEAK void __csi_after_memset(
+    const csi_id_t call_id, const void *addr, const size_t num_bytes,
+    const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id) {}
+
+__attribute__((always_inline)) WEAK void __csi_before_memcpy(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes) {}
+
+__attribute__((always_inline)) WEAK void __csi_after_memcpy(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes) {}
+
+__attribute__((always_inline)) WEAK void __csi_before_memmove(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes) {}
+
+__attribute__((always_inline)) WEAK void __csi_after_memmove(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes) {}
+
+// Floating-point builtins
 __attribute__((always_inline)) WEAK
 void __csi_before_builtin_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,

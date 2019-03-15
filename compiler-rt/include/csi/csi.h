@@ -1,5 +1,6 @@
 #pragma once 
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -1599,6 +1600,35 @@ WEAK void __csi_phi_v8double(
 
 ///-----------------------------------------------------------------------------
 /// Hooks for builtin functions
+WEAK void __csi_before_memset(
+    const csi_id_t call_id, const void *addr, const size_t num_bytes,
+    const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id);
+
+WEAK void __csi_after_memset(
+    const csi_id_t call_id, const void *addr, const size_t num_bytes,
+    const csi_builtin_func_op_t func_op,
+    const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id);
+
+WEAK void __csi_before_memcpy(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes);
+
+WEAK void __csi_after_memcpy(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes);
+
+WEAK void __csi_before_memmove(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes);
+
+WEAK void __csi_after_memmove(
+    const csi_id_t call_id, const void *dst, const void *src,
+    const size_t num_bytes);
+
+// Floating-point builtins
 WEAK void __csi_before_builtin_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand_cat,
