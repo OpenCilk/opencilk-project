@@ -184,8 +184,10 @@ typedef struct {
 typedef struct {
   // The call is indirect.
   unsigned is_indirect : 1;
+  // The call's return value has one use.
+  unsigned has_one_use : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 63;
+  uint64_t _padding : 62;
 } call_prop_t;
 
 typedef struct {
@@ -197,12 +199,16 @@ typedef struct {
   unsigned is_constant : 1;
   // The loaded address is on the stack.
   unsigned is_on_stack : 1;
-  // The loaded address cannot be captured.
+  // The loaded address can be captured.
   unsigned may_be_captured : 1;
+  // The load is volatile.
+  unsigned is_volatile : 1;
   // The loaded address is read before it is written in the same basic block.
   unsigned is_read_before_write_in_bb : 1;
+  // The loaded value has one use.
+  unsigned has_one_use : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 51;
+  uint64_t _padding : 49;
 } load_prop_t;
 
 typedef struct {
@@ -216,22 +222,28 @@ typedef struct {
   unsigned is_on_stack : 1;
   // The stored address cannot be captured.
   unsigned may_be_captured : 1;
+  // The store is volatile.
+  unsigned is_volatile : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 52;
+  uint64_t _padding : 51;
 } store_prop_t;
 
 typedef struct {
   // The alloca is static.
   unsigned is_static : 1;
+  // The alloca'd address can be captured.
+  unsigned may_be_captured : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 63;
+  uint64_t _padding : 62;
 } alloca_prop_t;
 
 typedef struct {
   // Type of the allocation function (e.g., malloc, calloc, new).
   unsigned allocfn_ty : 8;
+  // The allocated address can be captured.
+  unsigned may_be_captured : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 56;
+  uint64_t _padding : 55;
 } allocfn_prop_t;
 
 typedef struct {
@@ -253,8 +265,9 @@ typedef struct {
   unsigned allow_contract : 1;
   unsigned approx_func : 1;
   unsigned is_in_bounds : 1;
+  unsigned has_one_use : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 53;
+  uint64_t _padding : 52;
 } arithmetic_flags_t;
 
 typedef struct {
@@ -841,560 +854,560 @@ WEAK void __csi_before_arithmetic_v8double(
 // Floating-point extension and truncation
 /* WEAK void __csi_before_extend_half_float( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_extend_half_double( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 WEAK void __csi_before_extend_float_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_truncate_double_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 /* WEAK void __csi_before_truncate_double_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const double operand); */
+/*     const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_truncate_float_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const float operand); */
+/*     const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags); */
 
 // Conversion from floating-point to unsigned integer
 /* WEAK void __csi_before_convert_half_unsigned_i8( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_unsigned_i16( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_unsigned_i32( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_unsigned_i64( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_unsigned_i128( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 WEAK void __csi_before_convert_float_unsigned_i8(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_unsigned_i16(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_unsigned_i32(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_unsigned_i64(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_unsigned_i128(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_unsigned_i8(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_unsigned_i16(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_unsigned_i32(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_unsigned_i64(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_unsigned_i128(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 // Conversion from floating-point to signed integer
 /* WEAK void __csi_before_convert_half_signed_i8( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_signed_i16( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_signed_i32( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_signed_i64( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_half_signed_i128( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 WEAK void __csi_before_convert_float_signed_i8(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_signed_i16(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_signed_i32(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_signed_i64(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_float_signed_i128(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_signed_i8(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_signed_i16(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_signed_i32(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_signed_i64(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_double_signed_i128(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 // Conversion from unsigned integer to floating-point
 /* WEAK void __csi_before_convert_unsigned_i8_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const uint8_t operand); */
+/*     const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_unsigned_i16_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const uint16_t operand); */
+/*     const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_unsigned_i32_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const uint32_t operand); */
+/*     const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_unsigned_i64_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const uint64_t operand); */
+/*     const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_unsigned_i128_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const __uint128_t operand); */
+/*     const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags); */
 
 WEAK void __csi_before_convert_unsigned_i8_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i64_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i128_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __uint128_t operand);
+    const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i8_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i64_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i128_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __uint128_t operand);
+    const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags);
 
 // Vector versions for floating point
 WEAK void __csi_before_convert_unsigned_i8_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i64_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i128_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __uint128_t operand);
+    const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i8_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i64_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i8_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 
 WEAK void __csi_before_convert_unsigned_i8_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i64_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i128_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __uint128_t operand);
+    const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i8_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i64_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i128_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __uint128_t operand);
+    const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i8_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i16_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i32_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_unsigned_i64_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 // Conversion from signed integer to floating-point
 /* WEAK void __csi_before_convert_signed_i8_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const int8_t operand); */
+/*     const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_signed_i16_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const int16_t operand); */
+/*     const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_signed_i32_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const int32_t operand); */
+/*     const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_signed_i64_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const int64_t operand); */
+/*     const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags); */
 
 /* WEAK void __csi_before_convert_signed_i128_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const __int128_t operand); */
+/*     const csi_id_t operand_id, const __int128_t operand, const arithmetic_flags_t flags); */
 
 WEAK void __csi_before_convert_signed_i8_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i64_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int64_t operand);
+    const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i128_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __int128_t operand);
+    const csi_id_t operand_id, const __int128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i8_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i64_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int64_t operand);
+    const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i128_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __int128_t operand);
+    const csi_id_t operand_id, const __int128_t operand, const arithmetic_flags_t flags);
 
 // Vector versions for floating point
 WEAK void __csi_before_convert_signed_i8_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i64_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int64_t operand);
+    const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i128_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __int128_t operand);
+    const csi_id_t operand_id, const __int128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i8_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i64_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int64_t operand);
+    const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i8_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 
 WEAK void __csi_before_convert_signed_i8_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i64_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int64_t operand);
+    const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i128_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __int128_t operand);
+    const csi_id_t operand_id, const __int128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i8_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i64_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int64_t operand);
+    const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i128_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __int128_t operand);
+    const csi_id_t operand_id, const __int128_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i8_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int8_t operand);
+    const csi_id_t operand_id, const int8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i16_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int16_t operand);
+    const csi_id_t operand_id, const int16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i32_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int32_t operand);
+    const csi_id_t operand_id, const int32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i64_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const int64_t operand);
+    const csi_id_t operand_id, const int64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_convert_signed_i128_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __int128_t operand);
+    const csi_id_t operand_id, const __int128_t operand, const arithmetic_flags_t flags);
 
 // Vector operations
 WEAK void __csi_before_extract_element_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v4float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_extract_element_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v8float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_extract_element_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v16float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_extract_element_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v2double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_extract_element_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v4double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_extract_element_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v8double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_insert_element_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v4float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_insert_element_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v8float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_insert_element_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v16float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_insert_element_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v2double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_insert_element_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v4double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_insert_element_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const v8double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v4float_v4float_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1402,7 +1415,7 @@ WEAK void __csi_before_shuffle_v4float_v4float_v4float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v4float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v4float operand2);
+    const csi_id_t operand2_id, const v4float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v4float_v4float_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1410,7 +1423,7 @@ WEAK void __csi_before_shuffle_v4float_v4float_v8float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v4float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v8float operand2);
+    const csi_id_t operand2_id, const v8float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v4float_v4float_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1418,7 +1431,7 @@ WEAK void __csi_before_shuffle_v4float_v4float_v16float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v4float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v16float operand2);
+    const csi_id_t operand2_id, const v16float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v8float_v8float_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1426,7 +1439,7 @@ WEAK void __csi_before_shuffle_v8float_v8float_v4float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v8float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v4float operand2);
+    const csi_id_t operand2_id, const v4float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v8float_v8float_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1434,7 +1447,7 @@ WEAK void __csi_before_shuffle_v8float_v8float_v8float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v8float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v8float operand2);
+    const csi_id_t operand2_id, const v8float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v8float_v8float_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1442,7 +1455,7 @@ WEAK void __csi_before_shuffle_v8float_v8float_v16float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v8float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v16float operand2);
+    const csi_id_t operand2_id, const v16float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v16float_v16float_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1450,7 +1463,7 @@ WEAK void __csi_before_shuffle_v16float_v16float_v4float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v16float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v4float operand2);
+    const csi_id_t operand2_id, const v4float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v16float_v16float_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1458,7 +1471,7 @@ WEAK void __csi_before_shuffle_v16float_v16float_v8float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v16float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v8float operand2);
+    const csi_id_t operand2_id, const v8float operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v16float_v16float_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1466,7 +1479,7 @@ WEAK void __csi_before_shuffle_v16float_v16float_v16float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v16float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v16float operand2);
+    const csi_id_t operand2_id, const v16float operand2, const arithmetic_flags_t flags);
 
 
 WEAK void __csi_before_shuffle_v2double_v2double_v2double(
@@ -1475,7 +1488,7 @@ WEAK void __csi_before_shuffle_v2double_v2double_v2double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v2double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v2double operand2);
+    const csi_id_t operand2_id, const v2double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v2double_v2double_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1483,7 +1496,7 @@ WEAK void __csi_before_shuffle_v2double_v2double_v4double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v2double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v4double operand2);
+    const csi_id_t operand2_id, const v4double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v2double_v2double_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1491,7 +1504,7 @@ WEAK void __csi_before_shuffle_v2double_v2double_v8double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v2double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v8double operand2);
+    const csi_id_t operand2_id, const v8double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v4double_v4double_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1499,7 +1512,7 @@ WEAK void __csi_before_shuffle_v4double_v4double_v2double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v4double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v2double operand2);
+    const csi_id_t operand2_id, const v2double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v4double_v4double_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1507,7 +1520,7 @@ WEAK void __csi_before_shuffle_v4double_v4double_v4double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v4double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v4double operand2);
+    const csi_id_t operand2_id, const v4double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v4double_v4double_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1515,7 +1528,7 @@ WEAK void __csi_before_shuffle_v4double_v4double_v8double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v4double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v8double operand2);
+    const csi_id_t operand2_id, const v8double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v8double_v8double_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1523,7 +1536,7 @@ WEAK void __csi_before_shuffle_v8double_v8double_v2double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v8double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v2double operand2);
+    const csi_id_t operand2_id, const v2double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v8double_v8double_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1531,7 +1544,7 @@ WEAK void __csi_before_shuffle_v8double_v8double_v4double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v8double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v4double operand2);
+    const csi_id_t operand2_id, const v4double operand2, const arithmetic_flags_t flags);
 
 WEAK void __csi_before_shuffle_v8double_v8double_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand0_cat,
@@ -1539,64 +1552,64 @@ WEAK void __csi_before_shuffle_v8double_v8double_v8double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v8double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const v8double operand2);
+    const csi_id_t operand2_id, const v8double operand2, const arithmetic_flags_t flags);
 
 // PHI node hooks
 WEAK void __csi_phi_i8(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint8_t operand);
+    const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i16(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint16_t operand);
+    const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i32(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint32_t operand);
+    const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i64(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const uint64_t operand);
+    const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i128(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const __uint128_t operand);
+    const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags);
 
 /* WEAK void __csi_phi_half( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
-/*     const csi_id_t operand_id, const _Float16 operand); */
+/*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 WEAK void __csi_phi_float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v4float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const v4float operand);
+    const csi_id_t operand_id, const v4float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v8float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const v8float operand);
+    const csi_id_t operand_id, const v8float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v16float(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const v16float operand);
+    const csi_id_t operand_id, const v16float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v2double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const v2double operand);
+    const csi_id_t operand_id, const v2double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v4double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const v4double operand);
+    const csi_id_t operand_id, const v4double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v8double(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const v8double operand);
+    const csi_id_t operand_id, const v8double operand, const arithmetic_flags_t flags);
 
 ///-----------------------------------------------------------------------------
 /// Hooks for builtin functions
@@ -1632,78 +1645,78 @@ WEAK void __csi_after_memmove(
 WEAK void __csi_before_builtin_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const float operand);
+    const csi_id_t operand_id, const float operand, const call_prop_t prop);
 
 WEAK void __csi_before_builtin_double_double(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_double_double(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id, const double operand);
+    const csi_id_t operand_id, const double operand, const call_prop_t prop);
 
 WEAK void __csi_before_builtin_float_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const float operand1);
+    const csi_id_t operand1_id, const float operand1, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_float_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const float operand1);
+    const csi_id_t operand1_id, const float operand1, const call_prop_t prop);
 
 WEAK void __csi_before_builtin_float_float_i32(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_float_float_i32(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const float operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const call_prop_t prop);
 
 WEAK void __csi_before_builtin_double_double_double(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const double operand1);
+    const csi_id_t operand1_id, const double operand1, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_double_double_double(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const double operand1);
+    const csi_id_t operand1_id, const double operand1, const call_prop_t prop);
 
 WEAK void __csi_before_builtin_double_double_i32(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_double_double_i32(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand0_cat,
     const csi_id_t operand0_id, const double operand0,
     const csi_ir_variable_category_t operand1_cat,
-    const csi_id_t operand1_id, const int32_t operand1);
+    const csi_id_t operand1_id, const int32_t operand1, const call_prop_t prop);
 
 WEAK void __csi_before_builtin_float_float_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
@@ -1712,7 +1725,7 @@ WEAK void __csi_before_builtin_float_float_float_float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const float operand2);
+    const csi_id_t operand2_id, const float operand2, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_float_float_float_float(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
@@ -1721,7 +1734,7 @@ WEAK void __csi_after_builtin_float_float_float_float(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const float operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const float operand2);
+    const csi_id_t operand2_id, const float operand2, const call_prop_t prop);
 
 WEAK void __csi_before_builtin_double_double_double_double(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
@@ -1730,7 +1743,7 @@ WEAK void __csi_before_builtin_double_double_double_double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const double operand2);
+    const csi_id_t operand2_id, const double operand2, const call_prop_t prop);
 
 WEAK void __csi_after_builtin_double_double_double_double(
     const csi_id_t call_id, const csi_builtin_func_op_t func_op,
@@ -1739,7 +1752,7 @@ WEAK void __csi_after_builtin_double_double_double_double(
     const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const double operand1,
     const csi_ir_variable_category_t operand2_cat,
-    const csi_id_t operand2_id, const double operand2);
+    const csi_id_t operand2_id, const double operand2, const call_prop_t prop);
 
 
 // This struct is mirrored in ComprehensiveStaticInstrumentation.cpp,
