@@ -1615,15 +1615,13 @@ WEAK void __csi_phi_v8double(
 /// Hooks for builtin functions
 WEAK void __csi_before_memset(
     const csi_id_t call_id, const void *addr, const size_t num_bytes,
-    const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id);
+    const csi_id_t operand_id, const uint8_t operand);
 
 WEAK void __csi_after_memset(
     const csi_id_t call_id, const void *addr, const size_t num_bytes,
-    const csi_builtin_func_op_t func_op,
     const csi_ir_variable_category_t operand_cat,
-    const csi_id_t operand_id);
+    const csi_id_t operand_id, const uint8_t operand);
 
 WEAK void __csi_before_memcpy(
     const csi_id_t call_id, const void *dst, const void *src,
