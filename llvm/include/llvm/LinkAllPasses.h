@@ -72,6 +72,7 @@ namespace {
       (void) llvm::createCallGraphViewerPass();
       (void) llvm::createCFGSimplificationPass();
       (void) llvm::createStructurizeCFGPass();
+      (void) llvm::createDRFScopedNoAliasWrapperPass();
       (void) llvm::createDeadArgEliminationPass();
       (void) llvm::createDeadCodeEliminationPass();
       (void) llvm::createDependenceAnalysisWrapperPass();

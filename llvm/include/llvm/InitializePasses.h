@@ -88,6 +88,7 @@ void initializeDAEPass(PassRegistry&);
 void initializeDAHPass(PassRegistry&);
 void initializeDCELegacyPassPass(PassRegistry&);
 void initializeDRFAAWrapperPassPass(PassRegistry&);
+void initializeDRFScopedNoAliasWrapperPassPass(PassRegistry&);
 void initializeDeadMachineInstructionElimPass(PassRegistry&);
 void initializeDebugifyMachineModulePass(PassRegistry &);
 void initializeDependenceAnalysisWrapperPassPass(PassRegistry&);
