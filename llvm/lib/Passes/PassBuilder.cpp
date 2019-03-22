@@ -182,6 +182,7 @@
 #include "llvm/Transforms/Tapir/LoopSpawningTI.h"
 #include "llvm/Transforms/Tapir/LoopStripMinePass.h"
 #include "llvm/Transforms/Tapir/TapirToTarget.h"
+#include "llvm/Transforms/Tapir/DRFScopedNoAliasAA.h"
 #include "llvm/Transforms/Utils/AddDiscriminators.h"
 #include "llvm/Transforms/Utils/AssumeBundleBuilder.h"
 #include "llvm/Transforms/Utils/BreakCriticalEdges.h"
@@ -251,6 +252,10 @@ static cl::opt<bool> EnableSyntheticCounts(
 static cl::opt<bool> EnableTapirLoopStripmine(
     "enable-npm-tapir-loop-stripmine", cl::init(false), cl::Hidden,
     cl::desc("Enable the new, experimental Tapir LoopStripMine Pass"));
+
+static cl::opt<bool> EnableDRFAA(
+    "enable-npm-drf-aa", cl::init(false), cl::Hidden,
+    cl::desc("Enable AA based on the data-race-free assumption (default = off)"));
 
 static const Regex DefaultAliasRegex(
     "^(default|thinlto-pre-link|thinlto|lto-pre-link|lto)<(O[0123sz])>$");
@@ -1313,6 +1318,9 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
   bool RerunAfterTapirLowering = false;
   bool TapirHasBeenLowered = !LowerTapir;
 
+  if (EnableDRFAA)
+    MPM.addPass(createModuleToFunctionPassAdaptor(DRFScopedNoAliasPass()));
+
   // Force any function attributes we want the rest of the pipeline to observe.
   MPM.addPass(ForceFunctionAttrsPass());
 
@@ -1718,6 +1726,10 @@ AAManager PassBuilder::buildDefaultAAPipeline() {
   // analysis, all that the `AAManager` can do is query for any *cached*
   // results from `GlobalsAA` through a readonly proxy.
   AA.registerModuleAnalysis<GlobalsAA>();
+
+  // Add support for using Tapir parallel control flow to inform alias analysis
+  // based on the DRF assumption.
+  AA.registerFunctionAnalysis<DRFAA>();
 
   return AA;
 }
