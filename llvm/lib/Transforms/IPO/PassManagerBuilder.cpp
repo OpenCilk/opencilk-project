@@ -45,7 +45,6 @@ using namespace llvm;
 PassManagerBuilder::PassManagerBuilder() {
     TapirTarget = TapirTargetID::None;
     DisableTapirOpts = false;
-    Rhino = false;
     OptLevel = 2;
     SizeLevel = 0;
     LibraryInfo = nullptr;
@@ -435,6 +434,10 @@ void PassManagerBuilder::populateModulePassManager(
 
   MPM.add(createFloat2IntPass());
   MPM.add(createLowerConstantIntrinsicsPass());
+
+  // Stripmine Tapir loops.
+  MPM.add(createLoopStripMinePass());
+  addFunctionSimplificationPasses(MPM);
 
   // Re-rotate loops in all our loop nests. These may have fallout out of
   // rotated form due to GVN or other transformations, and the vectorizer relies

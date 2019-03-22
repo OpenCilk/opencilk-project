@@ -116,6 +116,7 @@
 #include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 #include "llvm/Transforms/Scalar/WarnMissedTransforms.h"
 #include "llvm/Transforms/Tapir/LoopSpawningTI.h"
+#include "llvm/Transforms/Tapir/LoopStripMinePass.h"
 #include "llvm/Transforms/Tapir/SerializeSmallTasks.h"
 #include "llvm/Transforms/Tapir/TapirToTarget.h"
 #include "llvm/Transforms/Tapir/DRFScopedNoAliasAA.h"
@@ -294,6 +295,7 @@ PipelineTuningOptions::PipelineTuningOptions() {
   LoopInterleaving = true;
   LoopVectorization = true;
   SLPVectorization = false;
+  LoopStripmine = true;
   LoopUnrolling = true;
   ForgetAllSCEVInLoopUnroll = ForgetSCEVInLoopUnroll;
   LicmMssaOptCap = SetLicmMssaOptCap;
@@ -1323,6 +1325,28 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // rather than on each loop in an inside-out manner, and so they are actually
   // function passes.
 
+  // Stripmine Tapir loops, if pass is enabled.
+  if (PTO.LoopStripmine && Level != OptimizationLevel::O1 &&
+      !Level.isOptimizingForSize()) {
+    OptimizePM.addPass(LoopStripMinePass());
+    // Cleanup tasks after stripmining loops.
+    OptimizePM.addPass(TaskSimplifyPass());
+    // Cleanup after stripmining loops.
+    LoopPassManager LPM;
+    LPM.addPass(LoopSimplifyCFGPass());
+    LPM.addPass(IndVarSimplifyPass());
+    LPM.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
+                         /*AllowSpeculation=*/true));
+    OptimizePM.addPass(
+        createFunctionToLoopPassAdaptor(std::move(LPM),
+                                        /*UseMemorySSA=*/false,
+                                        /*UseBlockFrequencyInfo=*/false));
+    OptimizePM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
+    OptimizePM.addPass(JumpThreadingPass());
+    OptimizePM.addPass(CorrelatedValuePropagationPass());
+    OptimizePM.addPass(InstCombinePass());
+  }
+
   for (auto &C : VectorizerStartEPCallbacks)
     C(OptimizePM, Level);
 
@@ -1432,7 +1456,7 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   FunctionPassManager FPM;
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1),
-                                              EnableMSSALoopDependency,
+                                              /*UseMemorySSA=*/true,
                                               /*UseBlockFrequencyInfo=*/true));
   FPM.addPass(SimplifyCFGPass(SimplifyCFGOptions().convertSwitchRangeToICmp(
       true))); // Merge & remove basic blocks.

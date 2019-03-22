@@ -227,6 +227,7 @@
 #include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 #include "llvm/Transforms/Scalar/WarnMissedTransforms.h"
 #include "llvm/Transforms/Tapir/LoopSpawningTI.h"
+#include "llvm/Transforms/Tapir/LoopStripMinePass.h"
 #include "llvm/Transforms/Tapir/TapirToTarget.h"
 #include "llvm/Transforms/Utils/AddDiscriminators.h"
 #include "llvm/Transforms/Utils/AssumeBundleBuilder.h"

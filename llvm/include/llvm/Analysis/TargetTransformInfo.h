@@ -516,6 +516,29 @@ public:
                                    LoopVectorizationLegality *LVL,
                                    InterleavedAccessInfo *IAI) const;
 
+  /// Parameters that control the generic loop stripmining transformation.
+  struct StripMiningPreferences {
+    /// A forced stripmining factor (the number of iterations of the original
+    /// loop in the stripmined inner-loop body). When set to 0, the stripmining
+    /// transformation will select an stripmining factor based on the current
+    /// cost threshold and other factors.
+    unsigned Count;
+    /// Allow emitting expensive instructions (such as divisions) when computing
+    /// the trip count of a loop for runtime unrolling.
+    bool AllowExpensiveTripCount;
+    /// Default factor for coarsening a task to amortize the cost of creating
+    /// it.
+    unsigned DefaultCoarseningFactor;
+    /// Allow unrolling of all the iterations of the runtime loop remainder.
+    bool UnrollRemainder;
+  };
+
+  /// Get target-customized preferences for the generic Tapir loop stripmining
+  /// transformation. The caller will initialize SMP with the current
+  /// target-independent defaults.
+  void getStripMiningPreferences(Loop *L, ScalarEvolution &,
+                                 StripMiningPreferences &SMP) const;
+
   /// Query the target whether lowering of the llvm.get.active.lane.mask
   /// intrinsic is supported and how the mask should be used. A return value
   /// of PredicationStyle::Data indicates the mask is used as data only,
@@ -1616,6 +1639,8 @@ public:
                               AssumptionCache &AC, TargetLibraryInfo *TLI,
                               DominatorTree *DT, LoopVectorizationLegality *LVL,
                               InterleavedAccessInfo *IAI) = 0;
+  virtual void getStripMiningPreferences(Loop *L, ScalarEvolution &,
+                                         StripMiningPreferences &SMP) = 0;
   virtual PredicationStyle emitGetActiveLaneMask() = 0;
   virtual std::optional<Instruction *> instCombineIntrinsic(
       InstCombiner &IC, IntrinsicInst &II) = 0;
@@ -2015,6 +2040,10 @@ public:
                                    LoopVectorizationLegality *LVL,
                                    InterleavedAccessInfo *IAI) override {
     return Impl.preferPredicateOverEpilogue(L, LI, SE, AC, TLI, DT, LVL, IAI);
+  }
+  void getStripMiningPreferences(Loop *L, ScalarEvolution &SE,
+                                 StripMiningPreferences &SMP) override {
+    return Impl.getStripMiningPreferences(L, SE, SMP);
   }
   PredicationStyle emitGetActiveLaneMask() override {
     return Impl.emitGetActiveLaneMask();
