@@ -82,6 +82,7 @@ namespace {
       (void) llvm::createCFGSimplificationPass();
       (void) llvm::createStructurizeCFGPass();
       (void) llvm::createCostModelAnalysisPass();
+      (void) llvm::createDRFScopedNoAliasWrapperPass();
       (void) llvm::createDeadArgEliminationPass();
       (void) llvm::createDeadCodeEliminationPass();
       (void) llvm::createDependenceAnalysisWrapperPass();
