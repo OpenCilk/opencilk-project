@@ -274,6 +274,7 @@ void initializeLoopSimplifyPass(PassRegistry&);
 void initializeLoopSpawningPass(PassRegistry&);
 void initializeLoopSpawningTIPass(PassRegistry&);
 void initializeLoopStrengthReducePass(PassRegistry&);
+void initializeLoopStripMinePass(PassRegistry&);
 void initializeLoopUnrollAndJamPass(PassRegistry&);
 void initializeLoopUnrollPass(PassRegistry&);
 void initializeLoopUnswitchPass(PassRegistry&);

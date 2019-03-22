@@ -192,10 +192,13 @@ cl::opt<AttributorRunOption> AttributorRun(
 extern cl::opt<bool> EnableKnowledgeRetention;
 } // namespace llvm
 
+static cl::opt<bool> EnableTapirLoopStripmine(
+    "enable-tapir-loop-stripmine", cl::init(false), cl::Hidden,
+    cl::desc("Enable the new, experimental Tapir LoopStripMine Pass"));
+
 PassManagerBuilder::PassManagerBuilder() {
     TapirTarget = TapirTargetID::None;
     DisableTapirOpts = false;
-    Rhino = false;
     OptLevel = 2;
     SizeLevel = 0;
     LibraryInfo = nullptr;
@@ -972,6 +975,13 @@ void PassManagerBuilder::populateModulePassManager(
     // analysis to establish no-aliasing between loads and stores of different
     // columns of the same matrix.
     MPM.add(createEarlyCSEPass(false));
+  }
+
+  // Stripmine Tapir loops.  This pass is currently only performed when
+  // -enable-tapir-loop-stripmine is specified.
+  if (EnableTapirLoopStripmine) {
+    MPM.add(createLoopStripMinePass());
+    addFunctionSimplificationPasses(MPM);
   }
 
   addExtensionsToPM(EP_VectorizerStart, MPM);
