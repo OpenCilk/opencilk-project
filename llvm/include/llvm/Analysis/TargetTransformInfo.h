@@ -528,6 +528,28 @@ public:
                                    AssumptionCache &AC, TargetLibraryInfo *TLI,
                                    DominatorTree *DT,
                                    const LoopAccessInfo *LAI) const;
+  /// Parameters that control the generic loop stripmining transformation.
+  struct StripMiningPreferences {
+    /// A forced stripmining factor (the number of iterations of the original
+    /// loop in the stripmined inner-loop body). When set to 0, the stripmining
+    /// transformation will select an stripmining factor based on the current
+    /// cost threshold and other factors.
+    unsigned Count;
+    /// Allow emitting expensive instructions (such as divisions) when computing
+    /// the trip count of a loop for runtime unrolling.
+    bool AllowExpensiveTripCount;
+    /// Default factor for coarsening a task to amortize the cost of creating
+    /// it.
+    unsigned DefaultCoarseningFactor;
+    /// Allow unrolling of all the iterations of the runtime loop remainder.
+    bool UnrollRemainder;
+  };
+
+  /// Get target-customized preferences for the generic Tapir loop stripmining
+  /// transformation. The caller will initialize SMP with the current
+  /// target-independent defaults.
+  void getStripMiningPreferences(Loop *L, ScalarEvolution &,
+                               StripMiningPreferences &SMP) const;
 
   /// Query the target whether lowering of the llvm.get.active.lane.mask
   /// intrinsic is supported.
@@ -1432,6 +1454,8 @@ public:
   preferPredicateOverEpilogue(Loop *L, LoopInfo *LI, ScalarEvolution &SE,
                               AssumptionCache &AC, TargetLibraryInfo *TLI,
                               DominatorTree *DT, const LoopAccessInfo *LAI) = 0;
+  virtual void getStripMiningPreferences(Loop *L, ScalarEvolution &,
+                                         StripMiningPreferences &SMP) = 0;
   virtual bool emitGetActiveLaneMask() = 0;
   virtual Optional<Instruction *> instCombineIntrinsic(InstCombiner &IC,
                                                        IntrinsicInst &II) = 0;
@@ -1749,6 +1773,10 @@ public:
                                    DominatorTree *DT,
                                    const LoopAccessInfo *LAI) override {
     return Impl.preferPredicateOverEpilogue(L, LI, SE, AC, TLI, DT, LAI);
+  }
+  void getStripMiningPreferences(Loop *L, ScalarEvolution &SE,
+                                 StripMiningPreferences &SMP) override {
+    return Impl.getStripMiningPreferences(L, SE, SMP);
   }
   bool emitGetActiveLaneMask() override {
     return Impl.emitGetActiveLaneMask();

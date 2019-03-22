@@ -180,10 +180,13 @@ cl::opt<AttributorRunOption> AttributorRun(
 
 extern cl::opt<bool> EnableKnowledgeRetention;
 
+static cl::opt<bool> EnableTapirLoopStripmine(
+    "enable-tapir-loop-stripmine", cl::init(false), cl::Hidden,
+    cl::desc("Enable the new, experimental Tapir LoopStripMine Pass"));
+
 PassManagerBuilder::PassManagerBuilder() {
     TapirTarget = TapirTargetID::None;
     DisableTapirOpts = false;
-    Rhino = false;
     OptLevel = 2;
     SizeLevel = 0;
     LibraryInfo = nullptr;
@@ -323,7 +326,7 @@ void PassManagerBuilder::populateFunctionPassManager(
 
   FPM.add(createCFGSimplificationPass());
   FPM.add(createSROAPass());
-  FPM.add(createEarlyCSEPass(false, Rhino));
+  FPM.add(createEarlyCSEPass(false));
   FPM.add(createLowerExpectIntrinsicPass());
 }
 
@@ -355,7 +358,7 @@ void PassManagerBuilder::addPGOInstrPasses(legacy::PassManagerBase &MPM,
 
     MPM.add(createFunctionInliningPass(IP));
     MPM.add(createSROAPass());
-    MPM.add(createEarlyCSEPass(false, Rhino)); // Catch trivial redundancies
+    MPM.add(createEarlyCSEPass(false));        // Catch trivial redundancies
     MPM.add(createCFGSimplificationPass());    // Merge & remove BBs
     MPM.add(createInstructionCombiningPass()); // Combine silly seq's
     addExtensionsToPM(EP_Peephole, MPM);
@@ -806,6 +809,13 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createEarlyCSEPass(false));
   }
 
+  // Stripmine Tapir loops.  This pass is currently only performed when
+  // -enable-tapir-loop-stripmine is specified.
+  if (EnableTapirLoopStripmine) {
+    MPM.add(createLoopStripMinePass());
+    addFunctionSimplificationPasses(MPM);
+  }
+
   addExtensionsToPM(EP_VectorizerStart, MPM);
 
   // Re-rotate loops in all our loop nests. These may have fallout out of
@@ -838,7 +848,7 @@ void PassManagerBuilder::populateModulePassManager(
     // common computations, hoist loop-invariant aspects out of any outer loop,
     // and unswitch the runtime checks if possible. Once hoisted, we may have
     // dead (or speculatable) control flows or more combining opportunities.
-    MPM.add(createEarlyCSEPass(false, Rhino));
+    MPM.add(createEarlyCSEPass(false));
     MPM.add(createCorrelatedValuePropagationPass());
     MPM.add(createInstructionCombiningPass());
     MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap));
@@ -866,7 +876,7 @@ void PassManagerBuilder::populateModulePassManager(
   if (SLPVectorize) {
     MPM.add(createSLPVectorizerPass()); // Vectorize parallel scalar chains.
     if (OptLevel > 1 && ExtraVectorizerPasses) {
-      MPM.add(createEarlyCSEPass(false, Rhino));
+      MPM.add(createEarlyCSEPass(false));
     }
   }
 

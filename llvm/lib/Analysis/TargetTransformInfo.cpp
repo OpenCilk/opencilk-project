@@ -370,6 +370,11 @@ void TargetTransformInfo::getPeelingPreferences(Loop *L, ScalarEvolution &SE,
   return TTIImpl->getPeelingPreferences(L, SE, PP);
 }
 
+void TargetTransformInfo::getStripMiningPreferences(
+    Loop *L, ScalarEvolution &SE, StripMiningPreferences &SMP) const {
+  return TTIImpl->getStripMiningPreferences(L, SE, SMP);
+}
+
 bool TargetTransformInfo::isLegalAddImmediate(int64_t Imm) const {
   return TTIImpl->isLegalAddImmediate(Imm);
 }
