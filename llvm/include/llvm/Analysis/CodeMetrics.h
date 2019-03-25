@@ -22,6 +22,7 @@ class BasicBlock;
 class Loop;
 class Function;
 template <class T> class SmallPtrSetImpl;
+class TargetLibraryInfo;
 class TargetTransformInfo;
 class Value;
 
@@ -59,6 +60,9 @@ struct CodeMetrics {
   /// Keep track of the number of calls to 'big' functions.
   unsigned NumCalls = false;
 
+  /// Keep track of the number of calls to 'builtin' functions.
+  unsigned NumBuiltinCalls = 0;
+
   /// The number of calls to internal functions with a single caller.
   ///
   /// These are likely targets for future inlining, likely exposed by
@@ -75,7 +79,8 @@ struct CodeMetrics {
 
   /// Add information about a block to the current state.
   void analyzeBasicBlock(const BasicBlock *BB, const TargetTransformInfo &TTI,
-                         const SmallPtrSetImpl<const Value*> &EphValues);
+                         const SmallPtrSetImpl<const Value*> &EphValues,
+                         TargetLibraryInfo *TLI = nullptr);
 
   /// Collect a loop's ephemeral values (those used only by an assume
   /// or similar intrinsics in the loop).
