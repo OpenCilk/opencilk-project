@@ -17,6 +17,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InstructionCost.h"
 
@@ -171,8 +172,13 @@ void CodeMetrics::analyzeBasicBlock(
     if (isa<ExtractElementInst>(I) || I.getType()->isVectorTy())
       ++NumVectorInsts;
 
-    if (I.getType()->isTokenTy() && I.isUsedOutsideOfBlock(BB))
-      notDuplicatable = true;
+    if (I.getType()->isTokenTy() && I.isUsedOutsideOfBlock(BB)) {
+      if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
+        if (Intrinsic::syncregion_start != II->getIntrinsicID())
+          notDuplicatable = true;
+      } else
+        notDuplicatable = true;
+    }
 
     if (const CallInst *CI = dyn_cast<CallInst>(&I)) {
       if (CI->cannotDuplicate())
