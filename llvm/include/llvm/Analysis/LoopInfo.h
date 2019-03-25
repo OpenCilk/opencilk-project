@@ -857,6 +857,14 @@ public:
   /// Add llvm.loop.mustprogress to this loop's loop id metadata.
   void setLoopMustProgress();
 
+  /// Add llvm.loop.from.tapir.loop to this loop's loop id metadata, to indicate
+  /// that this loop was derived from a Tapir loop.
+  void setDerivedFromTapirLoop();
+
+  /// Returns true if the loop was derived from a Tapir loop, according to its
+  /// metadata.
+  bool wasDerivedFromTapirLoop() const;
+
   void dump() const;
   void dumpVerbose() const;
 

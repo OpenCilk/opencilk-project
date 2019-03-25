@@ -592,6 +592,31 @@ void Loop::setLoopMustProgress() {
   setLoopID(NewLoopID);
 }
 
+void Loop::setDerivedFromTapirLoop() {
+  LLVMContext &Context = getHeader()->getContext();
+
+  MDNode *FromTapir = findOptionMDForLoop(this, "llvm.loop.fromtapirloop");
+
+  if (FromTapir)
+    return;
+
+  MDNode *FromTapirMD =
+      MDNode::get(Context, MDString::get(Context, "llvm.loop.fromtapirloop"));
+  MDNode *LoopID = getLoopID();
+  MDNode *NewLoopID =
+      makePostTransformationMetadata(Context, LoopID, {}, {FromTapirMD});
+  setLoopID(NewLoopID);
+}
+
+bool Loop::wasDerivedFromTapirLoop() const {
+  MDNode *FromTapir = findOptionMDForLoop(this, "llvm.loop.fromtapirloop");
+
+  if (FromTapir)
+    return true;
+
+  return false;
+}
+
 bool Loop::isAnnotatedParallel() const {
   MDNode *DesiredLoopIdMetadata = getLoopID();
 
