@@ -266,8 +266,8 @@ static cl::opt<bool> EnableSyntheticCounts(
              "pass"));
 
 static cl::opt<bool> EnableTapirLoopStripmine(
-    "enable-npm-tapir-loop-stripmine", cl::init(false), cl::Hidden,
-    cl::desc("Enable the new, experimental Tapir LoopStripMine Pass"));
+    "enable-npm-tapir-loop-stripmine", cl::init(true), cl::Hidden,
+    cl::desc("Enable the Tapir loop-stripmining pass (default = on)"));
 
 static cl::opt<bool> EnableDRFAA(
     "enable-npm-drf-aa", cl::init(false), cl::Hidden,
@@ -1247,6 +1247,23 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // rather than on each loop in an inside-out manner, and so they are actually
   // function passes.
 
+  // Stripmine Tapir loops, if pass is enabled.
+  if (EnableTapirLoopStripmine) {
+    OptimizePM.addPass(LoopStripMinePass());
+    // Cleanup tasks after stripmining loops.
+    OptimizePM.addPass(TaskSimplifyPass());
+    // Cleanup after stripmining loops.
+    LoopPassManager LPM(DebugLogging);
+    LPM.addPass(LoopSimplifyCFGPass());
+    LPM.addPass(IndVarSimplifyPass());
+    OptimizePM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM),
+                                                       DebugLogging));
+    OptimizePM.addPass(EarlyCSEPass(EnableEarlyCSEMemSSA));
+    OptimizePM.addPass(JumpThreadingPass());
+    OptimizePM.addPass(CorrelatedValuePropagationPass());
+    OptimizePM.addPass(InstCombinePass());
+  }
+
   for (auto &C : VectorizerStartEPCallbacks)
     C(OptimizePM, Level);
 
@@ -1266,11 +1283,6 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // Populates the VFABI attribute with the scalar-to-vector mappings
   // from the TargetLibraryInfo.
   OptimizePM.addPass(InjectTLIMappings());
-
-  // Stripmine Tapir loops, if pass is enabled.
-  // TODO: Cleanup loops afterwards.
-  if (EnableTapirLoopStripmine)
-    OptimizePM.addPass(LoopStripMinePass());
 
   // Now run the core loop vectorizer.
   OptimizePM.addPass(LoopVectorizePass(
@@ -1530,6 +1542,8 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
                                              DebugLogging));
 
       TapirHasBeenLowered = true;
+      // HACK to disable rerunning after Tapir lowering.
+      RerunAfterTapirLowering = false;
     }
   } while (RerunAfterTapirLowering);
 
