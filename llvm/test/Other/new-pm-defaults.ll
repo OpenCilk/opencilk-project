@@ -237,6 +237,16 @@
 ; CHECK-O-NEXT: Running pass: LowerConstantIntrinsicsPass on foo
 ; CHECK-MATRIX: Running pass: LowerMatrixIntrinsicsPass on f
 ; CHECK-MATRIX-NEXT: Running pass: EarlyCSEPass on f
+; CHECK-O-NEXT: Running pass: LoopStripMinePass
+; CHECK-O-NEXT: Running pass: TaskSimplifyPass on foo
+; CHECK-O-NEXT: Running pass: LoopSimplifyPass
+; CHECK-O-NEXT: Running pass: LCSSAPass
+; CHECK-O-NEXT: Running pass: LoopSimplifyCFGPass
+; CHECK-O-NEXT: Running pass: IndVarSimplifyPass
+; CHECK-O-NEXT: Running pass: EarlyCSEPass
+; CHECK-O-NEXT: Running pass: JumpThreadingPass
+; CHECK-O-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-O-NEXT: Running pass: InstCombinePass
 ; CHECK-EP-VECTORIZER-START-NEXT: Running pass: NoOpFunctionPass
 ; CHECK-EXT: Running pass: {{.*}}::Bye on foo
 ; CHECK-NOEXT:  {{^}}

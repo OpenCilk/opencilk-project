@@ -437,7 +437,14 @@ void PassManagerBuilder::populateModulePassManager(
 
   // Stripmine Tapir loops.
   MPM.add(createLoopStripMinePass());
-  addFunctionSimplificationPasses(MPM);
+  // Cleanup the IR after stripminning.
+  MPM.add(createTaskSimplifyPass());
+  MPM.add(createLoopSimplifyCFGPass());
+  MPM.add(createIndVarSimplifyPass());        // Canonicalize indvars
+  MPM.add(createEarlyCSEPass(false, Rhino));
+  MPM.add(createJumpThreadingPass());         // Thread jumps
+  MPM.add(createCorrelatedValuePropagationPass());
+  MPM.add(createInstructionCombiningPass());
 
   // Re-rotate loops in all our loop nests. These may have fallout out of
   // rotated form due to GVN or other transformations, and the vectorizer relies
@@ -509,9 +516,6 @@ void PassManagerBuilder::populateModulePassManager(
     // addFunctionSimplificationPasses(MPM);
 
     // Now lower Tapir to Target runtime calls.
-    //
-    // TODO: Make this sequence of passes check the library info for the target
-    // parallel RTS.
 
     MPM.add(createLowerTapirToTargetPass());
     // The lowering pass introduces new functions and may leave cruft around.
@@ -528,6 +532,8 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createBarrierNoopPass());
 
     TapirHasBeenLowered = true;
+    // HACK to disable rerun of the pipeline after Tapir lowering.
+    RerunAfterTapirLowering = false;
   }
   } while (RerunAfterTapirLowering);
 }
