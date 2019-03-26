@@ -306,6 +306,7 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
     switch (II->getIntrinsicID()) {
     case Intrinsic::invariant_start:
     case Intrinsic::invariant_end:
+    case Intrinsic::syncregion_start:
     case Intrinsic::assume:
     case Intrinsic::experimental_noalias_scope_decl:
     case Intrinsic::pseudoprobe:
@@ -1745,6 +1746,7 @@ MemoryUseOrDef *MemorySSA::createNewAccess(Instruction *I,
     case Intrinsic::assume:
     case Intrinsic::experimental_noalias_scope_decl:
     case Intrinsic::pseudoprobe:
+    case Intrinsic::syncregion_start:
       return nullptr;
     }
   }
