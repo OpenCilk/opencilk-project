@@ -296,6 +296,7 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
     case Intrinsic::lifetime_end:
     case Intrinsic::invariant_start:
     case Intrinsic::invariant_end:
+    case Intrinsic::syncregion_start:
     case Intrinsic::assume:
       return {false, NoAlias};
     case Intrinsic::dbg_addr:
@@ -1755,9 +1756,13 @@ MemoryUseOrDef *MemorySSA::createNewAccess(Instruction *I,
   // dependencies here.
   // FIXME: Replace this special casing with a more accurate modelling of
   // assume's control dependency.
-  if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(I))
+  if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(I)) {
     if (II->getIntrinsicID() == Intrinsic::assume)
       return nullptr;
+    // Also ignore syncregions
+    if (II->getIntrinsicID() == Intrinsic::syncregion_start)
+      return nullptr;
+  }
 
   // Using a nonstandard AA pipelines might leave us with unexpected modref
   // results for I, so add a check to not model instructions that may not read
