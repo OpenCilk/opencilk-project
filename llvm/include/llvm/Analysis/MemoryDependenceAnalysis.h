@@ -32,6 +32,7 @@ class AssumptionCache;
 class BatchAAResults;
 class DominatorTree;
 class PHITransAddr;
+class TaskInfo;
 class PhiValues;
 
 /// A memory dependence query can return one of three different answers.
@@ -350,6 +351,7 @@ private:
   DominatorTree &DT;
   PhiValues &PV;
   PredIteratorCache PredCache;
+  TaskInfo *TI;
 
   unsigned DefaultBlockScanLimit;
 
@@ -360,9 +362,10 @@ private:
 public:
   MemoryDependenceResults(AAResults &AA, AssumptionCache &AC,
                           const TargetLibraryInfo &TLI, DominatorTree &DT,
-                          PhiValues &PV, unsigned DefaultBlockScanLimit)
+                          PhiValues &PV, unsigned DefaultBlockScanLimit,
+                          TaskInfo *TI = nullptr)
       : AA(AA), AC(AC), TLI(TLI), DT(DT), PV(PV),
-        DefaultBlockScanLimit(DefaultBlockScanLimit) {}
+        DefaultBlockScanLimit(DefaultBlockScanLimit), TI(TI) {}
 
   /// Handle invalidation in the new PM.
   bool invalidate(Function &F, const PreservedAnalyses &PA,
