@@ -271,6 +271,10 @@ PreservedAnalyses LoopIdiomRecognizePass::run(Loop &L, LoopAnalysisManager &AM,
   if (!LIR.runOnLoop(&L))
     return PreservedAnalyses::all();
 
+  // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+  // Optimize this routine in the future.
+  AR.TI.recalculate(*F, AR.DT);
+
   auto PA = getLoopPassPreservedAnalyses();
   if (AR.MSSA)
     PA.preserve<MemorySSAAnalysis>();
