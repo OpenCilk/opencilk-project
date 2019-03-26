@@ -42,6 +42,7 @@ class Instruction;
 class LoadInst;
 class PHITransAddr;
 class TargetLibraryInfo;
+class TaskInfo;
 class PhiValues;
 class Value;
 
@@ -361,15 +362,17 @@ private:
   DominatorTree &DT;
   PhiValues &PV;
   PredIteratorCache PredCache;
+  TaskInfo *TI;
 
   unsigned DefaultBlockScanLimit;
 
 public:
   MemoryDependenceResults(AAResults &AA, AssumptionCache &AC,
                           const TargetLibraryInfo &TLI, DominatorTree &DT,
-                          PhiValues &PV, unsigned DefaultBlockScanLimit)
+                          PhiValues &PV, unsigned DefaultBlockScanLimit,
+                          TaskInfo *TI = nullptr)
       : AA(AA), AC(AC), TLI(TLI), DT(DT), PV(PV),
-        DefaultBlockScanLimit(DefaultBlockScanLimit) {}
+        DefaultBlockScanLimit(DefaultBlockScanLimit), TI(TI) {}
 
   /// Handle invalidation in the new PM.
   bool invalidate(Function &F, const PreservedAnalyses &PA,
