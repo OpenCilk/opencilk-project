@@ -32,6 +32,7 @@
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
@@ -141,6 +142,13 @@ static cl::opt<bool> SpeculateUnitStride(
     "laa-speculate-unit-stride", cl::Hidden,
     cl::desc("Speculate that non-constant strides are unit in LAA"),
     cl::init(true));
+
+/// Enable analysis using Tapir based on the data-race-free assumption.
+static cl::opt<bool> EnableDRFAA(
+    "enable-drf-laa", cl::Hidden,
+    cl::desc("Enable analysis using Tapir based on the data-race-free "
+             "assumption"),
+    cl::init(false));
 
 bool VectorizerParams::isInterleaveForced() {
   return ::VectorizationInterleave.getNumOccurrences() > 0;
@@ -1710,6 +1718,12 @@ void MemoryDepChecker::mergeInStatus(VectorizationSafetyStatus S) {
     Status = S;
 }
 
+/// Returns true if this loop is logically parallel as indicated by Tapir.
+static bool isLogicallyParallelViaTapir(const Loop *L, TaskInfo *TI) {
+  return L->wasDerivedFromTapirLoop() ||
+    (TI && getTaskIfTapirLoopStructure(L, TI));
+}
+
 /// Given a dependence-distance \p Dist between two
 /// memory accesses, that have the same stride whose absolute value is given
 /// in \p Stride, and that have the same type size \p TypeByteSize,
@@ -1826,6 +1840,11 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
 
   // Two reads are independent.
   if (!AIsWrite && !BIsWrite)
+    return Dependence::NoDep;
+
+  // Under certain assumptions, Tapir can guarantee that there are no
+  // loop-carried dependencies.
+  if (EnableDRFAA && isLogicallyParallelViaTapir(InnermostLoop, TI))
     return Dependence::NoDep;
 
   // We cannot check pointers in different address spaces.
@@ -2055,6 +2074,12 @@ bool MemoryDepChecker::areDepsSafe(DepCandidates &AccessSets,
 
             Dependence::DepType Type =
                 isDependent(*A.first, A.second, *B.first, B.second, Strides);
+            // Backward dependencies cannot happen in Tapir loops.
+            if ((Dependence::Backward == Type ||
+                 Dependence::BackwardVectorizable == Type ||
+                 Dependence::BackwardVectorizableButPreventsForwarding == Type)
+                && isLogicallyParallelViaTapir(InnermostLoop, TI))
+              Type = Dependence::NoDep;
             mergeInStatus(Dependence::isSafeForVectorization(Type));
 
             // Gather dependences unless we accumulated MaxDependences
@@ -2145,7 +2170,7 @@ bool LoopAccessInfo::canAnalyzeLoop() {
 
 void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
                                  const TargetLibraryInfo *TLI,
-                                 DominatorTree *DT) {
+                                 DominatorTree *DT, TaskInfo *TI) {
   // Holds the Load and Store instructions.
   SmallVector<LoadInst *, 16> Loads;
   SmallVector<StoreInst *, 16> Stores;
@@ -2162,7 +2187,8 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
   PtrRtChecking->Pointers.clear();
   PtrRtChecking->Need = false;
 
-  const bool IsAnnotatedParallel = TheLoop->isAnnotatedParallel();
+  const bool IsAnnotatedParallel = TheLoop->isAnnotatedParallel() ||
+    (EnableDRFAA && isLogicallyParallelViaTapir(TheLoop, TI));
 
   const bool EnableMemAccessVersioningOfLoop =
       EnableMemAccessVersioning &&
@@ -2763,13 +2789,13 @@ void LoopAccessInfo::collectStridedAccess(Value *MemAccess) {
 
 LoopAccessInfo::LoopAccessInfo(Loop *L, ScalarEvolution *SE,
                                const TargetLibraryInfo *TLI, AAResults *AA,
-                               DominatorTree *DT, LoopInfo *LI)
+                               DominatorTree *DT, LoopInfo *LI, TaskInfo *TI)
     : PSE(std::make_unique<PredicatedScalarEvolution>(*SE, *L)),
       PtrRtChecking(nullptr),
       DepChecker(std::make_unique<MemoryDepChecker>(*PSE, L)), TheLoop(L) {
   PtrRtChecking = std::make_unique<RuntimePointerChecking>(*DepChecker, SE);
   if (canAnalyzeLoop()) {
-    analyzeLoop(AA, LI, TLI, DT);
+    analyzeLoop(AA, LI, TLI, DT, TI);
   }
 }
 
