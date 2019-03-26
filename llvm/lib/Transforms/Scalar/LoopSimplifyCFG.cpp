@@ -715,7 +715,7 @@ PreservedAnalyses LoopSimplifyCFGPass::run(Loop &L, LoopAnalysisManager &AM,
   // Recompute task info.
   // FIXME: Figure out a way to update task info that is less computationally
   // wasteful.
-  AR.TI.recalculate(*L.getHeader()->getParent(), AR.DT);
+  AR.TI.recalculate(*AR.DT.getRoot()->getParent(), AR.DT);
 
   auto PA = getLoopPassPreservedAnalyses();
   if (AR.MSSA)
@@ -768,7 +768,6 @@ public:
     }
     AU.addPreserved<DependenceAnalysisWrapperPass>();
     getLoopAnalysisUsage(AU);
-    AU.addPreserved<TaskInfoWrapperPass>();
   }
 };
 } // end namespace

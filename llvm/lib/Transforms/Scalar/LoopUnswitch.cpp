@@ -41,6 +41,7 @@
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
@@ -544,6 +545,8 @@ bool LoopUnswitch::runOnLoop(Loop *L, LPPassManager &LPMRef) {
     MSSAU = std::make_unique<MemorySSAUpdater>(MSSA);
     assert(DT && "Cannot update MemorySSA without a valid DomTree.");
   }
+  auto *TIWP = getAnalysisIfAvailable<TaskInfoWrapperPass>();
+  auto *TI = TIWP ? &TIWP->getTaskInfo() : nullptr;
   CurrentLoop = L;
   Function *F = CurrentLoop->getHeader()->getParent();
 
@@ -566,6 +569,11 @@ bool LoopUnswitch::runOnLoop(Loop *L, LPPassManager &LPMRef) {
   if (MSSA && VerifyMemorySSA)
     MSSA->verifyMemorySSA();
 
+  // Update TaskInfo manually using the updated DT.
+  if (Changed && TI)
+    // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+    // Optimize this routine in the future.
+    TI->recalculate(*F, *DT);
   return Changed;
 }
 
