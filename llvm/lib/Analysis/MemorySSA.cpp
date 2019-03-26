@@ -96,7 +96,7 @@ static cl::opt<bool, true>
                      cl::Hidden, cl::desc("Enable verification of MemorySSA."));
 
 static cl::opt<bool>
-    AssumeDRF("memssa-assume-drf", cl::init(false), cl::Hidden,
+    EnableDRF("enable-drf-memoryssa", cl::init(false), cl::Hidden,
               cl::desc("Allow MemorySSA to assume the program is "
                        "data-race free."));
 
@@ -297,8 +297,9 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
   Instruction *DefInst = MD->getMemoryInst();
   assert(DefInst && "Defining instruction not actually an instruction");
 
-  if (TI && AssumeDRF)
-    if (TI->mayHappenInParallel(MD->getBlock(), UseInst->getParent()))
+  if (TI && EnableDRF)
+    if ((TI->getTaskFor(MD->getBlock()) != TI->getTaskFor(UseInst->getParent()))
+        && TI->mayHappenInParallel(MD->getBlock(), UseInst->getParent()))
       return {false, NoAlias};
 
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(DefInst)) {
@@ -2358,7 +2359,7 @@ MemorySSAAnalysis::Result MemorySSAAnalysis::run(Function &F,
                                                  FunctionAnalysisManager &AM) {
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &AA = AM.getResult<AAManager>(F);
-  TaskInfo *TI = AssumeDRF ? (&AM.getResult<TaskAnalysis>(F)) : nullptr;
+  TaskInfo *TI = EnableDRF ? (&AM.getResult<TaskAnalysis>(F)) : nullptr;
   return MemorySSAAnalysis::Result(
       std::make_unique<MemorySSA>(F, &AA, &DT, TI));
 }
@@ -2416,16 +2417,15 @@ void MemorySSAWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
   AU.addRequiredTransitive<DominatorTreeWrapperPass>();
   AU.addRequiredTransitive<AAResultsWrapperPass>();
-  if (AssumeDRF)
+  if (EnableDRF)
     AU.addRequiredTransitive<TaskInfoWrapperPass>();
 }
 
 bool MemorySSAWrapperPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   auto &AA = getAnalysis<AAResultsWrapperPass>().getAAResults();
-  TaskInfo *TI = AssumeDRF
-    ? &getAnalysis<TaskInfoWrapperPass>().getTaskInfo()
-    : nullptr;
+  TaskInfo *TI =
+    EnableDRF ? &getAnalysis<TaskInfoWrapperPass>().getTaskInfo() : nullptr;
   MSSA.reset(new MemorySSA(F, &AA, &DT, TI));
   return false;
 }
