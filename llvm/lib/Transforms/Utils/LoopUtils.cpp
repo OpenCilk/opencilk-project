@@ -690,7 +690,7 @@ void llvm::deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
     // Recompute task info.
     // FIXME: Figure out a way to update task info that is less computationally
     // wasteful.
-    TI->recalculate(*Preheader->getParent(), *DT);
+    TI->recalculate(*DT->getRoot()->getParent(), *DT);
 }
 
 void llvm::breakLoopBackedge(Loop *L, DominatorTree &DT, ScalarEvolution &SE,
