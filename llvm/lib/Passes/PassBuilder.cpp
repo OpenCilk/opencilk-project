@@ -1137,6 +1137,8 @@ ModulePassManager PassBuilder::buildModuleOptimizationPipeline(
     OptimizePM.addPass(JumpThreadingPass());
     OptimizePM.addPass(CorrelatedValuePropagationPass());
     OptimizePM.addPass(InstCombinePass());
+    if (EnableDRFAA)
+      OptimizePM.addPass(DRFScopedNoAliasPass());
   }
 
   for (auto &C : VectorizerStartEPCallbacks)
@@ -1741,9 +1743,10 @@ AAManager PassBuilder::buildDefaultAAPipeline() {
   // results from `GlobalsAA` through a readonly proxy.
   AA.registerModuleAnalysis<GlobalsAA>();
 
-  // Add support for using Tapir parallel control flow to inform alias analysis
-  // based on the DRF assumption.
-  AA.registerFunctionAnalysis<DRFAA>();
+  if (EnableDRFAA)
+    // Add support for using Tapir parallel control flow to inform alias
+    // analysis based on the data-race-free assumption.
+    AA.registerFunctionAnalysis<DRFAA>();
 
   return AA;
 }
