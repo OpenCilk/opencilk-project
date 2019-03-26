@@ -224,6 +224,7 @@ public:
         &getAnalysis<TargetTransformInfoWrapperPass>().getTTI(
             *L->getHeader()->getParent());
     const DataLayout *DL = &L->getHeader()->getModule()->getDataLayout();
+    TaskInfo *TI = &getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
 
     // For the old PM, we can't use OptimizationRemarkEmitter as an analysis
     // pass.  Function analyses need to be preserved across loop transformations
@@ -231,7 +232,12 @@ public:
     OptimizationRemarkEmitter ORE(L->getHeader()->getParent());
 
     LoopIdiomRecognize LIR(AA, DT, LI, SE, TLI, TTI, DL, ORE);
-    return LIR.runOnLoop(L);
+    bool Changed = LIR.runOnLoop(L);
+    if (Changed && TI)
+      // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+      // Optimize this routine in the future.
+      TI->recalculate(*L->getHeader()->getParent(), *DT);
+    return Changed;
   }
 
   /// This transformation requires natural loop information & requires that
@@ -267,6 +273,10 @@ PreservedAnalyses LoopIdiomRecognizePass::run(Loop &L, LoopAnalysisManager &AM,
                          *ORE);
   if (!LIR.runOnLoop(&L))
     return PreservedAnalyses::all();
+
+  // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+  // Optimize this routine in the future.
+  AR.TI.recalculate(*F, AR.DT);
 
   return getLoopPassPreservedAnalyses();
 }
