@@ -258,7 +258,6 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addPreserved<MemorySSAWrapperPass>();
     getLoopAnalysisUsage(AU);
-    AU.addPreserved<TaskInfoWrapperPass>();
   }
 };
 }
