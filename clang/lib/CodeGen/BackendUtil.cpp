@@ -339,6 +339,7 @@ static CSIOptions getCSIOptionsForCilkscale() {
   // Disable CSI hooks that Cilkscale doesn't need.
   Options.InstrumentFuncEntryExit = false;
   Options.InstrumentBasicBlocks = false;
+  Options.InstrumentLoops = false;
   Options.InstrumentMemoryAccesses = false;
   Options.InstrumentCalls = false;
   Options.InstrumentAtomics = false;
