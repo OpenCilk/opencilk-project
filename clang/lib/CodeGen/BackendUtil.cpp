@@ -344,7 +344,7 @@ static CSIOptions getCSIOptionsForCilkscale() {
   Options.InstrumentAtomics = false;
   Options.InstrumentMemIntrinsics = false;
   Options.InstrumentAllocas = false;
-  Options.InstrumentArithmetic = false;
+  Options.InstrumentArithmetic = CSIOptions::ArithmeticType::None;
   return Options;
 }
 
