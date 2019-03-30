@@ -153,6 +153,8 @@ typedef int8_t csi_builtin_func_op_t;
 typedef struct {
   csi_id_t num_func;
   csi_id_t num_func_exit;
+  csi_id_t num_loop;
+  csi_id_t num_loop_exit;
   csi_id_t num_bb;
   csi_id_t num_callsite;
   csi_id_t num_load;
@@ -204,6 +206,18 @@ typedef struct {
   // Pad struct to 64 total bits.
   uint64_t _padding : 56;
 } bb_prop_t;
+
+typedef struct {
+  // The loop is a Tapir loop
+  unsigned is_tapir_lop : 1;
+  uint64_t _padding : 63;
+} loop_prop_t;
+
+typedef struct {
+  // This exit block of the loop is a latch.
+  unsigned is_latch : 1;
+  uint64_t _padding : 63;
+} loop_exit_prop_t;
 
 typedef struct {
   // The call is indirect.
@@ -314,6 +328,25 @@ WEAK void __csi_func_exit(const csi_id_t func_exit_id, const csi_id_t func_id,
                           const csi_ir_variable_category_t return_cat,
                           const csi_id_t return_id,
                           const func_exit_prop_t prop);
+
+///-----------------------------------------------------------------------------
+/// Loop hooks.  The before_loop hook occurs just before the loop begins
+/// execution, i.e., in a loop preheader block.  The loopbody_entry hook
+/// executes at the beginning of each loop iteration.  The loopbody_exit hook
+/// executes at the end of each iteration.  The after_loop hook occurs just
+/// after the loop completes execution, i.e., in each dedicated exit from the
+/// loop.  Loops are transformed into a canonical form before instrumentation is
+/// inserted to ensure that before_loop and after_loop hooks are encountered as
+/// a pair.
+///
+/// TODO: Pass loop IVs to the loopbody_entry hook?
+WEAK void __csi_before_loop(const csi_id_t loop_id, const uint64_t trip_count,
+                            const loop_prop_t prop);
+WEAK void __csi_after_loop(const csi_id_t loop_id, const loop_prop_t prop);
+WEAK void __csi_loopbody_entry(const csi_id_t loop_id, const loop_prop_t prop);
+WEAK void __csi_loopbody_exit(const csi_id_t loop_exit_id,
+                              const csi_id_t loop_id,
+                              const loop_exit_prop_t prop);
 
 ///-----------------------------------------------------------------------------
 /// Basic block entry/exit.  The bb_entry hook comes after any PHI hooks in that

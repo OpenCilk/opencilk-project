@@ -7,6 +7,8 @@
 // Compile-time assert the property structs are 64 bits.
 static_assert(sizeof(func_prop_t) == 8, "Size of func_prop_t is not 64 bits.");
 static_assert(sizeof(func_exit_prop_t) == 8, "Size of func_exit_prop_t is not 64 bits.");
+static_assert(sizeof(loop_prop_t) == 8, "Size of loop_prop_t is not 64 bits.");
+static_assert(sizeof(loop_exit_prop_t) == 8, "Size of loop_prop_t is not 64 bits.");
 static_assert(sizeof(bb_prop_t) == 8, "Size of bb_prop_t is not 64 bits.");
 static_assert(sizeof(call_prop_t) == 8, "Size of call_prop_t is not 64 bits.");
 static_assert(sizeof(load_prop_t) == 8, "Size of load_prop_t is not 64 bits.");
@@ -33,6 +35,8 @@ typedef struct {
 typedef enum {
     FED_TYPE_FUNCTIONS,
     FED_TYPE_FUNCTION_EXIT,
+    FED_TYPE_LOOP,
+    FED_TYPE_LOOP_EXIT,
     FED_TYPE_BASICBLOCK,
     FED_TYPE_CALLSITE,
     FED_TYPE_LOAD,

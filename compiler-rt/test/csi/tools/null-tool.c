@@ -485,6 +485,21 @@ WEAK void __csi_func_exit(const csi_id_t func_exit_id,
                           const func_exit_prop_t prop) {}
 
 ///-----------------------------------------------------------------------------
+/// Loop hooks.
+__attribute__((always_inline))
+WEAK void __csi_before_loop(const csi_id_t loop_id, const uint64_t trip_count,
+                            const loop_prop_t prop) {}
+__attribute__((always_inline))
+WEAK void __csi_after_loop(const csi_id_t loop_id, const loop_prop_t prop) {}
+__attribute__((always_inline))
+WEAK void __csi_loopbody_entry(const csi_id_t loop_id, const loop_prop_t prop)
+{}
+__attribute__((always_inline))
+WEAK void __csi_loopbody_exit(const csi_id_t loop_exit_id,
+                              const csi_id_t loop_id,
+                              const loop_exit_prop_t prop) {}
+
+///-----------------------------------------------------------------------------
 /// Basic block entry/exit.  The bb_entry hook comes after any PHI hooks in that
 /// basic block.  The bb_exit hook comes before any hooks for terminators, e.g.,
 /// for invoke instructions.
