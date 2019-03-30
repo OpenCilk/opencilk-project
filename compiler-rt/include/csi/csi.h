@@ -62,6 +62,22 @@ enum CSI_IR_variable_category
   };
 typedef int8_t csi_ir_variable_category_t;
 
+enum CSITerminatorTy
+  {
+   UnconditionalBr = 0,
+   ConditionalBr,
+   Switch,
+   Call,
+   Invoke,
+   Return,
+   EHReturn,
+   Unreachable,
+   Detach,
+   Reattach,
+   Sync,
+   IndirectBr,
+  };
+
 enum CSI_arithmetic_opcode
   {
    Add = 0,
@@ -177,8 +193,16 @@ typedef struct {
   unsigned is_landingpad : 1;
   // The basic block is an exception-handling pad.
   unsigned is_ehpad : 1;
+  // The basic block, excluding its PHIs and terminator, contains no
+  // instructions that perform real computation.
+  unsigned is_empty : 1;
+  // The basic block, excluding its PHIs and terminator, contains no
+  // instructions that are instrumented.
+  unsigned no_instrumented_content : 1;
+  // The type of terminator instruction at the end of this basic block.
+  unsigned terminator_ty : 4;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 62;
+  uint64_t _padding : 56;
 } bb_prop_t;
 
 typedef struct {

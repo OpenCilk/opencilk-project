@@ -14,6 +14,7 @@ static_assert(sizeof(store_prop_t) == 8, "Size of store_prop_t is not 64 bits.")
 static_assert(sizeof(alloca_prop_t) == 8, "Size of alloca_prop_t is not 64 bits.");
 static_assert(sizeof(allocfn_prop_t) == 8, "Size of allocfn_prop_t is not 64 bits.");
 static_assert(sizeof(free_prop_t) == 8, "Size of free_prop_t is not 64 bits.");
+static_assert(sizeof(arithmetic_flags_t) == 8, "Size of arithmetic_flags_t is not 64 bits.");
 
 #define CSIRT_API __attribute__((visibility("default")))
 
