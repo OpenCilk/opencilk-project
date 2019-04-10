@@ -147,6 +147,7 @@ void PassManagerBuilder::addFunctionSimplificationPasses(
                          /*AllowSpeculation=*/false));
   // Rotate Loop - disable header duplication at -Oz
   MPM.add(createLoopRotatePass(SizeLevel == 2 ? 0 : -1, false));
+  MPM.add(createSerializeSmallTasksPass());
   // TODO: Investigate promotion cap for O1.
   MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap,
                          /*AllowSpeculation=*/true));
