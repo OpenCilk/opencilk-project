@@ -184,6 +184,10 @@ static cl::opt<bool> EnableTapirLoopStripmine(
     "enable-tapir-loop-stripmine", cl::init(true), cl::Hidden,
     cl::desc("Enable the Tapir loop-stripmining pass (default = on)"));
 
+static cl::opt<bool> EnableSerializeSmallTasks(
+  "enable-serialize-small-tasks", cl::Hidden, cl::init(false),
+  cl::desc("Serialize any Tapir tasks found to be unprofitable (default = off)"));
+
 static cl::opt<bool> EnableDRFAA(
     "enable-drf-aa", cl::init(false), cl::Hidden,
     cl::desc("Enable AA based on the data-race-free assumption (default = off)"));
@@ -447,6 +451,8 @@ void PassManagerBuilder::addFunctionSimplificationPasses(
   }
   // Rotate Loop - disable header duplication at -Oz
   MPM.add(createLoopRotatePass(SizeLevel == 2 ? 0 : -1, PrepareForLTO));
+  if (EnableSerializeSmallTasks)
+    MPM.add(createSerializeSmallTasksPass());
   // TODO: Investigate promotion cap for O1.
   MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap));
   if (EnableSimpleLoopUnswitch)
