@@ -312,6 +312,7 @@ void initializeScalarizerLegacyPassPass(PassRegistry&);
 void initializeScavengerTestPass(PassRegistry&);
 void initializeScopedNoAliasAAWrapperPassPass(PassRegistry&);
 void initializeSeparateConstOffsetFromGEPLegacyPassPass(PassRegistry &);
+void initializeSerializeSmallTasksPass(PassRegistry&);
 void initializeShadowStackGCLoweringPass(PassRegistry&);
 void initializeShrinkWrapPass(PassRegistry&);
 void initializeSimpleLoopUnswitchLegacyPassPass(PassRegistry&);
