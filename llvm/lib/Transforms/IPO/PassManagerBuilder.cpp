@@ -578,6 +578,11 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
     PM.add(createWarnMissedTransformationsPass());
   }
 
+  if (EnableSerializeSmallTasks)
+    PM.add(createSerializeSmallTasksPass());
+  if (EnableDRFAA)
+    PM.add(createDRFScopedNoAliasWrapperPass());
+
   if (!IsFullLTO) {
     // Eliminate loads by forwarding stores from the previous iteration to loads
     // of the current iteration.
@@ -906,6 +911,9 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createGlobalOptimizerPass());
     MPM.add(createGlobalDCEPass());
   }
+
+  if (EnableSerializeSmallTasks)
+    MPM.add(createSerializeSmallTasksPass());
 
   // If we are planning to perform ThinLTO later, let's not bloat the code with
   // unrolling/vectorization/... now. We'll first run the inliner + CGSCC passes
