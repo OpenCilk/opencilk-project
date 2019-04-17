@@ -226,6 +226,11 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
     PM.add(createWarnMissedTransformationsPass());
   }
 
+  if (EnableSerializeSmallTasks)
+    PM.add(createSerializeSmallTasksPass());
+  if (EnableDRFAA)
+    PM.add(createDRFScopedNoAliasWrapperPass());
+
   if (!IsFullLTO) {
     // Eliminate loads by forwarding stores from the previous iteration to loads
     // of the current iteration.
@@ -415,6 +420,8 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createGlobalOptimizerPass());
     MPM.add(createGlobalDCEPass());
   }
+
+  MPM.add(createSerializeSmallTasksPass());
 
   // We add a fresh GlobalsModRef run at this point. This is particularly
   // useful as the above will have inlined, DCE'ed, and function-attr
