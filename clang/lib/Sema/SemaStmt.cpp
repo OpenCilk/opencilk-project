@@ -3238,15 +3238,17 @@ StmtResult Sema::LiftCilkForLoopLimit(SourceLocation CilkForLoc,
   // Get the expression to lift.
   if (DeclUseInLHS)
     ToExtract = E->getRHS();
-  else if (DeclUseInRHS)
+  else {
+    assert(DeclUseInRHS && "Decl not in use in either LHS or RHS?");
     ToExtract = E->getLHS();
+  }
 
   // Create a new VarDecl that stores the result of the lifted
   // expression.
   Scope *S = getCurScope();
   SourceLocation EndLoc = ToExtract->getLocStart();
   QualType EndType = LoopVar->getType();
-  QualType EndInitType = ToExtract->getType();
+  // QualType EndInitType = ToExtract->getType();
   // Hijacking this method for handling range loops to build the
   // declaration for the end of the loop.
   VarDecl *EndVar = BuildForRangeVarDecl(*this, EndLoc, EndType,
