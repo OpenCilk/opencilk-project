@@ -370,7 +370,7 @@ const source_loc_t *__csi_get_loop_source_loc(const csi_id_t loop_id) {
 
 CSIRT_API
 __attribute__((const))
-const source_loc_t *__csi_get_loop_exit_source_loc(const csi_id_t loop_id) {
+const source_loc_t *__csi_get_loop_exit_source_loc(const csi_id_t loop_exit_id) {
     return get_fed_entry(FED_TYPE_LOOP_EXIT, loop_exit_id);
 }
 
