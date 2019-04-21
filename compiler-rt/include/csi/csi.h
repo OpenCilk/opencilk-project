@@ -209,12 +209,14 @@ typedef struct {
 
 typedef struct {
   // The loop is a Tapir loop
-  unsigned is_tapir_lop : 1;
-  uint64_t _padding : 63;
+  unsigned is_tapir_loop : 1;
+  // The loop has one exiting block: the latch.
+  unsigned has_one_exiting_block : 1;
+  uint64_t _padding : 62;
 } loop_prop_t;
 
 typedef struct {
-  // This exit block of the loop is a latch.
+  // This exiting block of the loop is a latch.
   unsigned is_latch : 1;
   uint64_t _padding : 63;
 } loop_exit_prop_t;
@@ -1825,31 +1827,53 @@ typedef struct {
   int32_t non_empty_size;
 } sizeinfo_t;
 
-// Front-end data (FED) table accessors.
+// Front-end data (FED) table accessors.  All such accessors should look like
+// accesses to constant data.
+__attribute__((const))
 const source_loc_t *__csi_get_func_source_loc(const csi_id_t func_id);
+__attribute__((const))
 const source_loc_t *__csi_get_func_exit_source_loc(const csi_id_t func_exit_id);
+__attribute__((const))
+const source_loc_t *__csi_get_loop_source_loc(const csi_id_t loop_id);
+__attribute__((const))
+const source_loc_t *__csi_get_loop_exit_source_loc(const csi_id_t loop_exit_id);
+__attribute__((const))
 const source_loc_t *__csi_get_bb_source_loc(const csi_id_t bb_id);
+__attribute__((const))
 const source_loc_t *__csi_get_callsite_source_loc(const csi_id_t call_id);
+__attribute__((const))
 const source_loc_t *__csi_get_load_source_loc(const csi_id_t load_id);
+__attribute__((const))
 const source_loc_t *__csi_get_store_source_loc(const csi_id_t store_id);
+__attribute__((const))
 const source_loc_t *__csi_get_detach_source_loc(const csi_id_t detach_id);
+__attribute__((const))
 const source_loc_t *__csi_get_task_source_loc(const csi_id_t task_id);
+__attribute__((const))
 const source_loc_t *__csi_get_task_exit_source_loc(const csi_id_t task_exit_id);
+__attribute__((const))
 const source_loc_t *
 __csi_get_detach_continue_source_loc(const csi_id_t detach_continue_id);
+__attribute__((const))
 const source_loc_t *__csi_get_sync_source_loc(const csi_id_t sync_id);
+__attribute__((const))
 const source_loc_t *__csi_get_alloca_source_loc(const csi_id_t alloca_id);
+__attribute__((const))
 const source_loc_t *__csi_get_allocfn_source_loc(const csi_id_t allocfn_id);
+__attribute__((const))
 const source_loc_t *__csi_get_free_source_loc(const csi_id_t free_id);
+__attribute__((const))
 const source_loc_t *__csi_get_arithmetic_source_loc(const csi_id_t arith_id);
+__attribute__((const))
 const source_loc_t *__csi_get_parameter_source_loc(const csi_id_t param_id);
+__attribute__((const))
 const source_loc_t *__csi_get_global_source_loc(const csi_id_t global_id);
+__attribute__((const))
 const sizeinfo_t *__csi_get_bb_sizeinfo(const csi_id_t bb_id);
 
+__attribute__((const))
 const char *__csan_get_allocfn_str(const allocfn_prop_t prop);
+__attribute__((const))
 const char *__csan_get_free_str(const free_prop_t prop);
-
-// Load property:
-//#define CSI_PROP_LOAD_READ_BEFORE_WRITE_IN_BB 0x1
 
 EXTERN_C_END
