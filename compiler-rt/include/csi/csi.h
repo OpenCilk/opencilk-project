@@ -343,7 +343,8 @@ WEAK void __csi_func_exit(const csi_id_t func_exit_id, const csi_id_t func_id,
 ///
 /// TODO: Pass loop IVs to the loopbody_entry hook?
 WEAK void __csi_before_loop(const csi_id_t loop_id, const uint64_t trip_count,
-                            const loop_prop_t prop);
+                            const operand_id_t *operand_ids,
+                            int32_t num_operands, const loop_prop_t prop);
 WEAK void __csi_after_loop(const csi_id_t loop_id, const loop_prop_t prop);
 WEAK void __csi_loopbody_entry(const csi_id_t loop_id, const loop_prop_t prop);
 WEAK void __csi_loopbody_exit(const csi_id_t loop_exit_id,
@@ -354,7 +355,8 @@ WEAK void __csi_loopbody_exit(const csi_id_t loop_exit_id,
 /// Basic block entry/exit.  The bb_entry hook comes after any PHI hooks in that
 /// basic block.  The bb_exit hook comes before any hooks for terminators, e.g.,
 /// for invoke instructions.
-WEAK void __csi_bb_entry(const csi_id_t bb_id, const bb_prop_t prop);
+WEAK void __csi_bb_entry(const csi_id_t bb_id, const operand_id_t *operand_ids,
+                         int32_t num_operands, const bb_prop_t prop);
 
 WEAK void __csi_bb_exit(const csi_id_t bb_id, const bb_prop_t prop);
 
@@ -777,7 +779,8 @@ WEAK void __csi_after_masked_scatter_v8double(
 /// Hooks for Tapir control flow.
 WEAK void __csi_detach(const csi_id_t detach_id, const int32_t *has_spawned);
 
-WEAK void __csi_task(const csi_id_t task_id, const csi_id_t detach_id);
+WEAK void __csi_task(const csi_id_t task_id, const csi_id_t detach_id,
+                     const operand_id_t *operand_ids, int32_t num_operands);
 
 WEAK void __csi_task_exit(const csi_id_t task_exit_id, const csi_id_t task_id,
                           const csi_id_t detach_id);

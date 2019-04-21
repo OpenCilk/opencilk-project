@@ -138,7 +138,8 @@ CILKTOOL_API void __csi_unit_init(const char *const file_name,
  */
 
 CILKTOOL_API
-void __csi_bb_entry(const csi_id_t bb_id, const bb_prop_t prop) {
+void __csi_bb_entry(const csi_id_t bb_id, const operand_id_t *operand_ids,
+                    int32_t num_operands, const bb_prop_t prop) {
   context_stack_t *stack;
 
 #if SERIAL_TOOL
@@ -177,7 +178,8 @@ void __csi_detach(const csi_id_t detach_id, const int32_t *has_spawned) {
 }
 
 CILKTOOL_API
-void __csi_task(const csi_id_t task_id, const csi_id_t detach_id) {
+void __csi_task(const csi_id_t task_id, const csi_id_t detach_id,
+                const operand_id_t *operand_ids, int32_t num_operands) {
   context_stack_t *stack;
 #if SERIAL_TOOL
   stack = &(ctx_stack);

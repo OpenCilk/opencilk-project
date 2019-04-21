@@ -488,7 +488,8 @@ WEAK void __csi_func_exit(const csi_id_t func_exit_id,
 /// Loop hooks.
 __attribute__((always_inline))
 WEAK void __csi_before_loop(const csi_id_t loop_id, const uint64_t trip_count,
-                            const loop_prop_t prop) {}
+                            const operand_id_t *operand_ids,
+                            int32_t num_operands, const loop_prop_t prop) {}
 __attribute__((always_inline))
 WEAK void __csi_after_loop(const csi_id_t loop_id, const loop_prop_t prop) {}
 __attribute__((always_inline))
@@ -504,7 +505,8 @@ WEAK void __csi_loopbody_exit(const csi_id_t loop_exit_id,
 /// basic block.  The bb_exit hook comes before any hooks for terminators, e.g.,
 /// for invoke instructions.
 __attribute__((always_inline))
-WEAK void __csi_bb_entry(const csi_id_t bb_id, const bb_prop_t prop) {}
+WEAK void __csi_bb_entry(const csi_id_t bb_id, const operand_id_t *operand_ids,
+                         int32_t num_operands, const bb_prop_t prop) {}
 
 __attribute__((always_inline))
 WEAK void __csi_bb_exit(const csi_id_t bb_id, const bb_prop_t prop) {}
@@ -528,7 +530,8 @@ __attribute__((always_inline))
 WEAK void __csi_detach(const csi_id_t detach_id, const int32_t *has_spawned) {}
 
 __attribute__((always_inline))
-WEAK void __csi_task(const csi_id_t task_id, const csi_id_t detach_id)
+WEAK void __csi_task(const csi_id_t task_id, const csi_id_t detach_id,
+                     const operand_id_t *operand_ids, int32_t num_operands)
 {}
 
 __attribute__((always_inline))
