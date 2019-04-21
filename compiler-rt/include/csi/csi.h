@@ -372,21 +372,31 @@ WEAK void __csi_after_call(const csi_id_t call_id, const csi_id_t func_id,
 ///-----------------------------------------------------------------------------
 /// Hooks for loads and stores
 WEAK void __csi_before_load(const csi_id_t load_id, const void *addr,
-                            const int32_t num_bytes, const load_prop_t prop);
+                            const int32_t num_bytes,
+                            const csi_ir_variable_category_t obj_operand_cat,
+                            const csi_id_t obj_operand_id,
+                            const load_prop_t prop);
 
 WEAK void __csi_after_load(const csi_id_t load_id, const void *addr,
-                           const int32_t num_bytes, const load_prop_t prop);
+                           const int32_t num_bytes,
+                           const csi_ir_variable_category_t obj_operand_cat,
+                           const csi_id_t obj_operand_id,
+                           const load_prop_t prop);
 
 WEAK void __csi_before_store(const csi_id_t store_id, const void *addr,
                              const int32_t num_bytes,
                              const csi_ir_variable_category_t operand_cat,
                              const csi_id_t operand_id,
+                             const csi_ir_variable_category_t obj_operand_cat,
+                             const csi_id_t obj_operand_id,
                              const store_prop_t prop);
 
 WEAK void __csi_after_store(const csi_id_t store_id, const void *addr,
                             const int32_t num_bytes,
                             const csi_ir_variable_category_t operand_cat,
                             const csi_id_t operand_id,
+                            const csi_ir_variable_category_t obj_operand_cat,
+                            const csi_id_t obj_operand_id,
                             const store_prop_t prop);
 
 ///-----------------------------------------------------------------------------

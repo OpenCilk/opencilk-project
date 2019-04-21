@@ -15,7 +15,9 @@ void __csi_init() {
 }
 
 void __csi_before_load(const csi_id_t load_id, const void *addr,
-                       const int32_t num_bytes, const load_prop_t prop) {
+                       const int32_t num_bytes,
+                       const csi_ir_variable_category_t obj_operand_cat,
+                       const csi_id_t obj_operand_id, const load_prop_t prop) {
     num_loads++;
     if (prop.is_read_before_write_in_bb) num_read_before_writes++;
 }
