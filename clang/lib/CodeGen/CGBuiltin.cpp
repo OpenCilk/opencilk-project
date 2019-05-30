@@ -92,11 +92,24 @@ static Value *EmitFromInt(CodeGenFunction &CGF, llvm::Value *V,
   return V;
 }
 
+/// Utility function to start a detach if necessary.
+static void MaybeDetach(CodeGenFunction *CGF,
+                        CodeGenFunction::IsSpawnedScope &SpawnedScp) {
+  if (SpawnedScp.OldScopeIsSpawned()) {
+    SpawnedScp.RestoreOldScope();
+    assert(CGF->CurDetachScope &&
+           "A call was spawned, but no detach scope was pushed.");
+    if (!CGF->CurDetachScope->IsDetachStarted())
+      CGF->CurDetachScope->StartDetach();
+  }
+}
+
 /// Utility to insert an atomic instruction based on Instrinsic::ID
 /// and the expression node.
 static Value *MakeBinaryAtomicValue(CodeGenFunction &CGF,
                                     llvm::AtomicRMWInst::BinOp Kind,
                                     const CallExpr *E) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   QualType T = E->getType();
   assert(E->getArg(0)->getType()->isPointerType());
   assert(CGF.getContext().hasSameUnqualifiedType(T,
@@ -117,14 +130,17 @@ static Value *MakeBinaryAtomicValue(CodeGenFunction &CGF,
   llvm::Type *ValueType = Args[1]->getType();
   Args[1] = EmitToInt(CGF, Args[1], T, IntType);
 
+  MaybeDetach(&CGF, SpawnedScp);
   llvm::Value *Result = CGF.Builder.CreateAtomicRMW(
       Kind, Args[0], Args[1], llvm::AtomicOrdering::SequentiallyConsistent);
   return EmitFromInt(CGF, Result, T, ValueType);
 }
 
 static Value *EmitNontemporalStore(CodeGenFunction &CGF, const CallExpr *E) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   Value *Val = CGF.EmitScalarExpr(E->getArg(0));
   Value *Address = CGF.EmitScalarExpr(E->getArg(1));
+  MaybeDetach(&CGF, SpawnedScp);
 
   // Convert the type of the pointer to a pointer to the stored type.
   Val = CGF.EmitToMemory(Val, E->getArg(0)->getType());
@@ -137,7 +153,9 @@ static Value *EmitNontemporalStore(CodeGenFunction &CGF, const CallExpr *E) {
 }
 
 static Value *EmitNontemporalLoad(CodeGenFunction &CGF, const CallExpr *E) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   Value *Address = CGF.EmitScalarExpr(E->getArg(0));
+  MaybeDetach(&CGF, SpawnedScp);
 
   LValue LV = CGF.MakeNaturalAlignAddrLValue(Address, E->getType());
   LV.setNontemporal(true);
@@ -158,6 +176,7 @@ static RValue EmitBinaryAtomicPost(CodeGenFunction &CGF,
                                    const CallExpr *E,
                                    Instruction::BinaryOps Op,
                                    bool Invert = false) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   QualType T = E->getType();
   assert(E->getArg(0)->getType()->isPointerType());
   assert(CGF.getContext().hasSameUnqualifiedType(T,
@@ -178,6 +197,7 @@ static RValue EmitBinaryAtomicPost(CodeGenFunction &CGF,
   Args[1] = EmitToInt(CGF, Args[1], T, IntType);
   Args[0] = CGF.Builder.CreateBitCast(DestPtr, IntPtrType);
 
+  MaybeDetach(&CGF, SpawnedScp);
   llvm::Value *Result = CGF.Builder.CreateAtomicRMW(
       Kind, Args[0], Args[1], llvm::AtomicOrdering::SequentiallyConsistent);
   Result = CGF.Builder.CreateBinOp(Op, Result, Args[1]);
@@ -201,6 +221,7 @@ static RValue EmitBinaryAtomicPost(CodeGenFunction &CGF,
 /// @returns result of cmpxchg, according to ReturnBool
 static Value *MakeAtomicCmpXchgValue(CodeGenFunction &CGF, const CallExpr *E,
                                      bool ReturnBool) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   QualType T = ReturnBool ? E->getArg(1)->getType() : E->getType();
   llvm::Value *DestPtr = CGF.EmitScalarExpr(E->getArg(0));
   unsigned AddrSpace = DestPtr->getType()->getPointerAddressSpace();
@@ -215,6 +236,7 @@ static Value *MakeAtomicCmpXchgValue(CodeGenFunction &CGF, const CallExpr *E,
   llvm::Type *ValueType = Args[1]->getType();
   Args[1] = EmitToInt(CGF, Args[1], T, IntType);
   Args[2] = EmitToInt(CGF, CGF.EmitScalarExpr(E->getArg(2)), T, IntType);
+  MaybeDetach(&CGF, SpawnedScp);
 
   Value *Pair = CGF.Builder.CreateAtomicCmpXchg(
       Args[0], Args[1], Args[2], llvm::AtomicOrdering::SequentiallyConsistent,
@@ -234,9 +256,11 @@ static Value *MakeAtomicCmpXchgValue(CodeGenFunction &CGF, const CallExpr *E,
 static Value *emitUnaryBuiltin(CodeGenFunction &CGF,
                                const CallExpr *E,
                                unsigned IntrinsicID) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   llvm::Value *Src0 = CGF.EmitScalarExpr(E->getArg(0));
 
   Value *F = CGF.CGM.getIntrinsic(IntrinsicID, Src0->getType());
+  MaybeDetach(&CGF, SpawnedScp);
   return CGF.Builder.CreateCall(F, Src0);
 }
 
@@ -244,10 +268,12 @@ static Value *emitUnaryBuiltin(CodeGenFunction &CGF,
 static Value *emitBinaryBuiltin(CodeGenFunction &CGF,
                                 const CallExpr *E,
                                 unsigned IntrinsicID) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   llvm::Value *Src0 = CGF.EmitScalarExpr(E->getArg(0));
   llvm::Value *Src1 = CGF.EmitScalarExpr(E->getArg(1));
 
   Value *F = CGF.CGM.getIntrinsic(IntrinsicID, Src0->getType());
+  MaybeDetach(&CGF, SpawnedScp);
   return CGF.Builder.CreateCall(F, { Src0, Src1 });
 }
 
@@ -255,11 +281,13 @@ static Value *emitBinaryBuiltin(CodeGenFunction &CGF,
 static Value *emitTernaryBuiltin(CodeGenFunction &CGF,
                                  const CallExpr *E,
                                  unsigned IntrinsicID) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   llvm::Value *Src0 = CGF.EmitScalarExpr(E->getArg(0));
   llvm::Value *Src1 = CGF.EmitScalarExpr(E->getArg(1));
   llvm::Value *Src2 = CGF.EmitScalarExpr(E->getArg(2));
 
   Value *F = CGF.CGM.getIntrinsic(IntrinsicID, Src0->getType());
+  MaybeDetach(&CGF, SpawnedScp);
   return CGF.Builder.CreateCall(F, { Src0, Src1, Src2 });
 }
 
@@ -267,16 +295,20 @@ static Value *emitTernaryBuiltin(CodeGenFunction &CGF,
 static Value *emitFPIntBuiltin(CodeGenFunction &CGF,
                                const CallExpr *E,
                                unsigned IntrinsicID) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   llvm::Value *Src0 = CGF.EmitScalarExpr(E->getArg(0));
   llvm::Value *Src1 = CGF.EmitScalarExpr(E->getArg(1));
 
   Value *F = CGF.CGM.getIntrinsic(IntrinsicID, Src0->getType());
+  MaybeDetach(&CGF, SpawnedScp);
   return CGF.Builder.CreateCall(F, {Src0, Src1});
 }
 
 /// EmitFAbs - Emit a call to @llvm.fabs().
 static Value *EmitFAbs(CodeGenFunction &CGF, Value *V) {
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   Value *F = CGF.CGM.getIntrinsic(Intrinsic::fabs, V->getType());
+  MaybeDetach(&CGF, SpawnedScp);
   llvm::CallInst *Call = CGF.Builder.CreateCall(F, V);
   Call->setDoesNotAccessMemory();
   return Call;
@@ -933,7 +965,6 @@ EmitCheckedMixedSignMultiply(CodeGenFunction &CGF, const clang::Expr *Op1,
 RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
                                         unsigned BuiltinID, const CallExpr *E,
                                         ReturnValueSlot ReturnValue) {
-  IsSpawnedScope SpawnedScp(this);
   // See if we can constant fold this builtin.  If so, don't emit it at all.
   Expr::EvalResult Result;
   if (E->EvaluateAsRValue(Result, CGM.getContext()) &&
@@ -1041,8 +1072,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     case Builtin::BI__builtin_fmod:
     case Builtin::BI__builtin_fmodf:
     case Builtin::BI__builtin_fmodl: {
+      IsSpawnedScope SpawnedScp(this);
       Value *Arg1 = EmitScalarExpr(E->getArg(0));
       Value *Arg2 = EmitScalarExpr(E->getArg(1));
+      MaybeDetach(this, SpawnedScp);
       return RValue::get(Builder.CreateFRem(Arg1, Arg2, "fmod"));
     }
 
@@ -1146,6 +1179,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
                            : EmitVAListRef(E->getArg(0)).getPointer(),
                        BuiltinID != Builtin::BI__builtin_va_end));
   case Builtin::BI__builtin_va_copy: {
+    IsSpawnedScope SpawnedScp(this);
     Value *DstPtr = EmitVAListRef(E->getArg(0)).getPointer();
     Value *SrcPtr = EmitVAListRef(E->getArg(1)).getPointer();
 
@@ -1153,14 +1187,17 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
 
     DstPtr = Builder.CreateBitCast(DstPtr, Type);
     SrcPtr = Builder.CreateBitCast(SrcPtr, Type);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(CGM.getIntrinsic(Intrinsic::vacopy),
                                           {DstPtr, SrcPtr}));
   }
   case Builtin::BI__builtin_abs:
   case Builtin::BI__builtin_labs:
   case Builtin::BI__builtin_llabs: {
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitScalarExpr(E->getArg(0));
 
+    MaybeDetach(this, SpawnedScp);
     Value *NegOp = Builder.CreateNeg(ArgValue, "neg");
     Value *CmpResult =
     Builder.CreateICmpSGE(ArgValue,
@@ -1174,7 +1211,9 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_conj:
   case Builtin::BI__builtin_conjf:
   case Builtin::BI__builtin_conjl: {
+    IsSpawnedScope SpawnedScp(this);
     ComplexPairTy ComplexVal = EmitComplexExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *Real = ComplexVal.first;
     Value *Imag = ComplexVal.second;
     Value *Zero =
@@ -1209,6 +1248,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_ctz:
   case Builtin::BI__builtin_ctzl:
   case Builtin::BI__builtin_ctzll: {
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitCheckedArgForBuiltin(E->getArg(0), BCK_CTZPassedZero);
 
     llvm::Type *ArgType = ArgValue->getType();
@@ -1216,6 +1256,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
 
     llvm::Type *ResultType = ConvertType(E->getType());
     Value *ZeroUndef = Builder.getInt1(getTarget().isCLZForZeroUndef());
+    MaybeDetach(this, SpawnedScp);
     Value *Result = Builder.CreateCall(F, {ArgValue, ZeroUndef});
     if (Result->getType() != ResultType)
       Result = Builder.CreateIntCast(Result, ResultType, /*isSigned*/true,
@@ -1226,6 +1267,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_clz:
   case Builtin::BI__builtin_clzl:
   case Builtin::BI__builtin_clzll: {
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitCheckedArgForBuiltin(E->getArg(0), BCK_CLZPassedZero);
 
     llvm::Type *ArgType = ArgValue->getType();
@@ -1233,6 +1275,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
 
     llvm::Type *ResultType = ConvertType(E->getType());
     Value *ZeroUndef = Builder.getInt1(getTarget().isCLZForZeroUndef());
+    MaybeDetach(this, SpawnedScp);
     Value *Result = Builder.CreateCall(F, {ArgValue, ZeroUndef});
     if (Result->getType() != ResultType)
       Result = Builder.CreateIntCast(Result, ResultType, /*isSigned*/true,
@@ -1243,12 +1286,14 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_ffsl:
   case Builtin::BI__builtin_ffsll: {
     // ffs(x) -> x ? cttz(x) + 1 : 0
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitScalarExpr(E->getArg(0));
 
     llvm::Type *ArgType = ArgValue->getType();
     Value *F = CGM.getIntrinsic(Intrinsic::cttz, ArgType);
 
     llvm::Type *ResultType = ConvertType(E->getType());
+    MaybeDetach(this, SpawnedScp);
     Value *Tmp =
         Builder.CreateAdd(Builder.CreateCall(F, {ArgValue, Builder.getTrue()}),
                           llvm::ConstantInt::get(ArgType, 1));
@@ -1264,12 +1309,14 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_parityl:
   case Builtin::BI__builtin_parityll: {
     // parity(x) -> ctpop(x) & 1
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitScalarExpr(E->getArg(0));
 
     llvm::Type *ArgType = ArgValue->getType();
     Value *F = CGM.getIntrinsic(Intrinsic::ctpop, ArgType);
 
     llvm::Type *ResultType = ConvertType(E->getType());
+    MaybeDetach(this, SpawnedScp);
     Value *Tmp = Builder.CreateCall(F, ArgValue);
     Value *Result = Builder.CreateAnd(Tmp, llvm::ConstantInt::get(ArgType, 1));
     if (Result->getType() != ResultType)
@@ -1283,12 +1330,14 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_popcount:
   case Builtin::BI__builtin_popcountl:
   case Builtin::BI__builtin_popcountll: {
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitScalarExpr(E->getArg(0));
 
     llvm::Type *ArgType = ArgValue->getType();
     Value *F = CGM.getIntrinsic(Intrinsic::ctpop, ArgType);
 
     llvm::Type *ResultType = ConvertType(E->getType());
+    MaybeDetach(this, SpawnedScp);
     Value *Result = Builder.CreateCall(F, ArgValue);
     if (Result->getType() != ResultType)
       Result = Builder.CreateIntCast(Result, ResultType, /*isSigned*/true,
@@ -1300,10 +1349,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI_rotr:
   case Builtin::BI_lrotr:
   case Builtin::BI_rotr64: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Val = EmitScalarExpr(E->getArg(0));
     Value *Shift = EmitScalarExpr(E->getArg(1));
 
     llvm::Type *ArgType = Val->getType();
+    MaybeDetach(this, SpawnedScp);
     Shift = Builder.CreateIntCast(Shift, ArgType, false);
     unsigned ArgWidth = cast<llvm::IntegerType>(ArgType)->getBitWidth();
     Value *ArgTypeSize = llvm::ConstantInt::get(ArgType, ArgWidth);
@@ -1326,10 +1377,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI_rotl:
   case Builtin::BI_lrotl:
   case Builtin::BI_rotl64: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Val = EmitScalarExpr(E->getArg(0));
     Value *Shift = EmitScalarExpr(E->getArg(1));
 
     llvm::Type *ArgType = Val->getType();
+    MaybeDetach(this, SpawnedScp);
     Shift = Builder.CreateIntCast(Shift, ArgType, false);
     unsigned ArgWidth = cast<llvm::IntegerType>(ArgType)->getBitWidth();
     Value *ArgTypeSize = llvm::ConstantInt::get(ArgType, ArgWidth);
@@ -1412,6 +1465,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
                                              /*EmittedE=*/nullptr));
   }
   case Builtin::BI__builtin_prefetch: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Locality, *RW, *Address = EmitScalarExpr(E->getArg(0));
     // FIXME: Technically these constants should of type 'int', yes?
     RW = (E->getNumArgs() > 1) ? EmitScalarExpr(E->getArg(1)) :
@@ -1420,16 +1474,21 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
       llvm::ConstantInt::get(Int32Ty, 3);
     Value *Data = llvm::ConstantInt::get(Int32Ty, 1);
     Value *F = CGM.getIntrinsic(Intrinsic::prefetch);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, {Address, RW, Locality, Data}));
   }
   case Builtin::BI__builtin_readcyclecounter: {
+    IsSpawnedScope SpawnedScp(this);
     Value *F = CGM.getIntrinsic(Intrinsic::readcyclecounter);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F));
   }
   case Builtin::BI__builtin___clear_cache: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Begin = EmitScalarExpr(E->getArg(0));
     Value *End = EmitScalarExpr(E->getArg(1));
     Value *F = CGM.getIntrinsic(Intrinsic::clear_cache);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, {Begin, End}));
   }
   case Builtin::BI__builtin_trap:
@@ -1448,10 +1507,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_powi:
   case Builtin::BI__builtin_powif:
   case Builtin::BI__builtin_powil: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Base = EmitScalarExpr(E->getArg(0));
     Value *Exponent = EmitScalarExpr(E->getArg(1));
     llvm::Type *ArgType = Base->getType();
     Value *F = CGM.getIntrinsic(Intrinsic::powi, ArgType);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, {Base, Exponent}));
   }
 
@@ -1461,10 +1522,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_islessequal:
   case Builtin::BI__builtin_islessgreater:
   case Builtin::BI__builtin_isunordered: {
+    IsSpawnedScope SpawnedScp(this);
     // Ordered comparisons: we know the arguments to these are matching scalar
     // floating point values.
     Value *LHS = EmitScalarExpr(E->getArg(0));
     Value *RHS = EmitScalarExpr(E->getArg(1));
+    MaybeDetach(this, SpawnedScp);
 
     switch (BuiltinID) {
     default: llvm_unreachable("Unknown ordered comparison");
@@ -1491,7 +1554,9 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     return RValue::get(Builder.CreateZExt(LHS, ConvertType(E->getType())));
   }
   case Builtin::BI__builtin_isnan: {
+    IsSpawnedScope SpawnedScp(this);
     Value *V = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     V = Builder.CreateFCmpUNO(V, V, "cmp");
     return RValue::get(Builder.CreateZExt(V, ConvertType(E->getType())));
   }
@@ -1504,10 +1569,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__finitel:
   case Builtin::BI__builtin_isinf:
   case Builtin::BI__builtin_isfinite: {
+    IsSpawnedScope SpawnedScp(this);
     // isinf(x)    --> fabs(x) == infinity
     // isfinite(x) --> fabs(x) != infinity
     // x != NaN via the ordered compare in either case.
     Value *V = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *Fabs = EmitFAbs(*this, V);
     Constant *Infinity = ConstantFP::getInfinity(V->getType());
     CmpInst::Predicate Pred = (BuiltinID == Builtin::BI__builtin_isinf)
@@ -1518,8 +1585,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   }
 
   case Builtin::BI__builtin_isinf_sign: {
+    IsSpawnedScope SpawnedScp(this);
     // isinf_sign(x) -> fabs(x) == infinity ? (signbit(x) ? -1 : 1) : 0
     Value *Arg = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *AbsArg = EmitFAbs(*this, Arg);
     Value *IsInf = Builder.CreateFCmpOEQ(
         AbsArg, ConstantFP::getInfinity(Arg->getType()), "isinf");
@@ -1535,8 +1604,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   }
 
   case Builtin::BI__builtin_isnormal: {
+    IsSpawnedScope SpawnedScp(this);
     // isnormal(x) --> x == x && fabsf(x) < infinity && fabsf(x) >= float_min
     Value *V = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *Eq = Builder.CreateFCmpOEQ(V, V, "iseq");
 
     Value *Abs = EmitFAbs(*this, V);
@@ -1553,8 +1624,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   }
 
   case Builtin::BI__builtin_fpclassify: {
+    IsSpawnedScope SpawnedScp(this);
     Value *V = EmitScalarExpr(E->getArg(5));
     llvm::Type *Ty = ConvertType(E->getArg(5)->getType());
+    MaybeDetach(this, SpawnedScp);
 
     // Create Result
     BasicBlock *Begin = Builder.GetInsertBlock();
@@ -1639,15 +1712,18 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
 
   case Builtin::BIbzero:
   case Builtin::BI__builtin_bzero: {
+    IsSpawnedScope SpawnedScp(this);
     Address Dest = EmitPointerWithAlignment(E->getArg(0));
     Value *SizeVal = EmitScalarExpr(E->getArg(1));
     EmitNonNullArgCheck(RValue::get(Dest.getPointer()), E->getArg(0)->getType(),
                         E->getArg(0)->getExprLoc(), FD, 0);
+    MaybeDetach(this, SpawnedScp);
     Builder.CreateMemSet(Dest, Builder.getInt8(0), SizeVal, false);
     return RValue::get(nullptr);
   }
   case Builtin::BImemcpy:
   case Builtin::BI__builtin_memcpy: {
+    IsSpawnedScope SpawnedScp(this);
     Address Dest = EmitPointerWithAlignment(E->getArg(0));
     Address Src = EmitPointerWithAlignment(E->getArg(1));
     Value *SizeVal = EmitScalarExpr(E->getArg(2));
@@ -1655,6 +1731,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
                         E->getArg(0)->getExprLoc(), FD, 0);
     EmitNonNullArgCheck(RValue::get(Src.getPointer()), E->getArg(1)->getType(),
                         E->getArg(1)->getExprLoc(), FD, 1);
+    MaybeDetach(this, SpawnedScp);
     Builder.CreateMemCpy(Dest, Src, SizeVal, false);
     return RValue::get(Dest.getPointer());
   }
@@ -1664,6 +1741,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     break;
 
   case Builtin::BI__builtin___memcpy_chk: {
+    IsSpawnedScope SpawnedScp(this);
     // fold __builtin_memcpy_chk(x, y, cst1, cst2) to memcpy iff cst1<=cst2.
     llvm::APSInt Size, DstSize;
     if (!E->getArg(2)->EvaluateAsInt(Size, CGM.getContext()) ||
@@ -1674,20 +1752,24 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     Address Dest = EmitPointerWithAlignment(E->getArg(0));
     Address Src = EmitPointerWithAlignment(E->getArg(1));
     Value *SizeVal = llvm::ConstantInt::get(Builder.getContext(), Size);
+    MaybeDetach(this, SpawnedScp);
     Builder.CreateMemCpy(Dest, Src, SizeVal, false);
     return RValue::get(Dest.getPointer());
   }
 
   case Builtin::BI__builtin_objc_memmove_collectable: {
+    IsSpawnedScope SpawnedScp(this);
     Address DestAddr = EmitPointerWithAlignment(E->getArg(0));
     Address SrcAddr = EmitPointerWithAlignment(E->getArg(1));
     Value *SizeVal = EmitScalarExpr(E->getArg(2));
+    MaybeDetach(this, SpawnedScp);
     CGM.getObjCRuntime().EmitGCMemmoveCollectable(*this,
                                                   DestAddr, SrcAddr, SizeVal);
     return RValue::get(DestAddr.getPointer());
   }
 
   case Builtin::BI__builtin___memmove_chk: {
+    IsSpawnedScope SpawnedScp(this);
     // fold __builtin_memmove_chk(x, y, cst1, cst2) to memmove iff cst1<=cst2.
     llvm::APSInt Size, DstSize;
     if (!E->getArg(2)->EvaluateAsInt(Size, CGM.getContext()) ||
@@ -1698,12 +1780,14 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     Address Dest = EmitPointerWithAlignment(E->getArg(0));
     Address Src = EmitPointerWithAlignment(E->getArg(1));
     Value *SizeVal = llvm::ConstantInt::get(Builder.getContext(), Size);
+    MaybeDetach(this, SpawnedScp);
     Builder.CreateMemMove(Dest, Src, SizeVal, false);
     return RValue::get(Dest.getPointer());
   }
 
   case Builtin::BImemmove:
   case Builtin::BI__builtin_memmove: {
+    IsSpawnedScope SpawnedScp(this);
     Address Dest = EmitPointerWithAlignment(E->getArg(0));
     Address Src = EmitPointerWithAlignment(E->getArg(1));
     Value *SizeVal = EmitScalarExpr(E->getArg(2));
@@ -1711,21 +1795,25 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
                         E->getArg(0)->getExprLoc(), FD, 0);
     EmitNonNullArgCheck(RValue::get(Src.getPointer()), E->getArg(1)->getType(),
                         E->getArg(1)->getExprLoc(), FD, 1);
+    MaybeDetach(this, SpawnedScp);
     Builder.CreateMemMove(Dest, Src, SizeVal, false);
     return RValue::get(Dest.getPointer());
   }
   case Builtin::BImemset:
   case Builtin::BI__builtin_memset: {
+    IsSpawnedScope SpawnedScp(this);
     Address Dest = EmitPointerWithAlignment(E->getArg(0));
     Value *ByteVal = Builder.CreateTrunc(EmitScalarExpr(E->getArg(1)),
                                          Builder.getInt8Ty());
     Value *SizeVal = EmitScalarExpr(E->getArg(2));
     EmitNonNullArgCheck(RValue::get(Dest.getPointer()), E->getArg(0)->getType(),
                         E->getArg(0)->getExprLoc(), FD, 0);
+    MaybeDetach(this, SpawnedScp);
     Builder.CreateMemSet(Dest, ByteVal, SizeVal, false);
     return RValue::get(Dest.getPointer());
   }
   case Builtin::BI__builtin___memset_chk: {
+    IsSpawnedScope SpawnedScp(this);
     // fold __builtin_memset_chk(x, y, cst1, cst2) to memset iff cst1<=cst2.
     llvm::APSInt Size, DstSize;
     if (!E->getArg(2)->EvaluateAsInt(Size, CGM.getContext()) ||
@@ -1737,6 +1825,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     Value *ByteVal = Builder.CreateTrunc(EmitScalarExpr(E->getArg(1)),
                                          Builder.getInt8Ty());
     Value *SizeVal = llvm::ConstantInt::get(Builder.getContext(), Size);
+    MaybeDetach(this, SpawnedScp);
     Builder.CreateMemSet(Dest, ByteVal, SizeVal, false);
     return RValue::get(Dest.getPointer());
   }
@@ -1756,34 +1845,46 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
                                       llvm::ConstantInt::get(Int32Ty, Offset)));
   }
   case Builtin::BI__builtin_return_address: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Depth = ConstantEmitter(*this).emitAbstract(E->getArg(0),
                                                    getContext().UnsignedIntTy);
     Value *F = CGM.getIntrinsic(Intrinsic::returnaddress);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, Depth));
   }
   case Builtin::BI_ReturnAddress: {
+    IsSpawnedScope SpawnedScp(this);
     Value *F = CGM.getIntrinsic(Intrinsic::returnaddress);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, Builder.getInt32(0)));
   }
   case Builtin::BI__builtin_frame_address: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Depth = ConstantEmitter(*this).emitAbstract(E->getArg(0),
                                                    getContext().UnsignedIntTy);
     Value *F = CGM.getIntrinsic(Intrinsic::frameaddress);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, Depth));
   }
   case Builtin::BI__builtin_extract_return_addr: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Address = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *Result = getTargetHooks().decodeReturnAddress(*this, Address);
     return RValue::get(Result);
   }
   case Builtin::BI__builtin_frob_return_addr: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Address = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *Result = getTargetHooks().encodeReturnAddress(*this, Address);
     return RValue::get(Result);
   }
   case Builtin::BI__builtin_dwarf_sp_column: {
+    IsSpawnedScope SpawnedScp(this);
     llvm::IntegerType *Ty
       = cast<llvm::IntegerType>(ConvertType(E->getType()));
+    MaybeDetach(this, SpawnedScp);
     int Column = getTargetHooks().getDwarfEHStackPointer(CGM);
     if (Column == -1) {
       CGM.ErrorUnsupported(E, "__builtin_dwarf_sp_column");
@@ -1792,7 +1893,9 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     return RValue::get(llvm::ConstantInt::get(Ty, Column, true));
   }
   case Builtin::BI__builtin_init_dwarf_reg_size_table: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Address = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     if (getTargetHooks().initDwarfEHRegSizeTable(*this, Address))
       CGM.ErrorUnsupported(E, "__builtin_init_dwarf_reg_size_table");
     return RValue::get(llvm::UndefValue::get(ConvertType(E->getType())));
@@ -1820,6 +1923,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     return RValue::get(Builder.CreateCall(F));
   }
   case Builtin::BI__builtin_extend_pointer: {
+    IsSpawnedScope SpawnedScp(this);
     // Extends a pointer to the size of an _Unwind_Word, which is
     // uint64_t on all platforms.  Generally this gets poked into a
     // register and eventually used as an address, so if the
@@ -1832,6 +1936,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
 
     // Cast the pointer to intptr_t.
     Value *Ptr = EmitScalarExpr(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *Result = Builder.CreatePtrToInt(Ptr, IntPtrTy, "extend.cast");
 
     // If that's 64 bits, we're done.
@@ -2022,11 +2127,13 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__sync_lock_release_4:
   case Builtin::BI__sync_lock_release_8:
   case Builtin::BI__sync_lock_release_16: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Ptr = EmitScalarExpr(E->getArg(0));
     QualType ElTy = E->getArg(0)->getType()->getPointeeType();
     CharUnits StoreSize = getContext().getTypeSizeInChars(ElTy);
     llvm::Type *ITy = llvm::IntegerType::get(getLLVMContext(),
                                              StoreSize.getQuantity() * 8);
+    MaybeDetach(this, SpawnedScp);
     Ptr = Builder.CreateBitCast(Ptr, ITy->getPointerTo());
     llvm::StoreInst *Store =
       Builder.CreateAlignedStore(llvm::Constant::getNullValue(ITy), Ptr,
@@ -2053,6 +2160,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     return RValue::get(EmitNontemporalStore(*this, E));
   case Builtin::BI__c11_atomic_is_lock_free:
   case Builtin::BI__atomic_is_lock_free: {
+    IsSpawnedScope SpawnedScp(this);
     // Call "bool __atomic_is_lock_free(size_t size, void *ptr)". For the
     // __c11 builtin, ptr is 0 (indicating a properly-aligned object), since
     // _Atomic(T) is always properly-aligned.
@@ -2076,6 +2184,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   }
 
   case Builtin::BI__atomic_test_and_set: {
+    IsSpawnedScope SpawnedScp(this);
     // Look at the argument type to determine whether this is a volatile
     // operation. The parameter type is always volatile.
     QualType PtrTy = E->getArg(0)->IgnoreImpCasts()->getType();
@@ -2087,6 +2196,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     Ptr = Builder.CreateBitCast(Ptr, Int8Ty->getPointerTo(AddrSpace));
     Value *NewVal = Builder.getInt8(1);
     Value *Order = EmitScalarExpr(E->getArg(1));
+    MaybeDetach(this, SpawnedScp);
     if (isa<llvm::ConstantInt>(Order)) {
       int ord = cast<llvm::ConstantInt>(Order)->getZExtValue();
       AtomicRMWInst *Result = nullptr;
@@ -2161,6 +2271,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   }
 
   case Builtin::BI__atomic_clear: {
+    IsSpawnedScope SpawnedScp(this);
     QualType PtrTy = E->getArg(0)->IgnoreImpCasts()->getType();
     bool Volatile =
         PtrTy->castAs<PointerType>()->getPointeeType().isVolatileQualified();
@@ -2170,6 +2281,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     Ptr = Builder.CreateBitCast(Ptr, Int8Ty->getPointerTo(AddrSpace));
     Value *NewVal = Builder.getInt8(0);
     Value *Order = EmitScalarExpr(E->getArg(1));
+    MaybeDetach(this, SpawnedScp);
     if (isa<llvm::ConstantInt>(Order)) {
       int ord = cast<llvm::ConstantInt>(Order)->getZExtValue();
       StoreInst *Store = Builder.CreateStore(NewVal, Ptr, Volatile);
@@ -2289,6 +2401,8 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_signbit:
   case Builtin::BI__builtin_signbitf:
   case Builtin::BI__builtin_signbitl: {
+    IsSpawnedScope SpawnedScp(this);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(
         Builder.CreateZExt(EmitSignBit(*this, EmitScalarExpr(E->getArg(0))),
                            ConvertType(E->getType())));
@@ -2336,6 +2450,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_subc:
   case Builtin::BI__builtin_subcl:
   case Builtin::BI__builtin_subcll: {
+    IsSpawnedScope SpawnedScp(this);
 
     // We translate all of these builtins from expressions of the form:
     //   int x = ..., y = ..., carryin = ..., carryout, result;
@@ -2379,6 +2494,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
       IntrinsicId = llvm::Intrinsic::usub_with_overflow;
       break;
     }
+    MaybeDetach(this, SpawnedScp);
 
     // Construct our resulting LLVM IR expression.
     llvm::Value *Carry1;
@@ -2396,6 +2512,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_add_overflow:
   case Builtin::BI__builtin_sub_overflow:
   case Builtin::BI__builtin_mul_overflow: {
+    IsSpawnedScope SpawnedScp(this);
     const clang::Expr *LeftArg = E->getArg(0);
     const clang::Expr *RightArg = E->getArg(1);
     const clang::Expr *ResultArg = E->getArg(2);
@@ -2449,6 +2566,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     llvm::Value *Left = EmitScalarExpr(LeftArg);
     llvm::Value *Right = EmitScalarExpr(RightArg);
     Address ResultPtr = EmitPointerWithAlignment(ResultArg);
+    MaybeDetach(this, SpawnedScp);
 
     // Extend each operand to the encompassing type.
     Left = Builder.CreateIntCast(Left, EncompassingLLVMTy, LeftInfo.Signed);
@@ -2500,6 +2618,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   case Builtin::BI__builtin_smul_overflow:
   case Builtin::BI__builtin_smull_overflow:
   case Builtin::BI__builtin_smulll_overflow: {
+    IsSpawnedScope SpawnedScp(this);
 
     // We translate all of these builtins directly to the relevant llvm IR node.
 
@@ -2543,7 +2662,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
       IntrinsicId = llvm::Intrinsic::smul_with_overflow;
       break;
     }
-
+    MaybeDetach(this, SpawnedScp);
 
     llvm::Value *Carry;
     llvm::Value *Sum = EmitOverflowIntrinsic(*this, IntrinsicId, X, Y, Carry);
@@ -2563,6 +2682,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     // __noop always evaluates to an integer literal zero.
     return RValue::get(ConstantInt::get(IntTy, 0));
   case Builtin::BI__builtin_call_with_static_chain: {
+    IsSpawnedScope SpawnedScp(this);
     const CallExpr *Call = cast<CallExpr>(E->getArg(0));
     const Expr *Chain = E->getArg(1);
     SpawnedScp.RestoreOldScope();
@@ -3139,18 +3259,24 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
 
   case Builtin::BI__builtin_store_half:
   case Builtin::BI__builtin_store_halff: {
+    IsSpawnedScope SpawnedScp(this);
     Value *Val = EmitScalarExpr(E->getArg(0));
     Address Address = EmitPointerWithAlignment(E->getArg(1));
+    MaybeDetach(this, SpawnedScp);
     Value *HalfVal = Builder.CreateFPTrunc(Val, Builder.getHalfTy());
     return RValue::get(Builder.CreateStore(HalfVal, Address));
   }
   case Builtin::BI__builtin_load_half: {
+    IsSpawnedScope SpawnedScp(this);
     Address Address = EmitPointerWithAlignment(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *HalfVal = Builder.CreateLoad(Address);
     return RValue::get(Builder.CreateFPExt(HalfVal, Builder.getDoubleTy()));
   }
   case Builtin::BI__builtin_load_halff: {
+    IsSpawnedScope SpawnedScp(this);
     Address Address = EmitPointerWithAlignment(E->getArg(0));
+    MaybeDetach(this, SpawnedScp);
     Value *HalfVal = Builder.CreateLoad(Address);
     return RValue::get(Builder.CreateFPExt(HalfVal, Builder.getFloatTy()));
   }
@@ -3232,6 +3358,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     return RValue::get(Builder.CreateStore(ArgPtr, DestAddr));
   }
   }
+  IsSpawnedScope SpawnedScp(this);
 
   // If this is an alias for a lib function (e.g. __builtin_sin), emit
   // the call using the normal call path, but using the unmangled
@@ -3245,9 +3372,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
   // If this is a predefined lib function (e.g. malloc), emit the call
   // using exactly the normal call path.
   if (getContext().BuiltinInfo.isPredefinedLibFunction(BuiltinID)) {
+    llvm::Constant *Callee =
+      cast<llvm::Constant>(EmitScalarExpr(E->getCallee()));
     SpawnedScp.RestoreOldScope();
-    return emitLibraryCall(*this, FD, E,
-                      cast<llvm::Constant>(EmitScalarExpr(E->getCallee())));
+    return emitLibraryCall(*this, FD, E, Callee);
   }
 
   // Check that a call to a target specific builtin has the correct target
@@ -3311,6 +3439,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
       Args.push_back(ArgValue);
     }
 
+    MaybeDetach(this, SpawnedScp);
     Value *V = Builder.CreateCall(F, Args);
     QualType BuiltinRetType = E->getType();
 
@@ -3327,6 +3456,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const FunctionDecl *FD,
     return RValue::get(V);
   }
 
+  SpawnedScp.RestoreOldScope();
   // See if we have a target specific builtin that needs to be lowered.
   if (Value *V = EmitTargetBuiltinExpr(BuiltinID, E))
     return RValue::get(V);
