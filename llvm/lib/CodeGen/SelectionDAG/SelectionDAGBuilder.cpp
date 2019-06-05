@@ -7383,12 +7383,12 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
   case Intrinsic::experimental_vector_splice:
     visitVectorSplice(I);
     return;
-  }
     // Tapir intrinsics
     //
     // Lower the starting point of a sync region to a no-op.
   case Intrinsic::syncregion_start:
-    return nullptr;
+    // Lower the starting point of a Tapir sync region to a no-op.
+    return;
   }
 }
 

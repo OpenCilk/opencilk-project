@@ -68,8 +68,6 @@
 ; CHECK-O1-NEXT: Running pass: LowerTypeTestsPass
 ; CHECK-O23SZ-NEXT: Running pass: GlobalOptPass
 ; CHECK-O23SZ-NEXT: Running pass: PromotePass
-; CHECK-O23SZ-NEXT: Running analysis: DominatorTreeAnalysis
-; CHECK-O23SZ-NEXT: Running analysis: AssumptionAnalysis
 ; CHECK-O23SZ-NEXT: Running analysis: TaskAnalysis
 ; CHECK-O23SZ-NEXT: Running pass: ConstantMergePass
 ; CHECK-O23SZ-NEXT: Running pass: DeadArgumentEliminationPass

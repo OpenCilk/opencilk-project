@@ -1010,7 +1010,8 @@ class MemorySSA::ClobberWalkerBase {
   MemorySSA *MSSA;
 
 public:
-  ClobberWalkerBase(MemorySSA *M, DominatorTree *D) : Walker(*M, *D), MSSA(M) {}
+  ClobberWalkerBase(MemorySSA *M, DominatorTree *D, TaskInfo *TI)
+      : Walker(*M, *D, TI), MSSA(M) {}
 
   MemoryAccess *getClobberingMemoryAccessBase(MemoryAccess *,
                                               const MemoryLocation &,
@@ -1592,7 +1593,7 @@ MemorySSAWalker *MemorySSA::getSkipSelfWalker() {
     return SkipWalker.get();
 
   if (!WalkerBase)
-    WalkerBase = std::make_unique<ClobberWalkerBase>(this, DT);
+    WalkerBase = std::make_unique<ClobberWalkerBase>(this, DT, TI);
 
   SkipWalker = std::make_unique<SkipSelfWalker>(this, WalkerBase.get());
   return SkipWalker.get();
