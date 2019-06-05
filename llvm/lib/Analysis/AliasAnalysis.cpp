@@ -223,13 +223,13 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I, const CallBase *Call2,
         if (isa<LoadInst>(DI) || isa<StoreInst>(DI) ||
             isa<AtomicCmpXchgInst>(DI) || isa<AtomicRMWInst>(DI) ||
             DI.isFenceLike() || ImmutableCallSite(&DI))
-          Result = unionModRef(Result, getModRefInfo(&DI, Call));
-        if (&DI == Call.getInstruction())
+          Result = unionModRef(Result, getModRefInfo(&DI, Call2));
+        if (&DI == Call2)
           return ModRefInfo::NoModRef;
       }
 
       // Add successors
-      const TerminatorInst *T = BB->getTerminator();
+      const Instruction *T = BB->getTerminator();
       if (const ReattachInst *RI = dyn_cast<ReattachInst>(T))
         if (D->getSyncRegion() == RI->getSyncRegion())
           continue;
@@ -460,7 +460,7 @@ MemoryEffects AAResults::getMemoryEffects(const DetachInst *D,
       assert(!(D == &I) &&
              "Invalid CFG found: Detached CFG reaches its own Detach.");
 
-      if (auto CS = ImmutableCallSite(&I))
+      if (const auto *CS = dyn_cast<CallBase>(&I))
         Result |= getMemoryEffects(CS, AAQI);
 
       // Early-exit the moment we reach the top of the lattice.
@@ -787,7 +787,7 @@ ModRefInfo AAResults::getModRefInfo(const DetachInst *D,
     }
 
     // Add successors
-    const TerminatorInst *T = BB->getTerminator();
+    const Instruction *T = BB->getTerminator();
     if (const ReattachInst *RI = dyn_cast<ReattachInst>(T))
       if (D->getSyncRegion() == RI->getSyncRegion())
         continue;
