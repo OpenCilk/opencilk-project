@@ -567,6 +567,7 @@ EmitMaterializeTemporaryExpr(const MaterializeTemporaryExpr *M) {
     default:
       break;
     }
+    }
     EmitAnyExprToMem(E, Object, Qualifiers(), /*IsInit*/true);
   }
   pushTemporaryCleanup(*this, M, E, Object);
