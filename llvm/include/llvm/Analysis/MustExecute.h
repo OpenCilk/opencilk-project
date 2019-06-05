@@ -96,6 +96,7 @@ public:
   /// least once (under the assumption that the loop is entered).
   virtual bool isGuaranteedToExecute(const Instruction &Inst,
                                      const DominatorTree *DT,
+                                     const TaskInfo *TI,
                                      const Loop *CurLoop) const = 0;
 
   LoopSafetyInfo() = default;
@@ -121,6 +122,7 @@ public:
 
   virtual bool isGuaranteedToExecute(const Instruction &Inst,
                                      const DominatorTree *DT,
+                                     const TaskInfo *TI,
                                      const Loop *CurLoop) const;
 
   SimpleLoopSafetyInfo() : LoopSafetyInfo() {};
@@ -150,6 +152,7 @@ public:
 
   virtual bool isGuaranteedToExecute(const Instruction &Inst,
                                      const DominatorTree *DT,
+                                     const TaskInfo *TI,
                                      const Loop *CurLoop) const;
 
   /// Returns true if we could not execute a memory-modifying instruction before
