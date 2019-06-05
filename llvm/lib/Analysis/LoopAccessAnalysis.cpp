@@ -1884,8 +1884,7 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
             !VFDatabase::getMappings(*Call).empty())
           continue;
 
-        // TODO: Determine if we should do something other than ignore Tapir
-        // instructions here.
+        // Ignore Tapir instructions.
         if (isa<DetachInst>(&I) || isa<ReattachInst>(&I) || isa<SyncInst>(&I))
           continue;
 

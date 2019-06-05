@@ -7060,12 +7060,12 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     setValue(&I, DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, ResultVT, Vec, Index));
     return;
   }
-  }
     // Tapir intrinsics
     //
     // Lower the starting point of a sync region to a no-op.
   case Intrinsic::syncregion_start:
-    return nullptr;
+    // Lower the starting point of a Tapir sync region to a no-op.
+    return;
   }
 }
 

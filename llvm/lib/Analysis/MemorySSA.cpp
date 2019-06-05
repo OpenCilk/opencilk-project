@@ -1019,8 +1019,9 @@ template <class AliasAnalysisType> class MemorySSA::ClobberWalkerBase {
   MemorySSA *MSSA;
 
 public:
-  ClobberWalkerBase(MemorySSA *M, AliasAnalysisType *A, DominatorTree *D)
-      : Walker(*M, *A, *D), MSSA(M) {}
+  ClobberWalkerBase(MemorySSA *M, AliasAnalysisType *A, DominatorTree *D,
+                    TaskInfo *TI)
+      : Walker(*M, *A, *D, TI), MSSA(M) {}
 
   MemoryAccess *getClobberingMemoryAccessBase(MemoryAccess *,
                                               const MemoryLocation &,
@@ -1601,7 +1602,7 @@ MemorySSAWalker *MemorySSA::getSkipSelfWalker() {
 
   if (!WalkerBase)
     WalkerBase =
-        std::make_unique<ClobberWalkerBase<AliasAnalysis>>(this, AA, DT);
+        std::make_unique<ClobberWalkerBase<AliasAnalysis>>(this, AA, DT, TI);
 
   SkipWalker =
       std::make_unique<SkipSelfWalker<AliasAnalysis>>(this, WalkerBase.get());

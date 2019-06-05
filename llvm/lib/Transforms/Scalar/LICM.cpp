@@ -932,14 +932,14 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
                match(&I, m_Intrinsic<Intrinsic::invariant_start>());
       };
       auto MustExecuteWithoutWritesBefore = [&](Instruction &I) {
-        return SafetyInfo->isGuaranteedToExecute(I, DT, CurLoop) &&
+        return SafetyInfo->isGuaranteedToExecute(I, DT, TI, CurLoop) &&
                SafetyInfo->doesNotWriteMemoryBefore(I, CurLoop);
       };
       if ((IsInvariantStart(I) || isGuard(&I)) &&
           CurLoop->hasLoopInvariantOperands(&I) &&
           MustExecuteWithoutWritesBefore(I)) {
         hoist(I, DT, CurLoop, CFH.getOrCreateHoistedBlock(BB), SafetyInfo,
-              MSSAU, SE, ORE);
+              MSSAU, SE, TI, ORE);
         HoistedInstructions.push_back(&I);
         Changed = true;
         continue;
@@ -953,7 +953,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
             PN->setIncomingBlock(
                 i, CFH.getOrCreateHoistedBlock(PN->getIncomingBlock(i)));
           hoist(*PN, DT, CurLoop, CFH.getOrCreateHoistedBlock(BB), SafetyInfo,
-                MSSAU, SE, ORE);
+                MSSAU, SE, TI, ORE);
           assert(DT->dominates(PN, BB) && "Conditional PHIs not expected");
           Changed = true;
           continue;
@@ -1762,7 +1762,7 @@ static void hoist(Instruction &I, const DominatorTree *DT, const Loop *CurLoop,
       // The check on hasMetadataOtherThanDebugLoc is to prevent us from burning
       // time in isGuaranteedToExecute if we don't actually have anything to
       // drop.  It is a compile time optimization, not required for correctness.
-      !SafetyInfo->isGuaranteedToExecute(I, DT, CurLoop))
+      !SafetyInfo->isGuaranteedToExecute(I, DT, TI, CurLoop))
     I.dropUnknownNonDebugMetadata();
 
   if (isa<PHINode>(I))
@@ -1795,7 +1795,7 @@ static bool isSafeToExecuteUnconditionally(Instruction &Inst,
     return true;
 
   bool GuaranteedToExecute =
-      SafetyInfo->isGuaranteedToExecute(Inst, DT, CurLoop);
+      SafetyInfo->isGuaranteedToExecute(Inst, DT, TI, CurLoop);
 
   if (!GuaranteedToExecute) {
     auto *LI = dyn_cast<LoadInst>(&Inst);
@@ -2113,7 +2113,7 @@ bool llvm::promoteLoopAccessesToScalars(
 
         if (!DereferenceableInPH || !SafeToInsertStore ||
             (InstAlignment > Alignment)) {
-          if (SafetyInfo->isGuaranteedToExecute(*UI, DT, CurLoop)) {
+          if (SafetyInfo->isGuaranteedToExecute(*UI, DT, TI, CurLoop)) {
             DereferenceableInPH = true;
             SafeToInsertStore = true;
             Alignment = std::max(Alignment, InstAlignment);
