@@ -91,7 +91,7 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   bool PragmaCilk = PragmaNameLoc->Ident->getName() == "cilk";
   if (PragmaCilk &&
       St->getStmtClass() != Stmt::CilkForStmtClass) {
-    S.Diag(St->getLocStart(), diag::err_pragma_cilk_precedes_noncilk)
+    S.Diag(St->getBeginLoc(), diag::err_pragma_cilk_precedes_noncilk)
       << "#pragma cilk";
     return nullptr;
   }
@@ -152,7 +152,7 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
                  .Default(LoopHintAttr::TapirGrainsize);
     if (Option == LoopHintAttr::TapirGrainsize) {
       assert(ValueExpr && "Attribute must have a valid value expression.");
-      if (S.CheckLoopHintExpr(ValueExpr, St->getLocStart()))
+      if (S.CheckLoopHintExpr(ValueExpr, St->getBeginLoc()))
         return nullptr;
       State = LoopHintAttr::Numeric;
     } else
@@ -266,6 +266,7 @@ CheckForIncompatibleAttributes(Sema &S,
     case LoopHintAttr::PipelineDisabled:
     case LoopHintAttr::PipelineInitiationInterval:
       Category = Pipeline;
+      break;
     case LoopHintAttr::TapirGrainsize:
       Category = TapirGrainsize;
       break;

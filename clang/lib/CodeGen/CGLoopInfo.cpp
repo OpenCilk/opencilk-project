@@ -143,6 +143,9 @@ static MDNode *createMetadata(LLVMContext &Ctx, const LoopAttributes &Attrs,
         MDString::get(Ctx, "llvm.loop.pipeline.initiationinterval"),
         ConstantAsMetadata::get(ConstantInt::get(
             Type::getInt32Ty(Ctx), Attrs.PipelineInitiationInterval))};
+    Args.push_back(MDNode::get(Ctx, Vals));
+  }
+
   // Setting tapir.loop.spawn.strategy
   if (Attrs.SpawnStrategy != LoopAttributes::Sequential) {
     Metadata *Vals[] = {MDString::get(Ctx, "tapir.loop.spawn.strategy"),
@@ -367,6 +370,7 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
         break;
       case LoopHintAttr::PipelineInitiationInterval:
         setPipelineInitiationInterval(ValueInt);
+        break;
       case LoopHintAttr::TapirGrainsize:
         setTapirGrainsize(ValueInt);
         break;
