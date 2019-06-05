@@ -805,7 +805,7 @@ bool TailRecursionEliminator::foldReturnAndProcessPred(
 
       bool EliminatedTail =
         eliminateRecursiveTailCall(CI, RI, OldEntry, TailCallsAreMarkedTail,
-                                   ArgumentPHIs, AA, ORE);
+                                   ArgumentPHIs, AA, ORE, DTU);
 
       // If a recursive tail was eliminated, fix up the syncs and sync region in
       // the CFG.
