@@ -5444,6 +5444,30 @@ Stmt *ASTNodeImporter::VisitCilkForStmt(CilkForStmt *S) {
   Stmt *ToInit = Importer.Import(S->getInit());
   if (!ToInit && S->getInit())
     return nullptr;
+  DeclStmt *ToLimit = nullptr;
+  if (DeclStmt *FromLimit = S->getLimitStmt()) {
+    ToLimit = dyn_cast_or_null<DeclStmt>(Importer.Import(FromLimit));
+    if (!ToLimit)
+      return nullptr;
+  }
+  Expr *ToInitCond = nullptr;
+  if (Expr *FromInitCond = S->getInitCond()) {
+    ToInitCond = dyn_cast_or_null<Expr>(Importer.Import(FromInitCond));
+    if (!ToInitCond)
+      return nullptr;
+  }
+  DeclStmt *ToBeginStmt = nullptr;
+  if (DeclStmt *FromBeginStmt = S->getBeginStmt()) {
+    ToBeginStmt = dyn_cast_or_null<DeclStmt>(Importer.Import(FromBeginStmt));
+    if (!ToBeginStmt)
+      return nullptr;
+  }
+  DeclStmt *ToEndStmt = nullptr;
+  if (DeclStmt *FromEndStmt = S->getEndStmt()) {
+    ToEndStmt = dyn_cast_or_null<DeclStmt>(Importer.Import(FromEndStmt));
+    if (!ToEndStmt)
+      return nullptr;
+  }
   Expr *ToCondition = Importer.Import(S->getCond());
   if (!ToCondition && S->getCond())
     return nullptr;
@@ -5467,16 +5491,13 @@ Stmt *ASTNodeImporter::VisitCilkForStmt(CilkForStmt *S) {
   Stmt *ToBody = Importer.Import(S->getBody());
   if (!ToBody && S->getBody())
     return nullptr;
-  SourceLocation ToForLoc = Importer.Import(S->getCilkForLoc());
+  SourceLocation ToCilkForLoc = Importer.Import(S->getCilkForLoc());
   SourceLocation ToLParenLoc = Importer.Import(S->getLParenLoc());
   SourceLocation ToRParenLoc = Importer.Import(S->getRParenLoc());
-  return new (Importer.getToContext()) CilkForStmt(Importer.getToContext(),
-                                                   ToInit,
-                                                   ToCondition,
-                                                   // ToConditionVariable,
-                                                   ToInc, ToLoopVariable, ToBody,
-                                                   ToForLoc, ToLParenLoc,
-                                                   ToRParenLoc);
+  return new (Importer.getToContext()) CilkForStmt(
+      Importer.getToContext(), ToInit, ToLimit, ToInitCond, ToBeginStmt,
+      ToEndStmt, ToCondition, /*ToConditionVariable,*/ ToInc, ToLoopVariable,
+      ToBody, ToCilkForLoc, ToLParenLoc, ToRParenLoc);
 }
 
 //----------------------------------------------------------------------------
