@@ -5198,7 +5198,9 @@ public:
                                   Stmt *First, Expr **Second);
   StmtResult ActOnCilkForStmt(SourceLocation CilkForLoc,
                               SourceLocation LParenLoc,
-                              Stmt *Init,
+                              Stmt *Init, DeclStmt *Limit,
+                              ConditionResult InitCond,
+                              DeclStmt *Begin, DeclStmt *End,
                               ConditionResult second,
                               FullExprArg third,
                               SourceLocation RParenLoc,
