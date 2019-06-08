@@ -4844,6 +4844,21 @@ Stmt *ASTNodeImporter::VisitCilkForStmt(CilkForStmt *S) {
   Stmt *ToInit = Importer.Import(S->getInit());
   if (!ToInit && S->getInit())
     return nullptr;
+  DeclStmt *ToLimit =
+    dyn_cast_or_null<DeclStmt>(Importer.Import(S->getLimitStmt()));
+  if (!ToLimit && S->getLimitStmt())
+    return nullptr;
+  Expr *ToInitCond = Importer.Import(S->getInitCond());
+  if (!ToInitCond && S->getInitCond())
+    return nullptr;
+  DeclStmt *ToBegin =
+    dyn_cast_or_null<DeclStmt>(Importer.Import(S->getBeginStmt()));
+  if (!ToBegin && S->getBeginStmt())
+    return nullptr;
+  DeclStmt *ToEnd =
+    dyn_cast_or_null<DeclStmt>(Importer.Import(S->getEndStmt()));
+  if (!ToEnd && S->getEndStmt())
+    return nullptr;
   Expr *ToCondition = Importer.Import(S->getCond());
   if (!ToCondition && S->getCond())
     return nullptr;
@@ -4871,12 +4886,12 @@ Stmt *ASTNodeImporter::VisitCilkForStmt(CilkForStmt *S) {
   SourceLocation ToLParenLoc = Importer.Import(S->getLParenLoc());
   SourceLocation ToRParenLoc = Importer.Import(S->getRParenLoc());
   return new (Importer.getToContext()) CilkForStmt(Importer.getToContext(),
-                                                   ToInit,
-                                                   ToCondition,
+                                                   ToInit, ToLimit, ToInitCond,
+                                                   ToBegin, ToEnd, ToCondition,
                                                    // ToConditionVariable,
-                                                   ToInc, ToLoopVariable, ToBody,
-                                                   ToForLoc, ToLParenLoc,
-                                                   ToRParenLoc);
+                                                   ToInc, ToLoopVariable,
+                                                   ToBody, ToForLoc,
+                                                   ToLParenLoc, ToRParenLoc);
 }
 
 //----------------------------------------------------------------------------
