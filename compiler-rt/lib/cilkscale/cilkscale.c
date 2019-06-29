@@ -138,8 +138,8 @@ CILKTOOL_API void __csi_unit_init(const char *const file_name,
  */
 
 CILKTOOL_API
-void __csi_bb_entry(const csi_id_t bb_id, const operand_id_t *operand_ids,
-                    int32_t num_operands, const bb_prop_t prop) {
+void __csi_bb_entry(const csi_id_t bb_id, const csi_id_t pred_bb_id,
+                    const bb_prop_t prop) {
   context_stack_t *stack;
 
 #if SERIAL_TOOL
@@ -178,8 +178,7 @@ void __csi_detach(const csi_id_t detach_id, const int32_t *has_spawned) {
 }
 
 CILKTOOL_API
-void __csi_task(const csi_id_t task_id, const csi_id_t detach_id,
-                const operand_id_t *operand_ids, int32_t num_operands) {
+void __csi_task(const csi_id_t task_id, const csi_id_t detach_id) {
   context_stack_t *stack;
 #if SERIAL_TOOL
   stack = &(ctx_stack);
@@ -263,14 +262,6 @@ void __csi_before_sync(const csi_id_t sync_id, const int32_t *has_spawned) {
   uint64_t strand_time = elapsed_nsec(&(stack->stop), &(stack->start));
   stack->running_wrk += strand_time;
   stack->bot->contin_spn += strand_time;
-
-  if (stack->bot->lchild_spn > stack->bot->contin_spn) {
-    stack->bot->prefix_spn += stack->bot->lchild_spn;
-  } else {
-    stack->bot->prefix_spn += stack->bot->contin_spn;
-  }
-  stack->bot->lchild_spn = 0;
-  stack->bot->contin_spn = 0;
 }
 
 CILKTOOL_API
@@ -281,6 +272,13 @@ void __csi_after_sync(const csi_id_t sync_id, const int32_t *has_spawned) {
 #else
   stack = &(REDUCER_VIEW(ctx_stack));
 #endif
+  if (stack->bot->lchild_spn > stack->bot->contin_spn) {
+    stack->bot->prefix_spn += stack->bot->lchild_spn;
+  } else {
+    stack->bot->prefix_spn += stack->bot->contin_spn;
+  }
+  stack->bot->lchild_spn = 0;
+  stack->bot->contin_spn = 0;
 
   gettime(&(stack->start));
 }

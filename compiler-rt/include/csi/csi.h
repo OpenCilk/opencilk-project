@@ -226,8 +226,10 @@ typedef struct {
   unsigned is_indirect : 1;
   // The call's return value has one use.
   unsigned has_one_use : 1;
+  // Value produced is only used in the same BB.
+  unsigned bb_local_uses_only : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 62;
+  uint64_t _padding : 61;
 } call_prop_t;
 
 typedef struct {
@@ -247,8 +249,10 @@ typedef struct {
   unsigned is_read_before_write_in_bb : 1;
   // The loaded value has one use.
   unsigned has_one_use : 1;
+  // Value produced is only used in the same BB.
+  unsigned bb_local_uses_only : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 49;
+  uint64_t _padding : 48;
 } load_prop_t;
 
 typedef struct {
@@ -273,6 +277,7 @@ typedef struct {
   unsigned is_static : 1;
   // The alloca'd address can be captured.
   unsigned may_be_captured : 1;
+  // TODO? Add bb_local_uses_only property
   // Pad struct to 64 total bits.
   uint64_t _padding : 62;
 } alloca_prop_t;
@@ -282,6 +287,7 @@ typedef struct {
   unsigned allocfn_ty : 8;
   // The allocated address can be captured.
   unsigned may_be_captured : 1;
+  // TODO? Add bb_local_uses_only property
   // Pad struct to 64 total bits.
   uint64_t _padding : 55;
 } allocfn_prop_t;
@@ -306,8 +312,10 @@ typedef struct {
   unsigned approx_func : 1;
   unsigned is_in_bounds : 1;
   unsigned has_one_use : 1;
+  // Value produced is only used in the same BB.
+  unsigned bb_local_uses_only : 1;
   // Pad struct to 64 total bits.
-  uint64_t _padding : 52;
+  uint64_t _padding : 51;
 } arithmetic_flags_t;
 
 typedef struct {
@@ -327,8 +335,6 @@ WEAK void __csi_func_entry(const csi_id_t func_id,
                            const func_prop_t prop);
 
 WEAK void __csi_func_exit(const csi_id_t func_exit_id, const csi_id_t func_id,
-                          const csi_ir_variable_category_t return_cat,
-                          const csi_id_t return_id,
                           const func_exit_prop_t prop);
 
 ///-----------------------------------------------------------------------------
@@ -343,8 +349,7 @@ WEAK void __csi_func_exit(const csi_id_t func_exit_id, const csi_id_t func_id,
 ///
 /// TODO: Pass loop IVs to the loopbody_entry hook?
 WEAK void __csi_before_loop(const csi_id_t loop_id, const uint64_t trip_count,
-                            const operand_id_t *operand_ids,
-                            int32_t num_operands, const loop_prop_t prop);
+                            const loop_prop_t prop);
 WEAK void __csi_after_loop(const csi_id_t loop_id, const loop_prop_t prop);
 WEAK void __csi_loopbody_entry(const csi_id_t loop_id, const loop_prop_t prop);
 WEAK void __csi_loopbody_exit(const csi_id_t loop_exit_id,
@@ -355,16 +360,15 @@ WEAK void __csi_loopbody_exit(const csi_id_t loop_exit_id,
 /// Basic block entry/exit.  The bb_entry hook comes after any PHI hooks in that
 /// basic block.  The bb_exit hook comes before any hooks for terminators, e.g.,
 /// for invoke instructions.
-WEAK void __csi_bb_entry(const csi_id_t bb_id, const operand_id_t *operand_ids,
-                         int32_t num_operands, const bb_prop_t prop);
+WEAK void __csi_bb_entry(const csi_id_t bb_id, const csi_id_t pred_bb_id,
+                         const bb_prop_t prop);
 
 WEAK void __csi_bb_exit(const csi_id_t bb_id, const bb_prop_t prop);
 
 ///-----------------------------------------------------------------------------
 /// Callsite hooks
-WEAK void __csi_before_call(const csi_id_t call_id, const csi_id_t func_id,
-                            const operand_id_t *operand_ids,
-                            int32_t num_operands, const call_prop_t prop);
+WEAK void __csi_before_call(const csi_id_t call_id, const csi_id_t parent_bb_id,
+                            const csi_id_t func_id, const call_prop_t prop);
 
 WEAK void __csi_after_call(const csi_id_t call_id, const csi_id_t func_id,
                            const call_prop_t prop);
@@ -789,8 +793,7 @@ WEAK void __csi_after_masked_scatter_v8double(
 /// Hooks for Tapir control flow.
 WEAK void __csi_detach(const csi_id_t detach_id, const int32_t *has_spawned);
 
-WEAK void __csi_task(const csi_id_t task_id, const csi_id_t detach_id,
-                     const operand_id_t *operand_ids, int32_t num_operands);
+WEAK void __csi_task(const csi_id_t task_id, const csi_id_t detach_id);
 
 WEAK void __csi_task_exit(const csi_id_t task_exit_id, const csi_id_t task_id,
                           const csi_id_t detach_id);
@@ -825,6 +828,8 @@ WEAK void __csi_after_free(const csi_id_t free_id, const void *ptr,
 
 ///-----------------------------------------------------------------------------
 /// Simple arithmetic ops.
+
+// Floating point
 /* WEAK void __csi_before_arithmetic_half( */
 /*     const csi_id_t arith_id, const csi_opcode_t opcode, */
 /*     const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id, */
@@ -846,6 +851,7 @@ WEAK void __csi_before_arithmetic_double(
     const csi_id_t operand1_id, const double operand1,
     const arithmetic_flags_t flags);
 
+// Integer
 WEAK void __csi_before_arithmetic_i8(
     const csi_id_t arith_id, const csi_opcode_t opcode,
     const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
@@ -881,6 +887,7 @@ WEAK void __csi_before_arithmetic_i128(
     const csi_id_t operand1_id, const __uint128_t operand1,
     const arithmetic_flags_t flags);
 
+// Vector
 WEAK void __csi_before_arithmetic_v4float(
     const csi_id_t arith_id, const csi_opcode_t opcode,
     const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
@@ -969,6 +976,7 @@ WEAK void __csi_before_truncate_double_float(
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
 /*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
+// Floating-point-integer conversions
 WEAK void __csi_before_convert_float_unsigned_i8(
     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
@@ -1627,60 +1635,91 @@ WEAK void __csi_before_shuffle_v8double_v8double_v8double(
     const csi_id_t operand2_id, const v8double operand2, const arithmetic_flags_t flags);
 
 // PHI node hooks
+// Integer types
 WEAK void __csi_phi_i8(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const uint8_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i16(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const uint16_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i32(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const uint32_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i64(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const uint64_t operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_i128(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const __uint128_t operand, const arithmetic_flags_t flags);
 
+// Floating-point types
 /* WEAK void __csi_phi_half( */
-/*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
+/*     const csi_id_t arith_id, const csi_id_t parent_bb_id, */
+/*     const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat, */
 /*     const csi_id_t operand_id, const _Float16 operand, const arithmetic_flags_t flags); */
 
 WEAK void __csi_phi_float(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_double(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const double operand, const arithmetic_flags_t flags);
 
+// Pointer types
+//
+// For consistency with other hooks, pointer arguments are always passed as
+// void*.
+WEAK void __csi_phi_pi8(
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand, const arithmetic_flags_t flags);
+
+WEAK void __csi_phi_pi32(
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand, const arithmetic_flags_t flags);
+
+// Vector types
 WEAK void __csi_phi_v4float(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const v4float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v8float(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const v8float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v16float(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const v16float operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v2double(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const v2double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v4double(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const v4double operand, const arithmetic_flags_t flags);
 
 WEAK void __csi_phi_v8double(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const v8double operand, const arithmetic_flags_t flags);
 
 ///-----------------------------------------------------------------------------
@@ -1823,6 +1862,36 @@ WEAK void __csi_after_builtin_double_double_double_double(
     const csi_id_t operand1_id, const double operand1,
     const csi_ir_variable_category_t operand2_cat,
     const csi_id_t operand2_id, const double operand2, const call_prop_t prop);
+
+// CSI provides additional typed hooks:
+//
+// void __csi_bb_input_TYPE(
+//     const csi_id_t bb_id, const csi_ir_variable_category_t operand_cat,
+//     const csi_id_t operand_id, CTYPE operand_value,
+//     const arithmetic_flags_t flags);
+//
+// void __csi_call_input_TYPE(
+//     const csi_id_t call_id, const csi_ir_variable_category_t operand_cat,
+//     const csi_id_t operand_id, CTYPE operand_value,
+//     const arithmetic_flags_t flags);
+//
+// void __csi_loop_input_TYPE(
+//     const csi_id_t loop_id, const csi_ir_variable_category_t operand_cat,
+//     const csi_id_t operand_id, CTYPE operand_value,
+//     const arithmetic_flags_t flags);
+//
+// void __csi_task_input_TYPE(
+//     const csi_id_t task_id, const csi_ir_variable_category_t operand_cat,
+//     const csi_id_t operand_id, CTYPE operand_value,
+//     const arithmetic_flags_t flags);
+//
+// In these hooks, TYPE corresponds to the type of the variable in the IR, and
+// CTYPE is the type in C that most closely corresponds to TYPE.
+//
+// Because these input hooks do not correspond to proper IR objects, they are
+// not assigned their own CSI IDs.
+//
+// TODO? Assign proper CSI IDs to input hooks.
 
 
 // This struct is mirrored in ComprehensiveStaticInstrumentation.cpp,

@@ -14,9 +14,8 @@ void __csi_init() {
     atexit(report);
 }
 
-void __csi_before_call(const csi_id_t call_id, const csi_id_t func_id,
-                       const operand_id_t *operand_ids, int32_t num_operands,
-                       const call_prop_t prop) {
+void __csi_before_call(const csi_id_t call_id, const csi_id_t parent_bb_id,
+                       const csi_id_t func_id, const call_prop_t prop) {
     num_function_calls++;
     if (func_id == UNKNOWN_CSI_ID) num_unknown_function_calls++;
 }
