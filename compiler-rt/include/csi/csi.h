@@ -321,7 +321,8 @@ typedef struct {
 typedef struct {
   const csi_ir_variable_category_t operand_cat;
   const csi_id_t operand_id;
-} operand_id_t;
+  const int64_t index_operand;
+} index_id_t;
 
 WEAK void __csi_init();
 
@@ -928,6 +929,48 @@ WEAK void __csi_before_arithmetic_v8double(
     const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
     const v8double operand0, const csi_ir_variable_category_t operand1_cat,
     const csi_id_t operand1_id, const v8double operand1,
+    const arithmetic_flags_t flags);
+
+// Pointer operations
+//
+// For consistency with other hooks, pointer arguments are always passed as
+// void*.
+WEAK void __csi_before_bitcast_pi32_pi8(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand, const arithmetic_flags_t flags);
+
+WEAK void __csi_before_bitcast_pi8_pi32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand, const arithmetic_flags_t flags);
+
+WEAK void __csi_before_getelementptr_pi8(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand,
+    const index_id_t *indices, int32_t num_indices,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_getelementptr_pi32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand,
+    const index_id_t *indices, int32_t num_indices,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_getelementptr_pi64(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand,
+    const index_id_t *indices, int32_t num_indices,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_getelementptr_pfloat(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand,
+    const index_id_t *indices, int32_t num_indices,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_getelementptr_pdouble(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand,
+    const index_id_t *indices, int32_t num_indices,
     const arithmetic_flags_t flags);
 
 // Floating-point extension and truncation
