@@ -1519,7 +1519,8 @@ INLINE WEAK void __csi_phi_pi8(
     const csi_id_t operand_id, const void *operand, const arithmetic_flags_t flags) {}
 
 INLINE WEAK void __csi_phi_pi32(
-    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t arith_id, const csi_id_t parent_bb_id,
+    const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const void *operand, const arithmetic_flags_t flags) {}
 
 // Vector types
