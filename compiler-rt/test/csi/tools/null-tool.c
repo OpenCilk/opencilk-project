@@ -1565,6 +1565,34 @@ INLINE WEAK void __csi_phi_v8double(
     const csi_id_t operand_id, const v8double operand, const arithmetic_flags_t flags) {}
 
 
+INLINE WEAK void __csi_before_cmp_i32(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint32_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint32_t operand1,
+    const arithmetic_flags_t flags) {}
+
+INLINE WEAK void __csi_before_cmp_i64(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint64_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint64_t operand1,
+    const arithmetic_flags_t flags) {}
+
+INLINE WEAK void __csi_before_cmp_pi32(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const void *operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const void *operand1,
+    const arithmetic_flags_t flags) {}
+
+INLINE WEAK void __csi_before_cmp_pi64(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const void *operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const void *operand1,
+    const arithmetic_flags_t flags) {}
+
 ///-----------------------------------------------------------------------------
 /// Hooks for builtin functions
 INLINE WEAK void __csi_before_memset(

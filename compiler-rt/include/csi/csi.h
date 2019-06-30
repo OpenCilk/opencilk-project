@@ -97,7 +97,33 @@ enum CSI_arithmetic_opcode
    AShr,
    And,
    Or,
-   Xor
+   Xor,
+   ICmp_EQ,
+   ICmp_NE,
+   ICmp_UGT,
+   ICmp_UGE,
+   ICmp_ULT,
+   ICmp_ULE,
+   ICmp_SGT,
+   ICmp_SGE,
+   ICmp_SLT,
+   ICmp_SLE,
+   FCmp_False,
+   FCmp_OEQ,
+   FCmp_OGT,
+   FCmp_OGE,
+   FCmp_OLT,
+   FCmp_OLE,
+   FCmp_ONE,
+   FCmp_ORD,
+   FCmp_UNO,
+   FCmp_UEQ,
+   FCmp_UGT,
+   FCmp_UGE,
+   FCmp_ULT,
+   FCmp_ULE,
+   FCmp_UNE,
+   FCmp_True,
   };
 typedef int8_t csi_opcode_t;
 
@@ -1775,6 +1801,35 @@ WEAK void __csi_phi_v8double(
     const csi_id_t arith_id, const csi_id_t parent_bb_id,
     const csi_id_t predecessor_bb_id, const csi_ir_variable_category_t operand_cat,
     const csi_id_t operand_id, const v8double operand, const arithmetic_flags_t flags);
+
+
+WEAK void __csi_before_cmp_i32(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint32_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint32_t operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_cmp_i64(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const uint64_t operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const uint64_t operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_cmp_pi32(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const void *operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const void *operand1,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_cmp_pi64(
+    const csi_id_t arith_id, const csi_opcode_t opcode,
+    const csi_ir_variable_category_t operand0_cat, const csi_id_t operand0_id,
+    const void *operand0, const csi_ir_variable_category_t operand1_cat,
+    const csi_id_t operand1_id, const void *operand1,
+    const arithmetic_flags_t flags);
 
 ///-----------------------------------------------------------------------------
 /// Hooks for builtin functions
