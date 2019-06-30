@@ -304,6 +304,7 @@ typedef struct {
   unsigned no_signed_wrap : 1;
   unsigned no_unsigned_wrap : 1;
   unsigned is_exact : 1;
+  unsigned allow_reassoc : 1;
   unsigned no_NaNs : 1;
   unsigned no_infs : 1;
   unsigned no_signed_zeros : 1;
