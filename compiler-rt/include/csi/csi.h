@@ -973,6 +973,16 @@ WEAK void __csi_before_getelementptr_pdouble(
     const index_id_t *indices, int32_t num_indices,
     const arithmetic_flags_t flags);
 
+WEAK void __csi_before_inttoptr_i64_pi32(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const uint64_t operand,
+    const arithmetic_flags_t flags);
+
+WEAK void __csi_before_ptrtoint_pi32_i64(
+    const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat,
+    const csi_id_t operand_id, const void *operand,
+    const arithmetic_flags_t flags);
+
 // Floating-point extension and truncation
 /* WEAK void __csi_before_extend_half_float( */
 /*     const csi_id_t arith_id, const csi_ir_variable_category_t operand_cat, */
