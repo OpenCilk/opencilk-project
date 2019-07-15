@@ -410,6 +410,7 @@ public:
     return Visit(E->getSubExpr());
   }
   Value *VisitCilkSpawnExpr(CilkSpawnExpr *CSE) {
+    CGF.IsSpawned = true;
     CGF.PushDetachScope();
     Value *V = Visit(CSE->getSpawnedExpr());
     if (DoSpawnedInit) {
@@ -1976,7 +1977,16 @@ Value *ScalarExprEmitter::VisitStmtExpr(const StmtExpr *E) {
 Value *ScalarExprEmitter::VisitExprWithCleanups(ExprWithCleanups *E) {
   CGF.enterFullExpression(E);
   CodeGenFunction::RunCleanupsScope Scope(CGF);
+  // If this expression is spawned, associate these cleanups with the detach
+  // scope.
+  bool CleanupsSaved = false;
+  if (CGF.IsSpawned)
+    CleanupsSaved = CGF.CurDetachScope->MaybeSaveCleanupsScope(&Scope);
   Value *V = Visit(E->getSubExpr());
+  // If this expression was spawned, then we must clean up the detach before
+  // forcing the scope's cleanup.
+  if (CleanupsSaved)
+    CGF.CurDetachScope->CleanupDetach();
   // Defend against dominance problems caused by jumps out of expression
   // evaluation through the shared cleanup block.
   Scope.ForceCleanup({&V});
@@ -4029,7 +4039,7 @@ void CodeGenFunction::EmitScalarExprIntoLValue(const Expr *E, LValue dest,
   assert(E && hasScalarEvaluationKind(E->getType()) &&
          "Invalid scalar expression to emit");
 
-  if (IsSpawned && isInit) {
+  if (isa<CilkSpawnExpr>(E) && isInit) {
     ScalarExprEmitter(*this, dest).Visit(const_cast<Expr *>(E));
     return;
   }

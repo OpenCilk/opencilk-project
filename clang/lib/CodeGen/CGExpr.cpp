@@ -1257,14 +1257,18 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
   case Expr::LambdaExprClass:
     return EmitLambdaLValue(cast<LambdaExpr>(E));
   case Expr::CilkSpawnExprClass:
-    PushDetachScope();
-    return EmitLValue(cast<CilkSpawnExpr>(E)->getSpawnedExpr());
+    return EmitCilkSpawnExprLValue(cast<CilkSpawnExpr>(E));
 
   case Expr::ExprWithCleanupsClass: {
     const auto *cleanups = cast<ExprWithCleanups>(E);
     enterFullExpression(cleanups);
     RunCleanupsScope Scope(*this);
+    bool CleanupsSaved = false;
+    if (IsSpawned)
+      CleanupsSaved = CurDetachScope->MaybeSaveCleanupsScope(&Scope);
     LValue LV = EmitLValue(cleanups->getSubExpr());
+    if (CleanupsSaved)
+      CurDetachScope->CleanupDetach();
     if (LV.isSimple()) {
       // Defend against branches out of gnu statement expressions surrounded by
       // cleanups.
@@ -4595,7 +4599,7 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
   assert(CalleeType->isFunctionPointerType() &&
          "Call must have function pointer type!");
 
-  IsSpawnedScope SpawnScp(this);
+  IsSpawnedScope SpawnedScp(this);
 
   const Decl *TargetDecl = OrigCallee.getAbstractInfo().getCalleeDecl();
 
@@ -4770,7 +4774,7 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
     Callee.setFunctionPointer(CalleePtr);
   }
 
-  SpawnScp.RestoreOldScope();
+  SpawnedScp.RestoreOldScope();
   return EmitCall(FnInfo, Callee, ReturnValue, Args, nullptr, E->getExprLoc());
 }
 
