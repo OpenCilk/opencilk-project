@@ -1180,6 +1180,13 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   // Emit the result value, even if unused, to evaluate the side effects.
   const Expr *RV = S.getRetValue();
 
+  // If RV is a CilkSpawnExpr, handle the CilkSpawnExpr part here.
+  if (const CilkSpawnExpr *CS = dyn_cast_or_null<CilkSpawnExpr>(RV)) {
+    IsSpawned = true;
+    PushDetachScope();
+    RV = CS->getSpawnedExpr();
+  }
+
   // Record the result expression of the return statement. The recorded
   // expression is used to determine whether a block capture's lifetime should
   // end at the end of the full expression as opposed to the end of the scope
@@ -1191,6 +1198,9 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   SaveRetExprRAII SaveRetExpr(RV, *this);
 
   RunCleanupsScope cleanupScope(*this);
+  bool CleanupsSaved = false;
+  if (IsSpawned)
+    CleanupsSaved = CurDetachScope->MaybeSaveCleanupsScope(&cleanupScope);
   if (const auto *EWC = dyn_cast_or_null<ExprWithCleanups>(RV))
     RV = EWC->getSubExpr();
   // FIXME: Clean this up by using an LValue for ReturnTemp,
@@ -1246,7 +1256,16 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   if (!RV || RV->isEvaluatable(getContext()))
     ++NumSimpleReturnExprs;
 
+  if (CleanupsSaved)
+    CurDetachScope->CleanupDetach();
   cleanupScope.ForceCleanup();
+  if (IsSpawned) {
+    // Pop the detach scope
+    assert(IsSpawned && CurDetachScope->IsDetachStarted() &&
+           "Processing _Cilk_spawn of expression did not produce a detach.");
+    IsSpawned = false;
+    PopDetachScope();
+  }
   EmitBranchThroughCleanup(ReturnBlock);
 }
 
