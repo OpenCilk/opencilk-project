@@ -116,6 +116,8 @@ STATISTIC(
     "Number of stores rewritten into predicated loads to allow promotion");
 STATISTIC(NumDeleted, "Number of instructions deleted");
 STATISTIC(NumVectorized, "Number of vectorized aggregates");
+STATISTIC(NumNotParallelPromotable, "Number of alloca's not promotable due to "
+          "Tapir instructions");
 
 /// Hidden option to experiment with completely strict handling of inbounds
 /// GEPs.
@@ -4884,6 +4886,8 @@ AllocaInst *SROA::rewritePartition(AllocaInst &AI, AllocaSlices &AS,
   }
 
   // Check if any detaches block promotion.
+  if (!TI->isAllocaParallelPromotable(NewAI))
+    ++NumNotParallelPromotable;
   Promotable &= TI->isAllocaParallelPromotable(NewAI);
 
   if (Promotable) {
