@@ -3144,7 +3144,6 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   // generalizing in the future.
   bool CompareUpperLimit = false;
   bool CompareInclusive = false;
-  bool CompareEqual = false;
   switch (Cond->getOpcode()) {
   default:
     return StmtEmpty();
@@ -3161,7 +3160,6 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
     CompareUpperLimit = DeclUseInRHS;
     break;
   case BO_NE:
-    CompareEqual = true;
     CompareInclusive = true;
     break;
   }
@@ -3245,7 +3243,7 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   ExprResult NewLimit = BuildBinOp(S, CondLoc, BO_Div, Range.get(), Stride);
 
   // If the comparison is not an equality, build Range/Stride + 1
-  if (!CompareEqual)
+  if (!CompareInclusive)
     NewLimit = BuildBinOp(S, CondLoc, BO_Add, NewLimit.get(),
                           ActOnIntegerConstant(CilkForLoc, 1).get());
 
