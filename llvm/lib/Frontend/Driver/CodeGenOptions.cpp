@@ -9,11 +9,13 @@
 #include "llvm/Frontend/Driver/CodeGenOptions.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 
 namespace llvm::driver {
 
 TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
-                                  driver::VectorLibrary Veclib) {
+                                  driver::VectorLibrary Veclib,
+                                  TapirTargetID TapirTarget) {
   TargetLibraryInfoImpl *TLII = new TargetLibraryInfoImpl(TargetTriple);
 
   using VectorLibrary = llvm::driver::VectorLibrary;
@@ -49,6 +51,9 @@ TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
   default:
     break;
   }
+
+  TLII->setTapirTarget(TapirTarget);
+
   return TLII;
 }
 

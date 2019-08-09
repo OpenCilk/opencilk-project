@@ -3793,6 +3793,10 @@ def Wlarge_by_value_copy_EQ : Joined<["-"], "Wlarge-by-value-copy=">,
   Visibility<[ClangOption, CC1Option]>,
   MarshallingInfoInt<LangOpts<"NumLargeByValueCopy">>;
 
+def fstripmine : Flag<["-"], "fstripmine">, Group<f_Group>,
+  HelpText<"Enable the Tapir loop stripmining passes">;
+def fno_stripmine : Flag<["-"], "fno-stripmine">, Group<f_Group>;
+
 // These "special" warning flags are effectively processed as f_Group flags by the driver:
 // Just silence warnings about -Wlarger-than for now.
 def Wlarger_than_EQ : Joined<["-"], "Wlarger-than=">, Group<clang_ignored_f_Group>;
@@ -6949,6 +6953,9 @@ def vectorize_loops : Flag<["-"], "vectorize-loops">,
 def vectorize_slp : Flag<["-"], "vectorize-slp">,
   HelpText<"Run the SLP vectorization passes">,
   MarshallingInfoFlag<CodeGenOpts<"VectorizeSLP">>;
+def stripmine_loops : Flag<["-"], "stripmine-loops">,
+  HelpText<"Run the Tapir Loop stripmining passes">,
+  MarshallingInfoFlag<CodeGenOpts<"StripmineLoop">>;
 def linker_option : Joined<["--"], "linker-option=">,
   HelpText<"Add linker option">,
   MarshallingInfoStringVector<CodeGenOpts<"LinkerOptions">>;
