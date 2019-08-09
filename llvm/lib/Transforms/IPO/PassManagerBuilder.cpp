@@ -53,6 +53,7 @@ PassManagerBuilder::PassManagerBuilder() {
     SLPVectorize = false;
     LoopVectorize = true;
     LoopsInterleaved = true;
+    LoopStripmine = true;
     LicmMssaOptCap = SetLicmMssaOptCap;
     LicmMssaNoAccForPromotionCap = SetLicmMssaNoAccForPromotionCap;
     DisableGVNLoadPRE = false;
@@ -226,10 +227,8 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
     PM.add(createWarnMissedTransformationsPass());
   }
 
-  if (EnableSerializeSmallTasks)
-    PM.add(createSerializeSmallTasksPass());
-  if (EnableDRFAA)
-    PM.add(createDRFScopedNoAliasWrapperPass());
+  PM.add(createSerializeSmallTasksPass());
+  PM.add(createDRFScopedNoAliasWrapperPass());
 
   if (!IsFullLTO) {
     // Eliminate loads by forwarding stores from the previous iteration to loads
@@ -444,15 +443,17 @@ void PassManagerBuilder::populateModulePassManager(
   MPM.add(createLowerConstantIntrinsicsPass());
 
   // Stripmine Tapir loops.
-  MPM.add(createLoopStripMinePass());
-  // Cleanup the IR after stripminning.
-  MPM.add(createTaskSimplifyPass());
-  MPM.add(createLoopSimplifyCFGPass());
-  MPM.add(createIndVarSimplifyPass());        // Canonicalize indvars
-  MPM.add(createEarlyCSEPass(false, Rhino));
-  MPM.add(createJumpThreadingPass());         // Thread jumps
-  MPM.add(createCorrelatedValuePropagationPass());
-  MPM.add(createInstructionCombiningPass());
+  if (LoopStripmine) {
+    MPM.add(createLoopStripMinePass());
+    // Cleanup the IR after stripminning.
+    MPM.add(createTaskSimplifyPass());
+    MPM.add(createLoopSimplifyCFGPass());
+    MPM.add(createIndVarSimplifyPass());        // Canonicalize indvars
+    MPM.add(createEarlyCSEPass(false, Rhino));
+    MPM.add(createJumpThreadingPass());         // Thread jumps
+    MPM.add(createCorrelatedValuePropagationPass());
+    MPM.add(createInstructionCombiningPass());
+  }
 
   // Re-rotate loops in all our loop nests. These may have fallout out of
   // rotated form due to GVN or other transformations, and the vectorizer relies

@@ -99,6 +99,7 @@ public:
   bool SLPVectorize;
   bool LoopVectorize;
   bool LoopsInterleaved;
+  bool LoopStripmine;
   bool DisableGVNLoadPRE;
   bool ForgetAllSCEVInLoopUnroll;
   bool VerifyInput;
