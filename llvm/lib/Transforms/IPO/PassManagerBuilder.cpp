@@ -180,10 +180,6 @@ cl::opt<AttributorRunOption> AttributorRun(
 
 extern cl::opt<bool> EnableKnowledgeRetention;
 
-static cl::opt<bool> EnableTapirLoopStripmine(
-    "enable-tapir-loop-stripmine", cl::init(true), cl::Hidden,
-    cl::desc("Enable the Tapir loop-stripmining pass (default = on)"));
-
 static cl::opt<bool> EnableSerializeSmallTasks(
   "enable-serialize-small-tasks", cl::Hidden, cl::init(false),
   cl::desc("Serialize any Tapir tasks found to be unprofitable (default = off)"));
@@ -203,6 +199,7 @@ PassManagerBuilder::PassManagerBuilder() {
     SLPVectorize = false;
     LoopVectorize = true;
     LoopsInterleaved = true;
+    LoopStripmine = true;
     RerollLoops = RunLoopRerolling;
     NewGVN = RunNewGVN;
     LicmMssaOptCap = SetLicmMssaOptCap;
@@ -824,9 +821,8 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createEarlyCSEPass(false));
   }
 
-  // Stripmine Tapir loops.  This pass is currently only performed when
-  // -enable-tapir-loop-stripmine is specified.
-  if (EnableTapirLoopStripmine) {
+  // Stripmine Tapir loops.
+  if (LoopStripmine) {
     MPM.add(createLoopStripMinePass());
     // Cleanup the IR after stripminning.
     MPM.add(createTaskSimplifyPass());
