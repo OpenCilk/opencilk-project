@@ -749,6 +749,8 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
   // non-integrated assemblers don't recognize .cgprofile section.
   PMBuilder.CallGraphProfile = !CodeGenOpts.DisableIntegratedAS;
 
+  PMBuilder.LoopStripmine = CodeGenOpts.StripmineLoop;
+
   PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
   // Loop interleaving in the loop vectorizer has historically been set to be
   // enabled when loop unrolling is enabled.
