@@ -171,20 +171,22 @@ getAllocationDataForFunction(const Function *Callee, AllocType AllocTy,
 }
 
 static Optional<AllocFnsTy> getAllocationData(const Value *V, AllocType AllocTy,
-                                              const TargetLibraryInfo *TLI) {
+                                              const TargetLibraryInfo *TLI,
+                                              bool IgnoreBuiltinAttr = false) {
   bool IsNoBuiltinCall;
   if (const Function *Callee = getCalledFunction(V, IsNoBuiltinCall))
-    if (!IsNoBuiltinCall)
+    if (IgnoreBuiltinAttr || !IsNoBuiltinCall)
       return getAllocationDataForFunction(Callee, AllocTy, TLI);
   return None;
 }
 
 static Optional<AllocFnsTy>
 getAllocationData(const Value *V, AllocType AllocTy,
-                  function_ref<const TargetLibraryInfo &(Function &)> GetTLI) {
+                  function_ref<const TargetLibraryInfo &(Function &)> GetTLI,
+                  bool IgnoreBuiltinAttr = false) {
   bool IsNoBuiltinCall;
   if (const Function *Callee = getCalledFunction(V, IsNoBuiltinCall))
-    if (!IsNoBuiltinCall)
+    if (IgnoreBuiltinAttr || !IsNoBuiltinCall)
       return getAllocationDataForFunction(
           Callee, AllocTy, &GetTLI(const_cast<Function &>(*Callee)));
   return None;
@@ -226,12 +228,14 @@ static Optional<AllocFnsTy> getAllocationSize(const Value *V,
 /// Tests if a value is a call or invoke to a library function that
 /// allocates or reallocates memory (either malloc, calloc, realloc, or strdup
 /// like).
-bool llvm::isAllocationFn(const Value *V, const TargetLibraryInfo *TLI) {
-  return getAllocationData(V, AnyAlloc, TLI).hasValue();
+bool llvm::isAllocationFn(const Value *V, const TargetLibraryInfo *TLI,
+                          bool IgnoreBuiltinAttr) {
+  return getAllocationData(V, AnyAlloc, TLI, IgnoreBuiltinAttr).hasValue();
 }
 bool llvm::isAllocationFn(
-    const Value *V, function_ref<const TargetLibraryInfo &(Function &)> GetTLI) {
-  return getAllocationData(V, AnyAlloc, GetTLI).hasValue();
+    const Value *V, function_ref<const TargetLibraryInfo &(Function &)> GetTLI,
+    bool IgnoreBuiltinAttr) {
+  return getAllocationData(V, AnyAlloc, GetTLI, IgnoreBuiltinAttr).hasValue();
 }
 
 /// Tests if a value is a call or invoke to a library function that
