@@ -69,6 +69,7 @@
 #include "llvm/Analysis/StackLifetime.h"
 #include "llvm/Analysis/StackSafetyAnalysis.h"
 #include "llvm/Analysis/StructuralHash.h"
+#include "llvm/Analysis/TapirRaceDetect.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"

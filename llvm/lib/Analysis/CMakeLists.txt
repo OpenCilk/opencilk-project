@@ -129,6 +129,7 @@ add_llvm_component_library(LLVMAnalysis
   StructuralHash.cpp
   SyntheticCountsUtils.cpp
   TFLiteUtils.cpp
+  TapirRaceDetect.cpp
   TapirTaskInfo.cpp
   TargetLibraryInfo.cpp
   TargetTransformInfo.cpp
