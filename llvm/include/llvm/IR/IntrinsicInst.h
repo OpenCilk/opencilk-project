@@ -116,6 +116,7 @@ public:
     case Intrinsic::objectsize:
     case Intrinsic::ptr_annotation:
     case Intrinsic::var_annotation:
+    case Intrinsic::syncregion_start:
       return true;
     }
     return false;
