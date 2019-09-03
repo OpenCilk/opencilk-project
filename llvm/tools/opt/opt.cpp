@@ -188,6 +188,11 @@ cl::opt<bool> DisableLoopUnrolling(
     "disable-loop-unrolling",
     cl::desc("Disable loop unrolling in all relevant passes"), cl::init(false));
 
+static cl::opt<bool>
+DisableLoopStripmining("disable-loop-stripmining",
+                        cl::desc("Disable loop stripmining pass"),
+                        cl::init(false));
+
 static cl::opt<bool> EmitSummaryIndex("module-summary",
                                       cl::desc("Emit module summary index"),
                                       cl::init(false));
@@ -355,6 +360,13 @@ static void AddOptimizationPasses(legacy::PassManagerBase &MPM,
   Builder.LoopVectorize = OptLevel > 1 && SizeLevel < 2;
 
   Builder.SLPVectorize = OptLevel > 1 && SizeLevel < 2;
+
+  // This is final, unless there is a relevant #pragma.
+  if (DisableLoopStripmining)
+    Builder.LoopStripmine = false;
+  // If option wasn't forced via cmd line (-stripmine-loops, -loop-stripmine)
+  else if (!Builder.LoopStripmine)
+    Builder.LoopStripmine = OptLevel > 1 && SizeLevel < 2;
 
   if (TM)
     TM->adjustPassManager(Builder);
