@@ -1413,8 +1413,6 @@ void tools::linkCilkSanitizerRuntimeDeps(const ToolChain &TC,
   addAsNeededOption(TC, Args, CmdArgs, false);
   // Link in the C++ standard library
   CmdArgs.push_back("-lstdc++");
-  // Link in the Snappy compression library
-  CmdArgs.push_back("-lsnappy");
 }
 
 static void
