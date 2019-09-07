@@ -324,12 +324,19 @@ static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
   // of the original code, but operates on "shadow" values.  It can benefit from
   // re-running some general purpose optimization passes.
   if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
     PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
     PM.add(createReassociatePass());
     PM.add(createLICMPass());
     PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
     PM.add(createInstructionCombiningPass());
     PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
   }
 }
 
@@ -342,12 +349,19 @@ addComprehensiveStaticInstrumentationPass(const PassManagerBuilder &Builder,
   // original code, but operates on "shadow" values.  It can benefit from
   // re-running some general purpose optimization passes.
   if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
     PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
     PM.add(createReassociatePass());
     PM.add(createLICMPass());
     PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
     PM.add(createInstructionCombiningPass());
     PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
   }
 }
 
@@ -375,12 +389,19 @@ addCilkscaleInstrumentation(const PassManagerBuilder &Builder,
   // original code, but operates on "shadow" values.  It can benefit from
   // re-running some general purpose optimization passes.
   if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
     PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
     PM.add(createReassociatePass());
     PM.add(createLICMPass());
     PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
     PM.add(createInstructionCombiningPass());
     PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
   }
 }
 
