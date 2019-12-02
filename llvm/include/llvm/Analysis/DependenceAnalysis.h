@@ -294,7 +294,18 @@ namespace llvm {
     bool isMod() const {
       return isModSet(ModRef);
     }
+
+    inline bool operator==(const GeneralAccess &RHS) {
+      if (!isValid() && !RHS.isValid())
+        return true;
+      if (!isValid() || !RHS.isValid())
+        return false;
+      return (I == RHS.I) && (Loc == RHS.Loc) &&
+          (OperandNum == RHS.OperandNum) && (ModRef == RHS.ModRef);
+    }
   };
+
+  raw_ostream &operator<<(raw_ostream &OS, const GeneralAccess &GA);
 
   /// DependenceInfo - This class is the main dependence-analysis driver.
   ///
