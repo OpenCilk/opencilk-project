@@ -3741,7 +3741,6 @@ public:
     AU.addRequired<MemorySSAWrapperPass>();
     AU.addPreserved<MemorySSAWrapperPass>();
     getLoopAnalysisUsage(AU);
-    AU.addPreserved<TaskInfoWrapperPass>();
   }
 };
 
