@@ -1591,9 +1591,9 @@ static bool isFuncOnlyAttr(Attribute::AttrKind Kind) {
   case Attribute::AllocSize:
   case Attribute::SpeculativeLoadHardening:
   case Attribute::Speculatable:
+  case Attribute::Stealable:
   case Attribute::StrictFP:
   case Attribute::NullPointerIsValid:
-  case Attribute::Stealable:
     return true;
   default:
     break;
