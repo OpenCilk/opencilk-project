@@ -757,7 +757,7 @@ public:
       // Recompute task info.
       // FIXME: Figure out a way to update task info that is less
       // computationally wasteful.
-      TI->recalculate(*L->getHeader()->getParent(), DT);
+      TI->recalculate(*DT.getRoot()->getParent(), DT);
     return Changed;
   }
 
