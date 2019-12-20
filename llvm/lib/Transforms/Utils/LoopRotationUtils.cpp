@@ -272,7 +272,6 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
   if (L->getBlocks().size() == 1)
     return false;
 
-  Function *ParentF = L->getHeader()->getParent();
   bool Rotated = false;
   do {
     BasicBlock *OrigHeader = L->getHeader();
@@ -672,7 +671,7 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
       // Recompute task info.
       // FIXME: Figure out a way to update task info that is less
       // computationally wasteful.
-      TaskI->recalculate(*ParentF, *DT);
+      TaskI->recalculate(*DT->getRoot()->getParent(), *DT);
 
     LLVM_DEBUG(dbgs() << "LoopRotation: into "; L->dump());
 
