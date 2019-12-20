@@ -84,7 +84,6 @@ public:
     if (EnableMSSALoopDependency)
       AU.addPreserved<MemorySSAWrapperPass>();
     getLoopAnalysisUsage(AU);
-    AU.addPreserved<TaskInfoWrapperPass>();
   }
 
   bool runOnLoop(Loop *L, LPPassManager &LPM) override {
