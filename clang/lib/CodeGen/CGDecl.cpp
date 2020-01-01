@@ -741,6 +741,10 @@ void CodeGenFunction::EmitScalarInit(const Expr *init, const ValueDecl *D,
                                      LValue lvalue, bool capturedByInit) {
   Qualifiers::ObjCLifetime lifetime = lvalue.getObjCLifetime();
   if (!lifetime) {
+    if (isa<CilkSpawnExpr>(init)) {
+      EmitScalarExprIntoLValue(init, lvalue, /*isInit*/ true);
+      return;
+    }
     llvm::Value *value = EmitScalarExpr(init);
     if (capturedByInit)
       drillIntoBlockVariable(*this, lvalue, cast<VarDecl>(D));
@@ -1774,11 +1778,16 @@ void CodeGenFunction::EmitExprAsInit(const Expr *init, const ValueDecl *D,
     EmitStoreThroughLValue(rvalue, lvalue, true);
     return;
   }
+
   switch (getEvaluationKind(type)) {
   case TEK_Scalar:
     EmitScalarInit(init, D, lvalue, capturedByInit);
     return;
   case TEK_Complex: {
+    if (isa<CilkSpawnExpr>(init)) {
+      EmitComplexExprIntoLValue(init, lvalue, /*init*/ true);
+      return;
+    }
     ComplexPairTy complex = EmitComplexExpr(init);
     if (capturedByInit)
       drillIntoBlockVariable(*this, lvalue, cast<VarDecl>(D));
@@ -1961,6 +1970,9 @@ void CodeGenFunction::pushDestroy(QualType::DestructionKind dtorKind,
 void CodeGenFunction::pushDestroy(CleanupKind cleanupKind, Address addr,
                                   QualType type, Destroyer *destroyer,
                                   bool useEHCleanupForArray) {
+  if (SpawnedCleanup)
+    return pushLifetimeExtendedDestroy(cleanupKind, addr, type, destroyer,
+                                       useEHCleanupForArray);
   pushFullExprCleanup<DestroyObject>(cleanupKind, addr, type,
                                      destroyer, useEHCleanupForArray);
 }

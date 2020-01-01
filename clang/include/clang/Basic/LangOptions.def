@@ -286,11 +286,19 @@ VALUE_LANGOPT(VtorDispMode, 2, 1, "How many vtordisps to insert")
 
 LANGOPT(ApplePragmaPack, 1, 0, "Apple gcc-compatible #pragma pack handling")
 
+LANGOPT(Cilk, 1, 0, "Enable Cilk language extensions")
+
+BENIGN_ENUM_LANGOPT(Cilktool, CilktoolKind, 3,
+                    Cilktool_None, "turn on the specified Cilk tool")
+
 LANGOPT(RetainCommentsFromSystemHeaders, 1, 0, "retain documentation comments from system headers in the AST")
 
 LANGOPT(SanitizeAddressFieldPadding, 2, 0, "controls how aggressive is ASan "
                                            "field padding (0: none, 1:least "
                                            "aggressive, 2: more aggressive)")
+
+BENIGN_ENUM_LANGOPT(ComprehensiveStaticInstrumentation, CSIExtensionPoint, 3,
+                    CSI_None, "turn on Comprehensive Static Instrumentation")
 
 LANGOPT(XRayInstrument, 1, 0, "controls whether to do XRay instrumentation")
 LANGOPT(XRayAlwaysEmitCustomEvents, 1, 0,

@@ -13,6 +13,7 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/ExprCilk.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
 #include "clang/AST/ExprOpenMP.h"
@@ -5379,7 +5380,18 @@ void InitializationSequence::InitializeFrom(Sema &S,
                                             bool TopLevelOfInitList,
                                             bool TreatUnavailableAsInvalid) {
   ASTContext &Context = S.Context;
-
+  // Peel off any CilkSpawnExpr at the start of the arguments.
+  if (Args.size() == 1)
+    if (CilkSpawnExpr *E = dyn_cast<CilkSpawnExpr>(Args[0])) {
+      IsSpawned = true;
+      SpawnLoc = E->getExprLoc();
+      Args[0] = E->getSpawnedExpr();
+      if (ExprWithCleanups *EWC =
+          dyn_cast<ExprWithCleanups>(E->getSpawnedExpr())) {
+        S.Cleanup.setExprNeedsCleanups(true);
+        Args[0] = EWC->getSubExpr();
+      }
+    }
   // Eliminate non-overload placeholder types in the arguments.  We
   // need to do this before checking whether types are dependent
   // because lowering a pseudo-object expression might well give us
@@ -7349,6 +7361,7 @@ ExprResult InitializationSequence::Perform(Sema &S,
         !Kind.isExplicitCast()) {
       // Rebuild the ParenListExpr.
       SourceRange ParenRange = Kind.getParenOrBraceRange();
+      assert(!IsSpawned && "ParenListExpr is spawned");
       return S.ActOnParenListExpr(ParenRange.getBegin(), ParenRange.getEnd(),
                                   Args);
     }
@@ -8135,6 +8148,9 @@ ExprResult InitializationSequence::Perform(Sema &S,
                             Entity.getKind() == InitializedEntity::EK_Result);
   }
 
+  // Push a spawn back onto the init if necessary.
+  if (IsSpawned)
+    return S.ActOnCilkSpawnExpr(SpawnLoc, CurInit.get());
   return CurInit;
 }
 

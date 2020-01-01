@@ -122,6 +122,32 @@ set(cuda_wrapper_files
   cuda_wrappers/new
 )
 
+set(cilk_header_files
+  cilk/cilk.h
+  cilk/cilk_api.h
+  cilk/cilk_api_linux.h
+  cilk/cilk_stub.h
+  cilk/cilk_undocumented.h
+  cilk/common.h
+  cilk/holder.h
+  cilk/hyperobject_base.h
+  cilk/metaprogramming.h
+  cilk/reducer.h
+  cilk/reducer_file.h
+  cilk/reducer_list.h
+  cilk/reducer_max.h
+  cilk/reducer_min.h
+  cilk/reducer_min_max.h
+  cilk/reducer_opadd.h
+  cilk/reducer_opand.h
+  cilk/reducer_opmul.h
+  cilk/reducer_opor.h
+  cilk/reducer_opxor.h
+  cilk/reducer_ostream.h
+  cilk/reducer_string.h
+  cilk/reducer_vector.h
+)
+
 set(output_dir ${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}/include)
 
 # Generate arm_neon.h
@@ -134,7 +160,7 @@ clang_tablegen(arm_fp16.h -gen-arm-fp16
   SOURCE ${CLANG_SOURCE_DIR}/include/clang/Basic/arm_fp16.td)
 
 set(out_files)
-foreach( f ${files} ${cuda_wrapper_files} )
+foreach( f ${files} ${cuda_wrapper_files} ${cilk_header_files} )
   set( src ${CMAKE_CURRENT_SOURCE_DIR}/${f} )
   set( dst ${output_dir}/${f} )
   add_custom_command(OUTPUT ${dst}
@@ -177,6 +203,12 @@ install(
   COMPONENT clang-headers
   PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   DESTINATION lib${LLVM_LIBDIR_SUFFIX}/clang/${CLANG_VERSION}/include/cuda_wrappers)
+
+install(
+  FILES ${cilk_header_files}
+  COMPONENT clang-headers
+  PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  DESTINATION lib${LLVM_LIBDIR_SUFFIX}/clang/${CLANG_VERSION}/include/cilk)
 
 if (NOT CMAKE_CONFIGURATION_TYPES) # don't add this for IDE's.
   add_llvm_install_targets(install-clang-headers

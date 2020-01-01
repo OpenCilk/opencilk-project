@@ -99,6 +99,7 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::DefaultStmtClass:
   case Stmt::CaseStmtClass:
   case Stmt::SEHLeaveStmtClass:
+  case Stmt::CilkSyncStmtClass:
     llvm_unreachable("should have emitted these statements as simple");
 
 #define STMT(Type, Base)
@@ -158,6 +159,12 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
     const CapturedStmt *CS = cast<CapturedStmt>(S);
     EmitCapturedStmt(*CS, CS->getCapturedRegionKind());
     }
+    break;
+  case Stmt::CilkSpawnStmtClass:
+    EmitCilkSpawnStmt(cast<CilkSpawnStmt>(*S));
+    break;
+  case Stmt::CilkForStmtClass:
+    EmitCilkForStmt(cast<CilkForStmt>(*S), Attrs);
     break;
   case Stmt::ObjCAtTryStmtClass:
     EmitObjCAtTryStmt(cast<ObjCAtTryStmt>(*S));
@@ -359,6 +366,7 @@ bool CodeGenFunction::EmitSimpleStmt(const Stmt *S) {
   case Stmt::DefaultStmtClass:  EmitDefaultStmt(cast<DefaultStmt>(*S));   break;
   case Stmt::CaseStmtClass:     EmitCaseStmt(cast<CaseStmt>(*S));         break;
   case Stmt::SEHLeaveStmtClass: EmitSEHLeaveStmt(cast<SEHLeaveStmt>(*S)); break;
+  case Stmt::CilkSyncStmtClass: EmitCilkSyncStmt(cast<CilkSyncStmt>(*S)); break;
   }
 
   return true;
@@ -1040,11 +1048,21 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   // Emit the result value, even if unused, to evaluate the side effects.
   const Expr *RV = S.getRetValue();
 
+  // If RV is a CilkSpawnExpr, handle the CilkSpawnExpr part here.
+  if (const CilkSpawnExpr *CS = dyn_cast_or_null<CilkSpawnExpr>(RV)) {
+    IsSpawned = true;
+    PushDetachScope();
+    RV = CS->getSpawnedExpr();
+  }
+
   // Treat block literals in a return expression as if they appeared
   // in their own scope.  This permits a small, easily-implemented
   // exception to our over-conservative rules about not jumping to
   // statements following block literals with non-trivial cleanups.
   RunCleanupsScope cleanupScope(*this);
+  bool CleanupsSaved = false;
+  if (IsSpawned)
+    CleanupsSaved = CurDetachScope->MaybeSaveCleanupsScope(&cleanupScope);
   if (const FullExpr *fe = dyn_cast_or_null<FullExpr>(RV)) {
     enterFullExpression(fe);
     RV = fe->getSubExpr();
@@ -1098,7 +1116,16 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   if (!RV || RV->isEvaluatable(getContext()))
     ++NumSimpleReturnExprs;
 
+  if (CleanupsSaved)
+    CurDetachScope->CleanupDetach();
   cleanupScope.ForceCleanup();
+  if (IsSpawned) {
+    // Pop the detach scope
+    assert(IsSpawned && CurDetachScope->IsDetachStarted() &&
+           "Processing _Cilk_spawn of expression did not produce a detach.");
+    IsSpawned = false;
+    PopDetachScope();
+  }
   EmitBranchThroughCleanup(ReturnBlock);
 }
 

@@ -20,6 +20,7 @@
 #include "clang/Driver/Job.h"
 #include "clang/Driver/Options.h"
 #include "clang/Driver/SanitizerArgs.h"
+#include "clang/Driver/Tapir.h"
 #include "clang/Driver/XRayArgs.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
@@ -819,21 +820,23 @@ SanitizerMask ToolChain::getSupportedSanitizers() const {
   // Return sanitizers which don't require runtime support and are not
   // platform dependent.
 
-  using namespace SanitizerKind;
-
-  SanitizerMask Res = (Undefined & ~Vptr & ~Function) | (CFI & ~CFIICall) |
-                      CFICastStrict | UnsignedIntegerOverflow |
-                      ImplicitConversion | Nullability | LocalBounds;
+  SanitizerMask Res = (SanitizerKind::Undefined & ~SanitizerKind::Vptr &
+                       ~SanitizerKind::Function) |
+                      (SanitizerKind::CFI & ~SanitizerKind::CFIICall) |
+                      SanitizerKind::CFICastStrict |
+                      SanitizerKind::UnsignedIntegerOverflow |
+                      SanitizerKind::ImplicitConversion |
+                      SanitizerKind::Nullability | SanitizerKind::LocalBounds;
   if (getTriple().getArch() == llvm::Triple::x86 ||
       getTriple().getArch() == llvm::Triple::x86_64 ||
       getTriple().getArch() == llvm::Triple::arm ||
       getTriple().getArch() == llvm::Triple::aarch64 ||
       getTriple().getArch() == llvm::Triple::wasm32 ||
       getTriple().getArch() == llvm::Triple::wasm64)
-    Res |= CFIICall;
+    Res |= SanitizerKind::CFIICall;
   if (getTriple().getArch() == llvm::Triple::x86_64 ||
       getTriple().getArch() == llvm::Triple::aarch64)
-    Res |= ShadowCallStack;
+    Res |= SanitizerKind::ShadowCallStack;
   return Res;
 }
 
@@ -962,4 +965,28 @@ llvm::opt::DerivedArgList *ToolChain::TranslateOpenMPTargetArgs(
 
   delete DAL;
   return nullptr;
+}
+
+void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
+                                       ArgStringList &CmdArgs) const {
+  TapirTargetID TapirTarget = parseTapirTarget(Args);
+  if (TapirTarget == TapirTargetID::Last_TapirTargetID)
+    if (const Arg *A = Args.getLastArg(options::OPT_ftapir_EQ))
+      getDriver().Diag(diag::err_drv_invalid_value) << A->getAsString(Args)
+                                                    << A->getValue();
+
+  switch (TapirTarget) {
+  case TapirTargetID::Cilk:
+    CmdArgs.push_back("-lcilkrts");
+    break;
+  case TapirTargetID::OpenMP:
+    CmdArgs.push_back("-lomp");
+    break;
+  case TapirTargetID::CilkR:
+    CmdArgs.push_back("-lcilkr");
+    CmdArgs.push_back("-lpthread");
+    break;
+  default:
+    break;
+  }
 }

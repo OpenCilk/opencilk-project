@@ -57,11 +57,14 @@
 #include "llvm/Transforms/Instrumentation/GCOVProfiler.h"
 #include "llvm/Transforms/Instrumentation/MemorySanitizer.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
+#include "llvm/Transforms/Instrumentation/CilkSanitizer.h"
+#include "llvm/Transforms/Instrumentation/ComprehensiveStaticInstrumentation.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/CanonicalizeAliases.h"
+#include "llvm/Transforms/Tapir/TapirToTarget.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include <memory>
@@ -330,6 +333,95 @@ static void addEfficiencySanitizerPass(const PassManagerBuilder &Builder,
   PM.add(createEfficiencySanitizerPass(Opts));
 }
 
+static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
+                                 legacy::PassManagerBase &PM) {
+  PM.add(createCilkSanitizerLegacyPass());
+
+  // CilkSanitizer inserts complex instrumentation that mostly follows the logic
+  // of the original code, but operates on "shadow" values.  It can benefit from
+  // re-running some general purpose optimization passes.
+  if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
+    PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createReassociatePass());
+    PM.add(createLICMPass());
+    PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
+    PM.add(createInstructionCombiningPass());
+    PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
+  }
+}
+
+static void
+addComprehensiveStaticInstrumentationPass(const PassManagerBuilder &Builder,
+                                          legacy::PassManagerBase &PM) {
+  PM.add(createComprehensiveStaticInstrumentationLegacyPass());
+
+  // CSI inserts complex instrumentation that mostly follows the logic of the
+  // original code, but operates on "shadow" values.  It can benefit from
+  // re-running some general purpose optimization passes.
+  if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
+    PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createReassociatePass());
+    PM.add(createLICMPass());
+    PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
+    PM.add(createInstructionCombiningPass());
+    PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
+  }
+}
+
+static CSIOptions getCSIOptionsForCilkscale() {
+  CSIOptions Options;
+  // Disable CSI hooks that Cilkscale doesn't need.
+  Options.InstrumentBasicBlocks = false;
+  Options.InstrumentLoops = false;
+  Options.InstrumentMemoryAccesses = false;
+  Options.InstrumentCalls = false;
+  Options.InstrumentAtomics = false;
+  Options.InstrumentMemIntrinsics = false;
+  Options.InstrumentAllocas = false;
+  Options.InstrumentAllocFns = false;
+  return Options;
+}
+
+static void
+addCilkscaleInstrumentation(const PassManagerBuilder &Builder,
+                            legacy::PassManagerBase &PM) {
+  PM.add(createComprehensiveStaticInstrumentationLegacyPass(
+             getCSIOptionsForCilkscale()));
+
+  // CSI inserts complex instrumentation that mostly follows the logic of the
+  // original code, but operates on "shadow" values.  It can benefit from
+  // re-running some general purpose optimization passes.
+  if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
+    PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createReassociatePass());
+    PM.add(createLICMPass());
+    PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
+    PM.add(createInstructionCombiningPass());
+    PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
+  }
+}
+
 static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
                                          const CodeGenOptions &CodeGenOpts) {
   TargetLibraryInfoImpl *TLII = new TargetLibraryInfoImpl(TargetTriple);
@@ -353,6 +445,9 @@ static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
   default:
     break;
   }
+
+  TLII->setTapirTarget(CodeGenOpts.getTapirTarget());
+
   return TLII;
 }
 
@@ -549,9 +644,17 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
   }
 
   PMBuilder.OptLevel = CodeGenOpts.OptimizationLevel;
+
+  if (CodeGenOpts.TapirEarlyOutline) PMBuilder.DisableTapirOpts = true;
+  if (CodeGenOpts.TapirRhino) PMBuilder.Rhino = true;
+  if (TLII->hasTapirTarget())
+    PMBuilder.TapirTarget = TLII->getTapirTarget();
+
   PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
   PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
   PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
+
+  PMBuilder.LoopStripmine = CodeGenOpts.StripmineLoop;
 
   PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
   PMBuilder.MergeFunctions = CodeGenOpts.MergeFunctions;
@@ -659,6 +762,53 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
                            addEfficiencySanitizerPass);
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addEfficiencySanitizerPass);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+    PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
+                           addCilkSanitizerPass);
+
+  if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
+    switch (LangOpts.getCilktool()) {
+    default: break;
+    case LangOptions::CilktoolKind::Cilktool_Cilkscale:
+      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
+                             addCilkscaleInstrumentation);
+      break;
+    }
+  }
+
+  if (LangOpts.getComprehensiveStaticInstrumentation()) {
+    switch (LangOpts.getComprehensiveStaticInstrumentation()) {
+    case LangOptions::CSI_EarlyAsPossible:
+      PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                             addComprehensiveStaticInstrumentationPass);
+      PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                             addComprehensiveStaticInstrumentationPass);
+      break;
+    case LangOptions::CSI_ModuleOptimizerEarly:
+      PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
+                             addComprehensiveStaticInstrumentationPass);
+      PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                             addComprehensiveStaticInstrumentationPass);
+      break;
+    case LangOptions::CSI_OptimizerLast:
+      PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                             addComprehensiveStaticInstrumentationPass);
+      PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                             addComprehensiveStaticInstrumentationPass);
+      break;
+    case LangOptions::CSI_TapirLate:
+      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
+                             addComprehensiveStaticInstrumentationPass);
+      break;
+    case LangOptions::CSI_TapirLoopEnd:
+      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
+                             addComprehensiveStaticInstrumentationPass);
+      break;
+    case LangOptions::CSI_None:
+      break;
+    }
   }
 
   // Set up the per-function pass manager.
@@ -994,6 +1144,25 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
     if (CodeGenOpts.OptimizationLevel == 0) {
       if (Optional<GCOVOptions> Options = getGCOVOptions(CodeGenOpts))
         MPM.addPass(GCOVProfilerPass(*Options));
+      // At -O0 we directly run necessary sanitizer passes.  Cilksan and CSI
+      // need to run before Tapir lowering.
+      if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+        MPM.addPass(CilkSanitizerPass());
+      if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
+        switch (LangOpts.getCilktool()) {
+        default: break;
+        case LangOptions::CilktoolKind::Cilktool_Cilkscale:
+          MPM.addPass(ComprehensiveStaticInstrumentationPass(
+                          getCSIOptionsForCilkscale()));
+          break;
+        }
+      }
+      if (LangOpts.getComprehensiveStaticInstrumentation())
+        MPM.addPass(ComprehensiveStaticInstrumentationPass());
+
+      // At -O0 outline Tapir constructs early.
+      if (TLII->hasTapirTarget())
+        MPM.addPass(TapirToTargetPass());
 
       // Build a minimal pipeline based on the semantics required by Clang,
       // which is just that always inlining occurs.
@@ -1024,7 +1193,74 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
         PB.registerPipelineStartEPCallback([Options](ModulePassManager &MPM) {
           MPM.addPass(GCOVProfilerPass(*Options));
         });
-
+      // Register the Cilksan pass.
+      if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+        PB.registerTapirLateEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CilkSanitizer performs significant changes to the CFG before
+              // attempting to analyze and insert instrumentation.  Hence we
+              // invalidate all analysis passes before running CilkSanitizer.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(CilkSanitizerPass());
+            });
+      // Register CSI instrumentation for Cilkscale
+      if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
+        switch (LangOpts.getCilktool()) {
+        default: break;
+        case LangOptions::CilktoolKind::Cilktool_Cilkscale:
+          PB.registerTapirLateEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CilkSanitizer performs significant changes to the CFG before
+              // attempting to analyze and insert instrumentation.  Hence we
+              // invalidate all analysis passes before running CilkSanitizer.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(ComprehensiveStaticInstrumentationPass(
+                              getCSIOptionsForCilkscale()));
+            });
+          break;
+        }
+      }
+      // Register the CSI pass.
+      if (LangOpts.getComprehensiveStaticInstrumentation()) {
+        switch (LangOpts.getComprehensiveStaticInstrumentation()) {
+        case LangOptions::CSI_EarlyAsPossible:
+        case LangOptions::CSI_ModuleOptimizerEarly:
+          PB.registerPipelineStartEPCallback(
+              [](ModulePassManager &MPM) {
+                // CSI performs significant changes to the CFG before attempting
+                // to analyze and insert instrumentation.  Hence we invalidate all
+                // analysis passes before running CSI.
+                MPM.addPass(InvalidateAllAnalysesPass());
+                MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              });
+          break;
+        case LangOptions::CSI_TapirLate:
+          PB.registerTapirLateEPCallback(
+              [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+                // CSI performs significant changes to the CFG before attempting
+                // to analyze and insert instrumentation.  Hence we invalidate all
+                // analysis passes before running CSI.
+                MPM.addPass(InvalidateAllAnalysesPass());
+                MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              });
+          break;
+        case LangOptions::CSI_TapirLoopEnd:
+          PB.registerTapirLoopEndEPCallback(
+              [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+                // CSI performs significant changes to the CFG before attempting
+                // to analyze and insert instrumentation.  Hence we invalidate all
+                // analysis passes before running CSI.
+                MPM.addPass(InvalidateAllAnalysesPass());
+                MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              });
+          break;
+        case LangOptions::CSI_OptimizerLast:
+          // FIXME: This is currently unsupported, just as the Sanitizers are
+          // not supported in the new pass manager.
+        case LangOptions::CSI_None:
+          break;
+        }
+      }
       if (IsThinLTO) {
         MPM = PB.buildThinLTOPreLinkDefaultPipeline(
             Level, CodeGenOpts.DebugPassManager);
@@ -1037,7 +1273,8 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
         MPM.addPass(NameAnonGlobalPass());
       } else {
         MPM = PB.buildPerModuleDefaultPipeline(Level,
-                                               CodeGenOpts.DebugPassManager);
+                                               CodeGenOpts.DebugPassManager,
+                                               TLII->hasTapirTarget());
       }
     }
   }
@@ -1234,6 +1471,7 @@ static void runThinLTOBackend(ModuleSummaryIndex *CombinedIndex, Module *M,
   Conf.RemarksWithHotness = CGOpts.DiagnosticsWithHotness;
   Conf.RemarksFilename = CGOpts.OptRecordFile;
   Conf.DwoPath = CGOpts.SplitDwarfFile;
+  Conf.TapirTarget = CGOpts.getTapirTarget();
   switch (Action) {
   case Backend_EmitNothing:
     Conf.PreCodeGenModuleHook = [](size_t Task, const Module &Mod) {

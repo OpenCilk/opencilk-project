@@ -2247,6 +2247,11 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
     }
   }
 
+  // For Cilk functions, ensure that a sync is implicitly executed before this
+  // function returns.
+  if (getLangOpts().Cilk)
+    EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup);
+
   // FIXME: We no longer need the types from FunctionArgList; lift up and
   // simplify.
 
@@ -2820,6 +2825,8 @@ void CodeGenFunction::EmitFunctionEpilog(const CGFunctionInfo &FI,
     Builder.CreateUnreachable();
     return;
   }
+
+  PopSyncRegion();
 
   // Functions with no result always return void.
   if (!ReturnValue.isValid()) {
@@ -3812,6 +3819,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
                                  SourceLocation Loc) {
   // FIXME: We no longer need the types from CallArgs; lift up and simplify.
 
+  IsSpawnedScope SpawnedScp(this);
+
   assert(Callee.isOrdinary() || Callee.isVirtual());
 
   // Handle struct-return functions by passing a pointer to the
@@ -4251,6 +4260,15 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   CalleePtr = simplifyVariadicCallee(CalleePtr);
 
   // 3. Perform the actual call.
+
+  // If this call is detached, start the detach, if it hasn't yet been started.
+  if (SpawnedScp.OldScopeIsSpawned()) {
+    SpawnedScp.RestoreOldScope();
+    assert(CurDetachScope &&
+           "A call was spawned, but no detach scope was pushed.");
+    if (!CurDetachScope->IsDetachStarted())
+      CurDetachScope->StartDetach();
+  }
 
   // Deactivate any cleanups that we're supposed to do immediately before
   // the call.

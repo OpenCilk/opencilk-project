@@ -1071,6 +1071,17 @@ def fsanitize_undefined_strip_path_components_EQ : Joined<["-"], "fsanitize-unde
   Group<f_clang_Group>, MetaVarName<"<number>">,
   HelpText<"Strip (or keep only, if negative) a given number of path components "
            "when emitting check metadata.">;
+def fcsi : Flag<["-"], "fcsi">, Group<f_clang_Group>,
+           MetaVarName<"<check>">,
+           HelpText<"Turn on Comprehensive Static Instrumentation.">;
+def fcsi_EQ : Joined<["-"], "fcsi=">, Group<f_clang_Group>,
+              MetaVarName<"<check>">,
+              HelpText<"Turn on Comprehensive Static Instrumentation at the "
+                       "specified point in the optimizer: first, early, "
+                       "tapirlate, aftertapirloops, last">;
+def fcilktool_EQ : Joined<["-"], "fcilktool=">, Group<f_clang_Group>,
+                   MetaVarName<"<check>">,
+                   HelpText<"Turn on the designated Cilk tool">;
 
 } // end -f[no-]sanitize* flags
 
@@ -1348,6 +1359,16 @@ def fno_implicit_modules :
   Flag <["-"], "fno-implicit-modules">,
   Group<f_Group>, Flags<[DriverOption, CC1Option]>;
 def fretain_comments_from_system_headers : Flag<["-"], "fretain-comments-from-system-headers">, Group<f_Group>, Flags<[CC1Option]>;
+
+def ftapir_EQ : Joined<["-"], "ftapir=">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Choose the backend parallel runtime for Tapir instructions">,
+  Values<"none,serial,cilk,openmp,cilkr">;
+def fcilkplus : Flag<["-"], "fcilkplus">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Enable Cilk Plus extensions">;
+def frhino : Flag <["-"], "frhino">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Enable Rhino optimizations to Tapir constructs">;
+def foutline_tapir_early : Flag <["-"], "foutline-tapir-early">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Perform early outlining of Tapir constructs">;
 
 def fmudflapth : Flag<["-"], "fmudflapth">, Group<f_Group>;
 def fmudflap : Flag<["-"], "fmudflap">, Group<f_Group>;
@@ -1718,6 +1739,10 @@ def Wlarge_by_value_copy_def : Flag<["-"], "Wlarge-by-value-copy">,
   HelpText<"Warn if a function definition returns or accepts an object larger "
            "in bytes than a given value">, Flags<[HelpHidden]>;
 def Wlarge_by_value_copy_EQ : Joined<["-"], "Wlarge-by-value-copy=">, Flags<[CC1Option]>;
+
+def fstripmine : Flag<["-"], "fstripmine">, Group<f_Group>,
+  HelpText<"Enable the Tapir loop stripmining passes">;
+def fno_stripmine : Flag<["-"], "fno-stripmine">, Group<f_Group>;
 
 // These "special" warning flags are effectively processed as f_Group flags by the driver:
 // Just silence warnings about -Wlarger-than for now.

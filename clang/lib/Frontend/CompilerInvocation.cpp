@@ -29,6 +29,7 @@
 #include "clang/Config/config.h"
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/Options.h"
+#include "clang/Driver/Tapir.h"
 #include "clang/Frontend/CommandLineSourceLoc.h"
 #include "clang/Frontend/DependencyOutputOptions.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
@@ -80,6 +81,8 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
+#include "llvm/Support/ScopedPrinter.h"
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -124,6 +127,9 @@ static unsigned getOptimizationLevel(ArgList &Args, InputKind IK,
   unsigned DefaultOpt = llvm::CodeGenOpt::None;
   if (IK.getLanguage() == InputKind::OpenCL && !Args.hasArg(OPT_cl_opt_disable))
     DefaultOpt = llvm::CodeGenOpt::Default;
+
+  if (Args.hasArg(OPT_frhino))
+    DefaultOpt = 2;
 
   if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
     if (A->getOption().matches(options::OPT_O0))
@@ -551,11 +557,52 @@ static void parseSanitizerKinds(StringRef FlagName,
                                 DiagnosticsEngine &Diags, SanitizerSet &S) {
   for (const auto &Sanitizer : Sanitizers) {
     SanitizerMask K = parseSanitizerValue(Sanitizer, /*AllowGroups=*/false);
-    if (K == 0)
+    if (K == SanitizerMask())
       Diags.Report(diag::err_drv_invalid_value) << FlagName << Sanitizer;
     else
       S.set(K, true);
   }
+}
+
+static LangOptions::CilktoolKind parseCilktoolKind(StringRef FlagName,
+                                                   ArgList &Args,
+                                                   DiagnosticsEngine &Diags) {
+  if (Arg *A = Args.getLastArg(OPT_fcilktool_EQ)) {
+    StringRef Val = A->getValue();
+    LangOptions::CilktoolKind ParsedCilktool =
+      llvm::StringSwitch<LangOptions::CilktoolKind>(Val)
+      .Case("cilkscale", LangOptions::Cilktool_Cilkscale)
+      .Default(LangOptions::Cilktool_None);
+    if (ParsedCilktool == LangOptions::Cilktool_None)
+      Diags.Report(diag::err_drv_invalid_value) << FlagName << Val;
+    else
+      return ParsedCilktool;
+  }
+  return LangOptions::Cilktool_None;
+}
+
+static LangOptions::CSIExtensionPoint
+parseCSIExtensionPoint(StringRef FlagName, ArgList &Args,
+                       DiagnosticsEngine &Diags) {
+  if (Arg *A = Args.getLastArg(OPT_fcsi_EQ)) {
+    StringRef Val = A->getValue();
+    LangOptions::CSIExtensionPoint ParsedExt =
+      llvm::StringSwitch<LangOptions::CSIExtensionPoint>(Val)
+      .Case("first",           LangOptions::CSI_EarlyAsPossible)
+      .Case("early",           LangOptions::CSI_ModuleOptimizerEarly)
+      .Case("last",            LangOptions::CSI_OptimizerLast)
+      .Case("tapirlate",       LangOptions::CSI_TapirLate)
+      .Case("aftertapirloops", LangOptions::CSI_TapirLoopEnd)
+      .Default(LangOptions::CSI_None);
+    if (ParsedExt == LangOptions::CSI_None) {
+      Diags.Report(diag::err_drv_invalid_value) << FlagName << Val;
+      return LangOptions::CSI_None;
+    } else
+      return ParsedExt;
+  } else if (Args.hasArg(OPT_fcsi))
+    // Use TapirLate extension point by default, for backwards compatability.
+    return LangOptions::CSI_TapirLate;
+  return LangOptions::CSI_None;
 }
 
 static void parseXRayInstrumentationBundle(StringRef FlagName, StringRef Bundle,
@@ -675,6 +722,18 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
     else
       Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args) << Name;
   }
+
+  // Parse Tapir-related codegen options.
+  TapirTargetID TapirTarget = parseTapirTarget(Args);
+  if (TapirTarget == TapirTargetID::Last_TapirTargetID)
+    if (const Arg *A = Args.getLastArg(OPT_ftapir_EQ))
+      Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args)
+                                                << A->getValue();
+  Opts.setTapirTarget(TapirTarget);
+  // Early outlining of Tapir
+  Opts.TapirEarlyOutline = Args.hasArg(OPT_foutline_tapir_early);
+  // Rhino optimizations of Tapir control-flow construct.
+  Opts.TapirRhino = Args.hasArg(OPT_frhino);
 
   if (Arg *A = Args.getLastArg(OPT_debug_info_kind_EQ)) {
     unsigned Val =
@@ -926,6 +985,8 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
 
   Opts.VectorizeLoop = Args.hasArg(OPT_vectorize_loops);
   Opts.VectorizeSLP = Args.hasArg(OPT_vectorize_slp);
+
+  Opts.StripmineLoop = Args.hasArg(OPT_stripmine_loops);
 
   Opts.PreferVectorWidth = Args.getLastArgValue(OPT_mprefer_vector_width_EQ);
 
@@ -2445,6 +2506,11 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
         (Opts.ObjCRuntime.getKind() == ObjCRuntime::FragileMacOSX);
   }
 
+  Opts.Cilk = Args.hasArg(OPT_fcilkplus);
+
+  if (Opts.Cilk && Opts.ObjC)
+    Diags.Report(diag::err_drv_cilk_objc);
+
   if (Args.hasArg(OPT_fgnu89_inline)) {
     if (Opts.CPlusPlus)
       Diags.Report(diag::err_drv_argument_not_allowed_with)
@@ -2538,6 +2604,7 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.PascalStrings = Args.hasArg(OPT_fpascal_strings);
   Opts.VtorDispMode = getLastArgIntValue(Args, OPT_vtordisp_mode_EQ, 1, Diags);
   Opts.Borland = Args.hasArg(OPT_fborland_extensions);
+
   Opts.WritableStrings = Args.hasArg(OPT_fwritable_strings);
   Opts.ConstStrings = Args.hasFlag(OPT_fconst_strings, OPT_fno_const_strings,
                                    Opts.ConstStrings);
@@ -2968,6 +3035,15 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       getLastArgIntValue(Args, OPT_fsanitize_address_field_padding, 0, Diags);
   Opts.SanitizerBlacklistFiles = Args.getAllArgValues(OPT_fsanitize_blacklist);
 
+  // -fcsi
+  if (Args.hasArg(OPT_fcsi_EQ) || Args.hasArg(OPT_fcsi))
+    Opts.setComprehensiveStaticInstrumentation(
+        parseCSIExtensionPoint("-fcsi=", Args, Diags));
+
+  // -fcilktool=
+  if (Args.hasArg(OPT_fcilktool_EQ))
+    Opts.setCilktool(parseCilktoolKind("-fcilktool=", Args, Diags));
+
   // -fxray-instrument
   Opts.XRayInstrument =
       Args.hasFlag(OPT_fxray_instrument, OPT_fnoxray_instrument, false);
@@ -3289,6 +3365,11 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
     LangOpts.PIE = Args.hasArg(OPT_pic_is_pie);
     parseSanitizerKinds("-fsanitize=", Args.getAllArgValues(OPT_fsanitize_EQ),
                         Diags, LangOpts.Sanitize);
+    if (Args.hasArg(OPT_fcsi_EQ) || Args.hasArg(OPT_fcsi))
+      LangOpts.setComprehensiveStaticInstrumentation(
+          parseCSIExtensionPoint("-fcsi=", Args, Diags));
+    if (Args.hasArg(OPT_fcilktool_EQ))
+      LangOpts.setCilktool(parseCilktoolKind("-fcilktool=", Args, Diags));
   } else {
     // Other LangOpts are only initialized when the input is not AST or LLVM IR.
     // FIXME: Should we really be calling this for an InputKind::Asm input?

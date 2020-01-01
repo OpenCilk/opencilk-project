@@ -179,6 +179,24 @@ public:
   };
 
 
+  enum CSIExtensionPoint {
+    // Don't run CSI
+    CSI_None = 0,
+    // The following extension points should be consistent with the extension
+    // points allowed by the pass manager, except for EnabledOnOptLevel0.
+    CSI_EarlyAsPossible,
+    CSI_ModuleOptimizerEarly,
+    CSI_OptimizerLast,
+    CSI_TapirLate,
+    CSI_TapirLoopEnd
+  };
+
+  enum CilktoolKind {
+    // No Cilktool
+    Cilktool_None = 0,
+    Cilktool_Cilkscale
+  };
+
 public:
   /// Set of enabled sanitizers.
   SanitizerSet Sanitize;
