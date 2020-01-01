@@ -844,8 +844,10 @@ SanitizerMask Linux::getSupportedSanitizers() const {
     Res |= SanitizerKind::DataFlow;
   if (IsX86_64 || IsMIPS64 || IsAArch64 || IsX86 || IsArmArch || IsPowerPC64)
     Res |= SanitizerKind::Leak;
-  if (IsX86_64 || IsMIPS64 || IsAArch64 || IsPowerPC64)
+  if (IsX86_64 || IsMIPS64 || IsAArch64 || IsPowerPC64) {
     Res |= SanitizerKind::Thread;
+    Res |= SanitizerKind::Cilk;
+  }
   if (IsX86_64 || IsMIPS64 || IsPowerPC64 || IsAArch64)
     Res |= SanitizerKind::Memory;
   if (IsX86_64 || IsMIPS64)

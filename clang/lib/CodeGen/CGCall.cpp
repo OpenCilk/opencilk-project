@@ -776,7 +776,7 @@ CodeGenTypes::arrangeLLVMFunctionInfo(CanQualType resultType,
 
   bool erased = FunctionsBeingProcessed.erase(FI); (void)erased;
   assert(erased && "Not in set?");
-  
+
   return *FI;
 }
 
@@ -1325,7 +1325,7 @@ static void CreateCoercedStore(llvm::Value *Src,
 }
 
 static Address emitAddressAtOffset(CodeGenFunction &CGF, Address addr,
-                                   const ABIArgInfo &info) {      
+                                   const ABIArgInfo &info) {
   if (unsigned offset = info.getDirectOffset()) {
     addr = CGF.Builder.CreateElementBitCast(addr, CGF.Int8Ty);
     addr = CGF.Builder.CreateConstInBoundsByteGEP(addr,
@@ -1655,7 +1655,7 @@ llvm::Type *CodeGenTypes::GetFunctionTypeForVTable(GlobalDecl GD) {
 
   if (!isFuncTypeConvertible(FPT))
     return llvm::StructType::get(getLLVMContext());
-    
+
   const CGFunctionInfo *Info;
   if (isa<CXXDestructorDecl>(MD))
     Info =
@@ -2207,6 +2207,11 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
     }
   }
 
+  // For Cilk functions, ensure that a sync is implicitly executed before this
+  // function returns.
+  if (getLangOpts().Cilk)
+    EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup);
+
   // FIXME: We no longer need the types from FunctionArgList; lift up and
   // simplify.
 
@@ -2656,7 +2661,7 @@ static llvm::Value *tryRemoveRetainOfSelf(CodeGenFunction &CGF,
   llvm::Value *retainedValue = retainCall->getArgOperand(0);
   llvm::LoadInst *load =
     dyn_cast<llvm::LoadInst>(retainedValue->stripPointerCasts());
-  if (!load || load->isAtomic() || load->isVolatile() || 
+  if (!load || load->isAtomic() || load->isVolatile() ||
       load->getPointerOperand() != CGF.GetAddrOfLocalVar(self).getPointer())
     return nullptr;
 
@@ -2769,6 +2774,8 @@ void CodeGenFunction::EmitFunctionEpilog(const CGFunctionInfo &FI,
     Builder.CreateUnreachable();
     return;
   }
+
+  PopSyncRegion();
 
   // Functions with no result always return void.
   if (!ReturnValue.isValid()) {
@@ -3098,7 +3105,7 @@ static void emitWriteback(CodeGenFunction &CGF,
   // Cast it back, in case we're writing an id to a Foo* or something.
   value = CGF.Builder.CreateBitCast(value, srcAddr.getElementType(),
                                     "icr.writeback-cast");
-  
+
   // Perform the writeback.
 
   // If we have a "to use" value, it's something we need to emit a use
@@ -3205,7 +3212,7 @@ static void emitWritebackArg(CodeGenFunction &CGF, CallArgList &args,
   // isn't null, so we need to register a dominating point so that the cleanups
   // system will make valid IR.
   CodeGenFunction::ConditionalEvaluation condEval(CGF);
-  
+
   // Zero-initialize it if we're not doing a copy-initialization.
   bool shouldCopy = CRE->shouldCopy();
   if (!shouldCopy) {
@@ -3229,7 +3236,7 @@ static void emitWritebackArg(CodeGenFunction &CGF, CallArgList &args,
     llvm::Value *isNull =
       CGF.Builder.CreateIsNull(srcAddr.getPointer(), "icr.isnull");
 
-    finalArgument = CGF.Builder.CreateSelect(isNull, 
+    finalArgument = CGF.Builder.CreateSelect(isNull,
                                    llvm::ConstantPointerNull::get(destType),
                                              temp.getPointer(), "icr.argument");
 
@@ -3269,7 +3276,7 @@ static void emitWritebackArg(CodeGenFunction &CGF, CallArgList &args,
       valueToUse = src;
     }
   }
-  
+
   // Finish the control flow if we needed it.
   if (shouldCopy && !provablyNonNull) {
     llvm::BasicBlock *copyBB = CGF.Builder.GetInsertBlock();
@@ -3320,7 +3327,7 @@ void CodeGenFunction::EmitNonNullArgCheck(RValue RV, QualType ArgType,
   auto PVD = ParmNum < AC.getNumParams() ? AC.getParamDecl(ParmNum) : nullptr;
   unsigned ArgNo = PVD ? PVD->getFunctionScopeIndex() : ParmNum;
 
-  // Prefer the nonnull attribute if it's present. 
+  // Prefer the nonnull attribute if it's present.
   const NonNullAttr *NNAttr = nullptr;
   if (SanOpts.has(SanitizerKind::NonnullAttribute))
     NNAttr = getNonNullAttr(AC.getDecl(), PVD, ArgType, ArgNo);
@@ -3644,7 +3651,7 @@ void CodeGenFunction::EmitNoreturnRuntimeCallOrInvoke(llvm::Value *callee,
   getBundlesForFunclet(callee, CurrentFuncletPad, BundleList);
 
   if (getInvokeDest()) {
-    llvm::InvokeInst *invoke = 
+    llvm::InvokeInst *invoke =
       Builder.CreateInvoke(callee,
                            getUnreachableBlock(),
                            getInvokeDest(),
@@ -3727,6 +3734,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
                                  llvm::Instruction **callOrInvoke,
                                  SourceLocation Loc) {
   // FIXME: We no longer need the types from CallArgs; lift up and simplify.
+
+  IsSpawnedScope SpawnedScp(this);
 
   assert(Callee.isOrdinary());
 
@@ -4126,6 +4135,15 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   CalleePtr = simplifyVariadicCallee(CalleePtr);
 
   // 3. Perform the actual call.
+
+  // If this call is detached, start the detach, if it hasn't yet been started.
+  if (SpawnedScp.OldScopeIsSpawned()) {
+    SpawnedScp.RestoreOldScope();
+    assert(CurDetachScope &&
+           "A call was spawned, but no detach scope was pushed.");
+    if (!CurDetachScope->IsDetachStarted())
+      CurDetachScope->StartDetach();
+  }
 
   // Deactivate any cleanups that we're supposed to do immediately before
   // the call.

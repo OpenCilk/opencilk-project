@@ -533,6 +533,27 @@ static bool addSanitizerDynamicList(const ToolChain &TC, const ArgList &Args,
   return false;
 }
 
+// CilkSanitizer has different runtime requirements than typical sanitizers.
+bool tools::needsCilkSanitizerDeps(const ToolChain &TC, const ArgList &Args) {
+  const SanitizerArgs &SanArgs = TC.getSanitizerArgs();
+  if (Args.hasArg(options::OPT_shared) || SanArgs.needsSharedRt()) {
+    // Don't link static runtimes into DSOs or if -shared-libasan.
+    return false;
+  }
+  return SanArgs.needsCilksanRt();
+}
+
+void tools::linkCilkSanitizerRuntimeDeps(const ToolChain &TC,
+                                         ArgStringList &CmdArgs) {
+  // Force linking against the system libraries sanitizers depends on
+  // (see PR15823 why this is necessary).
+  CmdArgs.push_back("--no-as-needed");
+  // Link in the C++ standard library
+  CmdArgs.push_back("-lstdc++");
+  // Link in the Snappy compression library
+  CmdArgs.push_back("-lsnappy");
+}
+
 void tools::linkSanitizerRuntimeDeps(const ToolChain &TC,
                                      ArgStringList &CmdArgs) {
   // Force linking against the system libraries sanitizers depends on
@@ -583,6 +604,8 @@ collectSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
       SharedRuntimes.push_back("scudo");
     if (SanArgs.needsHwasanRt())
       SharedRuntimes.push_back("hwasan");
+    if (SanArgs.needsCilksanRt())
+      SharedRuntimes.push_back("cilksan");
   }
 
   // The stats_client library is also statically linked into DSOs.
@@ -599,6 +622,8 @@ collectSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
     if (SanArgs.linkCXXRuntimes())
       StaticRuntimes.push_back("asan_cxx");
   }
+  if (SanArgs.needsCilksanRt())
+    StaticRuntimes.push_back("cilksan");
 
   if (SanArgs.needsHwasanRt()) {
     StaticRuntimes.push_back("hwasan");
@@ -698,6 +723,26 @@ bool tools::addSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
     CmdArgs.push_back("-export-dynamic-symbol=__cfi_check");
 
   return !StaticRuntimes.empty() || !NonWholeStaticRuntimes.empty();
+}
+
+bool tools::addCSIRuntime(const ToolChain &TC, const ArgList &Args,
+                          ArgStringList &CmdArgs) {
+  // Only add the CSI runtime library if -fcsi is specified.
+  if (!Args.hasArg(options::OPT_fcsi_EQ) && !Args.hasArg(options::OPT_fcsi))
+    return false;
+
+  CmdArgs.push_back(TC.getCompilerRTArgString(Args, "csi", false));
+  return true;
+}
+
+bool tools::addCilktoolRuntime(const ToolChain &TC, const ArgList &Args,
+                               ArgStringList &CmdArgs) {
+  if (Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ)) {
+    StringRef Val = A->getValue();
+    CmdArgs.push_back(TC.getCompilerRTArgString(Args, Val, false));
+    return true;
+  }
+  return false;
 }
 
 bool tools::areOptimizationsEnabled(const ArgList &Args) {

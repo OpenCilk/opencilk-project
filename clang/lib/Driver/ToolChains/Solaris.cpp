@@ -99,6 +99,8 @@ void solaris::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   AddLinkerInputs(getToolChain(), Inputs, Args, CmdArgs, JA);
 
+  getToolChain().AddTapirRuntimeLibArgs(Args, CmdArgs);
+
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs)) {
     if (getToolChain().ShouldLinkCXXStdlib(Args))
       getToolChain().AddCXXStdlibLibArgs(Args, CmdArgs);
