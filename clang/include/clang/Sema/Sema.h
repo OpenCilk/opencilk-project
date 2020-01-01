@@ -1950,6 +1950,8 @@ public:
                                 FunctionDecl *NewFD, LookupResult &Previous,
                                 bool IsMemberSpecialization);
   bool shouldLinkDependentDeclWithPrevious(Decl *D, Decl *OldDecl);
+  bool canFullyTypeCheckRedeclaration(ValueDecl *NewD, ValueDecl *OldD,
+                                      QualType NewT, QualType OldT);
   void CheckMain(FunctionDecl *FD, const DeclSpec &D);
   void CheckMSVCRTEntryPoint(FunctionDecl *FD);
   Attr *getImplicitCodeSegOrSectionAttrForFunction(const FunctionDecl *FD, bool IsDefinition);
@@ -3840,6 +3842,37 @@ public:
                                    CopyElisionSemanticsKind CESK);
   bool isCopyElisionCandidate(QualType ReturnType, const VarDecl *VD,
                               CopyElisionSemanticsKind CESK);
+
+  void DiagnoseCilkSpawn(Stmt *S);
+  StmtResult ActOnCilkSyncStmt(SourceLocation SyncLoc);
+  StmtResult ActOnCilkSpawnStmt(SourceLocation SpawnLoc, Stmt *S);
+  ExprResult ActOnCilkSpawnExpr(SourceLocation SpawnLoc, Expr *E);
+  StmtResult HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
+                                     SourceLocation LParenLoc,
+                                     Stmt *First,
+                                     Expr *Condition,
+                                     Expr *Increment,
+                                     SourceLocation RParenLoc,
+                                     Stmt *Body);
+  StmtResult LiftCilkForLoopLimit(SourceLocation CilkForLoc,
+                                  Stmt *First, Expr **Second);
+  StmtResult ActOnCilkForStmt(SourceLocation CilkForLoc,
+                              SourceLocation LParenLoc,
+                              Stmt *Init, DeclStmt *Limit,
+                              ConditionResult InitCond,
+                              DeclStmt *Begin, DeclStmt *End,
+                              ConditionResult second,
+                              FullExprArg third,
+                              SourceLocation RParenLoc,
+                              Stmt *Body,
+                              VarDecl *LoopVar = nullptr);
+
+  StmtResult BuildCilkForStmt(SourceLocation CilkForLoc,
+                              SourceLocation LParenLoc,
+                              Stmt *Init, Expr *Cond, Expr *Inc,
+                              SourceLocation RParenLoc, Stmt *Body,
+                              Expr *LoopCount, Expr *Stride,
+                              QualType SpanType);
 
   StmtResult ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
                              Scope *CurScope);

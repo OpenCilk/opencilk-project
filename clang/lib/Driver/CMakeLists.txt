@@ -19,6 +19,7 @@ add_clang_library(clangDriver
   Multilib.cpp
   Phases.cpp
   SanitizerArgs.cpp
+  Tapir.cpp
   Tool.cpp
   ToolChain.cpp
   ToolChains/Arch/AArch64.cpp

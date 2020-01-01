@@ -537,6 +537,12 @@ public:
 
   /// Return sanitizers which are enabled by default.
   virtual SanitizerMask getDefaultSanitizers() const { return 0; }
+
+  /// AddTapirRuntimeLibArgs - Add the specific linker arguments to use for the
+  /// given Tapir runtime library type.
+  virtual void AddTapirRuntimeLibArgs(const llvm::opt::ArgList &Args,
+                                      llvm::opt::ArgStringList &CmdArgs) const;
+
 };
 
 /// Set a ToolChain's effective triple. Reset it when the registration object

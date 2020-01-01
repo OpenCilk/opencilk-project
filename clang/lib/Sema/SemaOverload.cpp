@@ -16,6 +16,7 @@
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprCilk.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
 #include "clang/AST/TypeOrdering.h"
@@ -1105,7 +1106,8 @@ bool Sema::IsOverload(FunctionDecl *New, FunctionDecl *Old,
       (!TemplateParameterListsAreEqual(NewTemplate->getTemplateParameters(),
                                        OldTemplate->getTemplateParameters(),
                                        false, TPL_TemplateMatch) ||
-       OldType->getReturnType() != NewType->getReturnType()))
+       !Context.hasSameType(Old->getDeclaredReturnType(),
+                            New->getDeclaredReturnType())))
     return true;
 
   // If the function is a class member, its signature includes the
@@ -12429,6 +12431,22 @@ Sema::CreateOverloadedBinOp(SourceLocation OpLoc,
   OverloadCandidateSet::iterator Best;
   switch (CandidateSet.BestViableFunction(*this, OpLoc, Best)) {
     case OR_Success: {
+      // If the RHS is spawned and the operator is an assignment, then we
+      // actually want to spawn the the top-level call.
+      bool SpawnTheCall = false;
+      SourceLocation SpawnLoc;
+      // TODO: Generalize this condition.
+      if (BinaryOperator::isAssignmentOp(Opc)) {
+        if (CilkSpawnExpr *Spawn = dyn_cast<CilkSpawnExpr>(Args[1])) {
+          SpawnTheCall = true;
+          SpawnLoc = Spawn->getExprLoc();
+          if (ExprWithCleanups *EWC =
+              dyn_cast<ExprWithCleanups>(Spawn->getSpawnedExpr()))
+            Args[1] = RHS = EWC->getSubExpr();
+          else
+            Args[1] = RHS = Spawn->getSpawnedExpr();
+        }
+      }
       // We found a built-in operator or an overloaded operator.
       FunctionDecl *FnDecl = Best->Function;
 
@@ -12513,6 +12531,10 @@ Sema::CreateOverloadedBinOp(SourceLocation OpLoc,
         checkCall(FnDecl, nullptr, ImplicitThis, ArgsArray,
                   isa<CXXMethodDecl>(FnDecl), OpLoc, TheCall->getSourceRange(),
                   VariadicDoesNotApply);
+
+        if (SpawnTheCall)
+          return ActOnCilkSpawnExpr(SpawnLoc,
+                                    MaybeBindToTemporary(TheCall).get());
 
         return MaybeBindToTemporary(TheCall);
       } else {

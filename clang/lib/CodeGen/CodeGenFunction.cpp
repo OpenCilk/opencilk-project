@@ -297,6 +297,8 @@ static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
 void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
   assert(BreakContinueStack.empty() &&
          "mismatched push/pop in break/continue stack!");
+  assert(!CurDetachScope &&
+         "mismatched push/pop in detach-scope stack!");
 
   bool OnlySimpleReturnStmts = NumSimpleReturnExprs > 0
     && NumSimpleReturnExprs == NumReturnExprs
@@ -866,6 +868,8 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
     Fn->addFnAttr(llvm::Attribute::SanitizeHWAddress);
   if (SanOpts.has(SanitizerKind::Thread))
     Fn->addFnAttr(llvm::Attribute::SanitizeThread);
+  if (SanOpts.has(SanitizerKind::Cilk))
+    Fn->addFnAttr(llvm::Attribute::SanitizeCilk);
   if (SanOpts.has(SanitizerKind::Memory))
     Fn->addFnAttr(llvm::Attribute::SanitizeMemory);
   if (SanOpts.has(SanitizerKind::SafeStack))

@@ -1178,6 +1178,7 @@ CanThrowResult Sema::canThrow(const Expr *E) {
   case Expr::ShuffleVectorExprClass:
   case Expr::ConvertVectorExprClass:
   case Expr::VAArgExprClass:
+  case Expr::CilkSpawnExprClass:
     return canSubExprsThrow(*this, E);
 
     // Some might be dependent for other reasons.

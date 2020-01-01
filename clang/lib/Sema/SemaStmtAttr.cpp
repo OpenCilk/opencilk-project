@@ -87,14 +87,23 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 
   bool PragmaUnroll = PragmaNameLoc->Ident->getName() == "unroll";
   bool PragmaNoUnroll = PragmaNameLoc->Ident->getName() == "nounroll";
+  bool PragmaCilk = PragmaNameLoc->Ident->getName() == "cilk";
+  if (PragmaCilk &&
+      St->getStmtClass() != Stmt::CilkForStmtClass) {
+    S.Diag(St->getLocStart(), diag::err_pragma_cilk_precedes_noncilk)
+      << "#pragma cilk";
+    return nullptr;
+  }
   if (St->getStmtClass() != Stmt::DoStmtClass &&
       St->getStmtClass() != Stmt::ForStmtClass &&
       St->getStmtClass() != Stmt::CXXForRangeStmtClass &&
-      St->getStmtClass() != Stmt::WhileStmtClass) {
+      St->getStmtClass() != Stmt::WhileStmtClass &&
+      St->getStmtClass() != Stmt::CilkForStmtClass) {
     const char *Pragma =
         llvm::StringSwitch<const char *>(PragmaNameLoc->Ident->getName())
             .Case("unroll", "#pragma unroll")
             .Case("nounroll", "#pragma nounroll")
+            .Case("cilk", "#pragma cilk")
             .Default("#pragma clang loop");
     S.Diag(St->getLocStart(), diag::err_pragma_loop_precedes_nonloop) << Pragma;
     return nullptr;
@@ -118,6 +127,19 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
       Option = LoopHintAttr::Unroll;
       State = LoopHintAttr::Enable;
     }
+  } else if (PragmaCilk) {
+    Spelling = LoopHintAttr::Pragma_cilk;
+    Option = llvm::StringSwitch<LoopHintAttr::OptionType>(
+                 OptionLoc->Ident->getName())
+                 .Case("grainsize", LoopHintAttr::TapirGrainsize)
+                 .Default(LoopHintAttr::TapirGrainsize);
+    if (Option == LoopHintAttr::TapirGrainsize) {
+      assert(ValueExpr && "Attribute must have a valid value expression.");
+      if (S.CheckLoopHintExpr(ValueExpr, St->getLocStart()))
+        return nullptr;
+      State = LoopHintAttr::Numeric;
+    } else
+      llvm_unreachable("bad loop hint");
   } else {
     // #pragma clang loop ...
     assert(OptionLoc && OptionLoc->Ident &&
@@ -165,18 +187,20 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 static void
 CheckForIncompatibleAttributes(Sema &S,
                                const SmallVectorImpl<const Attr *> &Attrs) {
-  // There are 4 categories of loop hints attributes: vectorize, interleave,
-  // unroll and distribute. Except for distribute they come in two variants: a
-  // state form and a numeric form.  The state form selectively
-  // defaults/enables/disables the transformation for the loop (for unroll,
-  // default indicates full unrolling rather than enabling the transformation).
-  // The numeric form form provides an integer hint (for example, unroll count)
-  // to the transformer. The following array accumulates the hints encountered
-  // while iterating through the attributes to check for compatibility.
+  // There are 5 categories of loop hints attributes: vectorize, interleave,
+  // unroll, distribute, and (Tapir) grainsize. Except for distribute they come
+  // in two variants: a state form and a numeric form.  The state form
+  // selectively defaults/enables/disables the transformation for the loop (for
+  // unroll, default indicates full unrolling rather than enabling the
+  // transformation).  The numeric form form provides an integer hint (for
+  // example, unroll count) to the transformer. The following array accumulates
+  // the hints encountered while iterating through the attributes to check for
+  // compatibility.
   struct {
     const LoopHintAttr *StateAttr;
     const LoopHintAttr *NumericAttr;
   } HintAttrs[] = {{nullptr, nullptr},
+                   {nullptr, nullptr},
                    {nullptr, nullptr},
                    {nullptr, nullptr},
                    {nullptr, nullptr}};
@@ -189,7 +213,7 @@ CheckForIncompatibleAttributes(Sema &S,
       continue;
 
     LoopHintAttr::OptionType Option = LH->getOption();
-    enum { Vectorize, Interleave, Unroll, Distribute } Category;
+    enum { Vectorize, Interleave, Unroll, Distribute, TapirGrainsize } Category;
     switch (Option) {
     case LoopHintAttr::Vectorize:
     case LoopHintAttr::VectorizeWidth:
@@ -206,6 +230,9 @@ CheckForIncompatibleAttributes(Sema &S,
     case LoopHintAttr::Distribute:
       // Perform the check for duplicated 'distribute' hints.
       Category = Distribute;
+      break;
+    case LoopHintAttr::TapirGrainsize:
+      Category = TapirGrainsize;
       break;
     };
 

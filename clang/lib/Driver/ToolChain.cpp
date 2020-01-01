@@ -21,6 +21,7 @@
 #include "clang/Driver/Job.h"
 #include "clang/Driver/Options.h"
 #include "clang/Driver/SanitizerArgs.h"
+#include "clang/Driver/Tapir.h"
 #include "clang/Driver/XRayArgs.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
@@ -943,4 +944,28 @@ llvm::opt::DerivedArgList *ToolChain::TranslateOpenMPTargetArgs(
 
   delete DAL;
   return nullptr;
+}
+
+void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
+                                       ArgStringList &CmdArgs) const {
+  TapirTargetID TapirTarget = parseTapirTarget(Args);
+  if (TapirTarget == TapirTargetID::Last_TapirTargetID)
+    if (const Arg *A = Args.getLastArg(options::OPT_ftapir_EQ))
+      getDriver().Diag(diag::err_drv_invalid_value) << A->getAsString(Args)
+                                                    << A->getValue();
+
+  switch (TapirTarget) {
+  case TapirTargetID::Cilk:
+    CmdArgs.push_back("-lcilkrts");
+    break;
+  case TapirTargetID::OpenMP:
+    CmdArgs.push_back("-lomp");
+    break;
+  case TapirTargetID::CilkR:
+    CmdArgs.push_back("-lcilkr");
+    CmdArgs.push_back("-lpthread");
+    break;
+  default:
+    break;
+  }
 }

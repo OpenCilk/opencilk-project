@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <errno.h>
 
 int main(int argc, char **argv) {
   int mount_id;
@@ -14,6 +15,10 @@ int main(int argc, char **argv) {
 
   handle->handle_bytes = MAX_HANDLE_SZ;
   int res = name_to_handle_at(AT_FDCWD, argv[0], handle, &mount_id, 0);
+  if (errno == EPERM) { // Function not permitted
+    free(handle);
+    return 0;
+  }
   assert(!res);
 
   free(handle);

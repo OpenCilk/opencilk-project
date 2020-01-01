@@ -380,6 +380,11 @@ static Address createReferenceTemporary(CodeGenFunction &CGF,
     // promoted. This is easier on the optimizer and generally emits fewer
     // instructions.
     QualType Ty = Inner->getType();
+    if (CGF.IsSpawned) {
+      CGF.PushDetachScope();
+      return CGF.CurDetachScope->CreateDetachedMemTemp(
+          Ty, M->getStorageDuration(), "det.ref.tmp");
+    }
     if (CGF.CGM.getCodeGenOpts().MergeAllConstants &&
         (Ty->isArrayType() || Ty->isRecordType()) &&
         CGF.CGM.isTypeConstant(Ty, true))
@@ -418,7 +423,6 @@ static Address createReferenceTemporary(CodeGenFunction &CGF,
 LValue CodeGenFunction::
 EmitMaterializeTemporaryExpr(const MaterializeTemporaryExpr *M) {
   const Expr *E = M->GetTemporaryExpr();
-
     // FIXME: ideally this would use EmitAnyExprToMem, however, we cannot do so
     // as that will cause the lifetime adjustment to be lost for ARC
   auto ownership = M->getType().getObjCLifetime();
@@ -496,6 +500,7 @@ EmitMaterializeTemporaryExpr(const MaterializeTemporaryExpr *M) {
       EmitAnyExprToMem(E, Object, Qualifiers(), /*IsInit*/true);
     }
   } else {
+    if (!IsSpawned) {
     switch (M->getStorageDuration()) {
     case SD_Automatic:
     case SD_FullExpression:
@@ -512,6 +517,7 @@ EmitMaterializeTemporaryExpr(const MaterializeTemporaryExpr *M) {
       break;
     default:
       break;
+      }
     }
     EmitAnyExprToMem(E, Object, Qualifiers(), /*IsInit*/true);
   }
@@ -1250,12 +1256,19 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitCXXUuidofLValue(cast<CXXUuidofExpr>(E));
   case Expr::LambdaExprClass:
     return EmitLambdaLValue(cast<LambdaExpr>(E));
+  case Expr::CilkSpawnExprClass:
+    return EmitCilkSpawnExprLValue(cast<CilkSpawnExpr>(E));
 
   case Expr::ExprWithCleanupsClass: {
     const auto *cleanups = cast<ExprWithCleanups>(E);
     enterFullExpression(cleanups);
     RunCleanupsScope Scope(*this);
+    bool CleanupsSaved = false;
+    if (IsSpawned)
+      CleanupsSaved = CurDetachScope->MaybeSaveCleanupsScope(&Scope);
     LValue LV = EmitLValue(cleanups->getSubExpr());
+    if (CleanupsSaved)
+      CurDetachScope->CleanupDetach();
     if (LV.isSimple()) {
       // Defend against branches out of gnu statement expressions surrounded by
       // cleanups.
@@ -4417,6 +4430,28 @@ LValue CodeGenFunction::EmitBinaryOperatorLValue(const BinaryOperator *E) {
       break;
     }
 
+    if (isa<CilkSpawnExpr>(E->getRHS()->IgnoreImplicit())) {
+      // Emit the LHS before the RHS.
+      LValue LV = EmitCheckedLValue(E->getLHS(), TCK_Store);
+
+      // Set up to perform a detach.
+      assert(!IsSpawned &&
+             "_Cilk_spawn statement found in spawning environment.");
+      IsSpawned = true;
+
+      // Emit the expression.
+      RValue RV = EmitAnyExpr(E->getRHS());
+      EmitStoreThroughLValue(RV, LV);
+
+      // Finish the detach.
+      assert(CurDetachScope && CurDetachScope->IsDetachStarted() &&
+             "Processing _Cilk_spawn of expression did not produce a detach.");
+      PopDetachScope();
+      IsSpawned = false;
+
+      return LV;
+    }
+
     RValue RV = EmitAnyExpr(E->getRHS());
     LValue LV = EmitCheckedLValue(E->getLHS(), TCK_Store);
     if (RV.isScalar())
@@ -4563,6 +4598,8 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
   // function type or a block pointer type.
   assert(CalleeType->isFunctionPointerType() &&
          "Call must have function pointer type!");
+
+  IsSpawnedScope SpawnedScp(this);
 
   const Decl *TargetDecl = OrigCallee.getAbstractInfo().getCalleeDecl();
 
@@ -4737,6 +4774,7 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
     Callee.setFunctionPointer(CalleePtr);
   }
 
+  SpawnedScp.RestoreOldScope();
   return EmitCall(FnInfo, Callee, ReturnValue, Args, nullptr, E->getExprLoc());
 }
 
