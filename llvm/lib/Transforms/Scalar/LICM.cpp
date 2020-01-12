@@ -563,7 +563,7 @@ bool llvm::sinkRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
           isNotUsedOrFreeInLoop(I, LoopNestMode ? OutermostLoop : CurLoop,
                                 SafetyInfo, TTI, FreeInLoop, LoopNestMode) &&
           canSinkOrHoistInst(I, AA, DT, CurLoop, /*CurAST*/nullptr, MSSAU, true,
-                             &Flags, TI, ORE)) {
+                             TI, &Flags, ORE)) {
         if (sink(I, LI, DT, BFI, CurLoop, SafetyInfo, MSSAU, ORE)) {
           if (!FreeInLoop) {
             ++II;
@@ -888,7 +888,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
       // to that block.
       if (CurLoop->hasLoopInvariantOperands(&I) &&
           canSinkOrHoistInst(I, AA, DT, CurLoop, /*CurAST*/ nullptr, MSSAU,
-                             true, &Flags, TI, ORE) &&
+                             true, TI, &Flags, ORE) &&
           isSafeToExecuteUnconditionally(
               I, DT, TLI, CurLoop, SafetyInfo, TI, ORE,
               CurLoop->getLoopPreheader()->getTerminator(), AllowSpeculation)) {
@@ -1137,8 +1137,8 @@ bool isOnlyMemoryAccess(const Instruction *I, const Loop *L,
 bool llvm::canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
                               Loop *CurLoop, AliasSetTracker *CurAST,
                               MemorySSAUpdater *MSSAU,
-                              bool TargetExecutesOncePerLoop,
-                              SinkAndHoistLICMFlags *Flags, TaskInfo *TI,
+                              bool TargetExecutesOncePerLoop, TaskInfo *TI,
+                              SinkAndHoistLICMFlags *Flags,
                               OptimizationRemarkEmitter *ORE) {
   assert(((CurAST != nullptr) ^ (MSSAU != nullptr)) &&
          "Either AliasSetTracker or MemorySSA should be initialized.");

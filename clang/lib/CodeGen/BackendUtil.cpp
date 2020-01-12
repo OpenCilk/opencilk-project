@@ -822,19 +822,17 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
 
   PMBuilder.OptLevel = CodeGenOpts.OptimizationLevel;
 
-  if (CodeGenOpts.TapirEarlyOutline) PMBuilder.DisableTapirOpts = true;
-  if (CodeGenOpts.TapirRhino) PMBuilder.Rhino = true;
   if (TLII->hasTapirTarget())
     PMBuilder.TapirTarget = TLII->getTapirTarget();
 
   PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
   PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
   PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
+  PMBuilder.LoopStripmine = CodeGenOpts.StripmineLoop;
   // Only enable CGProfilePass when using integrated assembler, since
   // non-integrated assemblers don't recognize .cgprofile section.
   PMBuilder.CallGraphProfile = !CodeGenOpts.DisableIntegratedAS;
 
-  PMBuilder.LoopStripmine = CodeGenOpts.StripmineLoop;
 
   PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
   // Loop interleaving in the loop vectorizer has historically been set to be
@@ -1448,6 +1446,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
   PTO.LoopInterleaving = CodeGenOpts.UnrollLoops;
   PTO.LoopVectorization = CodeGenOpts.VectorizeLoop;
   PTO.SLPVectorization = CodeGenOpts.VectorizeSLP;
+  PTO.LoopStripmine = CodeGenOpts.StripmineLoop;
   PTO.MergeFunctions = CodeGenOpts.MergeFunctions;
   // Only enable CGProfilePass when using integrated assembler, since
   // non-integrated assemblers don't recognize .cgprofile section.
@@ -1665,7 +1664,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     } else if (IsLTO) {
       MPM = PB.buildLTOPreLinkDefaultPipeline(Level);
     } else {
-      MPM = PB.buildPerModuleDefaultPipeline(Level, false,
+      MPM = PB.buildPerModuleDefaultPipeline(Level, /* LTOPreLink */ false,
                                              TLII->hasTapirTarget());
     }
 
