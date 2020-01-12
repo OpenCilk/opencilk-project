@@ -852,6 +852,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
   PTO.LoopInterleaving = CodeGenOpts.UnrollLoops;
   PTO.LoopVectorization = CodeGenOpts.VectorizeLoop;
   PTO.SLPVectorization = CodeGenOpts.VectorizeSLP;
+  PTO.LoopStripmine = CodeGenOpts.StripmineLoop;
   PTO.MergeFunctions = CodeGenOpts.MergeFunctions;
   // Only enable CGProfilePass when using integrated assembler, since
   // non-integrated assemblers don't recognize .cgprofile section.
@@ -1116,7 +1117,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     } else if (IsLTO) {
       MPM = PB.buildLTOPreLinkDefaultPipeline(Level);
     } else {
-      MPM = PB.buildPerModuleDefaultPipeline(Level, false,
+      MPM = PB.buildPerModuleDefaultPipeline(Level, /* LTOPreLink */ false,
                                              TLII->hasTapirTarget());
     }
   }
