@@ -1425,6 +1425,13 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
     Changed |= formLCSSARecursively(*L, DT, &LI, &SE);
   }
 
+  if (Changed)
+    // Update TaskInfo manually using the updated DT.
+    //
+    // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+    // Optimize this routine in the future.
+    TI.recalculate(*DT.getRoot()->getParent(), DT);
+
   // Add the loop nests in the reverse order of LoopInfo. See method
   // declaration.
   SmallPriorityWorklist<Loop *, 4> Worklist;

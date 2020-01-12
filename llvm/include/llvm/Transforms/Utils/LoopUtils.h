@@ -302,6 +302,8 @@ TransformationMode hasUnrollAndJamTransformation(Loop *L);
 TransformationMode hasVectorizeTransformation(Loop *L);
 TransformationMode hasDistributeTransformation(Loop *L);
 TransformationMode hasLICMVersioningTransformation(Loop *L);
+TransformationMode hasLoopStripmineTransformation(Loop *L);
+TransformationMode hasLoopSpawningTransformation(Loop *L);
 /// @}
 
 /// Set input string into loop metadata by keeping other values intact.
@@ -354,8 +356,9 @@ void getLoopAnalysisUsage(AnalysisUsage &AU);
 bool canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
                         Loop *CurLoop, AliasSetTracker *CurAST,
                         MemorySSAUpdater *MSSAU, bool TargetExecutesOncePerLoop,
+                        TaskInfo *TI,
                         SinkAndHoistLICMFlags *LICMFlags = nullptr,
-                        TaskInfo *TI, OptimizationRemarkEmitter *ORE = nullptr);
+                        OptimizationRemarkEmitter *ORE = nullptr);
 
 /// Returns a Min/Max operation corresponding to MinMaxRecurrenceKind.
 Value *createMinMaxOp(IRBuilderBase &Builder, RecurKind RK, Value *Left,

@@ -45,6 +45,7 @@
 #include "llvm/Transforms/Scalar/SimpleLoopUnswitch.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Tapir.h"
+#include "llvm/Transforms/Tapir/LoopStripMinePass.h"
 #include "llvm/Transforms/Vectorize.h"
 #include "llvm/Transforms/Vectorize/LoopVectorize.h"
 #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
@@ -188,9 +189,12 @@ static cl::opt<bool> EnableDRFAA(
     "enable-drf-aa", cl::init(false), cl::Hidden,
     cl::desc("Enable AA based on the data-race-free assumption (default = off)"));
 
+static cl::opt<bool> DisableTapirOpts(
+    "disable-tapir-opts", cl::init(false), cl::Hidden,
+    cl::desc("Disable Tapir optimizations by outlining Tapir tasks early"));
+
 PassManagerBuilder::PassManagerBuilder() {
     TapirTarget = TapirTargetID::None;
-    DisableTapirOpts = false;
     OptLevel = 2;
     SizeLevel = 0;
     LibraryInfo = nullptr;
@@ -638,8 +642,7 @@ void PassManagerBuilder::populateModulePassManager(
   bool RerunAfterTapirLowering = false;
   bool TapirHasBeenLowered = (TapirTargetID::None == TapirTarget);
 
-  if ((TapirTargetID::None != TapirTarget) && DisableTapirOpts) { // -fdetach
-    // MPM.add(createAnalyzeTapirPass());
+  if (DisableTapirOpts && (TapirTargetID::None != TapirTarget)) {
     MPM.add(createLowerTapirToTargetPass());
     TapirHasBeenLowered = true;
   }
@@ -828,7 +831,7 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createTaskSimplifyPass());
     MPM.add(createLoopSimplifyCFGPass());
     MPM.add(createIndVarSimplifyPass());        // Canonicalize indvars
-    MPM.add(createEarlyCSEPass(false, Rhino));
+    MPM.add(createEarlyCSEPass(false));
     MPM.add(createJumpThreadingPass());         // Thread jumps
     MPM.add(createCorrelatedValuePropagationPass());
     addInstructionCombiningPass(MPM);

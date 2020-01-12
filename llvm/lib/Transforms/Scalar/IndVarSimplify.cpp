@@ -659,12 +659,6 @@ bool IndVarSimplify::simplifyAndExtend(Loop *L,
 //  linearFunctionTestReplace and its kin. Rewrite the loop exit condition.
 //===----------------------------------------------------------------------===//
 
-static Instruction *getExitingTerminator(Loop *L, TaskInfo *TI) {
-  if (getTaskIfTapirLoop(L, TI))
-    return L->getLoopLatch()->getTerminator();
-  return L->getExitingBlock()->getTerminator();
-}
-
 /// Given an Value which is hoped to be part of an add recurance in the given
 /// loop, return the associated Phi node if so.  Otherwise, return null.  Note
 /// that this is less general than SCEVs AddRec checking.
@@ -719,7 +713,7 @@ static bool isLoopExitTestBasedOn(Value *V, BasicBlock *ExitingBB) {
 
 /// linearFunctionTestReplace policy. Return true unless we can show that the
 /// current exit test is already sufficiently canonical.
-static bool needsLFTR(Loop *L, BasicBlock *ExitingBB) {
+static bool needsLFTR(Loop *L, BasicBlock *ExitingBB, TaskInfo *TI) {
   assert(L->getLoopLatch() && "Must be in simplified form");
 
   // Avoid converting a constant or loop invariant test back to a runtime
@@ -1130,15 +1124,6 @@ linearFunctionTestReplace(Loop *L, BasicBlock *ExitingBB,
     if (BO->hasNoSignedWrap())
       BO->setHasNoSignedWrap(AR->hasNoSignedWrap());
 
-    // See if we need to create a canonical IV that starts at 0.  Right now we
-    // only check for a Tapir loop, but this check might be generalized.
-    if (getTaskIfTapirLoop(L, TI) && !AR->getStart()->isZero()) {
-      // Rewriter is not in canonical mode, which we need.  Get a new
-      // SCEVExpander that is in canonical mode.
-      SCEVExpander ARRewriter(*SE, DL, "indvars");
-      CmpIndVar = ARRewriter.expandCodeFor(AR, AR->getType(),
-                                           &L->getHeader()->front());
-    }
   }
 
   Value *ExitCnt = genLoopLimit(
@@ -1750,6 +1735,31 @@ bool IndVarSimplify::predicateLoopExits(Loop *L, SCEVExpander &Rewriter) {
   return Changed;
 }
 
+static bool ensureZeroStartIV(Loop *L, const DataLayout &DL,
+                              ScalarEvolution *SE, DominatorTree *DT) {
+  BasicBlock *LatchBlock = L->getLoopLatch();
+
+  const SCEV *ExitCount = SE->getExitCount(L, LatchBlock);
+  if (isa<SCEVCouldNotCompute>(ExitCount))
+    return false;
+
+  PHINode *IndVar = FindLoopCounter(L, LatchBlock, ExitCount, SE, DT);
+  if (!IndVar)
+    return false;
+
+  Instruction * const IncVar =
+      cast<Instruction>(IndVar->getIncomingValueForBlock(LatchBlock));
+
+  const SCEVAddRecExpr *AR = cast<SCEVAddRecExpr>(SE->getSCEV(IncVar));
+
+  if (!AR->getStart()->isZero()) {
+    SCEVExpander ARRewriter(*SE, DL, "indvars");
+    ARRewriter.expandCodeFor(AR, AR->getType(),
+                             &L->getHeader()->front());
+  }
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //  IndVarSimplify driver. Manage several subpasses of IV simplification.
 //===----------------------------------------------------------------------===//
@@ -1771,6 +1781,7 @@ bool IndVarSimplify::run(Loop *L) {
   if (!L->isLoopSimplifyForm())
     return false;
 
+  bool IsTapirLoop = (nullptr != getTaskIfTapirLoop(L, TI));
 #ifndef NDEBUG
   // Used below for a consistency check only
   // Note: Since the result returned by ScalarEvolution may depend on the order
@@ -1779,7 +1790,7 @@ bool IndVarSimplify::run(Loop *L) {
   const SCEV *BackedgeTakenCount;
   if (VerifyIndvars)
     BackedgeTakenCount = SE->getBackedgeTakenCount(L);
-  if (getTaskIfTapirLoop(L, TI))
+  if (IsTapirLoop)
     BackedgeTakenCount = SE->getExitCount(L, L->getLoopLatch());
 #endif
 
@@ -1787,6 +1798,11 @@ bool IndVarSimplify::run(Loop *L) {
   // If there are any floating-point recurrences, attempt to
   // transform them to use integer recurrences.
   Changed |= rewriteNonIntegerIVs(L);
+
+  // See if we need to create a canonical IV that starts at 0.  Right now we
+  // only check for a Tapir loop, but this check might be generalized.
+  if (IsTapirLoop)
+    Changed |= ensureZeroStartIV(L, DL, SE, DT);
 
   // Create a rewriter object which we'll use to transform the code with.
   SCEVExpander Rewriter(*SE, DL, "indvars");
@@ -1854,7 +1870,7 @@ bool IndVarSimplify::run(Loop *L) {
       if (LI->getLoopFor(ExitingBB) != L)
         continue;
 
-      if (!needsLFTR(L, ExitingBB))
+      if (!needsLFTR(L, ExitingBB, TI))
         continue;
 
       const SCEV *ExitCount = SE->getExitCount(L, ExitingBB);
@@ -1874,7 +1890,8 @@ bool IndVarSimplify::run(Loop *L) {
 
       // Avoid high cost expansions.  Note: This heuristic is questionable in
       // that our definition of "high cost" is not exactly principled.
-      if (Rewriter.isHighCostExpansion(ExitCount, L, SCEVCheapExpansionBudget,
+      if (!IsTapirLoop &&
+          Rewriter.isHighCostExpansion(ExitCount, L, SCEVCheapExpansionBudget,
                                        TTI, PreHeaderBR))
         continue;
 

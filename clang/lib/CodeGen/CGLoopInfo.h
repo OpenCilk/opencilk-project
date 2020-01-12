@@ -181,6 +181,10 @@ private:
   createFullUnrollMetadata(const LoopAttributes &Attrs,
                            llvm::ArrayRef<llvm::Metadata *> LoopProperties,
                            bool &HasUserTransforms);
+  llvm::MDNode *
+  createTapirLoopMetadata(const LoopAttributes &Attrs,
+                          llvm::ArrayRef<llvm::Metadata *> LoopProperties,
+                          bool &HasUserTransforms);
   /// @}
 
   /// Create a LoopID for this loop, including transformation-unspecific

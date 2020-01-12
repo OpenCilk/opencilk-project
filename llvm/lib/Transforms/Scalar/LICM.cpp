@@ -546,8 +546,8 @@ bool llvm::sinkRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
       bool FreeInLoop = false;
       if (!I.mayHaveSideEffects() &&
           isNotUsedOrFreeInLoop(I, CurLoop, SafetyInfo, TTI, FreeInLoop) &&
-          canSinkOrHoistInst(I, AA, DT, CurLoop, CurAST, MSSAU, true, &Flags,
-                             TI, ORE)) {
+          canSinkOrHoistInst(I, AA, DT, CurLoop, CurAST, MSSAU, true, TI,
+                             &Flags, ORE)) {
         if (sink(I, LI, DT, BFI, CurLoop, SafetyInfo, MSSAU, ORE)) {
           if (!FreeInLoop) {
             ++II;
@@ -887,8 +887,8 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
       // and we have accurately duplicated the control flow from the loop header
       // to that block.
       if (CurLoop->hasLoopInvariantOperands(&I) &&
-          canSinkOrHoistInst(I, AA, DT, CurLoop, CurAST, MSSAU, true, &Flags,
-                             TI, ORE) &&
+          canSinkOrHoistInst(I, AA, DT, CurLoop, CurAST, MSSAU, true, TI,
+                             &Flags, ORE) &&
           worthSinkOrHoistInst(I, CurLoop->getLoopPreheader(), ORE, BFI) &&
           isSafeToExecuteUnconditionally(
               I, DT, CurLoop, SafetyInfo, TI, ORE,
@@ -1134,8 +1134,8 @@ bool isOnlyMemoryAccess(const Instruction *I, const Loop *L,
 bool llvm::canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
                               Loop *CurLoop, AliasSetTracker *CurAST,
                               MemorySSAUpdater *MSSAU,
-                              bool TargetExecutesOncePerLoop,
-                              SinkAndHoistLICMFlags *Flags, TaskInfo *TI,
+                              bool TargetExecutesOncePerLoop, TaskInfo *TI,
+                              SinkAndHoistLICMFlags *Flags,
                               OptimizationRemarkEmitter *ORE) {
   assert(((CurAST != nullptr) ^ (MSSAU != nullptr)) &&
          "Either AliasSetTracker or MemorySSA should be initialized.");

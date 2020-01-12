@@ -51,6 +51,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 
 using namespace llvm;
 using namespace llvm::PatternMatch;
@@ -520,6 +521,30 @@ TransformationMode llvm::hasLICMVersioningTransformation(Loop *L) {
     return TM_Disable;
 
   return TM_Unspecified;
+}
+
+TransformationMode llvm::hasLoopStripmineTransformation(Loop *L) {
+  if (getBooleanLoopAttribute(L, "tapir.loop.stripmine.disable"))
+    return TM_Disable;
+
+  if (getBooleanLoopAttribute(L, "tapir.loop.stripmine.enabe"))
+    return TM_ForcedByUser;
+
+  return TM_Unspecified;
+}
+
+TransformationMode llvm::hasLoopSpawningTransformation(Loop *L) {
+  TapirLoopHints Hints(L);
+
+  switch (Hints.getStrategy()) {
+  case TapirLoopHints::ST_DAC: {
+    dbgs() << "Has forced spawning transformation: " << *L << "\n";
+    return TM_ForcedByUser;
+  } case TapirLoopHints::ST_SEQ:
+    return TM_Disable;
+  default:
+    return TM_Unspecified;
+  }
 }
 
 /// Does a BFS from a given node to all of its children inside a given loop.

@@ -99,6 +99,10 @@ public:
   /// level.
   bool SLPVectorization;
 
+  /// Tuning option to enable/disable loop stripmining. Its default value
+  /// is that of the flag: `-stripmine-loops`.
+  bool LoopStripmine;
+
   /// Tuning option to enable/disable loop unrolling. Its default value is true.
   bool LoopUnrolling;
 
