@@ -203,7 +203,7 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I, const CallBase *Call2,
   // If this is a detach, collect the ModRef info of the detached operations.
   if (auto D = dyn_cast<DetachInst>(I)) {
     ModRefInfo Result = ModRefInfo::NoModRef;
-    SmallPtrSet<BasicBlock *, 32> Visited;
+    SmallPtrSet<const BasicBlock *, 32> Visited;
     SmallVector<BasicBlock *, 32> WorkList;
     WorkList.push_back(D->getDetached());
     while (!WorkList.empty()) {
@@ -216,6 +216,9 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I, const CallBase *Call2,
         assert(!(D == &DI) &&
                "Detached CFG reaches its own Detach instruction.");
 
+        if (&DI == Call2)
+          return ModRefInfo::NoModRef;
+
         // No need to recursively check nested syncs or detaches, as nested
         // tasks are wholly contained in the detached sub-CFG we're iterating
         // through.
@@ -224,10 +227,8 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I, const CallBase *Call2,
 
         if (isa<LoadInst>(DI) || isa<StoreInst>(DI) ||
             isa<AtomicCmpXchgInst>(DI) || isa<AtomicRMWInst>(DI) ||
-            DI.isFenceLike() || ImmutableCallSite(&DI))
-          Result = unionModRef(Result, getModRefInfo(&DI, Call2));
-        if (&DI == Call2)
-          return ModRefInfo::NoModRef;
+            DI.isFenceLike() || isa<CallBase>(DI))
+          Result = unionModRef(Result, getModRefInfo(&DI, Call2, AAQI));
       }
 
       // Add successors
@@ -782,7 +783,7 @@ ModRefInfo AAResults::getModRefInfo(const DetachInst *D,
       if (isa<SyncInst>(I) || isa<DetachInst>(I))
         continue;
 
-      Result = unionModRef(Result, getModRefInfo(&I, Loc));
+      Result = unionModRef(Result, getModRefInfo(&I, Loc, AAQI));
 
       // Early-exit the moment we reach the top of the lattice.
       if (isModAndRefSet(Result))
@@ -818,7 +819,7 @@ ModRefInfo AAResults::getModRefInfo(const SyncInst *S,
       continue;
 
     if (const DetachInst *D = dyn_cast<DetachInst>(BB->getTerminator())) {
-      Result = unionModRef(Result, getModRefInfo(D, Loc));
+      Result = unionModRef(Result, getModRefInfo(D, Loc, AAQI));
 
       // Early-exit the moment we reach the top of the lattice.
       if (isModAndRefSet(Result))
