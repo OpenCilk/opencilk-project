@@ -299,6 +299,8 @@ TransformationMode hasUnrollAndJamTransformation(const Loop *L);
 TransformationMode hasVectorizeTransformation(const Loop *L);
 TransformationMode hasDistributeTransformation(const Loop *L);
 TransformationMode hasLICMVersioningTransformation(const Loop *L);
+TransformationMode hasLoopStripmineTransformation(const Loop *L);
+TransformationMode hasLoopSpawningTransformation(const Loop *L);
 /// @}
 
 /// Set input string into loop metadata by keeping other values intact.

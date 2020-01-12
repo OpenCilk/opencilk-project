@@ -47,8 +47,6 @@ void llvm::initializeScalarOpts(PassRegistry &Registry) {
   initializeEarlyCSELegacyPassPass(Registry);
   initializeEarlyCSEMemSSALegacyPassPass(Registry);
   initializeMakeGuardsExplicitLegacyPassPass(Registry);
-  initializeEarlyCSERhinoLegacyPassPass(Registry);
-  initializeEarlyCSEMemSSARhinoLegacyPassPass(Registry);
   initializeGVNHoistLegacyPassPass(Registry);
   initializeGVNSinkLegacyPassPass(Registry);
   initializeFlattenCFGLegacyPassPass(Registry);
@@ -59,7 +57,6 @@ void llvm::initializeScalarOpts(PassRegistry &Registry) {
   initializeJumpThreadingPass(Registry);
   initializeDFAJumpThreadingLegacyPassPass(Registry);
   initializeLegacyLICMPassPass(Registry);
-  initializeLegacyLICMRhinoPassPass(Registry);
   initializeLegacyLoopSinkPassPass(Registry);
   initializeLoopFuseLegacyPass(Registry);
   initializeLoopDataPrefetchLegacyPassPass(Registry);
@@ -269,14 +266,6 @@ void LLVMAddEarlyCSEPass(LLVMPassManagerRef PM) {
 
 void LLVMAddEarlyCSEMemSSAPass(LLVMPassManagerRef PM) {
   unwrap(PM)->add(createEarlyCSEPass(true/*=UseMemorySSA*/));
-}
-
-void LLVMAddEarlyCSERhinoPass(LLVMPassManagerRef PM) {
-  unwrap(PM)->add(createEarlyCSEPass(false/*=UseMemorySSA*/,true));
-}
-
-void LLVMAddEarlyCSEMemSSARhinoPass(LLVMPassManagerRef PM) {
-  unwrap(PM)->add(createEarlyCSEPass(true/*=UseMemorySSA*/,true));
 }
 
 void LLVMAddGVNHoistLegacyPass(LLVMPassManagerRef PM) {
