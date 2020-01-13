@@ -108,6 +108,7 @@ void llvm::initializeCodeGen(PassRegistry &Registry) {
   initializeStackSlotColoringPass(Registry);
   initializeStripDebugMachineModulePass(Registry);
   initializeTailDuplicatePass(Registry);
+  initializeTapirCleanupPass(Registry);
   initializeTargetPassConfigPass(Registry);
   initializeTwoAddressInstructionPassPass(Registry);
   initializeTypePromotionPass(Registry);
