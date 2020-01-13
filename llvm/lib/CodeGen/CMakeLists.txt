@@ -239,6 +239,7 @@ add_llvm_component_library(LLVMCodeGen
   SwitchLoweringUtils.cpp
   TailDuplication.cpp
   TailDuplicator.cpp
+  TapirCleanup.cpp
   TargetFrameLoweringImpl.cpp
   TargetInstrInfo.cpp
   TargetLoweringBase.cpp
