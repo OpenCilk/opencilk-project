@@ -485,6 +485,11 @@ namespace llvm {
   /// Creates MIR Check Debug pass. \see MachineCheckDebugify.cpp
   ModulePass *createCheckDebugMachineModulePass();
 
+/// Clean up any remaining Tapir instructions.  Typically, this pass should
+  /// have no effect, because Tapir instructions should have been lowered
+  /// already to a particular parallel runtime.
+  FunctionPass *createTapirCleanupPass();
+
   /// The pass fixups statepoint machine instruction to replace usage of
   /// caller saved registers with stack slots.
   extern char &FixupStatepointCallerSavedID;
