@@ -231,10 +231,6 @@ static cl::opt<bool> EnableSyntheticCounts(
     cl::desc("Run synthetic function entry count generation "
              "pass"));
 
-static cl::opt<bool> EnableDRFAA(
-    "enable-npm-drf-aa", cl::init(false), cl::Hidden,
-    cl::desc("Enable AA based on the data-race-free assumption (default = off)"));
-
 static const Regex DefaultAliasRegex(
     "^(default|thinlto-pre-link|thinlto|lto-pre-link|lto)<(O[0123sz])>$");
 
@@ -958,8 +954,6 @@ ModulePassManager PassBuilder::buildModuleOptimizationPipeline(
     OptimizePM.addPass(JumpThreadingPass());
     OptimizePM.addPass(CorrelatedValuePropagationPass());
     OptimizePM.addPass(InstCombinePass());
-    if (EnableDRFAA)
-      OptimizePM.addPass(DRFScopedNoAliasPass());
   }
 
   for (auto &C : VectorizerStartEPCallbacks)
@@ -1140,9 +1134,6 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
 
   ModulePassManager MPM(DebugLogging);
   bool TapirHasBeenLowered = !LowerTapir;
-
-  if (EnableDRFAA)
-    MPM.addPass(createModuleToFunctionPassAdaptor(DRFScopedNoAliasPass()));
 
   // Force any function attributes we want the rest of the pipeline to observe.
   MPM.addPass(ForceFunctionAttrsPass());
