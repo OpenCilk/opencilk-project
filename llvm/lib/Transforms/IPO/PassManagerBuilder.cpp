@@ -185,10 +185,6 @@ static cl::opt<bool> EnableSerializeSmallTasks(
   "enable-serialize-small-tasks", cl::Hidden, cl::init(false),
   cl::desc("Serialize any Tapir tasks found to be unprofitable (default = off)"));
 
-static cl::opt<bool> EnableDRFAA(
-    "enable-drf-aa", cl::init(false), cl::Hidden,
-    cl::desc("Enable AA based on the data-race-free assumption (default = off)"));
-
 static cl::opt<bool> DisableTapirOpts(
     "disable-tapir-opts", cl::init(false), cl::Hidden,
     cl::desc("Disable Tapir optimizations by outlining Tapir tasks early"));
@@ -570,7 +566,6 @@ void PassManagerBuilder::populateModulePassManager(
     addExtensionsToPM(EP_TapirLoopEnd, MPM);
 
     if (TapirTargetID::None != TapirTarget) {
-      // MPM.add(createAnalyzeTapirPass());
       MPM.add(createLowerTapirToTargetPass());
       // The lowering pass may leave cruft around.  Clean it up.
       MPM.add(createCFGSimplificationPass());
@@ -614,8 +609,6 @@ void PassManagerBuilder::populateModulePassManager(
   if (LibraryInfo)
     MPM.add(new TargetLibraryInfoWrapperPass(*LibraryInfo));
 
-  if (EnableDRFAA)
-    MPM.add(createDRFScopedNoAliasWrapperPass());
   addInitialAliasAnalysisPasses(MPM);
 
   // For ThinLTO there are two passes of indirect call promotion. The
@@ -835,8 +828,6 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createJumpThreadingPass());         // Thread jumps
     MPM.add(createCorrelatedValuePropagationPass());
     addInstructionCombiningPass(MPM);
-    if (EnableDRFAA)
-      MPM.add(createDRFScopedNoAliasWrapperPass());
   }
 
   addExtensionsToPM(EP_VectorizerStart, MPM);
@@ -856,8 +847,6 @@ void PassManagerBuilder::populateModulePassManager(
 
   if (EnableSerializeSmallTasks)
     MPM.add(createSerializeSmallTasksPass());
-  if (EnableDRFAA)
-    MPM.add(createDRFScopedNoAliasWrapperPass());
 
   // Eliminate loads by forwarding stores from the previous iteration to loads
   // of the current iteration.
@@ -990,7 +979,6 @@ void PassManagerBuilder::populateModulePassManager(
     addExtensionsToPM(EP_TapirLate, MPM);
 
   if (!TapirHasBeenLowered) {
-    // MPM.add(createAnalyzeTapirPass());
     // First handle Tapir loops.  First, simplify their induction variables.
     MPM.add(createIndVarSimplifyPass());
     // Re-rotate loops in all our loop nests. These may have fallout out of
