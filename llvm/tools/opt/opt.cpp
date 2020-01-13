@@ -610,6 +610,7 @@ int main(int argc, char **argv) {
   initializeHardwareLoopsPass(Registry);
   initializeTypePromotionPass(Registry);
   initializeReplaceWithVeclibLegacyPass(Registry);
+  initializeTapirCleanupPass(Registry);
 
 #ifdef BUILD_EXAMPLES
   initializeExampleIRTransforms(Registry);
