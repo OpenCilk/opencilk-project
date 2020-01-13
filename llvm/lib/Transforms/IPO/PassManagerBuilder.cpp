@@ -228,7 +228,6 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
   }
 
   PM.add(createSerializeSmallTasksPass());
-  PM.add(createDRFScopedNoAliasWrapperPass());
 
   if (!IsFullLTO) {
     // Eliminate loads by forwarding stores from the previous iteration to loads
@@ -316,7 +315,6 @@ void PassManagerBuilder::populateModulePassManager(
     }
 
     if (TapirTargetID::None != TapirTarget) {
-      // MPM.add(createAnalyzeTapirPass());
       MPM.add(createLowerTapirToTargetPass());
       // The lowering pass may leave cruft around.  Clean it up.
       MPM.add(createCFGSimplificationPass());
@@ -500,7 +498,6 @@ void PassManagerBuilder::populateModulePassManager(
   MPM.add(createTaskSimplifyPass());
 
   if (!TapirHasBeenLowered) {
-    // MPM.add(createAnalyzeTapirPass());
     // First handle Tapir loops.  First, simplify their induction variables.
     MPM.add(createIndVarSimplifyPass());
     // Re-rotate loops in all our loop nests. These may have fallout out of
