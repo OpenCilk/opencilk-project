@@ -42,6 +42,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -228,7 +229,7 @@ static bool removeUselessSyncs(Function &F, DomTreeUpdater *DTU) {
 
           // Ignore predecessors via a reattach, which belong to child detached
           // contexts.
-          if (isa<ReattachInst>(PT))
+          if (isa<ReattachInst>(PT) || isDetachedRethrow(PT))
             continue;
 
           // For a predecessor terminated by a sync instruction, check the sync
