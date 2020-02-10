@@ -613,6 +613,7 @@ struct EHPersonality {
   static const EHPersonality GNU_ObjCXX;
   static const EHPersonality NeXT_ObjC;
   static const EHPersonality GNU_CPlusPlus;
+  static const EHPersonality GNU_Cilk;
   static const EHPersonality GNU_CPlusPlus_SJLJ;
   static const EHPersonality GNU_CPlusPlus_SEH;
   static const EHPersonality MSVC_except_handler;
