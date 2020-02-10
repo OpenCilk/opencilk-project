@@ -104,6 +104,8 @@ EHPersonality::NeXT_ObjC = { "__objc_personality_v0", nullptr };
 const EHPersonality
 EHPersonality::GNU_CPlusPlus = { "__gxx_personality_v0", nullptr };
 const EHPersonality
+EHPersonality::GNU_Cilk = { "__cilk_personality_v0", nullptr };
+const EHPersonality
 EHPersonality::GNU_CPlusPlus_SJLJ = { "__gxx_personality_sj0", nullptr };
 const EHPersonality
 EHPersonality::GNU_CPlusPlus_SEH = { "__gxx_personality_seh0", nullptr };
@@ -191,6 +193,8 @@ static const EHPersonality &getCXXPersonality(const TargetInfo &Target,
     return EHPersonality::GNU_Wasm_CPlusPlus;
   if (T.isOSzOS())
     return EHPersonality::ZOS_CPlusPlus;
+  if (L.Cilk)
+    return EHPersonality::GNU_Cilk;
   return EHPersonality::GNU_CPlusPlus;
 }
 
