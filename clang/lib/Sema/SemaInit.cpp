@@ -7834,6 +7834,8 @@ ExprResult InitializationSequence::Perform(Sema &S,
     assert(Kind.getKind() == InitializationKind::IK_Copy ||
            Kind.isExplicitCast() ||
            Kind.getKind() == InitializationKind::IK_DirectList);
+    if (IsSpawned)
+      return S.ActOnCilkSpawnExpr(SpawnLoc, Args[0]);
     return ExprResult(Args[0]);
   }
 
