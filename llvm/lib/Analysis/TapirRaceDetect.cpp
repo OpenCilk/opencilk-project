@@ -975,8 +975,8 @@ bool AccessPtrAnalysis::checkOpaqueAccesses(GeneralAccess &GA1,
     return false;
 
   if (!GA1.Loc && !GA2.Loc) {
-    const CallBase *Call1 = cast<CallBase>(GA1.I);
-    const CallBase *Call2 = cast<CallBase>(GA2.I);
+    const CallBase *Call1 = cast<CallBase>(GA1.I); (void)Call1;
+    const CallBase *Call2 = cast<CallBase>(GA2.I); (void)Call2;
 
     assert(!AA->doesNotAccessMemory(Call1) && !AA->doesNotAccessMemory(Call2) &&
            "Opaque call does not access memory.");
