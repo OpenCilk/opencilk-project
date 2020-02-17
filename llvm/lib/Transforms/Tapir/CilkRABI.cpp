@@ -332,19 +332,25 @@ Function *CilkRABI::Get__cilkrts_pop_frame() {
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
   IRBuilder<> B(Entry);
 
+  // TODO(jfc): Relaxed memory order is probably allowed for all
+  // operations here.  All communication with other threads is
+  // gated by the Dekker protocol which has a store-load memory barrier.
+  // The compiler does need to be aware that values of the apparently
+  // local stack frame can not be saved in registers across calls that
+  // might cause the frame to be stolen.
   // sf->worker->current_stack_frame = sf->call_parent;
   StoreSTyField(B, DL, WorkerTy,
                 LoadSTyField(B, DL, StackFrameTy, SF,
                              StackFrameFields::call_parent,
                              /*isVolatile=*/false,
-                             AtomicOrdering::NotAtomic),
+                             AtomicOrdering::Unordered),
                 LoadSTyField(B, DL, StackFrameTy, SF,
                              StackFrameFields::worker,
                              /*isVolatile=*/false,
-                             AtomicOrdering::Acquire),
+                             AtomicOrdering::Unordered),
                 WorkerFields::current_stack_frame,
                 /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                AtomicOrdering::Unordered);
 
   // sf->call_parent = nullptr;
   StoreSTyField(B, DL, StackFrameTy,
@@ -400,21 +406,44 @@ Function *CilkRABI::Get__cilkrts_detach() {
   // struct __cilkrts_worker *w = sf->worker;
   Value *W = LoadSTyField(B, DL, StackFrameTy, SF,
                           StackFrameFields::worker, /*isVolatile=*/false,
-                          AtomicOrdering::NotAtomic);
+                          AtomicOrdering::Unordered);
 
   // __cilkrts_stack_frame *parent = sf->call_parent;
   Value *Parent = LoadSTyField(B, DL, StackFrameTy, SF,
                                StackFrameFields::call_parent,
                                /*isVolatile=*/false,
-                               AtomicOrdering::NotAtomic);
+                               AtomicOrdering::Unordered);
+
+  // sf->flags |= CILK_FRAME_DETACHED;
+  {
+#if 0
+    // JFC: No need for atomic operation, the store-release of flags
+    // will push the value out to be visible to any thief.
+    B.CreateAtomicRMW(AtomicRMWInst::Or, GEP(B, SF, StackFrameFields::flags),
+		      ConstantInt::get(Type::getInt32Ty(Ctx),
+				       CILK_FRAME_DETACHED),
+		      AtomicOrdering::AcquireRelease);
+#else
+    Value *F = LoadSTyField(B, DL, StackFrameTy, SF,
+                            StackFrameFields::flags, /*isVolatile=*/false,
+                            AtomicOrdering::Unordered);
+    F = B.CreateOr(F, ConstantInt::get(F->getType(), CILK_FRAME_DETACHED));
+    StoreSTyField(B, DL, StackFrameTy, F, SF,
+                  StackFrameFields::flags, /*isVolatile=*/true,
+                  AtomicOrdering::Unordered);
+#endif
+  }
 
   // __cilkrts_stack_frame *volatile *tail = w->tail;
   Value *Tail = LoadSTyField(B, DL, WorkerTy, W,
                              WorkerFields::tail, /*isVolatile=*/false,
-                             AtomicOrdering::Acquire);
+                             AtomicOrdering::Unordered);
 
+  // JFC: This fence does not seem necessary.  The thief
+  // needs to load tail with acquire, and it will see all
+  // stores prior to the store with release below.
   // StoreStore_fence();
-  B.CreateFence(AtomicOrdering::Release);
+  // B.CreateFence(AtomicOrdering::Release);
 
   // *tail++ = parent;
   B.CreateStore(Parent, Tail, /*isVolatile=*/true);
@@ -423,17 +452,6 @@ Function *CilkRABI::Get__cilkrts_detach() {
   // w->tail = tail;
   StoreSTyField(B, DL, WorkerTy, Tail, W, WorkerFields::tail,
                 /*isVolatile=*/false, AtomicOrdering::Release);
-
-  // sf->flags |= CILK_FRAME_DETACHED;
-  {
-    Value *F = LoadSTyField(B, DL, StackFrameTy, SF,
-                            StackFrameFields::flags, /*isVolatile=*/false,
-                            AtomicOrdering::Acquire);
-    F = B.CreateOr(F, ConstantInt::get(F->getType(), CILK_FRAME_DETACHED));
-    StoreSTyField(B, DL, StackFrameTy, F, SF,
-                  StackFrameFields::flags, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
-  }
 
   B.CreateRetVoid();
 
@@ -492,10 +510,13 @@ Function *CilkRABI::GetCilkSyncFn() {
   {
     IRBuilder<> B(Entry);
 
+    // JFC: I removed Acquire here.  The runtime has a fence in any path
+    // between setting and reading the bit.  The compiler should know that
+    // memory changes at the setjmp that precedes this test.
     // if (sf->flags & CILK_FRAME_UNSYNCHED)
     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
                                 StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
+                                AtomicOrdering::Unordered);
     Flags = B.CreateAnd(Flags,
                         ConstantInt::get(Flags->getType(),
                                          CILK_FRAME_UNSYNCHED));
@@ -641,7 +662,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
     StoreSTyField(B, DL, StackFrameTy,
                   ConstantInt::get(Ty, CILK_FRAME_VERSION),
                   SF, StackFrameFields::flags, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+                  AtomicOrdering::Unordered);
     B.CreateBr(Cont);
   }
   // Block  (Cont)
@@ -657,13 +678,13 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
                   LoadSTyField(B, DL, WorkerTy, Wkr,
                                WorkerFields::current_stack_frame,
                                /*isVolatile=*/false,
-                               AtomicOrdering::Acquire),
+                               AtomicOrdering::Unordered),
                   SF, StackFrameFields::call_parent, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+                  AtomicOrdering::Unordered);
     // sf->worker = w;
     StoreSTyField(B, DL, StackFrameTy, Wkr, SF,
                   StackFrameFields::worker, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+                  AtomicOrdering::Unordered);
     // w->current_stack_frame = sf;
     StoreSTyField(B, DL, WorkerTy, SF, Wkr,
                   WorkerFields::current_stack_frame, /*isVolatile=*/false,
@@ -727,19 +748,19 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
   StoreSTyField(B, DL, StackFrameTy,
                 ConstantInt::get(Ty, CILK_FRAME_VERSION),
                 SF, StackFrameFields::flags, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                AtomicOrdering::Unordered);
   // sf->call_parent = w->current_stack_frame;
   StoreSTyField(B, DL, StackFrameTy,
                 LoadSTyField(B, DL, WorkerTy, W,
                              WorkerFields::current_stack_frame,
                              /*isVolatile=*/false,
-                             AtomicOrdering::Acquire),
+                             AtomicOrdering::Unordered),
                 SF, StackFrameFields::call_parent, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                AtomicOrdering::Unordered);
   // sf->worker = w;
   StoreSTyField(B, DL, StackFrameTy, W, SF,
                 StackFrameFields::worker, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                AtomicOrdering::Unordered);
   // w->current_stack_frame = sf;
   StoreSTyField(B, DL, WorkerTy, SF, W,
                 WorkerFields::current_stack_frame, /*isVolatile=*/false,
@@ -792,10 +813,12 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     // __cilkrts_pop_frame(sf)
     PopFrame = B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
 
+    // JFC: I removed AtomicOrdering::Acquire here.  If flags have been
+    // changed at least one change was in this function.
     // if (sf->flags != CILK_FRAME_VERSION)
     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
                                 StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
+                                AtomicOrdering::Unordered);
     Value *Cond = B.CreateICmpNE(
         Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_VERSION));
     B.CreateCondBr(Cond, B1, Exit);
