@@ -1071,7 +1071,7 @@ void CilkRABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
       }
       printf("Here.\n");
       printf("BB name:\n");
-      printf(Builder->GetInsertBlock()->getName().str());
+      printf(Builder->GetInsertBlock()->getName().data());
       printf("\n");
     }
   }
