@@ -73,6 +73,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <algorithm>
 #include <cassert>
@@ -249,6 +250,9 @@ namespace {
       LoopHeader = CurrentLoop->getHeader();
       LoopPreheader = CurrentLoop->getLoopPreheader();
     }
+
+    void GetLoopExitBlocks(Loop *L,
+                           SmallVectorImpl<BasicBlock *> &ExitBlocks);
 
     /// Split all of the edges from inside the loop to their exit blocks.
     /// Update the appropriate Phi nodes as we do so.
@@ -1429,6 +1433,107 @@ void LoopUnswitch::splitExitEdges(
   }
 }
 
+// Helper function to walk the hierarchy of tasks containing BasicBlock BB to
+// get the top-level task in loop L that contains BB.
+static Task *GetTopLevelTaskFor(BasicBlock *BB, Loop *L, TaskInfo *TaskI) {
+  Task *T = TaskI->getTaskFor(BB);
+  // Return null if we don't find a task for BB contained in L.
+  if (!T || !L->contains(T->getEntry()))
+    return nullptr;
+
+  // Walk up the tree of tasks until we discover a task containing BB that is
+  // outside of L.
+  while (L->contains(T->getParentTask()->getEntry()))
+    T = T->getParentTask();
+
+  return T;
+}
+
+// Helper function to walk the CFG from BasicBlock Exit in task SubT, which is
+// contained in loop L.  Specifically, find blocks that should be considered
+// part of L -- even if control flow makes them appear to be loop exits -- as
+// well as true exit blocks, which exit SubT.  LoopUnswitching should clone
+// these blocks in SubT along with the rest of the blocks in L, and it should
+// treat the exits of SubT as exits from L.
+//
+// The exits from SubT are pushed onto TaskExits.  If Blocks is non-null, then
+// non-exit basic blocks found during the traversal are pushed onto Blocks.
+// Visited keeps track of basic blocks that have already been examined by other
+// calls to this method.
+static void GetTaskExits(BasicBlock *Exit, Task *SubT, Loop *L,
+                         SmallVectorImpl<BasicBlock *> &TaskExits,
+                         std::vector<BasicBlock *> *Blocks,
+                         SmallPtrSetImpl<BasicBlock *> &Visited) {
+  // Get the sync region of this task.
+  Value *SyncReg = SubT->getDetach()->getSyncRegion();
+  // Traverse the CFG to find the exit blocks from SubT.
+  SmallVector<BasicBlock *, 4> Worklist;
+  Worklist.push_back(Exit);
+  while (!Worklist.empty()) {
+    BasicBlock *BB = Worklist.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+
+    assert(!L->contains(BB) && "Loop contains successor of an exit block.");
+
+    if (Blocks)
+      // Add this block to the vector of loop blocks to clone.
+      Blocks->push_back(BB);
+
+    // We only need to worry about encountering detached-rethrow exits from BB.
+    if (isDetachedRethrow(BB->getTerminator(), SyncReg)) {
+      // Add the unwind destionation of this detached rethrow as an exit.
+      TaskExits.push_back(
+          cast<InvokeInst>(BB->getTerminator())->getUnwindDest());
+      // Don't search the successors of BB.
+      continue;
+    }
+
+    // Add successors of BB to the worklist.
+    for (BasicBlock *Succ : successors(BB))
+      Worklist.push_back(Succ);
+  }
+}
+
+void LoopUnswitch::GetLoopExitBlocks(Loop *L,
+                                    SmallVectorImpl<BasicBlock *> &ExitBlocks) {
+  // Get the unique exit blocks for L.
+  SmallVector<BasicBlock*, 8> LoopExitBlocks;
+  L->getUniqueExitBlocks(LoopExitBlocks);
+
+  // Update the set of exits
+  SmallVector<BasicBlock*, 8> FixedExits;
+  SmallPtrSet<BasicBlock*, 8> Visited;
+  for (BasicBlock *Exit : LoopExitBlocks) {
+    if (Task *SubT = GetTopLevelTaskFor(Exit, L, TaskI)) {
+      // The exit blocks lives in a subtask.  Traverse that subtask to find the
+      // correct exit blocks.
+      GetTaskExits(Exit, SubT, L, FixedExits, nullptr, Visited);
+      continue;
+    }
+    FixedExits.push_back(Exit);
+  }
+
+  // Split all of the edges from inside the loop to their exit blocks.  Update
+  // the appropriate Phi nodes as we do so.
+  splitExitEdges(L, FixedExits);
+
+  // The exit blocks may have been changed due to edge splitting, recompute.
+  LoopExitBlocks.clear();
+  L->getUniqueExitBlocks(LoopExitBlocks);
+
+  Visited.clear();
+  for (BasicBlock *Exit : LoopExitBlocks) {
+    if (Task *SubT = GetTopLevelTaskFor(Exit, L, TaskI)) {
+      // The exit blocks lives in a subtask.  Traverse that subtask to find the
+      // correct exit blocks.  Add any non-exit blocks found to LoopBlocks.
+      GetTaskExits(Exit, SubT, L, ExitBlocks, &LoopBlocks, Visited);
+      continue;
+    }
+    ExitBlocks.push_back(Exit);
+  }
+}
+
 /// We determined that the loop is profitable to unswitch when LIC equal Val.
 /// Split it into loop versions and test the condition outside of either loop.
 /// Return the loops created as Out1/Out2.
@@ -1462,15 +1567,7 @@ void LoopUnswitch::unswitchNontrivialCondition(
   llvm::append_range(LoopBlocks, L->blocks());
 
   SmallVector<BasicBlock*, 8> ExitBlocks;
-  L->getUniqueExitBlocks(ExitBlocks);
-
-  // Split all of the edges from inside the loop to their exit blocks.  Update
-  // the appropriate Phi nodes as we do so.
-  splitExitEdges(L, ExitBlocks);
-
-  // The exit blocks may have been changed due to edge splitting, recompute.
-  ExitBlocks.clear();
-  L->getUniqueExitBlocks(ExitBlocks);
+  GetLoopExitBlocks(L, ExitBlocks);
 
   // Add exit blocks to the loop blocks.
   llvm::append_range(LoopBlocks, ExitBlocks);
