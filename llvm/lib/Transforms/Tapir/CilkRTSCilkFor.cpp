@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Tapir/Outline.h"
@@ -25,6 +26,9 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "cilkrtscilkfor"
+
+STATISTIC(LoopsUsingRuntimeCilkFor,
+          "Number of Tapir loops implemented using runtime cilk_for");
 
 cl::opt<bool> llvm::UseRuntimeCilkFor(
     "cilk-use-runtime-cilkfor", cl::init(false), cl::Hidden,
@@ -191,6 +195,8 @@ void RuntimeCilkFor::processOutlinedLoopCall(TapirLoopInfo &TL,
     TOI.replaceReplCall(Call);
     ReplCall->eraseFromParent();
   }
+
+  ++LoopsUsingRuntimeCilkFor;
 
   // If we're not using dynamic argument structs, then no further processing is
   // needed.
