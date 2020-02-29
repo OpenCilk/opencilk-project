@@ -39,9 +39,6 @@ using namespace llvm;
 
 #define DEBUG_TYPE "cilkabi"
 
-STATISTIC(LoopsUsingRuntimeCilkFor,
-          "Number of Tapir loops implemented using runtime cilk_for");
-
 static cl::opt<bool> fastCilk(
     "fast-cilk", cl::init(false), cl::Hidden,
     cl::desc("Attempt faster Cilk call implementation"));
