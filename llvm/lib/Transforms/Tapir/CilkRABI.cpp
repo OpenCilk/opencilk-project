@@ -1059,22 +1059,6 @@ void CilkRABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
     return;
 
   inlineCilkFunctions(F);
-
-  if (F.getName() == "cilk_main") {
-    printf("CILK_MAIN\n");
-    // Wrap cilk_main in a try-catch, to avoid having cxa_throw call terminate
-    // on its own.
-    EscapeEnumerator EE(F, "cilk_main.cleanup", true);
-    while (IRBuilder<> *Builder = EE.Next()) {
-      if (!Builder) {
-        continue;
-      }
-      printf("Here.\n");
-      printf("BB name:\n");
-      printf(Builder->GetInsertBlock()->getName().str());
-      printf("\n");
-    }
-  }
 }
 
 void CilkRABI::postProcessHelper(Function &F) {
