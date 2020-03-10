@@ -1105,8 +1105,11 @@ public:
     }
 
     void addImplicitSync() {
-      if (!InnerSyncScope)
+      if (!InnerSyncScope) {
         InnerSyncScope = new ImplicitSyncScope(CGF);
+        // >>>>>>> ?
+        CGF.EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup);
+      }
     }
   };
 
@@ -1248,6 +1251,7 @@ public:
     llvm::DetachInst *Detach = nullptr;
     llvm::BasicBlock *DetachedBlock = nullptr;
     llvm::BasicBlock *ContinueBlock = nullptr;
+    llvm::BasicBlock *TempInvokeDest = nullptr;
 
     // Pointer to the parent detach scope.
     DetachScope *ParentScope;
@@ -1364,6 +1368,17 @@ public:
     // task has started.
     Address CreateDetachedMemTemp(QualType Ty, StorageDuration SD,
                                   const Twine &Name = "det.tmp");
+<<<<<<< HEAD
+=======
+
+    bool IsDetachStarted() const { return DetachStarted; }
+
+    llvm::BasicBlock *getTempInvokeDest() {
+      if (!TempInvokeDest)
+        TempInvokeDest = CGF.createBasicBlock("temp.invoke.dest");
+        return TempInvokeDest;
+    }
+>>>>>>> 989ef1cdda4... TB's CallDetRethrow
   };
 
   /// The current detach scope.
