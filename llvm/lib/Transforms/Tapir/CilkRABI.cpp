@@ -886,40 +886,49 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
     IRB.CreateCall(CILKRTS_FUNC(detach), Args);
   }
 
-  EscapeEnumerator EE(Extracted, "cilkrabi_epilogue", false);
-  while (IRBuilder<> *AtExit = EE.Next()) {
-    if (isa<ReturnInst>(AtExit->GetInsertPoint()))
-      AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
-    else if (ResumeInst *RI = dyn_cast<ResumeInst>(AtExit->GetInsertPoint())) {
+  // Add eh cleanup that returns control to the runtime
+  EscapeEnumerator EE(Extracted, "cilkrabi_cleanup", true);
+  while (IRBuilder<> *Builder = EE.Next()) {
+    // TODO: maybe need to change this to a different cilkrts function
+    Builder->CreateCall(CILKRTS_FUNC(leave_frame), SF)->setDoesNotReturn();
+  }
+
+  // NOTE(grace): This currently doesn't do anything anyways b/c
+  //              CatchExceptions == false
+  //EscapeEnumerator EE(Extracted, "cilkrabi_epilogue", false);
+  //while (IRBuilder<> *AtExit = EE.Next()) {
+  //  if (isa<ReturnInst>(AtExit->GetInsertPoint()))
+  //    AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
+  //  else if (ResumeInst *RI = dyn_cast<ResumeInst>(AtExit->GetInsertPoint())) {
       // TODO: Handle exceptions.
       // /*
       //   sf.flags = sf.flags | CILK_FRAME_EXCEPTING;
       //   sf.except_data = Exn;
       // */
-      // IRBuilder<> B(RI);
-      // Value *Exn = AtExit->CreateExtractValue(RI->getValue(),
-      //                                         ArrayRef<unsigned>(0));
-      // Value *Flags = LoadSTyField(*AtExit, DL, StackFrameTy, SF,
-      //                             StackFrameFields::flags,
-      //                             /*isVolatile=*/false,
-      //                             AtomicOrdering::Acquire);
-      // Flags = AtExit->CreateOr(Flags,
-      //                          ConstantInt::get(Flags->getType(),
-      //                                           CILK_FRAME_EXCEPTING));
-      // StoreSTyField(*AtExit, DL, StackFrameTy, Flags, SF,
-      //               StackFrameFields::flags, /*isVolatile=*/false,
-      //               AtomicOrdering::Release);
-      // StoreSTyField(*AtExit, DL, StackFrameTy, Exn, SF,
-      //               StackFrameFields::except_data, /*isVolatile=*/false,
-      //               AtomicOrdering::Release);
+      //IRBuilder<> B(RI);
+      //Value *Exn = AtExit->CreateExtractValue(RI->getValue(),
+      //                                        ArrayRef<unsigned>(0));
+      //Value *Flags = LoadSTyField(*AtExit, DL, StackFrameTy, SF,
+      //                            StackFrameFields::flags,
+      //                            /*isVolatile=*/false,
+      //                            AtomicOrdering::Acquire);
+      //Flags = AtExit->CreateOr(Flags,
+      //                         ConstantInt::get(Flags->getType(),
+      //                                          CILK_FRAME_EXCEPTING));
+      //StoreSTyField(*AtExit, DL, StackFrameTy, Flags, SF,
+      //              StackFrameFields::flags, /*isVolatile=*/false,
+      //              AtomicOrdering::Release);
+      //StoreSTyField(*AtExit, DL, StackFrameTy, Exn, SF,
+      //              StackFrameFields::except_data, /*isVolatile=*/false,
+      //              AtomicOrdering::Release);
       /*
         __cilkrts_pop_frame(&sf);
         if (sf->flags)
           __cilkrts_leave_frame(&sf);
       */
-      AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
-    }
-  }
+  //    AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
+  //  }
+  //}
 
   return true;
 }
