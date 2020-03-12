@@ -454,7 +454,8 @@ bool isPlaceholderSuccessor(const BasicBlock *B);
 void getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
                    SmallPtrSetImpl<BasicBlock *> &ReattachBlocks,
                    SmallPtrSetImpl<BasicBlock *> &TaskResumeBlocks,
-                   SmallPtrSetImpl<BasicBlock *> &SharedEHEntries);
+                   SmallPtrSetImpl<BasicBlock *> &SharedEHEntries,
+                   const DominatorTree *DT);
 
 /// Outlines the content of task \p T in function \p F into a new helper
 /// function.  The parameter \p Inputs specified the inputs to the helper
