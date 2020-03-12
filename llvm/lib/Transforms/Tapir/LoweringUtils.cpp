@@ -537,7 +537,8 @@ bool llvm::isPlaceholderSuccessor(const BasicBlock *B) {
 void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
                          SmallPtrSetImpl<BasicBlock *> &ReattachBlocks,
                          SmallPtrSetImpl<BasicBlock *> &TaskResumeBlocks,
-                         SmallPtrSetImpl<BasicBlock *> &SharedEHEntries) {
+                         SmallPtrSetImpl<BasicBlock *> &SharedEHEntries,
+                         const DominatorTree *DT) {
   NamedRegionTimer NRT("getTaskBlocks", "Get task blocks", TimerGroupName,
                        TimerGroupDescription, TimePassesIsEnabled);
   SmallPtrSet<Spindle *, 8> SpindlesToExclude;
@@ -580,6 +581,13 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
     }
   }
 
+  // Record the predecessor spindles of the EH continuation, if there is one.
+  Spindle *EHContinuation = T->getEHContinuationSpindle();
+  SmallPtrSet<Spindle *, 2> EHContPred;
+  if (EHContinuation)
+    for (Spindle *Pred : predecessors(EHContinuation))
+      EHContPred.insert(Pred);
+
   // Add the spindles in the task proper.
   for (Spindle *S : depth_first<InTask<Spindle *>>(T->getEntrySpindle())) {
     if (SpindlesToExclude.count(S))
@@ -590,6 +598,18 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
     // Record the entry blocks of any shared-EH spindles.
     if (S->isSharedEH())
       SharedEHEntries.insert(S->getEntry());
+
+    // At -O0, the always-inliner can create blocks in the predecessor spindles
+    // of the EH continuation that are not reachable from the entry.  These
+    // blocks are not cloned, but we mark them as shared EH entries so that
+    // outlining can correct any PHI nodes in those blocks.
+    if (EHContPred.count(S))
+      for (BasicBlock *B : S->blocks())
+        for (BasicBlock *Pred : predecessors(B))
+          if (!DT->isReachableFromEntry(Pred)) {
+            SharedEHEntries.insert(B);
+            break;
+          }
 
     for (BasicBlock *B : S->blocks()) {
       // Skip basic blocks that are successors of detached rethrows.  They're
@@ -627,7 +647,7 @@ Function *llvm::createHelperForTask(
   // rewritten in the cloned helper.
   SmallPtrSet<BasicBlock *, 4> SharedEHEntries;
   getTaskBlocks(T, TaskBlocks, ReattachBlocks, TaskResumeBlocks,
-                SharedEHEntries);
+                SharedEHEntries, DT);
 
   SmallVector<ReturnInst *, 4> Returns;  // Ignore returns cloned.
   ValueSet Outputs;
