@@ -1073,7 +1073,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
     CreateHelper(Args, Outputs, TLBlocks, Header,
                  Preheader, TL->getExitBlock(), VMap, DestM,
                  F.getSubprogram() != nullptr, Returns,
-                 NameSuffix.str(), nullptr, &DetachedRethrowBlocks,
+                 NameSuffix.str(), &DT, nullptr, &DetachedRethrowBlocks,
                  &SharedEHEntries, TL->getUnwindDest(), &UnreachableExits,
                  InputSyncRegion, nullptr, nullptr, nullptr, nullptr);
   } // end timed region
