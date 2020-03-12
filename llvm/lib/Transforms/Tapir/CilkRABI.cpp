@@ -889,7 +889,7 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
   // Add eh cleanup that returns control to the runtime
   EscapeEnumerator EE(Extracted, "cilkrabi_cleanup", true);
   while (IRBuilder<> *Builder = EE.Next()) {
-    // TODO: maybe need to change this to a different cilkrts function
+    Builder->CreateCall(CILKRTS_FUNC(pop_frame), SF);
     Builder->CreateCall(CILKRTS_FUNC(leave_frame), SF)->setDoesNotReturn();
   }
 
