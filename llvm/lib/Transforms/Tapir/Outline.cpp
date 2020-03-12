@@ -36,7 +36,8 @@ void llvm::CloneIntoFunction(
     Function *NewFunc, const Function *OldFunc,
     std::vector<BasicBlock *> Blocks, ValueToValueMapTy &VMap,
     bool ModuleLevelChanges, SmallVectorImpl<ReturnInst *> &Returns,
-    const StringRef NameSuffix, SmallPtrSetImpl<BasicBlock *> *ReattachBlocks,
+    const StringRef NameSuffix, DominatorTree *DT,
+    SmallPtrSetImpl<BasicBlock *> *ReattachBlocks,
     SmallPtrSetImpl<BasicBlock *> *DetachedRethrowBlocks,
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries,
     DISubprogram *SP, ClonedCodeInfo *CodeInfo,
@@ -150,6 +151,26 @@ void llvm::CloneIntoFunction(
     }
   }
 
+  // Clean up all dead predecessors of phi nodes
+  SmallVector<BasicBlock *, 4> NoPred;
+  for (BasicBlock *BB : Blocks) {
+    BasicBlock *CBB = cast<BasicBlock>(VMap[BB]);
+    BasicBlock::iterator CBI = CBB->begin();
+    while (PHINode *PN = dyn_cast<PHINode>(CBI)) {
+      // Cloned blocks do not have predecessors yet, so check the predecessors
+      // of the original blocks.
+      for (BasicBlock *PredB : predecessors(BB)) {
+        if (!DT->isReachableFromEntry(PredB)) {
+          if (PN->getBasicBlockIndex(PredB) > -1) {
+            LLVM_DEBUG(dbgs() << "Removing : " << *PredB << "\n");
+            PN->removeIncomingValue(PredB);
+          }
+        }
+      }
+      ++CBI;
+    }
+  }
+
   for (DISubprogram *ISP : DIFinder.subprograms())
     if (ISP != SP)
       VMap.MD()[ISP].reset(ISP);
@@ -189,6 +210,7 @@ Function *llvm::CreateHelper(
     const BasicBlock *OldEntry, const BasicBlock *OldExit,
     ValueToValueMapTy &VMap, Module *DestM, bool ModuleLevelChanges,
     SmallVectorImpl<ReturnInst *> &Returns, const StringRef NameSuffix,
+    DominatorTree *DT,
     SmallPtrSetImpl<BasicBlock *> *ReattachBlocks,
     SmallPtrSetImpl<BasicBlock *> *DetachRethrowBlocks,
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries,
@@ -368,7 +390,7 @@ Function *llvm::CreateHelper(
 
   // Clone Blocks into the new function.
   CloneIntoFunction(NewFunc, OldFunc, Blocks, VMap, ModuleLevelChanges,
-                    Returns, NameSuffix, ReattachBlocks, DetachRethrowBlocks,
+                    Returns, NameSuffix, DT, ReattachBlocks, DetachRethrowBlocks,
                     SharedEHEntries, SP, CodeInfo, TypeMapper, Materializer);
 
   // Add a branch in the new function to the cloned Header.

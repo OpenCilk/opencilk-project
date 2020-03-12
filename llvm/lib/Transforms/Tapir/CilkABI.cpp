@@ -1621,7 +1621,7 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Function *SpawnHelper =
       CreateHelper(SHInputs, Outputs, BlocksToClone, CallBlock, DetBlock,
                    CallCont, VMap, &M, Parent->getSubprogram() != nullptr,
-                   Returns, NameSuffix.str(), nullptr, nullptr, nullptr,
+                   Returns, NameSuffix.str(), &DT, nullptr, nullptr, nullptr,
                    UnwindDest);
 
   assert(Returns.empty() && "Returns cloned when creating SpawnHelper.");

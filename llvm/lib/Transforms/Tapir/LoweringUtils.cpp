@@ -576,7 +576,7 @@ Function *llvm::createHelperForTask(
   Helper =
     CreateHelper(Args, Outputs, TaskBlocks, Header,Entry, DI->getContinue(),
                  VMap, DestM, F.getSubprogram() != nullptr, Returns,
-                 NameSuffix.str(), &ReattachBlocks,
+                 NameSuffix.str(), DT &ReattachBlocks,
                  &DetachedRethrowBlocks, &SharedEHEntries, nullptr,
                  dyn_cast<Instruction>(DI->getSyncRegion()), ReturnType,
                  nullptr, nullptr, nullptr);
