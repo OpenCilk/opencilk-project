@@ -59,6 +59,8 @@ class CilkRABI : public TapirTarget {
   FunctionCallee CilkRTSGetTLSWorker = nullptr;
   FunctionCallee CilkRTSPauseFrame = nullptr;
 
+  int FrameVersion;
+
   // Accessors for opaque Cilk RTS functions
   FunctionCallee Get__cilkrts_leave_frame();
   // FunctionCallee Get__cilkrts_rethrow();
@@ -85,7 +87,7 @@ class CilkRABI : public TapirTarget {
                               Instruction *TaskFrameCreate);
 
 public:
-  CilkRABI(Module &M);
+  CilkRABI(Module &M, bool OpenCilk);
   ~CilkRABI() { DetachCtxToStackFrame.clear(); }
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;

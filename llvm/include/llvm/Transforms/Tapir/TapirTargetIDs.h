@@ -24,6 +24,7 @@ enum class TapirTargetID {
   Cuda,     // Lower to Cuda ABI
   OpenMP,   // Lower to OpenMP
   Qthreads, // Lower to Qthreads
+  OpenCilk,
   Last_TapirTargetID
 };
 
