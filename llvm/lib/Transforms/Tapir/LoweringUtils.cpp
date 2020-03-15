@@ -46,9 +46,11 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return new CilkABI(M);
   case TapirTargetID::CilkR:
   case TapirTargetID::Cheetah:
-    return new CilkRABI(M);
+    return new CilkRABI(M, false);
   case TapirTargetID::Cuda:
     return new CudaABI(M);
+  case TapirTargetID::OpenCilk:
+    return new CilkRABI(M, true);
   case TapirTargetID::OpenMP:
     return new OpenMPABI(M);
   case TapirTargetID::Qthreads:
