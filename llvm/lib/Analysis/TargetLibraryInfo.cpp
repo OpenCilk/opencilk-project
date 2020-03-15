@@ -45,7 +45,9 @@ static cl::opt<TapirTargetID> ClTapirTarget(
                clEnumValN(TapirTargetID::CilkR,
                           "cilkr", "CilkR"),
                clEnumValN(TapirTargetID::Cheetah,
-                          "cheetah", "Cheetah")));
+                          "cheetah", "Cheetah"),
+               clEnumValN(TapirTargetID::OpenCilk,
+                          "opencilk", "OpenCilk")));
 
 StringLiteral const TargetLibraryInfoImpl::StandardNames[LibFunc::NumLibFuncs] =
     {
