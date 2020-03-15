@@ -1053,6 +1053,11 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                                                     << A->getValue();
 
   switch (TapirTarget) {
+  case TapirTargetID::Cheetah:
+  case TapirTargetID::OpenCilk:
+    CmdArgs.push_back("-lcheetah");
+    CmdArgs.push_back("-lpthread");
+    break;
   case TapirTargetID::Cilk:
     CmdArgs.push_back("-lcilkrts");
     break;

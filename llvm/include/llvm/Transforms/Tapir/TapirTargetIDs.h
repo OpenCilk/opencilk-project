@@ -22,6 +22,7 @@ enum class TapirTargetID {
   OpenMP,  // Lower to OpenMP
   CilkR,   // Lower to the CilkR ABI
   Cheetah, // Lower to the Cheetah ABI
+  OpenCilk,
   Last_TapirTargetID
 };
 
