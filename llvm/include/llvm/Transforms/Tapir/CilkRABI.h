@@ -27,31 +27,15 @@ class CilkRABI : public TapirTarget {
 
   // Cilk RTS data types
   StructType *StackFrameTy = nullptr;
-  enum StackFrameFields
-    {
-     flags = 0,
-     call_parent,
-     worker,
-     // except_data,
-     ctx,
-     mxcsr,
-     fpcsr,
-     reserved,
-     magic,
-    };
   StructType *WorkerTy = nullptr;
-  enum WorkerFields
-    {
-     tail = 0,
-     head,
-     exc,
-     ltq_limit,
-     self,
-     g,
-     l,
-     current_stack_frame,
-     // reducer_map,
-    };
+  short StackFrameFieldFlags = -1;
+  short StackFrameFieldParent = -1;
+  short StackFrameFieldWorker = -1;
+  short StackFrameFieldContext = -1;
+  short StackFrameFieldMXCSR = -1;
+  short StackFrameFieldFPCSR = -1;
+  short WorkerFieldTail = 0;
+  short WorkerFieldFrame = 7;
 
   // Opaque Cilk RTS functions
   FunctionCallee CilkRTSLeaveFrame = nullptr;
@@ -78,7 +62,7 @@ class CilkRABI : public TapirTarget {
   // Helper functions for implementing the Cilk ABI protocol
   Function *GetCilkSyncFn();
   Function *GetCilkParentEpilogueFn();
-  static void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
+  void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
   AllocaInst *CreateStackFrame(Function &F);
   Value *GetOrInitCilkStackFrame(Function &F, bool Helper);
   CallInst *EmitCilkSetJmp(IRBuilder<> &B, Value *SF);
