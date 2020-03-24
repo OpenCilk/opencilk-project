@@ -1502,6 +1502,38 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     assert(isa<CallInst>(II));
     return eraseInstFromFunction(CI);
   }
+  case Intrinsic::taskframe_use: {
+    // Remove a taskframe.use if it is not in a detached block.
+    BasicBlock *Parent = II->getParent();
+    if (!Parent->getSinglePredecessor())
+      return eraseInstFromFunction(CI);
+
+    BasicBlock *Pred = Parent->getSinglePredecessor();
+    if (!isa<DetachInst>(Pred->getTerminator()))
+      return eraseInstFromFunction(CI);
+
+    DetachInst *DI = cast<DetachInst>(Pred->getTerminator());
+    if (DI->getDetached() != Parent)
+      return eraseInstFromFunction(CI);
+    break;
+  }
+  case Intrinsic::taskframe_create: {
+    // Remove a taskframe.create if there is no taskframe.use among its users.
+    int NumUsers = 0;
+    for (User *U : II->users()) {
+      if (const CallBase *CB = dyn_cast<CallBase>(U))
+        if (const Function *Called = CB->getCalledFunction())
+          if (Intrinsic::taskframe_use == Called->getIntrinsicID())
+            ++NumUsers;
+    }
+    if (!NumUsers)
+      return eraseInstFromFunction(CI);
+    break;
+  }
+  case Intrinsic::taskframe_resume: {
+    assert(isa<CallInst>(II));
+    return eraseInstFromFunction(CI);
+  }
   case Intrinsic::assume: {
     Value *IIOperand = II->getArgOperand(0);
     SmallVector<OperandBundleDef, 4> OpBundles;
