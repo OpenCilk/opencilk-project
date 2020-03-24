@@ -1268,6 +1268,27 @@ def int_coro_subfn_addr : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty, llvm_i8_ty],
 //
 def int_syncregion_start : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly]>;
 
+// Intrinsics for taskframes.
+
+// Marker for the start of a taskframe.
+def int_taskframe_create : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly]>;
+
+// Marker placed in detached blocks (i.e., task-entry blocks) to
+// identify the taskframe used by the spawned task.
+def int_taskframe_use : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly]>;
+
+// Marker for the end of a taskframe along exception-handling unwind
+// paths.
+def int_taskframe_resume : Intrinsic<[], [llvm_token_ty, llvm_any_ty],
+                                     [IntrArgMemOnly, Throws]>;
+
+// Guard intrinsic to prevent illegal code motion of loads from memory
+// locations stored in spawned subtasks.
+def int_taskframe_load_guard : Intrinsic<[], [llvm_anyptr_ty], [IntrArgMemOnly,
+                                                                NoCapture<0>]>;
+
+// Marker for the end of a spawned task along exception-handling
+// unwind paths.
 def int_detached_rethrow : Intrinsic<[], [llvm_token_ty, llvm_any_ty],
                                      [IntrArgMemOnly, Throws]>;
 
