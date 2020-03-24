@@ -104,6 +104,11 @@ bool canDetach(const Function *F);
 void getDetachUnwindPHIUses(DetachInst *DI,
                             SmallPtrSetImpl<BasicBlock *> &UnwindPHIs);
 
+/// splitTaskFrameCreateBlocks - Split basic blocks in function F at
+/// taskframe.create intrinsics.  Returns true if anything changed, false
+/// otherwise.
+bool splitTaskFrameCreateBlocks(Function &F);
+
 /// Utility class for getting and setting Tapir-related loop hints in the form
 /// of loop metadata.
 ///

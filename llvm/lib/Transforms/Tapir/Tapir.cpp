@@ -27,6 +27,7 @@ using namespace llvm;
 void llvm::initializeTapirOpts(PassRegistry &Registry) {
   initializeLoopSpawningTIPass(Registry);
   initializeLowerTapirToTargetPass(Registry);
+  initializeTaskCanonicalizePass(Registry);
   initializeTaskSimplifyPass(Registry);
   initializeDRFScopedNoAliasWrapperPassPass(Registry);
   initializeLoopStripMinePass(Registry);
