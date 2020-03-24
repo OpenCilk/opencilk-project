@@ -1207,48 +1207,97 @@ public:
       CurSyncRegion->setSyncRegionStart(EmitSyncRegionStart());
   }
 
-  /// Class for handling exceptions thrown from within a detached scope that
-  /// should be caught by the parent of that scope.
-  ///
-  /// This class provides a catch-all handler for a catch scope enclosing a
-  /// detached scope.
-  class DetachedRethrowHandler {
-    CodeGenFunction &CGF;
-    llvm::BasicBlock *DetachedRethrowBlock = nullptr;
-    llvm::BasicBlock *DetachedRethrowResumeBlock = nullptr;
-
+  /// Testing lifetime-like cleanup for invoking taskframe.end.
+  /// Cleanup to ensure task frame is ended.
+  struct CallTaskEnd final : public EHScopeStack::Cleanup {
+    llvm::Value *TaskFrame;
   public:
-    explicit DetachedRethrowHandler(CodeGenFunction &CGF) : CGF(CGF) {}
+    CallTaskEnd(llvm::Value *TaskFrame) : TaskFrame(TaskFrame) {}
+    void Emit(CodeGenFunction &CGF, Flags F) override {
+      // Recreate the landingpad's return value for the rethrow invoke.  Tapir
+      // lowering will replace this rethrow with a resume.
+      llvm::Value *Exn = CGF.Builder.CreateLoad(
+          Address(CGF.ExceptionSlot, CGF.getPointerAlign()), "exn");
+      llvm::Value *Sel = CGF.Builder.CreateLoad(
+          Address(CGF.EHSelectorSlot, CharUnits::fromQuantity(4)), "sel");
+      llvm::Type *LPadType = llvm::StructType::get(Exn->getType(),
+                                                   Sel->getType());
+      llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
+      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
+      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");
 
-    llvm::BasicBlock *get();
-    bool isUsed() const {
-      return DetachedRethrowBlock && !DetachedRethrowBlock->use_empty();
+      llvm::Function *TaskFrameResume =
+          CGF.CGM.getIntrinsic(llvm::Intrinsic::taskframe_resume,
+                               { LPadVal->getType() });
+      CGF.Builder.CreateInvoke(TaskFrameResume, CGF.getUnreachableBlock(),
+                               CGF.CurDetachScope->getTempInvokeDest(),
+                               { TaskFrame, LPadVal });
+      CGF.Builder.SetInsertPoint(CGF.CurDetachScope->getTempInvokeDest());
     }
-    void emitIfUsed(llvm::Value *ExnSlot, llvm::Value *SelSlot,
-                    llvm::Value *SyncRegion);
+  };
+
+  /// Cleanup to ensure detached task is ended.
+  struct CallDetRethrow final : public EHScopeStack::Cleanup {
+    llvm::Value *SyncRegion;
+    llvm::BasicBlock *TempInvokeDest;
+  public:
+    CallDetRethrow(llvm::Value *SyncRegion,
+                   llvm::BasicBlock *TempInvokeDest = nullptr)
+        : SyncRegion(SyncRegion), TempInvokeDest(TempInvokeDest) {}
+    void Emit(CodeGenFunction &CGF, Flags F) override {
+      if (!TempInvokeDest)
+        TempInvokeDest = CGF.CurDetachScope->getTempInvokeDest();
+
+      // Recreate the landingpad's return value for the rethrow invoke.  Tapir
+      // lowering will replace this rethrow with a resume.
+      llvm::Value *Exn = CGF.Builder.CreateLoad(
+          Address(CGF.ExceptionSlot, CGF.getPointerAlign()), "exn");
+      llvm::Value *Sel = CGF.Builder.CreateLoad(
+          Address(CGF.EHSelectorSlot, CharUnits::fromQuantity(4)), "sel");
+      llvm::Type *LPadType = llvm::StructType::get(Exn->getType(),
+                                                   Sel->getType());
+      llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
+      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
+      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");
+
+      llvm::Function *DetachedRethrow =
+          CGF.CGM.getIntrinsic(llvm::Intrinsic::detached_rethrow,
+                               { LPadVal->getType() });
+      CGF.Builder.CreateInvoke(DetachedRethrow, CGF.getUnreachableBlock(),
+                               TempInvokeDest, { SyncRegion, LPadVal });
+      CGF.Builder.SetInsertPoint(TempInvokeDest);
+    }
   };
 
   /// RAII object to manage creation of detach/reattach instructions.
   class DetachScope {
     CodeGenFunction &CGF;
     bool DetachStarted = false;
-    bool DetachInitialized = false;
     bool DetachCleanedUp = false;
     llvm::DetachInst *Detach = nullptr;
     llvm::BasicBlock *DetachedBlock = nullptr;
     llvm::BasicBlock *ContinueBlock = nullptr;
 
-    RunCleanupsScope *StmtCleanupsScope = nullptr;
     DetachScope *ParentScope;
 
-    DetachedRethrowHandler DetRethrow;
+    std::unique_ptr<RunCleanupsScope> TaskFrameCleanups = nullptr;
+    std::unique_ptr<RunCleanupsScope> DetRethrowScope = nullptr;
+    RunCleanupsScope *StmtCleanupsScope = nullptr;
 
     // Old state from the CGF to restore when we're done with the detach.
     llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = nullptr;
+    llvm::AssertingVH<llvm::Instruction> TFAllocaInsertPt = nullptr;
+    llvm::BasicBlock *TempInvokeDest = nullptr;
+
     llvm::BasicBlock *OldEHResumeBlock = nullptr;
     llvm::Value *OldExceptionSlot = nullptr;
     llvm::AllocaInst *OldEHSelectorSlot = nullptr;
     Address OldNormalCleanupDest = Address::invalid();
+
+    llvm::BasicBlock *TFEHResumeBlock = nullptr;
+    llvm::Value *TFExceptionSlot = nullptr;
+    llvm::AllocaInst *TFEHSelectorSlot = nullptr;
+    Address TFNormalCleanupDest = Address::invalid();
 
     // Saved state in an initialized detach scope.
     llvm::AssertingVH<llvm::Instruction> SavedDetachedAllocaInsertPt = nullptr;
@@ -1258,8 +1307,10 @@ public:
     Address RefTmp;
     StorageDuration RefTmpSD;
 
+    // Optional taskframe created separately from detach.
+    llvm::Value *TaskFrame = nullptr;
+
     void InitDetachScope();
-    void RestoreDetachScope();
 
     DetachScope(const DetachScope &) = delete;
     void operator=(const DetachScope &) = delete;
@@ -1267,13 +1318,16 @@ public:
   public:
     /// Enter a new detach scope
     explicit DetachScope(CodeGenFunction &CGF)
-        : CGF(CGF), ParentScope(CGF.CurDetachScope), DetRethrow(CGF),
+        : CGF(CGF), ParentScope(CGF.CurDetachScope),
           RefTmp(nullptr, CharUnits()) {
       CGF.CurDetachScope = this;
+      EnsureTaskFrame();
     }
 
     /// Exit this detach scope.
     ~DetachScope() {
+      if (TempInvokeDest && TempInvokeDest->use_empty())
+        delete TempInvokeDest;
       CGF.CurDetachScope = ParentScope;
     }
 
@@ -1284,9 +1338,25 @@ public:
       }
       return false;
     }
+
+    void EnsureTaskFrame();
+    llvm::Value *GetTaskFrame() { return TaskFrame; }
+
+    void CreateTaskFrameEHState();
+    void CreateDetachedEHState();
+    void RestoreTaskFrameEHState();
+    void RestoreParentEHState();
+
+    llvm::BasicBlock *getTempInvokeDest() {
+      if (!TempInvokeDest)
+        TempInvokeDest = CGF.createBasicBlock("temp.invoke.dest");
+      return TempInvokeDest;
+    }
+
     void StartDetach();
     void PushSpawnedTaskTerminate();
     void CleanupDetach();
+    void EmitTaskEnd();
     void FinishDetach();
 
     Address CreateDetachedMemTemp(QualType Ty, StorageDuration SD,

@@ -9,8 +9,10 @@ void foo(float *A, float *B, int n) {
   _Cilk_sync;
 }
 
+// CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETBLOCK:.+]], label %[[CONT:.+]]
 // CHECK: [[DETBLOCK]]:
+// CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME]])
 // CHECK-NEXT: call void @llvm.memcpy
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONT]]
 // CHECK: call void @llvm.memcpy

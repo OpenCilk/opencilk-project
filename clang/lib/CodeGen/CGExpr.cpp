@@ -398,11 +398,6 @@ static Address createReferenceTemporary(CodeGenFunction &CGF,
     // promoted. This is easier on the optimizer and generally emits fewer
     // instructions.
     QualType Ty = Inner->getType();
-    if (CGF.IsSpawned) {
-      CGF.PushDetachScope();
-      return CGF.CurDetachScope->CreateDetachedMemTemp(
-          Ty, M->getStorageDuration(), "det.ref.tmp");
-    }
     if (CGF.CGM.getCodeGenOpts().MergeAllConstants &&
         (Ty->isArrayType() || Ty->isRecordType()) &&
         CGF.CGM.isTypeConstant(Ty, true))
@@ -426,6 +421,11 @@ static Address createReferenceTemporary(CodeGenFunction &CGF,
           return Address(C, alignment);
         }
       }
+    if (CGF.IsSpawned) {
+      CGF.PushDetachScope();
+      return CGF.CurDetachScope->CreateDetachedMemTemp(
+          Ty, M->getStorageDuration(), "det.ref.tmp");
+    }
     return CGF.CreateMemTemp(Ty, "ref.tmp", Alloca);
   }
   case SD_Thread:
@@ -5138,6 +5138,11 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
   // function type or a block pointer type.
   assert(CalleeType->isFunctionPointerType() &&
          "Call must have function pointer type!");
+
+  if (IsSpawned) {
+    PushDetachScope();
+    CurDetachScope->EnsureTaskFrame();
+  }
 
   IsSpawnedScope SpawnedScp(this);
 
