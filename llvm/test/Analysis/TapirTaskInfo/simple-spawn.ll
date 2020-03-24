@@ -34,8 +34,8 @@ declare void @bar(i32*) local_unnamed_addr #2
 
 declare void @baz(i32*, i32*) local_unnamed_addr #2
 
-; CHECK: task at depth 0 containing: <task entry><func sp entry>%entry<sp exit><phi sp entry>%det.cont<sp exit><sync sp entry>%sync.continue<sp exit><task exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd<sp exit><task exit>
+; CHECK: task at depth 0: {<task entry><func sp entry>%entry<sp exit>}{<phi sp entry>%det.cont<sp exit>}{<sync sp entry>%sync.continue<sp exit><task exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd<sp exit><task exit>}
 
 attributes #0 = { nounwind uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind }
