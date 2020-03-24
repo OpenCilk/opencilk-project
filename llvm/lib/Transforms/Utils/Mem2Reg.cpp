@@ -46,6 +46,8 @@ static bool promoteMemoryToRegister(Function &F, DominatorTree &DT,
   SmallVector<BasicBlock *, 4> EntryBlocks;
   for (Task *T : depth_first(TI.getRootTask())) {
     EntryBlocks.push_back(T->getEntry());
+    if (Value *TaskFrame = T->getTaskFrameUsed())
+      EntryBlocks.push_back(cast<Instruction>(TaskFrame)->getParent());
   }
 
   while (true) {
