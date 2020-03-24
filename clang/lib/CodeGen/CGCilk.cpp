@@ -47,100 +47,86 @@ void CodeGenFunction::IsSpawnedScope::RestoreOldScope() {
   CGF->SpawnedCleanup = OldSpawnedCleanup;
 }
 
-llvm::BasicBlock *CodeGenFunction::DetachedRethrowHandler::get() {
-  if (DetachedRethrowBlock)
-    return DetachedRethrowBlock;
-
-  DetachedRethrowBlock = CGF.createBasicBlock("det.rethrow");
-  return DetachedRethrowBlock;
+void CodeGenFunction::DetachScope::CreateTaskFrameEHState() {
+  // Save the old EH state.
+  OldEHResumeBlock = CGF.EHResumeBlock;
+  CGF.EHResumeBlock = nullptr;
+  OldExceptionSlot = CGF.ExceptionSlot;
+  CGF.ExceptionSlot = nullptr;
+  OldEHSelectorSlot = CGF.EHSelectorSlot;
+  CGF.EHSelectorSlot = nullptr;
+  OldNormalCleanupDest = CGF.NormalCleanupDest;
+  CGF.NormalCleanupDest = Address::invalid();
 }
 
-void CodeGenFunction::DetachedRethrowHandler::emitIfUsed(
-    llvm::Value *ExnSlot, llvm::Value *SelSlot, llvm::Value *SyncRegion) {
-  if (!isUsed())
-    return;
+void CodeGenFunction::DetachScope::CreateDetachedEHState() {
+  // Save the old EH state.
+  TFEHResumeBlock = CGF.EHResumeBlock;
+  CGF.EHResumeBlock = nullptr;
+  TFExceptionSlot = CGF.ExceptionSlot;
+  CGF.ExceptionSlot = nullptr;
+  TFEHSelectorSlot = CGF.EHSelectorSlot;
+  CGF.EHSelectorSlot = nullptr;
+  TFNormalCleanupDest = CGF.NormalCleanupDest;
+  CGF.NormalCleanupDest = Address::invalid();
+}
 
-  DetachedRethrowResumeBlock = CGF.createBasicBlock("det.rethrow.unreachable");
+void CodeGenFunction::DetachScope::RestoreTaskFrameEHState() {
+  EmitIfUsed(CGF, CGF.EHResumeBlock);
+  CGF.EHResumeBlock = TFEHResumeBlock;
+  CGF.ExceptionSlot = TFExceptionSlot;
+  CGF.EHSelectorSlot = TFEHSelectorSlot;
+  CGF.NormalCleanupDest = TFNormalCleanupDest;
+}
 
-  CGBuilderTy::InsertPoint SavedIP = CGF.Builder.saveIP();
-  CGF.Builder.SetInsertPoint(DetachedRethrowBlock);
+void CodeGenFunction::DetachScope::RestoreParentEHState() {
+  EmitIfUsed(CGF, CGF.EHResumeBlock);
+  CGF.EHResumeBlock = OldEHResumeBlock;
+  CGF.ExceptionSlot = OldExceptionSlot;
+  CGF.EHSelectorSlot = OldEHSelectorSlot;
+  CGF.NormalCleanupDest = OldNormalCleanupDest;
+}
 
-  // Recreate the landingpad's return value for the rethrow invoke.  Tapir
-  // lowering will replace this rethrow with a resume.
-  assert(ExnSlot &&
-         "DetachedRethrowHandler used with no Exception slot!");
-  llvm::Value *Exn = CGF.Builder.CreateLoad(
-      Address(ExnSlot, CGF.getPointerAlign()), "exn");
-  assert(SelSlot &&
-         "DetachedRethrowHandler used with no Selector slot!");
-  llvm::Value *Sel = CGF.Builder.CreateLoad(
-      Address(SelSlot, CharUnits::fromQuantity(4)), "sel");
+void CodeGenFunction::DetachScope::EnsureTaskFrame() {
+  if (!TaskFrame) {
+    llvm::Function *TaskFrameCreate =
+        CGF.CGM.getIntrinsic(llvm::Intrinsic::taskframe_create);
+    TaskFrame = CGF.Builder.CreateCall(TaskFrameCreate);
 
-  llvm::Type *LPadType = llvm::StructType::get(Exn->getType(),
-                                               Sel->getType());
-  llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
-  LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
-  LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");
+    // Create a new alloca insertion point within the task frame.
+    OldAllocaInsertPt = CGF.AllocaInsertPt;
+    llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
+    CGF.AllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "",
+                                               CGF.Builder.GetInsertBlock());
+    // SavedDetachedAllocaInsertPt = CGF.AllocaInsertPt;
 
-  // Insert an invoke of the detached_rethrow intrinsic.
-  llvm::BasicBlock *InvokeDest = CGF.getInvokeDest();
-  llvm::Function *DetachedRethrow =
-    CGF.CGM.getIntrinsic(llvm::Intrinsic::detached_rethrow,
-                         { LPadVal->getType() });
-  CGF.Builder.CreateInvoke(
-      DetachedRethrow, DetachedRethrowResumeBlock, InvokeDest,
-      { SyncRegion, LPadVal });
+    CreateTaskFrameEHState();
 
-  // The detached_rethrow intrinsic is just a placeholder, so the ordinary
-  // destination should of the invoke should be unreachable.
-  CGF.Builder.SetInsertPoint(DetachedRethrowResumeBlock);
-  CGF.Builder.CreateUnreachable();
-
-  CGF.EmitBlockAfterUses(DetachedRethrowBlock);
-  CGF.EmitBlock(DetachedRethrowResumeBlock);
-
-  CGF.Builder.restoreIP(SavedIP);
+    CGF.pushFullExprCleanup<CallTaskEnd>(
+        static_cast<CleanupKind>(EHCleanup | LifetimeMarker), TaskFrame);
+  }
 }
 
 void CodeGenFunction::DetachScope::InitDetachScope() {
   // Create the detached and continue blocks.
   DetachedBlock = CGF.createBasicBlock("det.achd");
   ContinueBlock = CGF.createBasicBlock("det.cont");
-
-  // Set the detached block as the new alloca insertion point.
-  OldAllocaInsertPt = CGF.AllocaInsertPt;
-  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
-  CGF.AllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "",
-                                             DetachedBlock);
-
-  DetachInitialized = true;
-}
-
-void CodeGenFunction::DetachScope::RestoreDetachScope() {
-  OldAllocaInsertPt = CGF.AllocaInsertPt;
-  CGF.AllocaInsertPt = SavedDetachedAllocaInsertPt;
 }
 
 void CodeGenFunction::DetachScope::PushSpawnedTaskTerminate() {
-  // TODO: Replace this cleanup with the actual cleanup we want.
-  CGF.pushFullExprCleanupImpl<ImplicitSyncCleanup>(
-      EHCleanup, CGF.CurSyncRegion->getSyncRegionStart());
-
-  // Create an EH scope for catching exceptions from the detached task.
-  // Ultimately, the detached task might be outlined into a separate helper
-  // function.  Hence, if an exception might propagate from the task to its
-  // parent, then it needs to be rethrown from this helper.  The
-  // detached-rethrow handler models this pattern of rethrowing the exception
-  // before outlining occurs.
-  EHCatchScope *CatchScope = CGF.EHStack.pushCatch(1);
-  CatchScope->setCatchAllHandler(0, DetRethrow.get());
+  CGF.pushFullExprCleanupImpl<CallDetRethrow>(
+      static_cast<CleanupKind>(EHCleanup | LifetimeMarker),
+      CGF.CurSyncRegion->getSyncRegionStart());
 }
 
 void CodeGenFunction::DetachScope::StartDetach() {
-  if (!DetachInitialized)
-    InitDetachScope();
-  else
-    RestoreDetachScope();
+  InitDetachScope();
+
+  // Set the detached block as the new alloca insertion point.
+  TFAllocaInsertPt = CGF.AllocaInsertPt;
+  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
+  CGF.AllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "",
+                                             DetachedBlock);
 
   if (StmtCleanupsScope)
     StmtCleanupsScope->DoDetach();
@@ -152,17 +138,17 @@ void CodeGenFunction::DetachScope::StartDetach() {
                                     CGF.CurSyncRegion->getSyncRegionStart());
 
   // Save the old EH state.
-  OldEHResumeBlock = CGF.EHResumeBlock;
-  CGF.EHResumeBlock = nullptr;
-  OldExceptionSlot = CGF.ExceptionSlot;
-  CGF.ExceptionSlot = nullptr;
-  OldEHSelectorSlot = CGF.EHSelectorSlot;
-  CGF.EHSelectorSlot = nullptr;
-  OldNormalCleanupDest = CGF.NormalCleanupDest;
-  CGF.NormalCleanupDest = Address::invalid();
+  CreateDetachedEHState();
 
   // Emit the detached block.
   CGF.EmitBlock(DetachedBlock);
+
+  // Link this detach block to the task frame, if it exists.
+  if (TaskFrame) {
+    llvm::Function *TaskFrameUse =
+        CGF.CGM.getIntrinsic(llvm::Intrinsic::taskframe_use);
+    CGF.Builder.CreateCall(TaskFrameUse, { TaskFrame });
+  }
 
   CGF.PushSyncRegion();
 
@@ -197,67 +183,119 @@ void CodeGenFunction::DetachScope::StartDetach() {
 void CodeGenFunction::DetachScope::CleanupDetach() {
   if (DetachCleanedUp)
     return;
+
   // Pop the sync region for the detached task.
   CGF.PopSyncRegion();
   DetachCleanedUp = true;
 }
 
+void CodeGenFunction::DetachScope::EmitTaskEnd() {
+  if (!CGF.HaveInsertPoint())
+    return;
+
+  // The CFG path into the spawned statement should terminate with a `reattach'.
+  CGF.Builder.CreateReattach(ContinueBlock,
+                             CGF.CurSyncRegion->getSyncRegionStart());
+}
+
+static void EmitTrivialLandingPad(CodeGenFunction &CGF,
+                                  llvm::BasicBlock *TempInvokeDest) {
+  // Save the current IR generation state.
+  CGBuilderTy::InsertPoint savedIP = CGF.Builder.saveAndClearIP();
+
+  // Insert a simple cleanup landingpad at the start of TempInvokeDest.
+  TempInvokeDest->setName("lpad");
+  CGF.EmitBlock(TempInvokeDest);
+  CGF.Builder.SetInsertPoint(&TempInvokeDest->front());
+
+  llvm::LandingPadInst *LPadInst =
+      CGF.Builder.CreateLandingPad(llvm::StructType::get(CGF.Int8PtrTy,
+                                                         CGF.Int32Ty), 0);
+
+  llvm::Value *LPadExn = CGF.Builder.CreateExtractValue(LPadInst, 0);
+  CGF.Builder.CreateStore(LPadExn, CGF.getExceptionSlot());
+  llvm::Value *LPadSel = CGF.Builder.CreateExtractValue(LPadInst, 1);
+  CGF.Builder.CreateStore(LPadSel, CGF.getEHSelectorSlot());
+
+  LPadInst->setCleanup(true);
+
+  // Restore the old IR generation state.
+  CGF.Builder.restoreIP(savedIP);
+}
+
 void CodeGenFunction::DetachScope::FinishDetach() {
   assert(DetachStarted &&
          "Attempted to finish a detach that was not started.");
-
   CleanupDetach();
-  CGF.popCatchScope();
+  // Pop the detached_rethrow.
+  CGF.PopCleanupBlock();
 
-  // The CFG path into the spawned statement should terminate with a `reattach'.
-  if (CGF.HaveInsertPoint())
-    CGF.Builder.CreateReattach(ContinueBlock,
-                               CGF.CurSyncRegion->getSyncRegionStart());
+  EmitTaskEnd();
 
-  // Restore the alloca insertion point.
-  llvm::Instruction *Ptr = CGF.AllocaInsertPt;
-  CGF.AllocaInsertPt = OldAllocaInsertPt;
-  SavedDetachedAllocaInsertPt = nullptr;
-  Ptr->eraseFromParent();
+  // Restore the alloca insertion point to taskframe_create.
+  {
+    llvm::Instruction *Ptr = CGF.AllocaInsertPt;
+    CGF.AllocaInsertPt = TFAllocaInsertPt;
+    SavedDetachedAllocaInsertPt = nullptr;
+    Ptr->eraseFromParent();
+  }
 
-  // Restore the EH state.
-  llvm::Value *DetExnSlot = CGF.ExceptionSlot;
-  llvm::Value *DetSelSlot = CGF.EHSelectorSlot;
+  // Restore the task frame's EH state.
+  RestoreTaskFrameEHState();
 
-  EmitIfUsed(CGF, CGF.EHResumeBlock);
-  CGF.EHResumeBlock = OldEHResumeBlock;
-  CGF.ExceptionSlot = OldExceptionSlot;
-  CGF.EHSelectorSlot = OldEHSelectorSlot;
-  CGF.NormalCleanupDest = OldNormalCleanupDest;
-
+  llvm::BasicBlock *InvokeDest = nullptr;
+  if (TempInvokeDest) {
+    InvokeDest = CGF.getInvokeDest();
+    if (InvokeDest)
+      TempInvokeDest->replaceAllUsesWith(InvokeDest);
+    else {
+      InvokeDest = TempInvokeDest;
+      EmitTrivialLandingPad(CGF, TempInvokeDest);
+      TempInvokeDest = nullptr;
+    }
+  }
   // Emit the continue block.
   CGF.EmitBlock(ContinueBlock);
 
-  DetRethrow.emitIfUsed(DetExnSlot, DetSelSlot,
-                        CGF.CurSyncRegion->getSyncRegionStart());
   // If the detached-rethrow handler is used, add an unwind destination to the
   // detach.
-  if (DetRethrow.isUsed()) {
+  if (InvokeDest) {
     CGBuilderTy::InsertPoint SavedIP = CGF.Builder.saveIP();
     CGF.Builder.SetInsertPoint(Detach);
     // Create the new detach instruction.
     llvm::DetachInst *NewDetach = CGF.Builder.CreateDetach(
-        Detach->getDetached(), Detach->getContinue(), CGF.getInvokeDest(),
+        Detach->getDetached(), Detach->getContinue(), InvokeDest,
         Detach->getSyncRegion());
     // Remove the old detach.
     Detach->eraseFromParent();
     Detach = NewDetach;
     CGF.Builder.restoreIP(SavedIP);
   }
+
+  // Pop the taskframe.
+  CGF.PopCleanupBlock();
+
+  // Restore the alloca insertion point.
+  {
+    llvm::Instruction *Ptr = CGF.AllocaInsertPt;
+    CGF.AllocaInsertPt = OldAllocaInsertPt;
+    TFAllocaInsertPt = nullptr;
+    Ptr->eraseFromParent();
+  }
+
+  // Restore the original EH state.
+  RestoreParentEHState();
+
+  if (TempInvokeDest) {
+    if (llvm::BasicBlock *InvokeDest = CGF.getInvokeDest()) {
+      TempInvokeDest->replaceAllUsesWith(InvokeDest);
+    } else
+      EmitTrivialLandingPad(CGF, TempInvokeDest);
+  }
 }
 
 Address CodeGenFunction::DetachScope::CreateDetachedMemTemp(
     QualType Ty, StorageDuration SD, const Twine &Name) {
-  if (!DetachInitialized)
-    InitDetachScope();
-  else
-    RestoreDetachScope();
-
   // There shouldn't be multiple reference temporaries needed.
   assert(!RefTmp.isValid() &&
          "Already created a reference temporary in this detach scope.");
@@ -265,10 +303,6 @@ Address CodeGenFunction::DetachScope::CreateDetachedMemTemp(
   // Create the reference temporary
   RefTmp = CGF.CreateMemTemp(Ty, Name);
   RefTmpSD = SD;
-
-  // Save the detached scope
-  SavedDetachedAllocaInsertPt = CGF.AllocaInsertPt;
-  CGF.AllocaInsertPt = OldAllocaInsertPt;
 
   return RefTmp;
 }
@@ -376,8 +410,10 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   JumpDest LoopExit = getJumpDestInCurrentScope("pfor.end");
 
   PushSyncRegion();
-  llvm::Instruction *SyncRegionStart = EmitSyncRegionStart();
-  CurSyncRegion->setSyncRegionStart(SyncRegionStart);
+  llvm::Instruction *SyncRegion = EmitSyncRegionStart();
+  CurSyncRegion->setSyncRegionStart(SyncRegion);
+
+  llvm::BasicBlock *TempInvokeDest = createBasicBlock("temp.invoke.dest");
 
   LexicalScope ForScope(*this, S.getSourceRange());
 
@@ -435,21 +471,20 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   assert(Inc && "_Cilk_for loop has no increment");
   Continue = getJumpDestInCurrentScope("pfor.inc");
 
-  // Ensure that the _Cilk_for loop iterations are synced on exit from the loop,
-  // whether normally or by an exception.
-  EHStack.pushCleanup<ImplicitSyncCleanup>(NormalAndEHCleanup,
-                                           SyncRegionStart);
+  // Ensure that the _Cilk_for loop iterations are synced on exit from the loop.
+  EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup,
+                                           SyncRegion);
 
   // Create a cleanup scope for the condition variable cleanups.
   LexicalScope ConditionScope(*this, S.getSourceRange());
 
-  // Save the old alloca insert point.
-  llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = AllocaInsertPt;
-  // Save the old EH state.
-  llvm::BasicBlock *OldEHResumeBlock = EHResumeBlock;
-  llvm::Value *OldExceptionSlot = ExceptionSlot;
-  llvm::AllocaInst *OldEHSelectorSlot = EHSelectorSlot;
-  Address OldNormalCleanupDest = NormalCleanupDest;
+  // Variables to store the old alloca insert point.
+  llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt;
+  // Variables to store the old EH state.
+  llvm::BasicBlock *OldEHResumeBlock;
+  llvm::Value *OldExceptionSlot;
+  llvm::AllocaInst *OldEHSelectorSlot;
+  Address OldNormalCleanupDest = Address::invalid();
 
   const VarDecl *LoopVar = S.getLoopVariable();
   RValue LoopVarInitRV;
@@ -489,11 +524,25 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
       LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
 
     Detach = Builder.CreateDetach(ForBodyEntry, Continue.getBlock(),
-                                  SyncRegionStart);
+                                  SyncRegion);
+    // Save the old alloca insert point.
+    OldAllocaInsertPt = AllocaInsertPt;
+    // Save the old EH state.
+    OldEHResumeBlock = EHResumeBlock;
+    OldExceptionSlot = ExceptionSlot;
+    OldEHSelectorSlot = EHSelectorSlot;
+    OldNormalCleanupDest = NormalCleanupDest;
 
     // Create a new alloca insert point.
     llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
     AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "", ForBodyEntry);
+
+    // Push a cleanup to make sure any exceptional exit from the loop is
+    // terminated by a detached.rethrow.
+    EHStack.pushCleanup<CallDetRethrow>(
+        static_cast<CleanupKind>(EHCleanup | LifetimeMarker), SyncRegion,
+        TempInvokeDest);
+
     // Set up nested EH state.
     EHResumeBlock = nullptr;
     ExceptionSlot = nullptr;
@@ -503,15 +552,6 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     EmitBlock(ForBodyEntry);
   }
 
-  // Create an EH scope for the loop-variable cleanups and exceptions.
-  // Ultimately, the loop body might be outlined into a separate helper
-  // function.  Hence, if an exception from the loop body might propagate out of
-  // the loop, then it must be rethrown from the outlined helper.  The
-  // detached-rethrow handler models this pattern of rethrowing the exception
-  // before outlining occurs.
-  DetachedRethrowHandler DetRethrow(*this);
-  EHCatchScope *CatchScope = EHStack.pushCatch(1);
-  CatchScope->setCatchAllHandler(0, DetRethrow.get());
   RunCleanupsScope DetachCleanupsScope(*this);
 
   // Set up a nested sync region for the loop body, and ensure it has an
@@ -556,13 +596,13 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     // the scope before popping the sync region.
     DetachCleanupsScope.ForceCleanup();
     PopSyncRegion();
-    popCatchScope();
-    Builder.CreateReattach(Continue.getBlock(), SyncRegionStart);
+    // Pop the detached.rethrow cleanup.
+    PopCleanupBlock();
+    Builder.CreateReattach(Continue.getBlock(), SyncRegion);
   }
 
   // Restore CGF state after detached region.
-  llvm::Value *DetExnSlot = ExceptionSlot;
-  llvm::Value *DetSelSlot = EHSelectorSlot;
+  llvm::BasicBlock *NestedEHResumeBlock;
   {
     // Restore the alloca insertion point.
     llvm::Instruction *Ptr = AllocaInsertPt;
@@ -570,11 +610,39 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     Ptr->eraseFromParent();
 
     // Restore the EH state.
-    EmitIfUsed(*this, EHResumeBlock);
+    NestedEHResumeBlock = EHResumeBlock;
     EHResumeBlock = OldEHResumeBlock;
     ExceptionSlot = OldExceptionSlot;
     EHSelectorSlot = OldEHSelectorSlot;
     NormalCleanupDest = OldNormalCleanupDest;
+  }
+
+  // An invocation of the detached.rethrow intrinsic marks the end of an
+  // exceptional return from the parallel-loop body.  That invoke needs a valid
+  // landinpad as its unwind destination.  We create that unwind destination
+  // here.
+  llvm::BasicBlock *InvokeDest = nullptr;
+  if (!TempInvokeDest->use_empty()) {
+    InvokeDest = getInvokeDest();
+    if (InvokeDest)
+      TempInvokeDest->replaceAllUsesWith(InvokeDest);
+    else {
+      InvokeDest = TempInvokeDest;
+      EmitTrivialLandingPad(*this, TempInvokeDest);
+    }
+  }
+
+  // If invocations in the parallel task led to the creation of EHResumeBlock,
+  // we need to create for outside the task.  In particular, the new
+  // EHResumeBlock must use an ExceptionSlot and EHSelectorSlot allocated
+  // outside of the task.
+  if (NestedEHResumeBlock && !NestedEHResumeBlock->use_empty()) {
+    // Translate the nested EHResumeBlock into an appropriate EHResumeBlock in
+    // the outer scope.
+    NestedEHResumeBlock->replaceAllUsesWith(
+        getEHResumeBlock(
+            isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
+    delete NestedEHResumeBlock;
   }
 
   // Emit the increment next.
@@ -582,16 +650,15 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   EmitStmt(Inc);
 
   {
-    DetRethrow.emitIfUsed(DetExnSlot, DetSelSlot, SyncRegionStart);
     // If the detached-rethrow handler is used, add an unwind destination to the
     // detach.
-    if (DetRethrow.isUsed()) {
+    if (InvokeDest) {
       CGBuilderTy::InsertPoint SavedIP = Builder.saveIP();
       Builder.SetInsertPoint(DetachBlock);
       // Create the new detach instruction.
       llvm::DetachInst *NewDetach = Builder.CreateDetach(
-          ForBodyEntry, Continue.getBlock(), getInvokeDest(),
-          SyncRegionStart);
+          ForBodyEntry, Continue.getBlock(), InvokeDest,
+          SyncRegion);
       // Remove the old detach.
       Detach->eraseFromParent();
       Detach = NewDetach;
@@ -623,4 +690,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   // Emit the fall-through block.
   EmitBlock(LoopExit.getBlock(), true);
   PopSyncRegion();
+
+  if (TempInvokeDest->use_empty())
+    delete TempInvokeDest;
 }
