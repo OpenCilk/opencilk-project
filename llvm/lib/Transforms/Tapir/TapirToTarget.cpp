@@ -121,13 +121,17 @@ TapirToTargetImpl::outlineAllTasks(Function &F, DominatorTree &DT,
   TaskOutlineMapTy TaskToOutline;
 
   // Determine the inputs for all tasks.
-  DenseMap<Task *, ValueSet> TaskInputs = findAllTaskInputs(F, DT, TI);
+  TaskValueSetMap TFInputs, TFOutputs;
+  findAllTaskFrameInputs(TFInputs, TFOutputs, F, DT, TI);
+
   DenseMap<Task *, SmallVector<Value *, 8>> HelperInputs;
   // Traverse the tasks in this function in post order.
-  for (Task *T : post_order(TI.getRootTask())) {
+  // TODO: Make sure to traverse subtasks first.
+  for (Task *T : post_order(TI.getRootTask()))
     // At this point, all subtasks of T must have been processed.  Replace their
     // detaches with calls.
-    for (Task *SubT : T->subtasks())
+    for (Task *SubT : T->subtasks()) {
+      // TODO: Rename replaceDetachWithCallToOutline.
       TaskToOutline[SubT].replaceReplCall(
           replaceDetachWithCallToOutline(SubT, TaskToOutline[SubT],
                                          HelperInputs[SubT]));
@@ -154,7 +158,7 @@ TapirToTargetImpl::outlineAllTasks(Function &F, DominatorTree &DT,
 
     ValueToValueMapTy VMap;
     ValueToValueMapTy InputMap;
-    TaskToOutline[T] = outlineTask(T, TaskInputs[T], HelperInputs[T],
+    TaskToOutline[T] = outlineTask(T, TFInputs[T], HelperInputs[T],
                                    &Target->getDestinationModule(), VMap,
                                    Target->getArgStructMode(),
                                    Target->getReturnType(), InputMap, &AC, &DT);
@@ -260,7 +264,9 @@ bool TapirToTargetImpl::processOutlinedTask(
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
   Function &F = *TaskToOutline[T].Outline;
-  Target->processOutlinedTask(F);
+  Instruction *DetachPt = TaskToOutline[T].DetachPt;
+  Instruction *TaskFrameCreate = TaskToOutline[T].TaskFrameCreate;
+  Target->processOutlinedTask(F, DetachPt, TaskFrameCreate);
   if (!T->isSerial()) {
     // Process outlined function F for a task as a spawner.
     Target->processSpawner(F);
@@ -276,13 +282,12 @@ bool TapirToTargetImpl::processOutlinedTask(
 
 void TapirToTargetImpl::processFunction(
     Function &F, SmallVectorImpl<Function *> &NewHelpers) {
-  unifyReturns(F);
-
   LLVM_DEBUG(dbgs() << "Tapir: Processing function " << F.getName() << "\n");
 
   // Get the necessary analysis results.
   DominatorTree &DT = GetDT(F);
   TaskInfo &TI = GetTI(F);
+  TI.findTaskFrameSubtasks();
   AssumptionCache &AC = GetAC(F);
 
   {
@@ -298,6 +303,9 @@ void TapirToTargetImpl::processFunction(
     processSimpleABI(F);
     return;
   }
+
+  for (Task *T : post_order(TI.getRootTask()))
+    fixupTaskFrameExternalUses(T, DT);
 
   // Outline all tasks in a target-oblivious manner.
   TaskOutlineMapTy TaskToOutline = outlineAllTasks(F, DT, AC, TI);
