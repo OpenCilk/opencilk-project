@@ -61,11 +61,21 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
 //----------------------------------------------------------------------------//
 // Lowering utilities for Tapir tasks.
 
+/// Returns true if the value \p V is defined outside the set \p Blocks of basic
+/// blocks in a function.
+static bool definedOutsideBlocks(const Value *V,
+                                 SmallPtrSetImpl<BasicBlock *> &Blocks) {
+  if (isa<Argument>(V)) return true;
+  if (const Instruction *I = dyn_cast<Instruction>(V))
+    return !Blocks.count(I->getParent());
+  return false;
+}
+
 /// Helper function to find the inputs and outputs to task T, based only the
 /// blocks in T and no subtask of T.
 static void
-findTaskInputsOutputs(Task *T, ValueSet &Inputs, ValueSet &Outputs,
-                      DominatorTree &DT) {
+findTaskInputsOutputs(const Task *T, ValueSet &Inputs, ValueSet &Outputs,
+                      const DominatorTree &DT) {
   NamedRegionTimer NRT("findTaskInputsOutputs", "Find task inputs and outputs",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -137,9 +147,9 @@ findTaskInputsOutputs(Task *T, ValueSet &Inputs, ValueSet &Outputs,
 ///
 /// Aggregating all of this work into a single routine allows us to avoid
 /// redundant traversals of basic blocks in nested tasks.
-DenseMap<Task *, ValueSet>
-llvm::findAllTaskInputs(Function &F, DominatorTree &DT, TaskInfo &TI) {
-  DenseMap<Task *, ValueSet> TaskInputs;
+TaskValueSetMap llvm::findAllTaskInputs(Function &F, const DominatorTree &DT,
+                                        const TaskInfo &TI) {
+  TaskValueSetMap TaskInputs;
   for (Task *T : post_order(TI.getRootTask())) {
     // Skip the root task
     if (T->isRootTask()) break;
@@ -186,6 +196,111 @@ llvm::findAllTaskInputs(Function &F, DominatorTree &DT, TaskInfo &TI) {
     TaskInputs[T] = Inputs;
   }
   return TaskInputs;
+}
+
+// Helper function to check if a value is defined outside of a given spindle.
+static bool taskInputDefinedOutsideTaskFrame(
+    const Value *V, const SpindleSet &TFSpindles,// ValueSet &TaskFrameInputs,
+    const TaskInfo &TI) {
+  // Arguments are always defined outside of spindles.
+  if (isa<Argument>(V))
+    return true;
+
+  // If we have no taskframe spindles, return true.
+  if (TFSpindles.empty()) {
+    LLVM_DEBUG(dbgs() << "LoweringUtils: No taskframe spindles to check\n");
+    return true;
+  }
+
+  // If V is an instruction, check if Spindle contains it.
+  if (const Instruction *I = dyn_cast<Instruction>(V))
+    return !TFSpindles.count(TI.getSpindleFor(I->getParent()));
+
+  return true;
+}
+
+/// Get the set of inputs for the given task T, accounting for the taskframe of
+/// T, if it exists.
+void llvm::getTaskFrameInputsOutputs(ValueSet &TFInputs, ValueSet &TFOutputs,
+                                     const Task &T, const ValueSet &TaskInputs,
+                                     const SpindleSet &TFSpindles,
+                                     const TaskInfo &TI,
+                                     const DominatorTree &DT) {
+  LLVM_DEBUG(dbgs() << "getTaskFrameInputsOutputs: task@"
+             << T.getEntry()->getName() << "\n");
+  // Check the taskframe spindles.
+  for (Value *V : TaskInputs)
+    if (taskInputDefinedOutsideTaskFrame(V, TFSpindles, TI))
+      TFInputs.insert(V);
+
+  // Get the set of basic blocks in the taskframe spindles.
+  SmallPtrSet<BasicBlock *, 1> BlocksToCheck;
+  for (Spindle *S : TFSpindles)
+    for (BasicBlock *BB : S->blocks()) {
+      LLVM_DEBUG(dbgs() << "Adding block to check: " << BB->getName() << "\n");
+      BlocksToCheck.insert(BB);
+    }
+
+  // Get inputs and outputs and outputs of the taskframe.
+  for (BasicBlock *BB : BlocksToCheck) {
+    for (Instruction &I : *BB) {
+      // Ignore certain instructions from consideration: the taskframe.create
+      // intrinsic for this taskframe, the detach instruction that spawns T, and
+      // the landingpad value in T's EH continuation.
+      if ((T.getTaskFrameUsed() == &I) || (T.getDetach() == &I) ||
+          (T.getLPadValueInEHContinuationSpindle() == &I))
+        continue;
+
+      // Examine all operands of this instruction
+      for (User::op_iterator OI = I.op_begin(), OE = I.op_end(); OI != OE;
+           ++OI) {
+        LLVM_DEBUG({
+            if (Instruction *OP = dyn_cast<Instruction>(*OI))
+              assert(!T.encloses(OP->getParent()) &&
+                     "TaskFrame uses value defined in task.");
+          });
+        // If this operand is not defined in one of the blocks to check, then
+        // it's an input.
+        if (definedOutsideBlocks(*OI, BlocksToCheck))
+          TFInputs.insert(*OI);
+      }
+      // Examine all users of this instruction.
+      for (User *U : I.users()) {
+        // If we find a live use outside of the task, it's an output.
+        if (Instruction *UI = dyn_cast<Instruction>(U)) {
+          if (!T.encloses(UI->getParent()) &&
+              !BlocksToCheck.count(UI->getParent()) &&
+              DT.isReachableFromEntry(UI->getParent()))
+            TFOutputs.insert(&I);
+        }
+      }
+    }
+  }
+}
+
+/// Determine the inputs for all tasks in this function.  Returns a map from
+/// tasks to their inputs.
+///
+/// Aggregating all of this work into a single routine allows us to avoid
+/// redundant traversals of basic blocks in nested tasks.
+void llvm::findAllTaskFrameInputs(
+    TaskValueSetMap &TFInputs, TaskValueSetMap &TFOutputs, Function &F,
+    const DominatorTree &DT, TaskInfo &TI) {
+  // Determine the inputs for all tasks.
+  TaskValueSetMap TaskInputs = findAllTaskInputs(F, DT, TI);
+
+  for (Task *T : post_order(TI.getRootTask())) {
+    // Collects spindles in the taskframe for task T.
+    SpindleSet TFSpindles;
+    Spindle *TFUsed = TI.getTaskFrameSpindleFor(T);
+    if (TFUsed)
+      for (Spindle *S : TFUsed->taskframe_spindles())
+        TFSpindles.insert(S);
+
+    // Update the inputs to account for the taskframe.
+    getTaskFrameInputsOutputs(TFInputs[T], TFOutputs[T], *T, TaskInputs[T],
+                              TFSpindles, TI, DT);
+  }
 }
 
 /// Create a structure for storing all arguments to a task.
@@ -370,7 +485,35 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
                          SmallPtrSetImpl<BasicBlock *> &SharedEHEntries) {
   NamedRegionTimer NRT("getTaskBlocks", "Get task blocks", TimerGroupName,
                        TimerGroupDescription, TimePassesIsEnabled);
+  SmallPtrSet<Spindle *, 8> SpindlesToExclude;
+  for (Spindle *TFSpindle : T->taskframe_creates())
+    for (Spindle *S : TFSpindle->taskframe_spindles())
+      SpindlesToExclude.insert(S);
+
+  // Add taskframe-spindle blocks.
+  if (Spindle *TFCreateSpindle = T->getTaskFrameCreateSpindle()) {
+    for (Spindle *S : TFCreateSpindle->taskframe_spindles()) {
+      assert(!SpindlesToExclude.count(S) &&
+             "Taskframe spindle marked for exclusion.");
+      if (T->getEHContinuationSpindle() == S)
+        SharedEHEntries.insert(S->getEntry());
+
+      for (BasicBlock *B : S->blocks()) {
+        LLVM_DEBUG(dbgs() << "Adding task block " << B->getName() << "\n");
+        TaskBlocks.push_back(B);
+
+        // TODO: Rename DetachedRethrowBlocks.
+        if (isTaskFrameResume(B->getTerminator()))
+          DetachedRethrowBlocks.insert(B);
+      }
+    }
+  }
+
+  // Add the spindles in the task proper.
   for (Spindle *S : depth_first<InTask<Spindle *>>(T->getEntrySpindle())) {
+    if (SpindlesToExclude.count(S))
+      continue;
+
     // Record the entry blocks of any shared-EH spindles.
     if (S->isSharedEH())
       SharedEHEntries.insert(S->getEntry());
@@ -417,6 +560,13 @@ Function *llvm::createHelperForTask(
   ValueSet Outputs;
   DetachInst *DI = T->getDetach();
 
+  BasicBlock *Header = T->getEntry();
+  BasicBlock *Entry = DI->getParent();
+  if (Spindle *TaskFrameCreate = T->getTaskFrameCreateSpindle()) {
+    Header = TaskFrameCreate->getEntry();
+    Entry = Header->getSinglePredecessor();
+  }
+
   Twine NameSuffix = ".otd" + Twine(T->getTaskDepth());
   Function *Helper;
   {
@@ -424,12 +574,12 @@ Function *llvm::createHelperForTask(
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
   Helper =
-    CreateHelper(Args, Outputs, TaskBlocks, T->getEntry(),
-                 DI->getParent(), DI->getContinue(), VMap, DestM,
-                 F.getSubprogram() != nullptr, Returns,
+    CreateHelper(Args, Outputs, TaskBlocks, Header,Entry, DI->getContinue(),
+                 VMap, DestM, F.getSubprogram() != nullptr, Returns,
                  NameSuffix.str(), &ReattachBlocks,
-                 &DetachedRethrowBlocks, &SharedEHEntries, nullptr, nullptr,
-                 ReturnType, nullptr, nullptr, nullptr);
+                 &DetachedRethrowBlocks, &SharedEHEntries, nullptr,
+                 dyn_cast<Instruction>(DI->getSyncRegion()), ReturnType,
+                 nullptr, nullptr, nullptr);
   }
   assert(Returns.empty() && "Returns cloned when cloning detached CFG.");
 
@@ -458,6 +608,20 @@ Function *llvm::createHelperForTask(
     // We do not need to add new llvm.stacksave/llvm.stackrestore intrinsics,
     // because calling and returning from the helper will automatically manage
     // the stack appropriately.
+  }
+
+  if (VMap[DI]) {
+    // Convert the cloned detach into an unconditional branch.
+    NamedRegionTimer NRT("serializeClone", "Serialize cloned Tapir task",
+                         TimerGroupName, TimerGroupDescription,
+                         TimePassesIsEnabled);
+    DetachInst *ClonedDI = cast<DetachInst>(VMap[DI]);
+    BasicBlock *ClonedDetacher = ClonedDI->getParent();
+    BasicBlock *ClonedContinue = ClonedDI->getContinue();
+    ClonedContinue->removePredecessor(ClonedDetacher);
+    BranchInst *DetachRepl = BranchInst::Create(ClonedDI->getDetached());
+    ReplaceInstWithInst(ClonedDI, DetachRepl);
+    VMap[DI] = DetachRepl;
   }
 
   return Helper;
@@ -507,7 +671,7 @@ Instruction *llvm::replaceDetachWithCallToOutline(
   // Remove any dependencies from T's exception-handling code to T's parent.
   unlinkTaskEHFromParent(T);
 
-  DetachInst *DI = T->getDetach();
+  Instruction *ToReplace = Out.ReplCall;
 
   // Add call to new helper function in original function.
   if (!Out.ReplUnwind) {
@@ -518,10 +682,10 @@ Instruction *llvm::replaceDetachWithCallToOutline(
     TopCall = Builder.CreateCall(Out.Outline, OutlineInputs);
     // Use a fast calling convention for the outline.
     TopCall->setCallingConv(Out.Outline->getCallingConv());
-    TopCall->setDebugLoc(DI->getDebugLoc());
+    TopCall->setDebugLoc(ToReplace->getDebugLoc());
     TopCall->setDoesNotThrow();
     // Replace the detach with an unconditional branch to its continuation.
-    ReplaceInstWithInst(DI, BranchInst::Create(Out.ReplRet));
+    ReplaceInstWithInst(ToReplace, BranchInst::Create(Out.ReplRet));
     return TopCall;
   } else {
     // The detach might catch an exception from the task.  Replace the detach
@@ -530,12 +694,12 @@ Instruction *llvm::replaceDetachWithCallToOutline(
     // Create invoke instruction.  The ordinary return of the invoke is the
     // detach's continuation, and the unwind return is the detach's unwind.
     TopCall = InvokeInst::Create(Out.Outline, Out.ReplRet, Out.ReplUnwind,
-                                 OutlineInputs, "", DI->getParent());
+                                 OutlineInputs, "", ToReplace->getParent());
     // Use a fast calling convention for the outline.
     TopCall->setCallingConv(Out.Outline->getCallingConv());
-    TopCall->setDebugLoc(DI->getDebugLoc());
+    TopCall->setDebugLoc(ToReplace->getDebugLoc());
     // Remove the detach.  The invoke serves as a replacement terminator.
-    DI->eraseFromParent();
+    ToReplace->eraseFromParent();
     return TopCall;
   }
 }
@@ -552,21 +716,42 @@ TaskOutlineInfo llvm::outlineTask(
   assert(!T->isRootTask() && "Cannot outline the root task.");
   Function &F = *T->getEntry()->getParent();
   DetachInst *DI = T->getDetach();
+  Value *TFCreate = T->getTaskFrameUsed();
+
+  Instruction *LoadPt = T->getEntry()->getFirstNonPHIOrDbgOrLifetime();
+  Instruction *StorePt = DI;
+  BasicBlock *Unwind = DI->getUnwindDest();
+  if (Spindle *TaskFrameCreate = T->getTaskFrameCreateSpindle()) {
+    LoadPt = &TaskFrameCreate->getEntry()->front();
+    StorePt =
+        TaskFrameCreate->getEntry()->getSinglePredecessor()->getTerminator();
+    if (Unwind) {
+      // Find the corresponding taskframe.resume.
+      for (User *U : T->getTaskFrameUsed()->users()) {
+        if (Instruction *I = dyn_cast<Instruction>(U))
+          if (isTaskFrameResume(I)) {
+            Unwind = cast<InvokeInst>(I)->getUnwindDest();
+            break;
+          }
+      }
+    }
+  }
 
   // Convert the inputs of the task to inputs to the helper.
   ValueSet HelperArgs;
-  Instruction *ArgsStart =
-    fixupHelperInputs(F, T, Inputs, HelperArgs, DI,
-                      T->getEntry()->getFirstNonPHIOrDbgOrLifetime(),
-                      useArgStruct, InputMap);
+  Instruction *ArgsStart = fixupHelperInputs(F, T, Inputs, HelperArgs, StorePt,
+                                             LoadPt, useArgStruct, InputMap);
   for (Value *V : HelperArgs)
     HelperInputs.push_back(V);
 
   // Clone the blocks into a helper function.
   Function *Helper = createHelperForTask(F, T, HelperArgs, DestM, VMap,
                                          ReturnType, AC, DT);
-  return TaskOutlineInfo(Helper, Inputs, ArgsStart, DI, DI->getContinue(),
-                         DI->getUnwindDest());
+  Value *ClonedTFCreate = TFCreate ? VMap[TFCreate] : nullptr;
+  return TaskOutlineInfo(
+      Helper, dyn_cast_or_null<Instruction>(VMap[DI]),
+      dyn_cast_or_null<Instruction>(ClonedTFCreate), Inputs,
+      ArgsStart, StorePt, DI->getContinue(), Unwind);
 }
 
 //----------------------------------------------------------------------------//
@@ -583,16 +768,6 @@ static bool taskInputDefinedOutsideLoop(const Value *V, const Loop *L) {
   if (const Instruction *I = dyn_cast<Instruction>(V))
     if ((Header != I->getParent()) && (Latch != I->getParent()))
       return true;
-  return false;
-}
-
-/// Returns true if the value \p V is defined outside the set \p Blocks of basic
-/// blocks in a function.
-static bool definedOutsideBlocks(const Value *V,
-                                 SmallPtrSetImpl<BasicBlock *> &Blocks) {
-  if (isa<Argument>(V)) return true;
-  if (const Instruction *I = dyn_cast<Instruction>(V))
-    return !Blocks.count(I->getParent());
   return false;
 }
 

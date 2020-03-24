@@ -136,7 +136,8 @@ void llvm::CloneIntoFunction(
                          TimePassesIsEnabled);
     for (BasicBlock *DetRethrowBlk : *DetachedRethrowBlocks) {
       // Skip blocks that are not terminated by a detached-rethrow.
-      if (!isDetachedRethrow(DetRethrowBlk->getTerminator()))
+      if (!isDetachedRethrow(DetRethrowBlk->getTerminator()) &&
+          !isTaskFrameResume(DetRethrowBlk->getTerminator()))
         continue;
 
       BasicBlock *ClonedDRB = cast<BasicBlock>(VMap[DetRethrowBlk]);
