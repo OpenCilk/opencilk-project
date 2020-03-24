@@ -4745,8 +4745,11 @@ PreservedAnalyses SROA::runImpl(Function &F, DominatorTree &RunDT,
   // CFG's.  We can perform this scan for entry blocks once for the function,
   // because this pass preserves the CFG.
   SmallVector<BasicBlock *, 4> EntryBlocks;
-  for (Task *T : depth_first(TI->getRootTask()))
+  for (Task *T : depth_first(TI->getRootTask())) {
     EntryBlocks.push_back(T->getEntry());
+    if (Value *TaskFrame = T->getTaskFrameUsed())
+      EntryBlocks.push_back(cast<Instruction>(TaskFrame)->getParent());
+  }
 
   for (BasicBlock *BB : EntryBlocks) {
     BasicBlock &EntryBB = *BB;
