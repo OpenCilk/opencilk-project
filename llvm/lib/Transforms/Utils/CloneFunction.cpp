@@ -74,6 +74,7 @@ BasicBlock *llvm::CloneBasicBlock(const BasicBlock *BB, ValueToValueMapTy &VMap,
   if (CodeInfo) {
     CodeInfo->ContainsCalls          |= hasCalls;
     CodeInfo->ContainsDynamicAllocas |= hasDynamicAllocas;
+    CodeInfo->ContainsDetach         |= isa<DetachInst>(BB->getTerminator());
   }
   return NewBB;
 }
@@ -444,6 +445,7 @@ void PruningFunctionCloner::CloneBlock(const BasicBlock *BB,
     CodeInfo->ContainsDynamicAllocas |= hasDynamicAllocas;
     CodeInfo->ContainsDynamicAllocas |= hasStaticAllocas &&
       BB != &BB->getParent()->front();
+    CodeInfo->ContainsDetach         |= isa<DetachInst>(BB->getTerminator());
   }
 }
 
@@ -455,6 +457,7 @@ void llvm::CloneAndPruneIntoFromInst(Function *NewFunc, const Function *OldFunc,
                                      ValueToValueMapTy &VMap,
                                      bool ModuleLevelChanges,
                                      SmallVectorImpl<ReturnInst *> &Returns,
+                                     SmallVectorImpl<ResumeInst *> &Resumes,
                                      const char *NameSuffix,
                                      ClonedCodeInfo *CodeInfo) {
   assert(NameSuffix && "NameSuffix cannot be null!");
@@ -715,9 +718,12 @@ void llvm::CloneAndPruneIntoFromInst(Function *NewFunc, const Function *OldFunc,
   // because we can iteratively remove and merge returns above.
   for (Function::iterator I = cast<BasicBlock>(VMap[StartingBB])->getIterator(),
                           E = NewFunc->end();
-       I != E; ++I)
+       I != E; ++I) {
     if (ReturnInst *RI = dyn_cast<ReturnInst>(I->getTerminator()))
       Returns.push_back(RI);
+    if (ResumeInst *RI = dyn_cast<ResumeInst>(I->getTerminator()))
+      Resumes.push_back(RI);
+  }
 }
 
 
@@ -732,11 +738,13 @@ void llvm::CloneAndPruneFunctionInto(Function *NewFunc, const Function *OldFunc,
                                      ValueToValueMapTy &VMap,
                                      bool ModuleLevelChanges,
                                      SmallVectorImpl<ReturnInst*> &Returns,
+                                     SmallVectorImpl<ResumeInst*> &Resumes,
                                      const char *NameSuffix,
                                      ClonedCodeInfo *CodeInfo,
                                      Instruction *TheCall) {
   CloneAndPruneIntoFromInst(NewFunc, OldFunc, &OldFunc->front().front(), VMap,
-                            ModuleLevelChanges, Returns, NameSuffix, CodeInfo);
+                            ModuleLevelChanges, Returns, Resumes, NameSuffix,
+                            CodeInfo);
 }
 
 /// Remaps instructions in \p Blocks using the mapping in \p VMap.
