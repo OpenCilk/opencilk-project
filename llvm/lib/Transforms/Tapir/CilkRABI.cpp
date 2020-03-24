@@ -849,7 +849,9 @@ Value* CilkRABI::GetOrInitCilkStackFrame(Function &F, bool Helper = true) {
   return SF;
 }
 
-bool CilkRABI::makeFunctionDetachable(Function &Extracted) {
+bool CilkRABI::makeFunctionDetachable(Function &Extracted,
+                                      Instruction *DetachPt,
+                                      Instruction *TaskFrameCreate) {
   /*
     __cilkrts_stack_frame sf;
     __cilkrts_enter_frame_fast(&sf);
@@ -872,11 +874,15 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted) {
 
   BasicBlock::iterator InsertPt = ++SF->getIterator();
   IRBuilder<> IRB(&(Extracted.getEntryBlock()), InsertPt);
+  if (TaskFrameCreate)
+    IRB.SetInsertPoint(TaskFrameCreate);
 
   IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
 
   // Call __cilkrts_detach
   {
+    if (DetachPt)
+      IRB.SetInsertPoint(DetachPt);
     IRB.CreateCall(CILKRTS_FUNC(detach), Args);
   }
 
@@ -966,8 +972,9 @@ void CilkRABI::lowerSync(SyncInst &SI) {
   Fn.addFnAttr(Attribute::Stealable);
 }
 
-void CilkRABI::processOutlinedTask(Function &F) {
-  makeFunctionDetachable(F);
+void CilkRABI::processOutlinedTask(Function &F, Instruction *DetachPt,
+                                   Instruction *TaskFrameCreate) {
+  makeFunctionDetachable(F, DetachPt, TaskFrameCreate);
 }
 
 void CilkRABI::processSpawner(Function &F) {

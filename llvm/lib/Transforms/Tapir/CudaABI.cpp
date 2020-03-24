@@ -51,7 +51,8 @@ void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
 void CudaABI::postProcessHelper(Function &F) {
 }
 
-void CudaABI::processOutlinedTask(Function &F) {
+void CudaABI::processOutlinedTask(Function &F, Instruction *DetachPt,
+                                  Instruction *TaskFrameCreate) {
 }
 
 void CudaABI::processSpawner(Function &F) {
