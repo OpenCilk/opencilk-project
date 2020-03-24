@@ -231,6 +231,7 @@ namespace {
       (void) llvm::createScalarizeMaskedMemIntrinPass();
       (void) llvm::createWarnMissedTransformationsPass();
       (void) llvm::createHardwareLoopsPass();
+      (void) llvm::createTaskCanonicalizePass();
       (void) llvm::createTaskSimplifyPass();
 
       (void)new llvm::IntervalPartition();
