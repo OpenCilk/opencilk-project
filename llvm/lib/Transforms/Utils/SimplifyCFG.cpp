@@ -1491,6 +1491,14 @@ static bool isSafeToHoistInstr(Instruction *I, unsigned Flags) {
 
 static bool passingValueIsAlwaysUndefined(Value *V, Instruction *I, bool PtrValueMayBeModified = false);
 
+// Helper function to check if an instruction is a taskframe.create call.
+static bool isTaskFrameCreate(const Instruction *I) {
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I))
+    if (Intrinsic::taskframe_create == II->getIntrinsicID())
+      return true;
+  return false;
+}
+
 /// Given a conditional branch that goes to BB1 and BB2, hoist any common code
 /// in the two blocks up into the branch block. The caller of this function
 /// guarantees that BI's block dominates BB1 and BB2. If EqTermsOnly is given,
@@ -1527,6 +1535,11 @@ bool SimplifyCFGOpt::HoistThenElseCodeToIf(BranchInst *BI,
     while (isa<DbgInfoIntrinsic>(I2))
       I2 = &*BB2_Itr++;
   }
+  // Skip taskframe.create calls.
+  while (isTaskFrameCreate(I1))
+    I1 = &*BB1_Itr++;
+  while (isTaskFrameCreate(I2))
+    I2 = &*BB2_Itr++;
   if (isa<PHINode>(I1))
     return false;
 
@@ -1670,6 +1683,11 @@ bool SimplifyCFGOpt::HoistThenElseCodeToIf(BranchInst *BI,
       while (isa<DbgInfoIntrinsic>(I2))
         I2 = &*BB2_Itr++;
     }
+    // Skip taskframe.create calls.
+    while (isTaskFrameCreate(I1))
+      I1 = &*BB1_Itr++;
+    while (isTaskFrameCreate(I2))
+      I2 = &*BB2_Itr++;
   }
 
   return Changed;
@@ -6895,6 +6913,13 @@ static bool TryToMergeLandingPad(LandingPadInst *LPad, BranchInst *BI,
     // path instead and make ourselves dead.
     SmallSetVector<BasicBlock *, 16> UniquePreds(pred_begin(BB), pred_end(BB));
     for (BasicBlock *Pred : UniquePreds) {
+      // Handle detach predecessors.
+      if (DetachInst *DI = dyn_cast<DetachInst>(Pred->getTerminator())) {
+        assert(DI->getDetached() != BB && DI->getContinue() != BB &&
+               DI->getUnwindDest() == BB && "unexpected detach successor");
+        DI->setUnwindDest(OtherPred);
+        continue;
+      }
       InvokeInst *II = cast<InvokeInst>(Pred->getTerminator());
       assert(II->getNormalDest() != BB && II->getUnwindDest() == BB &&
              "unexpected successor");
