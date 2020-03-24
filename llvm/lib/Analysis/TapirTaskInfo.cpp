@@ -991,27 +991,26 @@ bool MaybeParallelTasks::markDefiningSpindle(const Spindle *S) {
     return true;
   case Spindle::SPType::Sync:
     return false;
-  case Spindle::SPType::Phi:
-    {
-      // At task-continuation Phi's, initialize the task list with the
-      // detached task that reattaches to this continuation.
-      if (S->isTaskContinuation()) {
-        LLVM_DEBUG(dbgs() << "  TaskCont spindle " << S->getEntry()->getName()
-                   << "\n");
-        for (const Spindle *Pred : predecessors(S)) {
-          LLVM_DEBUG(dbgs() << "    pred spindle "
-                     << Pred->getEntry()->getName() << "\n");
-          if (S->predInDifferentTask(Pred))
-            TaskList[S].insert(Pred->getParentTask());
-        }
-        LLVM_DEBUG({
-            for (const Task *MPT : TaskList[S])
-              dbgs() << "  Added MPT " << MPT->getEntry()->getName() << "\n";
-          });
-        return true;
+  case Spindle::SPType::Phi: {
+    // At task-continuation Phi's, initialize the task list with the detached
+    // task that reattaches to this continuation.
+    if (S->isTaskContinuation()) {
+      LLVM_DEBUG(dbgs() << "  TaskCont spindle " << S->getEntry()->getName()
+                 << "\n");
+      for (const Spindle *Pred : predecessors(S)) {
+        LLVM_DEBUG(dbgs() << "    pred spindle "
+                   << Pred->getEntry()->getName() << "\n");
+        if (S->predInDifferentTask(Pred))
+          TaskList[S].insert(Pred->getParentTask());
       }
-      return false;
+      LLVM_DEBUG({
+          for (const Task *MPT : TaskList[S])
+            dbgs() << "  Added MPT " << MPT->getEntry()->getName() << "\n";
+        });
+      return true;
     }
+    return false;
+  }
   }
   return false;
 }
