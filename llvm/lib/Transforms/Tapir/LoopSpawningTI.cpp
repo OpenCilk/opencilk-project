@@ -382,8 +382,8 @@ static BasicBlock *createTaskUnwind(Function *F, BasicBlock *UnwindDest,
   // Create the landing bad.
   IRBuilder<> Builder(CallUnwind);
   LandingPadInst *LPad = Builder.CreateLandingPad(
-      UnwindDest->getLandingPadInst()->getType(), 1);
-  LPad->addClause(ConstantPointerNull::get(Builder.getInt8PtrTy()));
+      UnwindDest->getLandingPadInst()->getType(), 0);
+  LPad->setCleanup(true);
   // Create the normal return for the detached rethrow.
   BasicBlock *DRUnreachable = BasicBlock::Create(
       Ctx, CallUnwind->getName()+".unreachable", F);
@@ -1334,6 +1334,13 @@ bool LoopSpawningImpl::run() {
 
   // Perform any Target-dependent postprocessing of F.
   Target->postProcessFunction(F, true);
+
+#ifndef NDEBUG
+  if (verifyModule(*F.getParent(), &errs())) {
+    LLVM_DEBUG(dbgs() << "Module after loop spawning:" << *F.getParent());
+    llvm_unreachable("Loop spawning produced bad IR!");
+  }
+#endif
 
   return true;
 }
