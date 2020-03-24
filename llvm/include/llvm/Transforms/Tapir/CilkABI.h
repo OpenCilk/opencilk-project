@@ -93,7 +93,9 @@ class CilkABI : public TapirTarget {
   Value *GetOrInitCilkStackFrame(Function &F, bool Helper,
                                  bool instrumet = false);
   CallInst *EmitCilkSetJmp(IRBuilder<> &B, Value *SF);
-  bool makeFunctionDetachable(Function &Extracted, bool instrument = false);
+  bool makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
+                              Instruction *TaskFrameCreate,
+                              bool instrument = false);
 
 public:
   CilkABI(Module &M);
@@ -110,7 +112,8 @@ public:
     override final;
   void postProcessHelper(Function &F) override final;
 
-  void processOutlinedTask(Function &F) override final;
+  void processOutlinedTask(Function &F, Instruction *DetachPt,
+                           Instruction *TaskFrameCreate) override final;
   void processSpawner(Function &F) override final;
   void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT)
     override final;
