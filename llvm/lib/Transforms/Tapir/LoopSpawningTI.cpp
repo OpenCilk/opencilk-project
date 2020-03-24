@@ -1248,10 +1248,12 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
         TL, LoopArgs[L], OutlineProcessors[TL]->getIVArgIndex(F, LoopArgs[L]),
         OutlineProcessors[TL]->getLimitArgIndex(F, LoopArgs[L]),
         &OutlineProcessors[TL]->getDestinationModule(), VMap, InputMap);
-    TaskToOutline[T] = TaskOutlineInfo(Outline, LoopInputSets[L],
-                                       LoopArgStarts[L],
-                                       L->getLoopPreheader()->getTerminator(),
-                                       TL->getExitBlock(), TL->getUnwindDest());
+    TaskToOutline[T] = TaskOutlineInfo(
+        Outline, cast<Instruction>(VMap[T->getDetach()]),
+        dyn_cast_or_null<Instruction>(VMap[T->getTaskFrameUsed()]),
+        LoopInputSets[L], LoopArgStarts[L],
+        L->getLoopPreheader()->getTerminator(), TL->getExitBlock(),
+        TL->getUnwindDest());
 
     // Do ABI-dependent processing of each outlined Tapir loop.
     {
