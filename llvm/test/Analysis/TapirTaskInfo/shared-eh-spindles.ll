@@ -457,22 +457,22 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #4
 
 declare %class.gTreeNode* @_ZN9gTreeNodeI8_point2dIdE7_vect2dIdE6vertex5nDataIS4_EE7newTreeE4_seqIPS4_ES1_dPS7_i(%struct.vertex** %S.coerce0, i64 %S.coerce1, double %cnt.coerce0, double %cnt.coerce1, double %sz, %class.gTreeNode* %newNodes, i32 %numNewNodes) local_unnamed_addr #7
 
-; CHECK: task at depth 0 containing: <task entry><func sp entry>%entry,%if.else<sp exit>
-; CHECK-DAG: <shared EH><phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>
-; CHECK-DAG: <shared EH><phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd75.3<sp exit>
-; CHECK: <phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd75.2<sp exit>
-; CHECK: <phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd75.1<sp exit>
-; CHECK: <phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd75<sp exit>
-; CHECK: <phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd.3<sp exit>
-; CHECK: <phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd.2<sp exit>
-; CHECK: <phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd.1<sp exit>
-; CHECK: <phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd<sp exit>
-; CHECK: <phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>
+; CHECK: task at depth 0: {<task entry><func sp entry>%entry,%if.else<sp exit>
+; CHECK-DAG: {<shared EH><phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK-DAG: {<shared EH><phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75.3<sp exit>
+; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75.2<sp exit>
+; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75.1<sp exit>
+; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75<sp exit>
+; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd.3<sp exit>
+; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd.2<sp exit>
+; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd.1<sp exit>
+; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd<sp exit>
+; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}

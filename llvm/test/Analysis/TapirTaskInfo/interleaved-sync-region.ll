@@ -50,9 +50,9 @@ declare dso_local i32 @bar(...)
 attributes #0 = { nounwind uwtable  }
 attributes #1 = { argmemonly nounwind }
 
-; CHECK: task at depth 0 containing: <task entry><func sp entry>%entry<sp exit><phi sp entry>%while.body<sp exit><sync sp entry>%sync.continue<sp exit><phi sp entry>%det.cont<sp exit><sync sp entry>%sync.continue1<sp exit><phi sp entry>%det.cont4<sp exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd2<sp exit><task exit>
-; CHECK: task at depth 1 containing: <task entry><task sp entry>%det.achd<sp exit><task exit>
+; CHECK: task at depth 0: {<task entry><func sp entry>%entry<sp exit>}{<phi sp entry>%while.body<sp exit>}{<sync sp entry>%sync.continue<sp exit>}{<phi sp entry>%det.cont<sp exit>}{<sync sp entry>%sync.continue1<sp exit>}{<phi sp entry>%det.cont4<sp exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd2<sp exit><task exit>}
+; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd<sp exit><task exit>}
 
 ; CHECK-DAG: Spindle @ while.body may happen in parallel with:
 ; CHECK-NEXT: task @ det.achd2
