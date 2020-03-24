@@ -7,11 +7,9 @@ int return_spawn_test(int i){
 }
 
 // CHECK-LABEL: define {{(dso_local )?}}i32 @_Z17return_spawn_testi(i32 %i)
-// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]] unwind
+// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]
-// CHECK: %[[CALL:.+]] = invoke i32 @_Z12return_stuffi(i32
-// CHECK: to label %[[INVOKECONT:.+]] unwind
-// CHECK: [[INVOKECONT]]
+// CHECK: %[[CALL:.+]] = call i32 @_Z12return_stuffi(i32
 // CHECK-NEXT: store i32 %[[CALL]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 // CHECK: [[CONTINUE]]
@@ -46,12 +44,14 @@ void spawn_infinite_loop() {
 // CHECK-LABEL: define {{(dso_local )?}}void @_Z19spawn_infinite_loopv()
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]] unwind
 // CHECK: [[DETACHED]]
+// CHECK: %[[REFTMP:.+]] = alloca %class.Bar
+// CHECK: %[[REFTMP2:.+]] = alloca %class.Bar
 // CHECK: br label %[[LABEL1:.+]]
 // CHECK: [[LABEL1]]
-// CHECK: invoke void @_ZN3BarC1Ev(%class.Bar* %[[REFTMP:.+]])
+// CHECK: call void @_ZN3BarC1Ev(%class.Bar* %[[REFTMP]])
 // CHECK: %[[CALL:.+]] = invoke i32 @_ZNK3Bar11getValSpawnEi(%class.Bar* %[[REFTMP]], i32 0)
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* %[[REFTMP]])
-// CHECK: invoke void @_ZN3BarC1Ev(%class.Bar* %[[REFTMP2:.+]])
+// CHECK: call void @_ZN3BarC1Ev(%class.Bar* %[[REFTMP2]])
 // CHECK: %[[CALL:.+]] = invoke i32 @_Z3fooRK3Bar(%class.Bar* {{.+}}%[[REFTMP2]])
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* %[[REFTMP2]])
 // CHECK-NEXT: br label %[[LABEL1]]
@@ -59,11 +59,9 @@ void spawn_infinite_loop() {
 // CHECK: ret void
 
 // CHECK-LABEL: define linkonce_odr {{(dso_local )?}}i32 @_ZNK3Bar11getValSpawnEi(%class.Bar
-// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]] unwind
+// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]
-// CHECK: %[[CALL:.+]] = invoke i32 @_Z12return_stuffi(i32
-// CHECK: to label %[[INVOKECONT:.+]] unwind
-// CHECK: [[INVOKECONT]]
+// CHECK: %[[CALL:.+]] = call i32 @_Z12return_stuffi(i32
 // CHECK-NEXT: store i32 %[[CALL]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 // CHECK: [[CONTINUE]]
