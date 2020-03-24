@@ -607,6 +607,9 @@ public:
   /// llvm.lifetime.end marker.
   bool isLifetimeStartOrEnd() const;
 
+  /// Return true if the instruction is a llvm.taskframe marker.
+  bool isTaskFrameMarker() const;
+
   /// Return a pointer to the next non-debug instruction in the same basic
   /// block as 'this', or nullptr if no such instruction exists.
   const Instruction *getNextNonDebugInstruction() const;

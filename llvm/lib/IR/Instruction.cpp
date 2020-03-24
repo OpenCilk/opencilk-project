@@ -618,6 +618,15 @@ bool Instruction::isLifetimeStartOrEnd() const {
   return ID == Intrinsic::lifetime_start || ID == Intrinsic::lifetime_end;
 }
 
+bool Instruction::isTaskFrameMarker() const {
+  auto II = dyn_cast<IntrinsicInst>(this);
+  if (!II)
+    return false;
+  Intrinsic::ID ID = II->getIntrinsicID();
+  return ID == Intrinsic::taskframe_create || ID == Intrinsic::taskframe_use ||
+      ID == Intrinsic::taskframe_resume;
+}
+
 const Instruction *Instruction::getNextNonDebugInstruction() const {
   for (const Instruction *I = getNextNode(); I; I = I->getNextNode())
     if (!isa<DbgInfoIntrinsic>(I))
