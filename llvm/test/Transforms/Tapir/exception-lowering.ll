@@ -438,7 +438,7 @@ terminate.lpad:                                   ; preds = %lpad30
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
 ; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: br label %[[BODY:.+]]
+; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
 ; CHECK-NEXT: call i32 @_Z4quuzi(i32 {{.*}}%[[ARG]])
@@ -450,7 +450,7 @@ terminate.lpad:                                   ; preds = %lpad30
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
 ; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: br label %[[BODY:.+]]
+; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
 ; CHECK-NEXT: invoke i32 @_Z3barP3Foo(%class.Foo* {{.+}}%[[ARG]])
@@ -475,7 +475,7 @@ terminate.lpad:                                   ; preds = %lpad30
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
 ; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: br label %[[BODY:.+]]
+; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
 ; CHECK-NEXT: invoke i32 @_Z3barP3Foo(%class.Foo* {{.+}}%[[ARG]])
@@ -511,7 +511,7 @@ terminate.lpad:                                   ; preds = %lpad30
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
 ; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: br label %[[BODY:.+]]
+; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
 ; CHECK-NEXT: invoke i32 @_Z3barP3Foo(%class.Foo* {{.+}}%[[ARG]])

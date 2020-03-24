@@ -37,6 +37,17 @@ bool llvm::isDetachedRethrow(const Instruction *I, const Value *SyncRegion) {
   return false;
 }
 
+/// Returns true if the given instruction performs a taskframe resume, false
+/// otherwise.
+bool llvm::isTaskFrameResume(const Instruction *I, const Value *TaskFrame) {
+  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
+    if (const Function *Called = II->getCalledFunction())
+      if (Intrinsic::taskframe_resume == Called->getIntrinsicID())
+        if (!TaskFrame || (TaskFrame == II->getArgOperand(0)))
+          return true;
+  return false;
+}
+
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.
 ///
@@ -1034,6 +1045,17 @@ void llvm::getDetachUnwindPHIUses(DetachInst *DI,
   }
 }
 
+/// Return the taskframe used in the given detached block.
+Value *llvm::getTaskFrameUsed(BasicBlock *Detached) {
+  // Scan the detached block for a taskframe.use intrinsic.  If we find one,
+  // return its argument.
+  for (const Instruction &I : *Detached)
+    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+      if (Intrinsic::taskframe_use == II->getIntrinsicID())
+        return II->getArgOperand(0);
+  return nullptr;
+}
+
 // Helper function to check if the given taskframe.create instruction requires
 // the parent basic block to be split in order to canonicalize the
 // representation of taskframes.
@@ -1108,6 +1130,123 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F) {
     }
 
   return Changed;
+}
+
+/// fixupTaskFrameExternalUses - Fix any uses of variables defined in
+/// taskframes, but outside of tasks themselves.  For each such variable, insert
+/// a memory allocation in the parent frame, add a store to that memory in the
+/// taskframe, and modify external uses to use the value in that memory loaded
+/// at the tasks continuation.
+void llvm::fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT) {
+  if (T->isRootTask())
+    // Nothing to be done for root tasks.
+    return;
+
+  // Collects spindles in the taskframe for task T.
+  SetVector<Spindle *> TFSpindles;
+  if (Spindle *TFUsed = T->getTaskFrameCreateSpindle())
+    for (Spindle *S : TFUsed->taskframe_spindles())
+      TFSpindles.insert(S);
+
+  // If there are no taskframe spindles, there's nothing to do.
+  if (TFSpindles.empty())
+    return;
+
+  // Get the set of basic blocks in the taskframe spindles.  At the same time,
+  // find the continuation of corresponding taskframe.resume intrinsics.
+  SmallPtrSet<BasicBlock *, 1> BlocksToCheck;
+  BasicBlock *Continuation = T->getContinuationSpindle()->getEntry();
+  BasicBlock *TFResumeContin = nullptr;
+  for (Spindle *S : TFSpindles) {
+    for (BasicBlock *BB : S->blocks()) {
+      BlocksToCheck.insert(BB);
+      if (isTaskFrameResume(BB->getTerminator())) {
+        InvokeInst *TFResume = cast<InvokeInst>(BB->getTerminator());
+        assert((nullptr == TFResumeContin) ||
+               (TFResumeContin == TFResume->getUnwindDest()) &&
+               "Multiple taskframe.resume destinations found");
+        TFResumeContin = TFResume->getUnwindDest();
+      }
+    }
+  }
+
+  MapVector<Instruction *, SmallVector<Use *, 16>> ToRewrite;
+  // Find instructions in the taskframe that are used outside of the taskframe.
+  for (BasicBlock *BB : BlocksToCheck) {
+    for (Instruction &I : *BB) {
+      // Ignore certain instructions from consideration: the taskframe.create
+      // intrinsic for this taskframe, the detach instruction that spawns T, and
+      // the landingpad value in T's EH continuation.
+      if ((T->getTaskFrameUsed() == &I) || (T->getDetach() == &I) ||
+          (T->getLPadValueInEHContinuationSpindle() == &I))
+        continue;
+
+      // Examine all users of this instruction.
+      for (Use &U : I.uses()) {
+        // If we find a live use outside of the task, it's an output.
+        if (Instruction *UI = dyn_cast<Instruction>(U.getUser())) {
+          if (!T->encloses(UI->getParent()) &&
+              !BlocksToCheck.count(UI->getParent()) &&
+              DT.isReachableFromEntry(UI->getParent()))
+            ToRewrite[&I].push_back(&U);
+        }
+      }
+    }
+  }
+
+  Module *M = T->getEntry()->getModule();
+  for (auto &TFInstr : ToRewrite) {
+    LLVM_DEBUG(dbgs() << "Fixing taskframe output " << *TFInstr.first << "\n");
+    // Create an allocation to store the result of the instruction.
+    IRBuilder<> Builder(
+        &*T->getParentTask()->getEntry()->getFirstInsertionPt());
+    AllocaInst *AI = Builder.CreateAlloca(TFInstr.first->getType());
+    AI->setName(TFInstr.first->getName());
+
+    // Store the result of the instruction into that alloca.
+    Builder.SetInsertPoint(&*(++TFInstr.first->getIterator()));
+    Builder.CreateStore(TFInstr.first, AI);
+
+    // Load the result of the instruction at the continuation.
+    Builder.SetInsertPoint(&*Continuation->getFirstInsertionPt());
+    Builder.CreateCall(
+        Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
+                                  { AI->getType() }), { AI });
+    LoadInst *ContinVal = Builder.CreateLoad(AI);
+    LoadInst *EHContinVal = nullptr;
+
+    // For each external use, replace the use with a load from the alloca.
+    for (Use *UseToRewrite : TFInstr.second) {
+      Instruction *User = cast<Instruction>(UseToRewrite->getUser());
+      BasicBlock *UserBB = User->getParent();
+      if (auto *PN = dyn_cast<PHINode>(User))
+        UserBB = PN->getIncomingBlock(*UseToRewrite);
+
+      if (!DT.dominates(Continuation, UserBB)) {
+        assert(DT.dominates(TFResumeContin, UserBB) &&
+               "Use not dominated by continuation or taskframe.resume");
+        // If necessary, load the value at the taskframe.resume continuation.
+        if (!EHContinVal) {
+          Builder.SetInsertPoint(&*(TFResumeContin->getFirstInsertionPt()));
+          Builder.CreateCall(
+              Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
+                                        { AI->getType() }), { AI });
+          EHContinVal = Builder.CreateLoad(AI);
+        }
+
+        // Rewrite to use the value loaded at the taskframe.resume continuation.
+        if (UseToRewrite->get()->hasValueHandle())
+          ValueHandleBase::ValueIsRAUWd(*UseToRewrite, EHContinVal);
+        UseToRewrite->set(EHContinVal);
+        continue;
+      }
+
+      // Rewrite to use the value loaded at the continuation.
+      if (UseToRewrite->get()->hasValueHandle())
+        ValueHandleBase::ValueIsRAUWd(*UseToRewrite, ContinVal);
+      UseToRewrite->set(ContinVal);
+    }
+  }
 }
 
 /// Find hints specified in the loop metadata and update local values.

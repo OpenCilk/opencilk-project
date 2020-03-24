@@ -30,12 +30,15 @@ class DominatorTree;
 class Function;
 class Loop;
 class LoopOutlineProcessor;
+class Spindle;
 class TapirLoopInfo;
 class Task;
 class TaskInfo;
 class Value;
 
 using ValueSet = SetVector<Value *>;
+using SpindleSet = SetVector<Spindle *>;
+using TaskValueSetMap = DenseMap<Task *, ValueSet>;
 
 /// Structure that captures relevant information about an outlined task,
 /// including the following:
@@ -49,6 +52,12 @@ using ValueSet = SetVector<Value *>;
 struct TaskOutlineInfo {
   // The outlined helper function.
   Function *Outline = nullptr;
+
+  // Instruction in Outline corresponding to the detach point.
+  Instruction *DetachPt = nullptr;
+
+  // Instruction in Outline corresponding to the taskframe.create.
+  Instruction *TaskFrameCreate = nullptr;
 
   // The set of values in the caller passed to the helper function.  These
   // values might be passed directly to a call to the helper function, or they
@@ -76,11 +85,13 @@ struct TaskOutlineInfo {
   BasicBlock *ReplUnwind = nullptr;
 
   TaskOutlineInfo() = default;
-  TaskOutlineInfo(Function *Outline, ValueSet &InputSet, Instruction *ReplStart,
-                  Instruction *ReplCall, BasicBlock *ReplRet,
-                  BasicBlock *ReplUnwind = nullptr)
-      : Outline(Outline), InputSet(InputSet), ReplStart(ReplStart),
-        ReplCall(ReplCall), ReplRet(ReplRet), ReplUnwind(ReplUnwind) {}
+  TaskOutlineInfo(Function *Outline, Instruction *DetachPt,
+                  Instruction *TaskFrameCreate, ValueSet &InputSet,
+                  Instruction *ReplStart, Instruction *ReplCall,
+                  BasicBlock *ReplRet, BasicBlock *ReplUnwind = nullptr)
+      : Outline(Outline), DetachPt(DetachPt), TaskFrameCreate(TaskFrameCreate),
+        InputSet(InputSet), ReplStart(ReplStart), ReplCall(ReplCall),
+        ReplRet(ReplRet), ReplUnwind(ReplUnwind) {}
 
   // Replaces the stored call or invoke instruction to the outlined function
   // with \p NewReplCall, and updates other information in this TaskOutlineInfo
@@ -245,7 +256,8 @@ public:
   // Process the Function F that has just been outlined from a task.  This
   // routine is executed on each outlined function by traversing in post-order
   // the tasks in the original function.
-  virtual void processOutlinedTask(Function &F) = 0;
+  virtual void processOutlinedTask(Function &F, Instruction *DetachPt,
+                                   Instruction *TaskFrameCreate) = 0;
 
   // Process the Function F as a function that can spawn subtasks.  This routine
   // is called after processOutlinedTask.
@@ -384,8 +396,17 @@ public:
 TapirTarget *getTapirTargetFromID(Module &M, TapirTargetID TargetID);
 
 /// Find all inputs to tasks within a function \p F, including nested tasks.
-DenseMap<Task *, ValueSet>
-findAllTaskInputs(Function &F, DominatorTree &DT, TaskInfo &TI);
+TaskValueSetMap findAllTaskInputs(Function &F, const DominatorTree &DT,
+                                  const TaskInfo &TI);
+
+void getTaskFrameInputsOutputs(ValueSet &TFInputs, ValueSet &TFOutputs,
+                               const Task &T, const ValueSet &TaskInputs,
+                               const SpindleSet &TFSpindles,
+                               const TaskInfo &TI, const DominatorTree &DT);
+
+void findAllTaskFrameInputs(TaskValueSetMap &TFInputs,
+                            TaskValueSetMap &TFOutputs, Function &F,
+                            const DominatorTree &DT, TaskInfo &TI);
 
 /// Create a struct to store the inputs to pass to an outlined function for the
 /// task \p T.  Stores into the struct will be inserted \p StorePt, which should

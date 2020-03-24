@@ -29,6 +29,10 @@ class TaskInfo;
 /// otherwise.
 bool isDetachedRethrow(const Instruction *I, const Value *SyncRegion = nullptr);
 
+/// Returns true if the given instruction performs a taskframe resume, false
+/// otherwise.
+bool isTaskFrameResume(const Instruction *I, const Value *TaskFrame = nullptr);
+
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.
 bool ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
@@ -104,10 +108,20 @@ bool canDetach(const Function *F);
 void getDetachUnwindPHIUses(DetachInst *DI,
                             SmallPtrSetImpl<BasicBlock *> &UnwindPHIs);
 
+/// getTaskFrameUsed - Return the taskframe used in the given detached block.
+Value *getTaskFrameUsed(BasicBlock *Detached);
+
 /// splitTaskFrameCreateBlocks - Split basic blocks in function F at
 /// taskframe.create intrinsics.  Returns true if anything changed, false
 /// otherwise.
 bool splitTaskFrameCreateBlocks(Function &F);
+
+/// fixupTaskFrameExternalUses - Fix any uses of variables defined in
+/// taskframes, but outside of tasks themselves.  For each such variable, insert
+/// a memory allocation in the parent frame, add a store to that memory in the
+/// taskframe, and modify external uses to use the value in that memory loaded
+/// at the tasks continuation.
+void fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT);
 
 /// Utility class for getting and setting Tapir-related loop hints in the form
 /// of loop metadata.
