@@ -4778,10 +4778,11 @@ void Verifier::visitInstruction(Instruction &I) {
                 F->getIntrinsicID() == Intrinsic::experimental_gc_statepoint ||
                 F->getIntrinsicID() == Intrinsic::wasm_rethrow ||
                 F->getIntrinsicID() == Intrinsic::detached_rethrow ||
+                F->getIntrinsicID() == Intrinsic::taskframe_resume ||
                 IsAttachedCallOperand(F, CBI, i),
             "Cannot invoke an intrinsic other than donothing, patchpoint, "
-            "statepoint, coro_resume, coro_destroy, detached_rethrow or "
-            "clang.arc.attachedcall",
+            "statepoint, coro_resume, coro_destroy, detached_rethrow, "
+            "taskframe_resume or clang.arc.attachedcall",
             &I);
       Check(F->getParent() == &M, "Referencing function in another module!", &I,
             &M, F, F->getParent());
