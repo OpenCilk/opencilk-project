@@ -1623,6 +1623,21 @@ bool SimplifyCFGOpt::hoistCommonCodeFromSuccessors(BasicBlock *BB,
       }
     }
 
+    // Skip Tapir intrinsics if they are not identical.
+    bool AllTapirIntrinsicsAreIdentical = all_of(OtherSuccIterRange, [I1](auto &Iter) {
+      Instruction *I2 = &*Iter;
+      return I1->isIdenticalToWhenDefined(I2);
+    });
+    if (!AllTapirIntrinsicsAreIdentical) {
+      while (isSkippableTapirIntrinsic(I1))
+        I1 = &*++BB1ItrPair.first;
+      for (auto &SuccIter : OtherSuccIterRange) {
+        Instruction *I2 = &*SuccIter;
+        while (isSkippableTapirIntrinsic(I2))
+          I2 = &*++SuccIter;
+      }
+    }
+
     bool AllInstsAreIdentical = true;
     bool HasTerminator = I1->isTerminator();
     for (auto &SuccIter : OtherSuccIterRange) {
@@ -7162,6 +7177,13 @@ static bool TryToMergeLandingPad(LandingPadInst *LPad, BranchInst *BI,
     // path instead and make ourselves dead.
     SmallSetVector<BasicBlock *, 16> UniquePreds(pred_begin(BB), pred_end(BB));
     for (BasicBlock *Pred : UniquePreds) {
+      // Handle detach predecessors.
+      if (DetachInst *DI = dyn_cast<DetachInst>(Pred->getTerminator())) {
+        assert(DI->getDetached() != BB && DI->getContinue() != BB &&
+               DI->getUnwindDest() == BB && "unexpected detach successor");
+        DI->setUnwindDest(OtherPred);
+        continue;
+      }
       InvokeInst *II = cast<InvokeInst>(Pred->getTerminator());
       assert(II->getNormalDest() != BB && II->getUnwindDest() == BB &&
              "unexpected successor");

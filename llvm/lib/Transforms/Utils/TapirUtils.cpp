@@ -48,6 +48,24 @@ bool llvm::isTaskFrameResume(const Instruction *I, const Value *TaskFrame) {
   return false;
 }
 
+// Check if the given instruction is a Tapir intrinsic that can be skipped.
+bool llvm::isSkippableTapirIntrinsic(const Instruction *I) {
+  if (const CallBase *CB = dyn_cast<CallBase>(I))
+    if (const Function *Called = CB->getCalledFunction())
+      switch (Called->getIntrinsicID()) {
+      default:
+        break;
+      case Intrinsic::syncregion_start:
+      case Intrinsic::taskframe_create:
+      case Intrinsic::taskframe_end:
+      case Intrinsic::taskframe_use:
+      case Intrinsic::tapir_runtime_start:
+      case Intrinsic::tapir_runtime_end:
+        return true;
+      }
+  return false;
+}
+
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.
 ///

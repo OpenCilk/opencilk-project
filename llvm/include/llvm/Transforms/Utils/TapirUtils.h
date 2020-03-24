@@ -33,6 +33,9 @@ bool isDetachedRethrow(const Instruction *I, const Value *SyncRegion = nullptr);
 /// otherwise.
 bool isTaskFrameResume(const Instruction *I, const Value *TaskFrame = nullptr);
 
+/// Check if the given instruction is a Tapir intrinsic that can be skipped.
+bool isSkippableTapirIntrinsic(const Instruction *I);
+
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.
 bool ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
