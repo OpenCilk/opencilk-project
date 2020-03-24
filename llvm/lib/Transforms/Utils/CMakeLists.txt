@@ -65,6 +65,7 @@ add_llvm_component_library(LLVMTransformUtils
   StripNonLineTableDebugInfo.cpp
   SymbolRewriter.cpp
   TapirUtils.cpp
+  TaskCanonicalize.cpp
   TaskSimplify.cpp
   UnifyFunctionExitNodes.cpp
   UnifyLoopExits.cpp
