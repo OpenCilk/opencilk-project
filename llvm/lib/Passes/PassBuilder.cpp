@@ -191,6 +191,7 @@
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include "llvm/Transforms/Vectorize/LoadStoreVectorizer.h"
+#include "llvm/Transforms/Utils/TaskCanonicalize.h"
 #include "llvm/Transforms/Utils/TaskSimplify.h"
 #include "llvm/Transforms/Vectorize/LoopVectorize.h"
 #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
@@ -1113,6 +1114,9 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   // Add passes to run just after Tapir loops are processed.
   for (auto &C : TapirLoopEndEPCallbacks)
     C(MPM, Level);
+
+  // Canonicalize the representation of tasks.
+  MPM.addPass(createModuleToFunctionPassAdaptor(TaskCanonicalizePass()));
 
   // Lower Tapir to target runtime calls.
   MPM.addPass(TapirToTargetPass());
