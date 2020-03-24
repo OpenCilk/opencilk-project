@@ -1034,6 +1034,82 @@ void llvm::getDetachUnwindPHIUses(DetachInst *DI,
   }
 }
 
+// Helper function to check if the given taskframe.create instruction requires
+// the parent basic block to be split in order to canonicalize the
+// representation of taskframes.
+static bool needToSplitTaskFrameCreate(Instruction *TFCreate) {
+  // If the taskframe.create is not the first instruction, split.
+  if (TFCreate != &TFCreate->getParent()->front())
+    return true;
+
+  // The taskframe.create is at the front of the block.  Check that we have a
+  // single predecessor.
+  BasicBlock *Pred = TFCreate->getParent()->getSinglePredecessor();
+  if (!Pred)
+    return true;
+
+  // Check that the single predecessor has a single successor.
+  if (!Pred->getSingleSuccessor())
+    return true;
+
+  // Check whether the single predecessor is terminated with a sync.
+  if (isa<SyncInst>(Pred->getTerminator()))
+    return true;
+
+  return false;
+}
+
+/// Split blocks in function F containing taskframe.create calls to canonicalize
+/// the representation of Tapir taskframes in F.
+bool llvm::splitTaskFrameCreateBlocks(Function &F) {
+  if (F.empty())
+    return false;
+
+  // Scan the function for taskframe.create instructions to split.
+  SmallVector<Instruction *, 32> TFCreateToSplit;
+  SmallVector<BasicBlock *, 8> WorkList;
+  SmallPtrSet<BasicBlock *, 32> Visited;
+  WorkList.push_back(&F.getEntryBlock());
+  while (!WorkList.empty()) {
+    BasicBlock *BB = WorkList.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+
+    // We can find taskframe.create instructions to split by examining the
+    // arguments of taskframe.use instructions in detached blocks.
+    if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      // Scan the instructions in the detached block for a taskframe.use.
+      for (const Instruction &I : *DI->getDetached()) {
+        if (const CallBase *Call = dyn_cast<CallBase>(&I))
+          if (const Function *Called = Call->getCalledFunction())
+            if (Intrinsic::taskframe_use == Called->getIntrinsicID()) {
+              TFCreateToSplit.push_back(
+                  cast<Instruction>(Call->getArgOperand(0)));
+              LLVM_DEBUG(dbgs() << "Pushing TFCreate "
+                         << *Call->getArgOperand(0) << "\n");
+              break;
+            }
+      }
+    }
+
+    // Add all successors of BB
+    for (BasicBlock *Succ : successors(BB))
+      WorkList.push_back(Succ);
+  }
+
+  bool Changed = false;
+  // Split the basic blocks containing taskframe.create calls so that the
+  // taskframe.create call starts the basic block.
+  for (Instruction *I : TFCreateToSplit)
+    if (needToSplitTaskFrameCreate(I)) {
+      LLVM_DEBUG(dbgs() << "Splitting at " << *I << "\n");
+      SplitBlock(I->getParent(), I);
+      Changed = true;
+    }
+
+  return Changed;
+}
+
 /// Find hints specified in the loop metadata and update local values.
 void llvm::TapirLoopHints::getHintsFromMetadata() {
   MDNode *LoopID = TheLoop->getLoopID();
