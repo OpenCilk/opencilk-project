@@ -1135,20 +1135,23 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, const Task &T) {
 
 /// Print task with all the BBs inside it.
 void Task::print(raw_ostream &OS, unsigned Depth, bool Verbose) const {
-  OS.indent(Depth * 2) << "task at depth " << Depth << " containing: ";
+  OS.indent(Depth * 2) << "task at depth " << Depth << ": ";
 
   // Print the spindles in this task.
   for (const Spindle *S :
-         depth_first<InTask<const Spindle *>>(getEntrySpindle()))
+         depth_first<InTask<const Spindle *>>(getEntrySpindle())) {
+    OS << "{";
     S->print(OS, Verbose);
+    OS << "}";
+  }
   OS << "\n";
 
   // If this task contains tracks any shared EH spindles for its subtasks, print
   // those shared EH spindles.
   for (const Spindle *S : shared_eh_spindles()) {
-    OS << "<shared EH>";
+    OS << "{<shared EH>";
     S->print(OS, Verbose);
-    OS << "\n";
+    OS << "}\n";
   }
 
   // Print the subtasks of this task.
@@ -1158,6 +1161,7 @@ void Task::print(raw_ostream &OS, unsigned Depth, bool Verbose) const {
 
 // Debugging
 void TaskInfo::print(raw_ostream &OS) const {
+  OS << "Spindles:\n";
   SmallVector<const Spindle *, 8> WorkList;
   SmallPtrSet<const Spindle *, 8> Visited;
   WorkList.push_back(getRootTask()->getEntrySpindle());
@@ -1165,13 +1169,18 @@ void TaskInfo::print(raw_ostream &OS) const {
     const Spindle *S = WorkList.pop_back_val();
     if (!Visited.insert(S).second) continue;
 
+    OS << "{";
     S->print(OS);
+    OS << "}";
 
     for (const Spindle *Succ : successors(S))
       WorkList.push_back(Succ);
   }
+  OS << "\n\n";
+
+  OS << "Task tree:\n";
+  getRootTask()->print(OS);
   OS << "\n";
-  RootTask->print(OS);
 
   for (const Task *T : post_order(getRootTask())) {
     if (T->taskframe_creates().begin() == T->taskframe_creates().end())
