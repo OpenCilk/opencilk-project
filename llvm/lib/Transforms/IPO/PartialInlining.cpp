@@ -875,6 +875,9 @@ int PartialInlinerImpl::computeBBInlineCost(BasicBlock *BB,
     if (I.isLifetimeStartOrEnd())
       continue;
 
+    if (I.isTaskFrameMarker())
+      continue;
+
     if (auto *II = dyn_cast<IntrinsicInst>(&I)) {
       Intrinsic::ID IID = II->getIntrinsicID();
       SmallVector<Type *, 4> Tys;

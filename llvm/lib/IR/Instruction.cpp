@@ -660,6 +660,15 @@ bool Instruction::isDebugOrPseudoInst() const {
   return isa<DbgInfoIntrinsic>(this) || isa<PseudoProbeInst>(this);
 }
 
+bool Instruction::isTaskFrameMarker() const {
+  auto II = dyn_cast<IntrinsicInst>(this);
+  if (!II)
+    return false;
+  Intrinsic::ID ID = II->getIntrinsicID();
+  return ID == Intrinsic::taskframe_create || ID == Intrinsic::taskframe_use ||
+      ID == Intrinsic::taskframe_resume;
+}
+
 const Instruction *
 Instruction::getNextNonDebugInstruction(bool SkipPseudoOp) const {
   for (const Instruction *I = getNextNode(); I; I = I->getNextNode())
