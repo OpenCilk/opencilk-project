@@ -866,6 +866,9 @@ int PartialInlinerImpl::computeBBInlineCost(BasicBlock *BB) {
     if (I.isLifetimeStartOrEnd())
       continue;
 
+    if (I.isTaskFrameMarker())
+      continue;
+
     if (CallInst *CI = dyn_cast<CallInst>(&I)) {
       InlineCost += getCallsiteCost(*CI, DL);
       continue;
