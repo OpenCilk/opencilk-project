@@ -46,7 +46,7 @@ contb:
 
 define i8 @f2() personality ptr @__gxx_personality_v0 {
 entry:
-; CHECK: Cannot invoke an intrinsic other than donothing, patchpoint, statepoint, coro_resume, coro_destroy, detached_rethrow or clang.arc.attachedcall
+; CHECK: Cannot invoke an intrinsic other than donothing, patchpoint, statepoint, coro_resume, coro_destroy, detached_rethrow, taskframe_resume or clang.arc.attachedcall
   invoke void @llvm.trap()
   to label %cont unwind label %lpad
 
