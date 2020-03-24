@@ -1102,7 +1102,7 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 ; CHECK: sync within %[[SYNCREG]]
 ; CHECK: [[LSUNWIND]]:
 ; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad [[LPADTYPE:.+]]
-; CHECK-NEXT: catch {{.+}} null
+; CHECK-NEXT: cleanup
 ; CHECK: invoke void @llvm.detached.rethrow
 ; CHECK: (token %[[SYNCREG]], [[LPADTYPE]] %[[LPADVAL]])
 
@@ -1118,7 +1118,7 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 ; CHECK: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach29.ls2(i64 0,
 ; CHECK: [[LSUNWIND]]:
 ; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad [[LPADTYPE:.+]]
-; CHECK-NEXT: catch {{.+}} null
+; CHECK-NEXT: cleanup
 ; CHECK: invoke void @llvm.detached.rethrow
 ; CHECK: (token %[[SYNCREG]], [[LPADTYPE]] %[[LPADVAL]])
 
