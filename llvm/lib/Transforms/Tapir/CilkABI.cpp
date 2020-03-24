@@ -1370,7 +1370,9 @@ Value *CilkABI::GetOrInitCilkStackFrame(Function &F, bool Helper,
   return SF;
 }
 
-bool CilkABI::makeFunctionDetachable(Function &Extracted, bool instrument) {
+bool CilkABI::makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
+                                     Instruction *TaskFrameCreate,
+                                     bool instrument) {
   /*
     __cilkrts_stack_frame sf;
     __cilkrts_enter_frame_fast_1(&sf);
@@ -1393,6 +1395,8 @@ bool CilkABI::makeFunctionDetachable(Function &Extracted, bool instrument) {
 
   BasicBlock::iterator InsertPt = ++SF->getIterator();
   IRBuilder<> IRB(&(Extracted.getEntryBlock()), InsertPt);
+  if (TaskFrameCreate)
+    IRB.SetInsertPoint(TaskFrameCreate);
 
   // if (instrument) {
   //   Type *Int8PtrTy = IRB.getInt8PtrTy();
@@ -1417,7 +1421,8 @@ bool CilkABI::makeFunctionDetachable(Function &Extracted, bool instrument) {
   {
     // if (instrument)
     //   IRB.CreateCall(CILK_CSI_FUNC(detach_begin, *M), args);
-
+    if (DetachPt)
+      IRB.SetInsertPoint(DetachPt);
     IRB.CreateCall(CILKRTS_FUNC(detach), Args);
 
     // if (instrument)
@@ -1514,11 +1519,12 @@ void CilkABI::lowerSync(SyncInst &SI) {
   Fn.addFnAttr(Attribute::Stealable);
 }
 
-void CilkABI::processOutlinedTask(Function &F) {
+void CilkABI::processOutlinedTask(Function &F, Instruction *DetachPt,
+                                  Instruction *TaskFrameCreate) {
   NamedRegionTimer NRT("processOutlinedTask", "Process outlined task",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
-  makeFunctionDetachable(F, false);
+  makeFunctionDetachable(F, DetachPt, TaskFrameCreate, false);
 }
 
 void CilkABI::processSpawner(Function &F) {
