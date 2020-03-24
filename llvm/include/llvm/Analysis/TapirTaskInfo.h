@@ -25,6 +25,7 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Allocator.h"
@@ -66,7 +67,13 @@ private:
   // Predecessor and successor spindles.
   SmallVector<SpindleEdge, 8> Incoming;
   SmallVector<SpindleEdge, 8> Outgoing;
-  
+
+  // If this spindle starts with a taskframe.create, TaskFrameUser points to the
+  // task that uses that created taskframe.
+  Task *TaskFrameUser = nullptr;
+  SmallVector<Task *, 1> TaskFrameSubtasks;
+  SmallVector<Spindle *, 1> TaskFrameSpindles;
+
   Spindle(const Spindle &) = delete;
   const Spindle &operator=(const Spindle &) = delete;
 
@@ -80,6 +87,9 @@ public:
   SPType getType() const { return Ty; }
   bool isSync() const { return Sync == Ty; }
   bool isPhi() const { return Phi == Ty; }
+
+  Value *getTaskFrameCreate() const;
+  Task *getTaskFrameUser() const { return TaskFrameUser; }
 
   /// Return true if the specified basic block is in this task.
   bool contains(const BasicBlock *BB) const {
@@ -229,6 +239,31 @@ public:
     adj_iterator_impl<spedge_const_iterator, const Spindle *>;
   using adj_range = iterator_range<adj_iterator>;
   using adj_const_range = iterator_range<adj_const_iterator>;
+
+  using tf_subtask_iterator = typename SmallVectorImpl<Task *>::const_iterator;
+  using tf_subtask_const_iterator = tf_subtask_iterator;
+  inline tf_subtask_iterator tf_subtask_begin() const {
+    return TaskFrameSubtasks.begin();
+  }
+  inline tf_subtask_iterator tf_subtask_end() const {
+    return TaskFrameSubtasks.end();
+  }
+  inline iterator_range<tf_subtask_iterator> taskframe_subtasks() const {
+    return make_range(tf_subtask_begin(), tf_subtask_end());
+  }
+
+  using tf_spindle_iterator =
+      typename SmallVectorImpl<Spindle *>::const_iterator;
+  using tf_spindle_const_iterator = tf_spindle_iterator;
+  inline tf_spindle_iterator tf_spindle_begin() const {
+    return TaskFrameSpindles.begin();
+  }
+  inline tf_spindle_iterator tf_spindle_end() const {
+    return TaskFrameSpindles.end();
+  }
+  inline iterator_range<tf_spindle_iterator> taskframe_spindles() const {
+    return make_range(tf_spindle_begin(), tf_spindle_end());
+  }
 
   /// Print spindle with all the BBs inside it.
   void print(raw_ostream &OS, bool Verbose = false) const;
@@ -494,6 +529,12 @@ class Task {
   // value of landingpad at the exceptional continuation.
   Value *LPadValueInEHContinuation = nullptr;
 
+  // Spindle that creates the taskframe this task uses.
+  Spindle *TaskFrameCreateSpindle = nullptr;
+
+  // Set of taskframe.create spindles that are children of this task.
+  SmallVector<Spindle *, 4> TaskFrameCreates;
+
   Task(const Task &) = delete;
   const Task &operator=(const Task &) = delete;
 
@@ -537,6 +578,20 @@ public:
     return dyn_cast<DetachInst>(Detacher->getTerminator());
   }
 
+  /// Get the taskframe that this task uses.
+  Value *getTaskFrameUsed() const {
+    // Scan the entry block for a taskframe.use intrinsic.  If we find one,
+    // return its argument.
+    for (const Instruction &I : *getEntry())
+      if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+        if (Intrinsic::taskframe_use == II->getIntrinsicID())
+          return II->getArgOperand(0);
+    return nullptr;
+  }
+
+  // Get the spindle that creates the taskframe this task uses.
+  Spindle *getTaskFrameCreateSpindle() const { return TaskFrameCreateSpindle; }
+
   /// Get the spindle for the continuation of this task.  Returns nullptr if
   /// this task is a root task, meaning it has no continuation spindle.
   Spindle *getContinuationSpindle() const {
@@ -551,8 +606,8 @@ public:
   Spindle *getEHContinuationSpindle() const {
     assert(((isRootTask() && !EHContinuation) ||
             (!isRootTask() &&
-             (getDetach()->hasUnwindDest() && EHContinuation) ||
-             (!getDetach()->hasUnwindDest() && !EHContinuation))) &&
+             ((getDetach()->hasUnwindDest() && EHContinuation) ||
+              (!getDetach()->hasUnwindDest() && !EHContinuation)))) &&
            "Task should have a EH continuation spindle iff not a root task and "
            "detach has an unwind destination.");
     return EHContinuation;
@@ -564,8 +619,9 @@ public:
   Value *getLPadValueInEHContinuationSpindle() const {
     assert(((isRootTask() && !LPadValueInEHContinuation) ||
             (!isRootTask() &&
-             (getDetach()->hasUnwindDest() && LPadValueInEHContinuation) ||
-             (!getDetach()->hasUnwindDest() && !LPadValueInEHContinuation))) &&
+             ((getDetach()->hasUnwindDest() && LPadValueInEHContinuation) ||
+              (!getDetach()->hasUnwindDest() &&
+               !LPadValueInEHContinuation)))) &&
            "Task should have a EH continuation spindle iff not a root task and "
            "detach has an unwind destination.");
     return LPadValueInEHContinuation;
@@ -609,6 +665,14 @@ public:
   inline bool empty() const { return SubTasks.empty(); }
   inline iterator_range<iterator> subtasks() const {
     return make_range(begin(), end());
+  }
+
+  using tf_iterator = typename SmallVectorImpl<Spindle *>::const_iterator;
+  using tf_const_iterator = tf_iterator;
+  inline tf_iterator tf_begin() const { return TaskFrameCreates.begin(); }
+  inline tf_iterator tf_end() const { return TaskFrameCreates.end(); }
+  inline iterator_range<tf_iterator> taskframe_creates() const {
+    return make_range(tf_begin(), tf_end());
   }
 
   /// Get the number of spindles in this task in constant time.
@@ -743,9 +807,12 @@ public:
   bool isTaskExiting(const BasicBlock *BB) const {
     if (BB->getTerminator()->getNumSuccessors() == 0)
       return true;
-    for (const auto &Succ : children<const BasicBlock *>(BB))
+    for (const auto &Succ : children<const BasicBlock *>(BB)) {
+      if (isa<UnreachableInst>(Succ->getFirstNonPHIOrDbgOrLifetime()))
+        continue;
       if (!encloses(Succ))
         return true;
+    }
     return false;
   }
 
@@ -1073,6 +1140,15 @@ public:
   /// Same as getTaskFor(BB).
   const Task *operator[](const BasicBlock *BB) const { return getTaskFor(BB); }
 
+  /// Return the taskframe spindle for the given task T.
+  Spindle *getTaskFrameSpindleFor(const Task *T) const {
+    Instruction *TaskFrame =
+        dyn_cast_or_null<Instruction>(T->getTaskFrameUsed());
+    if (!TaskFrame)
+      return nullptr;
+    return getSpindleFor(TaskFrame->getParent());
+  }
+
   /// Return the innermost task that encompases both basic blocks BB1 and BB2.
   Task *getEnclosingTask(const BasicBlock *BB1, const BasicBlock *BB2) const {
     return getTaskFor(
@@ -1202,6 +1278,9 @@ public:
   /// Create the task forest using a stable algorithm.
   void analyze(Function &F, DominatorTree &DomTree);
 
+  /// Compute the spindles and subtasks contained in all taskframes.
+  void findTaskFrameSubtasks();
+
   /// Handle invalidation explicitly.
   bool invalidate(Function &F, const PreservedAnalyses &PA,
                   FunctionAnalysisManager::Invalidator &);
@@ -1275,6 +1354,12 @@ public:
     assert(!BBMap.count(&B) && "Block already mapped to a spindle.");
     S->addBlock(B);
     BBMap[&B] = S;
+  }
+
+  // Associate a task T with the spindle TFSpindle that creates its taskframe.
+  void AssociateTaskFrameWithUser(Task *T, Spindle *TFSpindle) {
+    TFSpindle->TaskFrameUser = T;
+    T->TaskFrameCreateSpindle = TFSpindle;
   }
 };
 

@@ -59,10 +59,35 @@ static cl::opt<bool, true>
     VerifyTaskInfoX("verify-task-info", cl::location(VerifyTaskInfo),
                     cl::Hidden, cl::desc("Verify task info (time consuming)"));
 
+static cl::opt<bool> PrintTaskFrameSubtasks(
+    "print-taskframe-subtasks", cl::init(false),
+    cl::Hidden, cl::desc("Print subtasks of task frames."));
+
 static cl::opt<bool> PrintMayHappenInParallel(
     "print-may-happen-in-parallel", cl::init(false),
     cl::Hidden, cl::desc("Print may-happen-in-parallel analysis results "
                          "derived from Tapir control flow."));
+
+/// Returns the taskframe.create at the start of BB if one exists, nullptr
+/// otherwise.
+static Value *getTaskFrameCreate(BasicBlock *BB) {
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&BB->front()))
+    if (Intrinsic::taskframe_create == II->getIntrinsicID())
+      return &BB->front();
+  return nullptr;
+}
+
+/// Returns true if the given instruction performs a taskframe resume, false
+/// otherwise.
+static bool isTaskFrameResume(const Instruction *I,
+                              const Value *TaskFrame = nullptr) {
+  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
+    if (const Function *Called = II->getCalledFunction())
+      if (Intrinsic::taskframe_resume == Called->getIntrinsicID())
+        if (!TaskFrame || (TaskFrame == II->getArgOperand(0)))
+          return true;
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 // Spindle implementation
@@ -105,6 +130,12 @@ bool Spindle::succInSameTask(const Spindle *Succ) const {
 /// spindle.
 bool Spindle::succInSubTask(const Spindle *Succ) const {
   return (Succ->getParentTask()->getParentTask() == getParentTask());
+}
+
+/// Return the taskframe.create intrinsic at the start of the entry block of
+/// this Spindle, or nullptr if no such intrinsic exists.
+Value *Spindle::getTaskFrameCreate() const {
+  return ::getTaskFrameCreate(getEntry());
 }
 
 //===----------------------------------------------------------------------===//
@@ -470,7 +501,28 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
       }
       assert(getSpindleFor(SPEntry)->isSync() &&
              "Before computing phis, discovered non-sync spindle after sync");
-    }      
+    }
+    // Create new spindles based on taskframe instrinsics.  We need only work
+    // about taskframe.create and taskframe.resume.
+    if (getTaskFrameCreate(&B)) {
+      // This block starts with a taskframe.create.  Mark is as a spindle entry.
+      DefiningBlocks.insert(&B);
+      if (!getSpindleFor(&B)) {
+        // Create a new spindle.
+        createSpindleWithEntry(&B, Spindle::SPType::Phi);
+        SpindleCount++;
+      }
+    } else if (isTaskFrameResume(B.getTerminator())) {
+      // This block ends with a taskframe.resume invocation.  Mark the unwind
+      // destination as a spindle entry.
+      InvokeInst *II = cast<InvokeInst>(B.getTerminator());
+      BasicBlock *ResumeDest = II->getUnwindDest();
+      DefiningBlocks.insert(ResumeDest);
+      if (!getSpindleFor(ResumeDest)) {
+        createSpindleWithEntry(ResumeDest, Spindle::SPType::Phi);
+        SpindleCount++;
+      }
+    }
   }
   NumBasicBlocks += BBCount;
   NumSpindles += SpindleCount;
@@ -498,6 +550,7 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
              [&BBNumbers](const BasicBlock *A, const BasicBlock *B) {
                return BBNumbers.find(A)->second < BBNumbers.find(B)->second;
              });
+
   LLVM_DEBUG({
       dbgs() << "IDFBlocks:\n";
       for (BasicBlock *BB : IDFBlocks)
@@ -542,6 +595,7 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
   // task entry is encountered.
   std::vector<BasicBlock *> FoundBlocks;
   SmallVector<Spindle *, 8> FoundSpindles;
+  SmallVector<Spindle *, 8> FoundTFCreates;
   SmallVector<Task *, 4> UnassocTasks;
   for (auto DomNode : post_order(DomTree.getRootNode())) {
     BasicBlock *BB = DomNode->getBlock();
@@ -577,6 +631,18 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
       // Associate the unassociated blocks with spindle S.
       if (!UnassocBlocks.empty())
         AssociateWithSpindle(this, S, UnassocBlocks);
+    }
+
+    // Mark taskframe.create spindles found.
+    if (Value *TaskFrame = S->getTaskFrameCreate()) {
+      FoundTFCreates.push_back(S);
+      for (Task *SubT : reverse(UnassocTasks)) {
+        if (!DomTree.dominates(S->getEntry(), SubT->getEntry()))
+          break;
+        // If SubT uses the TaskFrame created in S, associate the two.
+        if (SubT->getTaskFrameUsed() == TaskFrame)
+          AssociateTaskFrameWithUser(SubT, S);
+      }
     }
 
     // If this spindle is not an entry to a task, mark it found and continue.
@@ -616,6 +682,15 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
       UnassocTasks.pop_back();
     }
     UnassocTasks.push_back(T);
+
+    // Add taskframe.create spindles as children of this task.
+    while (!FoundTFCreates.empty()) {
+      Spindle *TF = FoundTFCreates.back();
+      if (!DomTree.dominates(T->getEntry(), TF->getEntry()))
+        break;
+      T->TaskFrameCreates.push_back(TF);
+      FoundTFCreates.pop_back();
+    }
   }
 
   // Populate the predecessors and successors of all spindles.
@@ -623,6 +698,54 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
 
   // Record continuation spindles for each task.
   recordContinuationSpindles(this);
+
+  if (PrintTaskFrameSubtasks)
+    // Determine the subtasks of taskframes discovered.
+    findTaskFrameSubtasks();
+}
+
+/// Compute the spindles and subtasks contained in all taskframes.
+void TaskInfo::findTaskFrameSubtasks() {
+  for (Task *T : depth_first(getRootTask())) {
+    for (Spindle *TFSpindle : T->taskframe_creates()) {
+      const Value *TaskFrame = TFSpindle->getTaskFrameCreate();
+      const Task *User = TFSpindle->getTaskFrameUser();
+      const Spindle *Continuation = User->getContinuationSpindle();
+
+      SmallVector<Spindle *, 8> WorkList;
+      SmallPtrSet<Spindle *, 8> Visited;
+      WorkList.push_back(TFSpindle);
+      while (!WorkList.empty()) {
+        Spindle *S = WorkList.pop_back_val();
+        if (!Visited.insert(S).second)
+          continue;
+
+        // Add S to the set of taskframe spindles.
+        TFSpindle->TaskFrameSpindles.push_back(S);
+
+        for (Spindle::SpindleEdge &SuccEdge : S->out_edges()) {
+          // Ignore any spindles not in the parent task of T.
+          if (!T->contains(SuccEdge.first))
+            if (isa<DetachInst>(SuccEdge.second->getTerminator())) {
+              if (getTaskFor(SuccEdge.first) != User)
+                // Add the subtask.
+                TFSpindle->TaskFrameSubtasks.push_back(
+                    getTaskFor(SuccEdge.first));
+            continue;
+          }
+          // Ignore continuations.
+          if (SuccEdge.first == Continuation)
+            continue;
+          // Ignore successors of taskframe.resume.
+          if (isTaskFrameResume(SuccEdge.second->getTerminator(),
+                                TaskFrame))
+            continue;
+
+          WorkList.push_back(SuccEdge.first);
+        }
+      }
+    }
+  }
 }
 
 /// Determine which blocks the value is live in.
@@ -946,16 +1069,18 @@ bool TaskInfo::invalidate(Function &F, const PreservedAnalyses &PA,
            PAC.preservedSet<CFGAnalyses>());
 }
 
-/// Returns true if the given instruction performs a detached rethrow, false
-/// otherwise.
-static bool isDetachedRethrow(const Instruction *I,
-                              const Value *SyncRegion = nullptr) {
-  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
-    if (const Function *Called = II->getCalledFunction())
-      if (Intrinsic::detached_rethrow == Called->getIntrinsicID())
-        if (!SyncRegion || (SyncRegion == II->getArgOperand(0)))
-          return true;
-  return false;
+static const BasicBlock *getSingleNotUnreachableSuccessor(
+    const BasicBlock *BB) {
+  const BasicBlock *SingleSuccessor = nullptr;
+  for (const auto &Succ : children<const BasicBlock *>(BB)) {
+    if (isa<UnreachableInst>(Succ->getFirstNonPHIOrDbgOrLifetime()))
+      continue;
+    if (!SingleSuccessor)
+      SingleSuccessor = Succ;
+    else
+      return nullptr;
+  }
+  return SingleSuccessor;
 }
 
 /// Print spindle with all the BBs inside it.
@@ -966,6 +1091,8 @@ void Spindle::print(raw_ostream &OS, bool Verbose) const {
   for (unsigned i = 0; i < getBlocks().size(); ++i) {
     BasicBlock *BB = getBlocks()[i];
     if (BB == Entry) {
+      if (getTaskFrameCreate())
+        OS << "<tf create>";
       switch (Ty) {
       case SPType::Entry: OS << "<func sp entry>"; break;
       case SPType::Detach: OS << "<task sp entry>"; break;
@@ -981,14 +1108,18 @@ void Spindle::print(raw_ostream &OS, bool Verbose) const {
 
     if (isSpindleExiting(BB)) {
       OS << "<sp exit>";
-      if (getParentTask()->isTaskExiting(BB)) {
-        if (isDetachedRethrow(BB->getTerminator()) ||
-            isa<UnreachableInst>(BB->getTerminator()) ||
+      if (isTaskFrameResume(BB->getTerminator()))
+        OS << "<tf exit>";
+      else if (getParentTask()->isTaskExiting(BB)) {
+        if (isa<UnreachableInst>(BB->getTerminator()) ||
             isa<ResumeInst>(BB->getTerminator()))
           OS << "<task EH exit>";
         else if (isa<ReattachInst>(BB->getTerminator()) ||
                  isa<ReturnInst>(BB->getTerminator()))
           OS << "<task exit>";
+        else if (getSingleNotUnreachableSuccessor(BB) ==
+                 getParentTask()->getEHContinuationSpindle()->getEntry())
+          OS << "<task EH-contin exit>";
         else
           OS << "<task UNUSUAL exit>";
       }
@@ -1042,6 +1173,26 @@ void TaskInfo::print(raw_ostream &OS) const {
   }
   OS << "\n";
   RootTask->print(OS);
+
+  for (const Task *T : post_order(getRootTask())) {
+    if (T->taskframe_creates().begin() == T->taskframe_creates().end())
+      continue;
+    OS << "task@" << T->getEntry()->getName() << " has taskframe.creates:\n";
+    for (const Spindle *S : T->taskframe_creates()) {
+      OS << "  spindle@" << S->getEntry()->getName() << "\n";
+      // Print the task that uses this taskframe.create
+      if (S->getTaskFrameUser())
+        OS << "    used by task@"
+           << S->getTaskFrameUser()->getEntry()->getName() << "\n";
+      else
+        OS << "    not used.\n";
+
+      // Print the subtasks under this taskframe.create.
+      for (const Task *SubT : S->taskframe_subtasks())
+        OS << "    contains subtask@"
+           << SubT->getEntry()->getName() << "\n";
+    }
+  }
   OS << "\n";
 
   if (PrintMayHappenInParallel) {
