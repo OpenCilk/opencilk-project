@@ -1367,6 +1367,14 @@ static bool isSafeToHoistInvoke(BasicBlock *BB1, BasicBlock *BB2,
 
 static bool passingValueIsAlwaysUndefined(Value *V, Instruction *I, bool PtrValueMayBeModified = false);
 
+// Helper function to check if an instruction is a taskframe.create call.
+static bool isTaskFrameCreate(const Instruction *I) {
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I))
+    if (Intrinsic::taskframe_create == II->getIntrinsicID())
+      return true;
+  return false;
+}
+
 /// Given a conditional branch that goes to BB1 and BB2, hoist any common code
 /// in the two blocks up into the branch block. The caller of this function
 /// guarantees that BI's block dominates BB1 and BB2.
@@ -1393,6 +1401,11 @@ bool SimplifyCFGOpt::HoistThenElseCodeToIf(BranchInst *BI,
     while (isa<DbgInfoIntrinsic>(I2))
       I2 = &*BB2_Itr++;
   }
+  // Skip taskframe.create calls.
+  while (isTaskFrameCreate(I1))
+    I1 = &*BB1_Itr++;
+  while (isTaskFrameCreate(I2))
+    I2 = &*BB2_Itr++;
   // FIXME: Can we define a safety predicate for CallBr?
   if (isa<PHINode>(I1) || !I1->isIdenticalToWhenDefined(I2) ||
       (isa<InvokeInst>(I1) && !isSafeToHoistInvoke(BB1, BB2, I1, I2)) ||
@@ -1497,6 +1510,11 @@ bool SimplifyCFGOpt::HoistThenElseCodeToIf(BranchInst *BI,
       while (isa<DbgInfoIntrinsic>(I2))
         I2 = &*BB2_Itr++;
     }
+    // Skip taskframe.create calls.
+    while (isTaskFrameCreate(I1))
+      I1 = &*BB1_Itr++;
+    while (isTaskFrameCreate(I2))
+      I2 = &*BB2_Itr++;
   } while (I1->isIdenticalToWhenDefined(I2));
 
   return true;
@@ -6183,6 +6201,13 @@ static bool TryToMergeLandingPad(LandingPadInst *LPad, BranchInst *BI,
     SmallPtrSet<BasicBlock *, 16> Preds;
     Preds.insert(pred_begin(BB), pred_end(BB));
     for (BasicBlock *Pred : Preds) {
+      // Handle detach predecessors.
+      if (DetachInst *DI = dyn_cast<DetachInst>(Pred->getTerminator())) {
+        assert(DI->getDetached() != BB && DI->getContinue() != BB &&
+               DI->getUnwindDest() == BB && "unexpected detach successor");
+        DI->setUnwindDest(OtherPred);
+        continue;
+      }
       InvokeInst *II = cast<InvokeInst>(Pred->getTerminator());
       assert(II->getNormalDest() != BB && II->getUnwindDest() == BB &&
              "unexpected successor");

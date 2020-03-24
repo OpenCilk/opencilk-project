@@ -2352,10 +2352,11 @@ void llvm::removeUnwindEdge(BasicBlock *BB, DomTreeUpdater *DTU) {
   Instruction *TI = BB->getTerminator();
 
   if (auto *II = dyn_cast<InvokeInst>(TI)) {
-    // If we're removing the unwind destination of a detached rethrow, simply
-    // remove the detached rethrow.
+    // If we're removing the unwind destination of a detached rethrow or
+    // taskframe resume, simply remove the intrinsic.
     if (auto *Called = II->getCalledFunction()) {
-      if (Intrinsic::detached_rethrow == Called->getIntrinsicID()) {
+      if (Intrinsic::detached_rethrow == Called->getIntrinsicID() ||
+          Intrinsic::taskframe_resume == Called->getIntrinsicID()) {
         BranchInst::Create(II->getNormalDest(), II);
         II->getUnwindDest()->removePredecessor(BB);
         II->eraseFromParent();
