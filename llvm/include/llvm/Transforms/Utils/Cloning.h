@@ -72,6 +72,9 @@ struct ClonedCodeInfo {
   /// are in the entry block but are not a constant size.
   bool ContainsDynamicAllocas = false;
 
+  /// This is set to true if the cloned code contains a detach instruction.
+  bool ContainsDetach = false;
+
   /// All cloned call sites that have operand bundles attached are appended to
   /// this vector.  This vector may contain nulls or undefs if some of the
   /// originally inserted callsites were DCE'ed after they were cloned.
@@ -178,6 +181,7 @@ void CloneAndPruneIntoFromInst(Function *NewFunc, const Function *OldFunc,
                                const Instruction *StartingInst,
                                ValueToValueMapTy &VMap, bool ModuleLevelChanges,
                                SmallVectorImpl<ReturnInst *> &Returns,
+                               SmallVectorImpl<ResumeInst *> &Resumes,
                                const char *NameSuffix = "",
                                ClonedCodeInfo *CodeInfo = nullptr);
 
@@ -195,6 +199,7 @@ void CloneAndPruneIntoFromInst(Function *NewFunc, const Function *OldFunc,
 void CloneAndPruneFunctionInto(Function *NewFunc, const Function *OldFunc,
                                ValueToValueMapTy &VMap, bool ModuleLevelChanges,
                                SmallVectorImpl<ReturnInst*> &Returns,
+                               SmallVectorImpl<ResumeInst *> &Resumes,
                                const char *NameSuffix = "",
                                ClonedCodeInfo *CodeInfo = nullptr);
 
