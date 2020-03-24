@@ -598,11 +598,12 @@ bool MachineSinking::isProfitableToSinkTo(unsigned Reg, MachineInstr &MI,
   return false;
 }
 
-// Helper routine to scan a machine basic block for a EH_SjLj terminator.
-static inline bool hasSetJmpPred(MachineBasicBlock *MBB) {
+// Helper routine to check if a predecessor machine basic block is terminated by
+// an instruction with side effects, such as setjmp.
+static inline bool hasPredWithSideEffects(MachineBasicBlock *MBB) {
   for (MachineBasicBlock *Pred : MBB->predecessors())
     for (MachineInstr &Term : Pred->terminators())
-      if (Term.getOpcode() == 777)
+      if (Term.hasUnmodeledSideEffects())
         return true;
   return false;
 }
@@ -644,7 +645,7 @@ MachineSinking::GetAllSortedSuccessors(MachineInstr &MI, MachineBasicBlock *MBB,
     SmallPtrSet<MachineBasicBlock*, 10> toRemove;
     for (MachineBasicBlock *MBB : AllSuccs0) {
       if (toRemove.count(MBB) == 0 &&
-          (hasSetJmpPred(MBB) || MBB->hasAddressTaken())) {
+          (hasPredWithSideEffects(MBB) || MBB->hasAddressTaken())) {
         // Enqueue MBB for removal.
         toRemove.insert(MBB);
         // Scan the successors of MBB and enqueue them for removal as well.
