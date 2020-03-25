@@ -555,7 +555,8 @@ void DACSpawning::implementDACIterSpawnOnHelper(
       // Use a fast calling convention for the outline.
       RecurCall->setCallingConv(CallingConv::Fast);
       RecurCall->setDebugLoc(TLDebugLoc);
-      RecurCall->setDoesNotThrow();
+      if (Helper->doesNotThrow())
+        RecurCall->setDoesNotThrow();
     } else {
       InvokeInst *RecurCall;
       BasicBlock *CallDest = SplitBlock(RecurDet, RecurDet->getTerminator());
@@ -1037,7 +1038,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   assert(Returns.empty() && "Returns cloned when cloning detached CFG.");
   // If the Tapir loop has no unwind destination, then the outlined function
   // cannot throw.
-  if (nullptr == TL->getUnwindDest())
+  if (F.doesNotThrow() && !TL->getUnwindDest())
     Helper->setDoesNotThrow();
 
   // Update cloned loop condition to use the end-iteration argument.
