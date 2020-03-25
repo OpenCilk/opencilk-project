@@ -57,6 +57,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee CilkRTSSync = nullptr;
   FunctionCallee CilkRTSGetNworkers = nullptr;
   FunctionCallee CilkRTSGetTLSWorker = nullptr;
+  FunctionCallee CilkRTSStoreExnSel = nullptr;
 
   // Accessors for opaque Cilk RTS functions
   FunctionCallee Get__cilkrts_leave_frame();
@@ -64,6 +65,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee Get__cilkrts_sync();
   FunctionCallee Get__cilkrts_get_nworkers();
   FunctionCallee Get__cilkrts_get_tls_worker();
+  FunctionCallee Get__cilkrts_store_exn_sel();
 
   // Accessors for generated Cilk RTS functions
   Function *Get__cilkrts_enter_frame();
