@@ -131,6 +131,22 @@ FunctionCallee CilkRABI::Get__cilkrts_leave_frame() {
   return CilkRTSLeaveFrame;
 }
 
+FunctionCallee CilkRABI::Get__cilkrts_store_exn_sel() {
+  if (CilkRTSStoreExnSel)
+    return CilkRTSStoreExnSel;
+
+  LLVMContext &C = M.getContext();
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
+  IntegerType *SelTy = Type::getInt32Ty(C);
+  CilkRTSStoreExnSel = M.getOrInsertFunction("__cilkrts_store_exn_sel", VoidTy,
+                                            StackFramePtrTy, ExnPtrTy, SelTy);
+
+  return CilkRTSStoreExnSel;
+}
+
+
 // FunctionCallee CilkRABI::Get__cilkrts_rethrow() {
 //   if (CilkRTSRethrow)
 //     return CilkRTSRethrow;
@@ -889,6 +905,16 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
   // Add eh cleanup that returns control to the runtime
   EscapeEnumerator EE(Extracted, "cilkrabi_cleanup", true);
   while (IRBuilder<> *Builder = EE.Next()) {
+    // Store the exception object and selector value in fiber local storage
+    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
+      Value *Exn = Builder->CreateExtractValue(RI->getValue(),
+                                               {0});
+      Value *Sel = Builder->CreateExtractValue(RI->getValue(),
+                                               {1});
+      Builder->CreateCall(CILKRTS_FUNC(store_exn_sel), {SF, Exn, Sel} );
+    }
+
+    // Return to runtime
     Builder->CreateCall(CILKRTS_FUNC(pop_frame), SF);
     Builder->CreateCall(CILKRTS_FUNC(leave_frame), SF)->setDoesNotReturn();
   }
