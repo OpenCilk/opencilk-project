@@ -179,8 +179,10 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
                                    Target->getReturnType(), InputMap, &AC, &DT);
     // If the detach for task T does not catch an exception from the task, then
     // the outlined function cannot throw.
+    /*
     if (F.doesNotThrow() && !T->getDetach()->hasUnwindDest())
       TaskToOutline[T].Outline->setDoesNotThrow();
+    */
     Target->addHelperAttributes(*TaskToOutline[T].Outline);
 
     // Update subtask outline info to reflect the fact that their spawner was
