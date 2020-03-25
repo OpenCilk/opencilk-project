@@ -127,10 +127,10 @@ TapirToTargetImpl::outlineAllTasks(Function &F, DominatorTree &DT,
   DenseMap<Task *, SmallVector<Value *, 8>> HelperInputs;
   // Traverse the tasks in this function in post order.
   // TODO: Make sure to traverse subtasks first.
-  for (Task *T : post_order(TI.getRootTask()))
+  for (Task *T : post_order(TI.getRootTask())) {
     // At this point, all subtasks of T must have been processed.  Replace their
     // detaches with calls.
-    for (Task *SubT : T->subtasks()) {
+    for (Task *SubT : T->subtasks())
       // TODO: Rename replaceDetachWithCallToOutline.
       TaskToOutline[SubT].replaceReplCall(
           replaceDetachWithCallToOutline(SubT, TaskToOutline[SubT],
