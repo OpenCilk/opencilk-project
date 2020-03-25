@@ -200,6 +200,22 @@ FunctionCallee CilkRABI::Get__cilkrts_leave_frame() {
   return CilkRTSLeaveFrame;
 }
 
+FunctionCallee CilkRABI::Get__cilkrts_store_exn_sel() {
+  if (CilkRTSStoreExnSel)
+    return CilkRTSStoreExnSel;
+
+  LLVMContext &C = M.getContext();
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
+  IntegerType *SelTy = Type::getInt32Ty(C);
+  CilkRTSStoreExnSel = M.getOrInsertFunction("__cilkrts_store_exn_sel", VoidTy,
+                                            StackFramePtrTy, ExnPtrTy, SelTy);
+
+  return CilkRTSStoreExnSel;
+}
+
+
 // FunctionCallee CilkRABI::Get__cilkrts_rethrow() {
 //   if (CilkRTSRethrow)
 //     return CilkRTSRethrow;
