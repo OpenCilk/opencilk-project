@@ -683,7 +683,8 @@ Instruction *llvm::replaceDetachWithCallToOutline(
     // Use a fast calling convention for the outline.
     TopCall->setCallingConv(Out.Outline->getCallingConv());
     TopCall->setDebugLoc(ToReplace->getDebugLoc());
-    TopCall->setDoesNotThrow();
+    if (Out.Outline->doesNotThrow())
+      TopCall->setDoesNotThrow();
     // Replace the detach with an unconditional branch to its continuation.
     ReplaceInstWithInst(ToReplace, BranchInst::Create(Out.ReplRet));
     return TopCall;
@@ -837,7 +838,8 @@ Instruction *llvm::replaceLoopWithCallToOutline(
     // Use a fast calling convention for the outline.
     TopCall->setCallingConv(Out.Outline->getCallingConv());
     TopCall->setDebugLoc(TL->getDebugLoc());
-    TopCall->setDoesNotThrow();
+    if (Out.Outline->doesNotThrow())
+      TopCall->setDoesNotThrow();
     // Replace the loop with an unconditional branch to its exit.
     L->getHeader()->removePredecessor(Out.ReplCall->getParent());
     ReplaceInstWithInst(Out.ReplCall, BranchInst::Create(Out.ReplRet));
