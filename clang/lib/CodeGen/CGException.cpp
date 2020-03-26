@@ -909,11 +909,14 @@ llvm::BasicBlock *CodeGenFunction::EmitLandingPad() {
   assert((LPadInst->getNumClauses() > 0 || LPadInst->isCleanup()) &&
          "landingpad instruction has no clauses!");
 
+  // HERE?
   // Tell the backend how to generate the landing pad.
   Builder.CreateBr(getEHDispatchBlock(EHStack.getInnermostEHScope()));
 
   // Restore the old IR generation state.
   Builder.restoreIP(savedIP);
+
+  llvm::dbgs() << "LPAD " << *lpad << "\n";
 
   return lpad;
 }
@@ -1171,6 +1174,8 @@ void CodeGenFunction::ExitCXXTryStmt(const CXXTryStmt &S, bool IsFnTryBlock) {
 
   // Emit the structure of the EH dispatch for this catch.
   emitCatchDispatchBlock(*this, CatchScope);
+
+  S.dump();
 
   // Copy the handler blocks off before we pop the EH stack.  Emitting
   // the handlers might scribble on this memory.
