@@ -1297,7 +1297,7 @@ public:
     llvm::BasicBlock *getTempInvokeDest() {
       if (!TempInvokeDest)
         TempInvokeDest = CGF.createBasicBlock("temp.invoke.dest");
-        return TempInvokeDest;
+      return TempInvokeDest;
     }
   };
 

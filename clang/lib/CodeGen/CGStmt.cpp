@@ -497,9 +497,14 @@ void CodeGenFunction::EmitBranch(llvm::BasicBlock *Target) {
 }
 
 void CodeGenFunction::EmitBlockAfterUses(llvm::BasicBlock *block) {
+  //printf("CGStmt:505, basic block ptr = %p\n", block);
+  llvm::dbgs() << "CurFn = " << *CurFn << "\n";
+  llvm::dbgs() << "block ptr = " << (void*)block << "\n";
   bool inserted = false;
   for (llvm::User *u : block->users()) {
     if (llvm::Instruction *insn = dyn_cast<llvm::Instruction>(u)) {
+      llvm::dbgs() << "instruction " << *insn << "\n";
+      llvm::dbgs() << "instruction parent " << *(insn->getParent()) << "\n";
       CurFn->getBasicBlockList().insertAfter(insn->getParent()->getIterator(),
                                              block);
       inserted = true;
