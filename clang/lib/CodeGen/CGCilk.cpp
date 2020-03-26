@@ -131,6 +131,7 @@ void CodeGenFunction::DetachScope::PushSpawnedTaskTerminate() {
 }
 
 void CodeGenFunction::DetachScope::StartDetach() {
+  printf("Start detach\n");
   InitDetachScope();
 
   // Set the detached block as the new alloca insertion point.
