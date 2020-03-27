@@ -1113,6 +1113,26 @@ public:
     }
   };
 
+  /// Cleanup to ensure parent stack frame is synced.
+  struct ImplicitSyncCleanup final : public EHScopeStack::Cleanup {
+    llvm::Instruction *SyncRegion;
+  public:
+    ImplicitSyncCleanup(llvm::Instruction *SyncRegion = nullptr)
+        : SyncRegion(SyncRegion) {}
+    void Emit(CodeGenFunction &CGF, Flags F) {
+      llvm::Instruction *SR = SyncRegion;
+      // If a sync region wasn't specified with this cleanup initially, try to
+      // graph the current sync region.
+      if (!SR && CGF.CurSyncRegion)
+        SR = CGF.CurSyncRegion->getSyncRegionStart();
+      if (SR) {
+        llvm::BasicBlock *ContinueBlock = CGF.createBasicBlock("sync.continue");
+        CGF.Builder.CreateSync(ContinueBlock, SR);
+        CGF.EmitBlock(ContinueBlock);
+      }
+    }
+  };
+
   /// The current sync region.
   SyncRegion *CurSyncRegion = nullptr;
 
@@ -1251,7 +1271,6 @@ public:
     llvm::DetachInst *Detach = nullptr;
     llvm::BasicBlock *DetachedBlock = nullptr;
     llvm::BasicBlock *ContinueBlock = nullptr;
-    llvm::BasicBlock *TempInvokeDest = nullptr;
 
     // Pointer to the parent detach scope.
     DetachScope *ParentScope;
@@ -1368,8 +1387,6 @@ public:
     // task has started.
     Address CreateDetachedMemTemp(QualType Ty, StorageDuration SD,
                                   const Twine &Name = "det.tmp");
-<<<<<<< HEAD
-=======
 
     bool IsDetachStarted() const { return DetachStarted; }
 
@@ -1378,7 +1395,6 @@ public:
         TempInvokeDest = CGF.createBasicBlock("temp.invoke.dest");
       return TempInvokeDest;
     }
->>>>>>> 989ef1cdda4... TB's CallDetRethrow
   };
 
   /// The current detach scope.
