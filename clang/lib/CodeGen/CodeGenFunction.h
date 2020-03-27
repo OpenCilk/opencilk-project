@@ -1064,36 +1064,6 @@ public:
     }
   };
 
-  /// Cleanup to ensure detached task is ended.
-  struct CallDetRethrow final : public EHScopeStack::Cleanup {
-    llvm::Value *SyncRegion;
-    llvm::BasicBlock *TempInvokeDest;
-  public:
-    CallDetRethrow(llvm::Value *SyncRegion,
-                   llvm::BasicBlock *TempInvokeDest = nullptr)
-        : SyncRegion(SyncRegion), TempInvokeDest(TempInvokeDest) {}
-    void Emit(CodeGenFunction &CGF, Flags F) override {
-      if (!TempInvokeDest)
-        TempInvokeDest = CGF.CurDetachScope->getTempInvokeDest();
-      // Recreate the landingpad's return value for the rethrow invoke.  Tapir 
-      // lowering will replace this rethrow with a resume.
-      llvm::Value *Exn = CGF.Builder.CreateLoad(
-          Address(CGF.ExceptionSlot, CGF.getPointerAlign()), "exn");
-      llvm::Value *Sel = CGF.Builder.CreateLoad(
-          Address(CGF.EHSelectorSlot, CharUnits::fromQuantity(4)), "sel");
-      llvm::Type *LPadType = llvm::StructType::get(Exn->getType(), Sel->getType());
-      llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
-      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
-      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");
-      llvm::Function *DetachedRethrow =
-          CGF.CGM.getIntrinsic(llvm::Intrinsic::detached_rethrow,
-                               { LPadVal->getType() });
-      CGF.Builder.CreateInvoke(DetachedRethrow, CGF.getUnreachableBlock(),
-                               TempInvokeDest, { SyncRegion, LPadVal });
-      CGF.Builder.SetInsertPoint(TempInvokeDest);
-    }
-  };
-
   /// Cleanup to ensure parent stack frame is synced.
   struct ImplicitSyncCleanup final : public EHScopeStack::Cleanup {
     llvm::Instruction *SyncRegion;
@@ -1206,7 +1176,6 @@ public:
     llvm::DetachInst *Detach = nullptr;
     llvm::BasicBlock *DetachedBlock = nullptr;
     llvm::BasicBlock *ContinueBlock = nullptr;
-    llvm::BasicBlock *TempInvokeDest = nullptr;
 
     DetachScope *ParentScope;
 
@@ -1293,12 +1262,6 @@ public:
                                   const Twine &Name = "det.tmp");
 
     bool IsDetachStarted() const { return DetachStarted; }
-
-    llvm::BasicBlock *getTempInvokeDest() {
-      if (!TempInvokeDest)
-        TempInvokeDest = CGF.createBasicBlock("temp.invoke.dest");
-      return TempInvokeDest;
-    }
   };
 
   /// The current detach scope.
