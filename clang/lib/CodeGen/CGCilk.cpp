@@ -133,7 +133,6 @@ void CodeGenFunction::DetachScope::PushSpawnedTaskTerminate() {
 }
 
 void CodeGenFunction::DetachScope::StartDetach() {
-  printf("Start detach\n");
   InitDetachScope();
 
   // Set the detached block as the new alloca insertion point.
@@ -239,6 +238,8 @@ void CodeGenFunction::DetachScope::FinishDetach() {
   if (!DetachStarted)
     return;
 
+  assert(DetachStarted &&
+         "Attempted to finish a detach that was not started.");
   CleanupDetach();
   // Pop the detached_rethrow.
   CGF.PopCleanupBlock();
