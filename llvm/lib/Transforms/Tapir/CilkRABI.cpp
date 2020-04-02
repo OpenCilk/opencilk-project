@@ -78,7 +78,7 @@ CilkRABI::CilkRABI(Module &M, bool OpenCilk)
   Type *Int16Ty = Type::getInt16Ty(C);
 
   // Get or create local definitions of Cilk RTS structure types.
-  char *StackFrameName;
+  const char *StackFrameName;
   if (OpenCilk) {
     StackFrameName = "struct.__opencilk_stack_frame";
   }
@@ -182,14 +182,18 @@ FunctionCallee CilkRABI::Get__cilkrts_leave_frame() {
   if (CilkRTSLeaveFrame)
     return CilkRTSLeaveFrame;
 
+  const char *name = "__cilkrts_leave_frame";
+  if (FrameVersion == __CILKRTS_ABI_VERSION_OPENCILK) {
+    name = "__opencilk_leave_frame";
+  }
+
   LLVMContext &C = M.getContext();
   AttributeList AL;
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
                        Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSLeaveFrame = M.getOrInsertFunction("__cilkrts_leave_frame", AL, VoidTy,
-                                            StackFramePtrTy);
+  CilkRTSLeaveFrame = M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
 
   return CilkRTSLeaveFrame;
 }
@@ -292,10 +296,7 @@ void CilkRABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
       FunctionType::get(Type::getVoidTy(C),
 			{PointerType::getUnqual(Type::getInt32Ty(C))},
 			false);
-    Value *Asm = InlineAsm::get(FTy,
-				"stmxcsr $0",
-				"*m,~{dirflag},~{fpsr},~{flags}",
-				/*sideeffects*/ true);
+    Value *Asm = InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
     Value *Args[1] = {
       GEP(B, SF, StackFrameFieldMXCSR),
     };
@@ -306,10 +307,7 @@ void CilkRABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
       FunctionType::get(Type::getVoidTy(C),
 			{PointerType::getUnqual(Type::getInt16Ty(C))},
 			false);
-    Value *Asm = InlineAsm::get(FTy,
-				"fnstcw $0",
-				"*m,~{dirflag},~{fpsr},~{flags}",
-				/*sideeffects*/ true);
+    Value *Asm = InlineAsm::get(FTy, "fnstcw $0", "*m", /*sideeffects*/ true);
     Value *Args[1] = {
       GEP(B, SF, StackFrameFieldFPCSR)
     };
