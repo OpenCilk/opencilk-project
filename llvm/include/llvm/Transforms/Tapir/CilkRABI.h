@@ -58,6 +58,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee CilkRTSGetNworkers = nullptr;
   FunctionCallee CilkRTSGetTLSWorker = nullptr;
   FunctionCallee CilkRTSStoreExnSel = nullptr;
+  FunctionCallee CilkRTSPauseFrame = nullptr;
 
   // Accessors for opaque Cilk RTS functions
   FunctionCallee Get__cilkrts_leave_frame();
@@ -66,6 +67,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee Get__cilkrts_get_nworkers();
   FunctionCallee Get__cilkrts_get_tls_worker();
   FunctionCallee Get__cilkrts_store_exn_sel();
+  FunctionCallee Get__cilkrts_pause_frame();
 
   // Accessors for generated Cilk RTS functions
   Function *Get__cilkrts_enter_frame();
@@ -75,6 +77,7 @@ class CilkRABI : public TapirTarget {
 
   // Helper functions for implementing the Cilk ABI protocol
   Function *GetCilkSyncFn();
+  Function *GetCilkPauseFrameFn();
   Function *GetCilkParentEpilogueFn();
   static void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
   AllocaInst *CreateStackFrame(Function &F);
