@@ -215,6 +215,19 @@ FunctionCallee CilkRABI::Get__cilkrts_store_exn_sel() {
   return CilkRTSStoreExnSel;
 }
 
+FunctionCallee CilkRABI::Get__cilkrts_pause_frame() {
+  if (CilkRTSPauseFrame)
+    return CilkRTSPauseFrame;
+
+  LLVMContext &C = M.getContext();
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkRTSPauseFrame = M.getOrInsertFunction("__cilkrts_pause_frame", VoidTy,
+                                            StackFramePtrTy);
+
+  return CilkRTSPauseFrame;
+}
+
 
 // FunctionCallee CilkRABI::Get__cilkrts_rethrow() {
 //   if (CilkRTSRethrow)
@@ -755,6 +768,74 @@ Function *CilkRABI::GetCilkSyncNoThrowFn() {
   return Fn;
 }
 
+/// Get or create a LLVM function for __cilk_sync.  Calls to this function is
+/// always inlined, as it saves the current stack/frame pointer values. This
+/// function must be marked as returns_twice to allow it to be inlined, since
+/// the call to setjmp is marked returns_twice.
+///
+/// It is equivalent to the following C code:
+///
+/// void __cilk_pause_frame(struct __cilkrts_stack_frame *sf) {
+///   if (!CILK_SETJMP(sf->ctx))
+///     __cilkrts_pause_frame(sf);
+/// }
+///
+/// With exceptions disabled in the compiler, the function
+/// does not call __cilkrts_rethrow()
+Function *CilkRABI::GetCilkPauseFrameFn() {
+  // Get or create the __cilk_sync function.
+  LLVMContext &Ctx = M.getContext();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  Function *Fn = nullptr;
+  if (GetOrCreateFunction(M, "__cilk_pause_frame",
+                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
+                          Fn))
+    return Fn;
+
+  // Create the body of __cilk_pause_frame.
+  Function::arg_iterator Args = Fn->arg_begin();
+  Value *SF = &*Args;
+
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.pause.frame.test", Fn);
+  BasicBlock *PauseFrameCall = BasicBlock::Create(Ctx, "cilk.pause.frame.runtimecall", Fn);
+  BasicBlock *Exit = BasicBlock::Create(Ctx, "cilk.pause.frame.end", Fn);
+
+  // Entry
+  {
+    IRBuilder<> B(Entry);
+
+    // if (!CILK_SETJMP(sf.ctx))
+    Value *C = EmitCilkSetJmp(B, SF);
+    C = B.CreateICmpEQ(C, ConstantInt::get(C->getType(), 0));
+    B.CreateCondBr(C, PauseFrameCall, Exit);
+  }
+
+  // PauseFrameCall
+  {
+    IRBuilder<> B(PauseFrameCall);
+
+    // __cilkrts_pause_frame(&sf);
+    B.CreateCall(CILKRTS_FUNC(pause_frame), SF);
+    B.CreateBr(Exit);
+    // TODO: should this be unreachable? We don't want to return from this sj...
+    //B.CreateUnreachable();
+  }
+  // Exit
+  {
+    IRBuilder<> B(Exit);
+
+    B.CreateRetVoid();
+  }
+
+  Fn->setLinkage(Function::InternalLinkage);
+  Fn->addFnAttr(Attribute::AlwaysInline);
+  Fn->addFnAttr(Attribute::ReturnsTwice);
+
+  return Fn;
+}
+
+
 /// Get or create a LLVM function for __cilkrts_enter_frame.  It is equivalent
 /// to the following C code:
 ///
@@ -1115,8 +1196,8 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
       CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
       // // If throwing an exception, store the exception object and selector value
       // // in the closure, call setjmp, and call pause_frame.
-      // CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
-      CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+      CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
+      // CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
     // } else {
     //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
     //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
