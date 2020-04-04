@@ -150,11 +150,9 @@ void CodeGenFunction::DetachScope::StartDetach() {
     CGF.Builder.CreateCall(TaskFrameUse, { TaskFrame });
   }
 
-  CGF.PushSyncRegion();
-
   // For Cilk, ensure that the detached task is implicitly synced before it
   // returns.
-  CGF.CurSyncRegion->addImplicitSync();
+  CGF.PushSyncRegion()->addImplicitSync();
 
   // Initialize lifetime intrinsics for the reference temporary.
   if (RefTmp.isValid()) {
@@ -556,8 +554,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
 
   // Set up a nested sync region for the loop body, and ensure it has an
   // implicit sync.
-  PushSyncRegion();
-  CurSyncRegion->addImplicitSync();
+  PushSyncRegion()->addImplicitSync();
 
   // Store the blocks to use for break and continue.
   JumpDest Preattach = getJumpDestInCurrentScope("pfor.preattach");
