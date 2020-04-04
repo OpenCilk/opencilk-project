@@ -673,6 +673,50 @@ Function *CilkRABI::GetCilkSyncFn() {
   return Fn;
 }
 
+/// Emit inline assembly code to save register state, for x86 Only.
+/// (except rbp, rsp, rip, which are already preserved by setjmp)
+void CilkRABI::EmitSaveRegisterState(IRBuilder<> &B) {
+  LLVMContext &C = B.getContext();
+  FunctionType *FTy =
+    FunctionType::get(Type::getVoidTy(C), {},
+                      false);
+
+  Value *Asm = InlineAsm::get(FTy,
+                              "push %rax\n\t" "push %rbx\n\t"
+                              "push %rcx\n\t" "push %rdx\n\t"
+                              "push %rsi\n\t" "push %rdi\n\t"
+                              "push %r8\n\t" "push %r9\n\t"
+                              "push %r10\n\t" "push %r11\n\t"
+                              "push %r12\n\t" "push %r13\n\t"
+                              "push %r14\n\t" "push %r15",
+                              "~{dirflag},~{fpsr},~{flags}",
+                              /*sideeffects*/ true);
+
+  B.CreateCall(Asm, {});
+}
+
+/// Emit inline assembly code to save register state, for x86 Only.
+/// (except rbp, rsp, rip, which are already preserved by setjmp)
+void CilkRABI::EmitRestoreRegisterState(IRBuilder<> &B) {
+  LLVMContext &C = B.getContext();
+  FunctionType *FTy =
+    FunctionType::get(Type::getVoidTy(C), {},
+                      false);
+
+  Value *Asm = InlineAsm::get(FTy,
+                              "pop %r15\n\t" "pop %r14\n\t"
+                              "pop %r13\n\t" "pop %r12\n\t"
+                              "pop %r11\n\t" "pop %r10\n\t"
+                              "pop %r9\n\t" "pop %r8\n\t"
+                              "pop %rdi\n\t" "pop %rsi\n\t"
+                              "pop %rdx\n\t" "pop %rcx\n\t"
+                              "pop %rbx\n\t" "pop %rax",
+                              "~{dirflag},~{fpsr},~{flags}",
+                              /*sideeffects*/ true);
+
+  B.CreateCall(Asm, {});
+}
+
 /// Get or create a LLVM function for __cilk_sync.  Calls to this function is
 /// always inlined, as it saves the current stack/frame pointer values. This
 /// function must be marked as returns_twice to allow it to be inlined, since
@@ -706,12 +750,19 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   BasicBlock *PauseFrameCall = BasicBlock::Create(Ctx, "cilk.pause.frame.runtimecall", Fn);
   BasicBlock *Exit = BasicBlock::Create(Ctx, "cilk.pause.frame.end", Fn);
 
+  Triple T(M.getTargetTriple());
+
   // Entry
   {
     IRBuilder<> B(Entry);
 
+    // save all registers (except rbp, rsp, and rip)
+    if (T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64)
+      EmitSaveRegisterState(B);
+
     // if (!CILK_SETJMP(sf.ctx))
     Value *C = EmitCilkSetJmp(B, SF);
+
     C = B.CreateICmpEQ(C, ConstantInt::get(C->getType(), 0));
     B.CreateCondBr(C, PauseFrameCall, Exit);
   }
@@ -722,13 +773,17 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
 
     // __cilkrts_pause_frame(&sf);
     B.CreateCall(CILKRTS_FUNC(pause_frame), SF);
+
     B.CreateBr(Exit);
-    // TODO: should this be unreachable? We don't want to return from this sj...
-    //B.CreateUnreachable();
+
   }
   // Exit
   {
     IRBuilder<> B(Exit);
+
+    // restore all registers (except rbp, rsp, and rip)
+    if (T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64)
+      EmitRestoreRegisterState(B);
 
     B.CreateRetVoid();
   }
