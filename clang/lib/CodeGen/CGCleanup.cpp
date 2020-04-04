@@ -205,6 +205,8 @@ void *EHScopeStack::pushCleanup(CleanupKind Kind, size_t Size) {
     InnermostEHScope = stable_begin();
   if (IsLifetimeMarker)
     Scope->setLifetimeMarker();
+  if (Kind & TaskExit)
+    Scope->setTaskExit();
 
   // With Windows -EHa, Invoke llvm.seh.scope.begin() for EHCleanup
   // If exceptions are disabled/ignored and SEH is not in use, then there is no
