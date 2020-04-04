@@ -80,6 +80,8 @@ class CilkRABI : public TapirTarget {
   Function *GetCilkPauseFrameFn();
   Function *GetCilkParentEpilogueFn();
   static void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
+  static void EmitSaveRegisterState(IRBuilder<> &B);
+  static void EmitRestoreRegisterState(IRBuilder<> &B);
   AllocaInst *CreateStackFrame(Function &F);
   Value *GetOrInitCilkStackFrame(Function &F, bool Helper);
   CallInst *EmitCilkSetJmp(IRBuilder<> &B, Value *SF);
