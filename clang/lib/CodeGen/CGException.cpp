@@ -818,6 +818,8 @@ llvm::BasicBlock *CodeGenFunction::EmitLandingPad() {
     case EHScope::Cleanup:
       // If we have a cleanup, remember that.
       hasCleanup = (hasCleanup || cast<EHCleanupScope>(*I).isEHCleanup());
+      if (cast<EHCleanupScope>(*I).isTaskExit())
+        goto done;
       continue;
 
     case EHScope::Filter: {

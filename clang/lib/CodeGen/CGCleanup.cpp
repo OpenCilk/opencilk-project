@@ -193,6 +193,8 @@ void *EHScopeStack::pushCleanup(CleanupKind Kind, size_t Size) {
     InnermostEHScope = stable_begin();
   if (IsLifetimeMarker)
     Scope->setLifetimeMarker();
+  if (Kind & TaskExit)
+    Scope->setTaskExit();
 
   return Scope->getCleanupBuffer();
 }
