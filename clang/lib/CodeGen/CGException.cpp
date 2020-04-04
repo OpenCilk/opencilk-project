@@ -627,7 +627,19 @@ void CodeGenFunction::EmitCXXTryStmt(const CXXTryStmt &S) {
       (CGM.getLangOpts().OpenMPIsTargetDevice && (T.isNVPTX() || T.isAMDGCN()));
   if (!IsTargetDevice)
     EnterCXXTryStmt(S);
-  EmitStmt(S.getTryBlock());
+  {
+    // If compiling Cilk code, create a nested sync region, with an implicit
+    // sync, for the try-catch.
+    const LangOptions &LO = CGM.getLangOpts();
+    if (LO.Cilk)
+      PushSyncRegion()->addImplicitSync();
+
+    EmitStmt(S.getTryBlock());
+
+    // Pop the nested sync region after the try block.
+    if (LO.Cilk)
+      PopSyncRegion();
+  }
   if (!IsTargetDevice)
     ExitCXXTryStmt(S);
 }
