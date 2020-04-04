@@ -37,11 +37,14 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
     TapirTarget = llvm::StringSwitch<TapirTargetID>(A->getValue())
       .Case("none", TapirTargetID::None)
       .Case("serial", TapirTargetID::Serial)
+      .Case("cheetah", TapirTargetID::Cheetah)
       .Case("cilk", TapirTargetID::Cilk)
-      .Case("openmp", TapirTargetID::OpenMP)
       .Case("cilkr", TapirTargetID::CilkR)
       .Case("cheetah", TapirTargetID::Cheetah)
       .Case("opencilk", TapirTargetID::OpenCilk)
+      .Case("cuda", TapirTargetID::Cuda)
+      .Case("openmp", TapirTargetID::OpenMP)
+      .Case("qthreads", TapirTargetID::Qthreads)
       .Default(TapirTargetID::Last_TapirTargetID);
 
   return TapirTarget;

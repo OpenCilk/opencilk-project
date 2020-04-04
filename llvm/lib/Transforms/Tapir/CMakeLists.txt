@@ -1,6 +1,8 @@
 add_llvm_library(LLVMTapirOpts
   CilkABI.cpp
   CilkRABI.cpp
+  CilkRTSCilkFor.cpp
+  CudaABI.cpp
   DRFScopedNoAliasAA.cpp
   LoopSpawningTI.cpp
   LoopStripMine.cpp
@@ -8,6 +10,8 @@ add_llvm_library(LLVMTapirOpts
   LoweringUtils.cpp
   OpenMPABI.cpp
   Outline.cpp
+  QthreadsABI.cpp
+  SerialABI.cpp
   SerializeSmallTasks.cpp
   Tapir.cpp
   TapirToTarget.cpp
