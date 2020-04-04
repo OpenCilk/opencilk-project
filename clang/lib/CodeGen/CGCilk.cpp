@@ -103,7 +103,8 @@ void CodeGenFunction::DetachScope::EnsureTaskFrame() {
     CreateTaskFrameEHState();
 
     CGF.pushFullExprCleanup<CallTaskEnd>(
-        static_cast<CleanupKind>(EHCleanup | LifetimeMarker), TaskFrame);
+        static_cast<CleanupKind>(EHCleanup | LifetimeMarker | TaskExit),
+        TaskFrame);
   }
 }
 
@@ -538,8 +539,8 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     // Push a cleanup to make sure any exceptional exit from the loop is
     // terminated by a detached.rethrow.
     EHStack.pushCleanup<CallDetRethrow>(
-        static_cast<CleanupKind>(EHCleanup | LifetimeMarker), SyncRegion,
-        TempInvokeDest);
+        static_cast<CleanupKind>(EHCleanup | LifetimeMarker | TaskExit),
+        SyncRegion, TempInvokeDest);
 
     // Set up nested EH state.
     EHResumeBlock = nullptr;
