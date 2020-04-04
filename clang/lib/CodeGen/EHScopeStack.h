@@ -87,6 +87,8 @@ enum CleanupKind : unsigned {
 
   LifetimeMarker = 0x8,
   NormalEHLifetimeMarker = LifetimeMarker | NormalAndEHCleanup,
+
+  TaskExit = 0x10,
 };
 
 /// A stack of scopes which respond to exceptions, including cleanups

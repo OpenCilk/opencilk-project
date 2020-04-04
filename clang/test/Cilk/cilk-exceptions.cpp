@@ -126,12 +126,10 @@ void parallelfor_tryblock(int n) {
       // CHECK: reattach within %[[SYNCREG2]]
       // CHECK: [[TASKLPAD]]:
       // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
-      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-      // CHECK-NEXT: catch i8* null
+      // CHECK-NEXT: cleanup
       // CHECK: [[TASKLPAD2]]:
       // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
-      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-      // CHECK-NEXT: catch i8* null
+      // CHECK-NEXT: cleanup
       // CHECK: call void @_ZdlPv(i8* %[[OBJ]])
       // CHECK: invoke void @llvm.detached.rethrow
       // CHECK: (token %[[SYNCREG2]], [[LPADTYPE]] {{.+}})
@@ -166,9 +164,8 @@ void parallelfor_tryblock_inline(int n) {
       // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
       // CHECK: [[TASKLPAD]]:
       // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
+      // CHECK-NEXT: cleanup
       // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-      // CHECK-NEXT: catch i8* null
       // CHECK: br i1 {{.+}}, label {{.+}}, label %[[CATCHRESUME:.+]]
       // CHECK: [[CATCHRESUME]]:
       // CHECK: invoke void @llvm.detached.rethrow
@@ -427,12 +424,10 @@ void spawn_tryblock(int n) {
     }
   // CHECK: [[DUNWIND]]:
   // CHECK: landingpad [[LPADTYPE]]
-  // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-  // CHECK-NEXT: catch i8* null
+  // CHECK-NEXT: cleanup
   // CHECK: [[TASKLPAD]]:
   // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
-  // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-  // CHECK-NEXT: catch i8* null
+  // CHECK-NEXT: cleanup
   // CHECK: invoke void @llvm.detached.rethrow
   // CHECK: (token %[[SYNCREG]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
