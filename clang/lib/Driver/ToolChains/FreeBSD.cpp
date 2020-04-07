@@ -315,7 +315,7 @@ void freebsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     if (NeedsXRayDeps)
       linkXRayRuntimeDeps(ToolChain, CmdArgs);
     if (NeedsCilkSanitizerDeps)
-      linkCilkSanitizerRuntimeDeps(ToolChain, CmdArgs);
+      linkCilkSanitizerRuntimeDeps(Args, ToolChain, CmdArgs);
     // FIXME: For some reason GCC passes -lgcc and -lgcc_s before adding
     // the default system libraries. Just mimic this for now.
     if (Args.hasArg(options::OPT_pg))

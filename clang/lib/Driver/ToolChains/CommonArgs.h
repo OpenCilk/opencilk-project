@@ -42,7 +42,8 @@ void linkSanitizerRuntimeDeps(const ToolChain &TC,
 bool needsCilkSanitizerDeps(const ToolChain &TC,
                             const llvm::opt::ArgList &Args);
 
-void linkCilkSanitizerRuntimeDeps(const ToolChain &TC,
+void linkCilkSanitizerRuntimeDeps(const llvm::opt::ArgList &Args,
+                                  const ToolChain &TC,
                                   llvm::opt::ArgStringList &CmdArgs);
 
 bool addXRayRuntime(const ToolChain &TC, const llvm::opt::ArgList &Args,

@@ -778,16 +778,20 @@ bool tools::needsCilkSanitizerDeps(const ToolChain &TC, const ArgList &Args) {
     // Don't link static runtimes into DSOs or if -shared-libasan.
     return false;
   }
+  if (Args.hasArg(options::OPT_nostdlibxx)) {
+    return false;
+  }
   return SanArgs.needsCilksanRt();
 }
 
-void tools::linkCilkSanitizerRuntimeDeps(const ToolChain &TC,
+void tools::linkCilkSanitizerRuntimeDeps(const ArgList &Args,
+                                         const ToolChain &TC,
                                          ArgStringList &CmdArgs) {
   // Force linking against the system libraries sanitizers depends on
   // (see PR15823 why this is necessary).
   CmdArgs.push_back("--no-as-needed");
   // Link in the C++ standard library
-  CmdArgs.push_back("-lstdc++");
+  TC.AddCXXStdlibLibArgs(Args, CmdArgs);
 }
 
 static void
