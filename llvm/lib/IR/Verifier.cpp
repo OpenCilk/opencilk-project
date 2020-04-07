@@ -104,7 +104,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-//#include "llvm/Transforms/Tapir/CilkABI.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -342,12 +341,6 @@ public:
         BB.printAsOperand(*OS, true, MST);
         *OS << "\n";
       }
-      // if (const DetachInst* Det = dyn_cast<DetachInst>(&I->back())) {
-      //   if (!cilk::verifyDetachedCFG(*Det, DT)) {
-      //     OS << "Invalid end to detached CFG\n";
-      //     return true;
-      //   }
-      // }
       return false;
     }
 
@@ -4079,9 +4072,11 @@ void Verifier::visitInstruction(Instruction &I) {
               F->getIntrinsicID() == Intrinsic::experimental_patchpoint_i64 ||
               F->getIntrinsicID() == Intrinsic::experimental_gc_statepoint ||
               F->getIntrinsicID() == Intrinsic::wasm_rethrow_in_catch ||
-              F->getIntrinsicID() == Intrinsic::detached_rethrow,
+              F->getIntrinsicID() == Intrinsic::detached_rethrow ||
+              F->getIntrinsicID() == Intrinsic::taskframe_resume,
           "Cannot invoke an intrinsic other than donothing, patchpoint, "
-          "statepoint, coro_resume, coro_destroy, or detached_rethrow",
+          "statepoint, coro_resume, coro_destroy, detached_rethrow, or "
+          "taskframe_resume",
           &I);
       Assert(F->getParent() == &M, "Referencing function in another module!",
              &I, &M, F, F->getParent());

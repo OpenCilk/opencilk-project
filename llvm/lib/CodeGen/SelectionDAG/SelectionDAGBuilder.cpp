@@ -6889,6 +6889,15 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
   case Intrinsic::syncregion_start:
     // Lower the starting point of a Tapir sync region to a no-op.
     return;
+  case Intrinsic::taskframe_load_guard:
+    // Discard any taskframe.load.guards.
+    break;
+  case Intrinsic::taskframe_create:
+    // Discard any taskframe.creates.
+    break;
+  case Intrinsic::taskframe_use:
+    // Discard any taskframe.uses.
+    break;
   }
 }
 

@@ -537,7 +537,8 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
   return OutlinedFn;
 }
 
-void OpenMPABI::processOutlinedTask(Function &F) {}
+void OpenMPABI::processOutlinedTask(Function &F, Instruction *DetachPt,
+                                    Instruction *TaskFrameCreate) {}
 void OpenMPABI::processSpawner(Function &F) {}
 
 void OpenMPABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {

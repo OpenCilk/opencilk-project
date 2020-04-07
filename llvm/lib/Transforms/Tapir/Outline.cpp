@@ -136,7 +136,8 @@ void llvm::CloneIntoFunction(
                          TimePassesIsEnabled);
     for (BasicBlock *DetRethrowBlk : *DetachedRethrowBlocks) {
       // Skip blocks that are not terminated by a detached-rethrow.
-      if (!isDetachedRethrow(DetRethrowBlk->getTerminator()))
+      if (!isDetachedRethrow(DetRethrowBlk->getTerminator()) &&
+          !isTaskFrameResume(DetRethrowBlk->getTerminator()))
         continue;
 
       BasicBlock *ClonedDRB = cast<BasicBlock>(VMap[DetRethrowBlk]);
@@ -379,14 +380,13 @@ Function *llvm::CreateHelper(
     ReturnInst::Create(Header->getContext(), Constant::getNullValue(RetTy),
                        NewExit);
 
-  // If needed, create a landing pad and resume for the unwind destination in
-  // the new function.
+  // If needed, create a landingpad and resume for the unwind destination in the
+  // new function.
   if (OldUnwind) {
     LandingPadInst *LPad =
-      LandingPadInst::Create(OldUnwind->getLandingPadInst()->getType(), 1,
+      LandingPadInst::Create(OldUnwind->getLandingPadInst()->getType(), 0,
                              "lpadval", NewUnwind);
-    LPad->addClause(ConstantPointerNull::get(
-                        PointerType::getInt8PtrTy(Header->getContext())));
+    LPad->setCleanup(true);
     ResumeInst::Create(LPad, NewUnwind);
   }
 

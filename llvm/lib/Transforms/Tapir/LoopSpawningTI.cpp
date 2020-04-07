@@ -382,8 +382,8 @@ static BasicBlock *createTaskUnwind(Function *F, BasicBlock *UnwindDest,
   // Create the landing bad.
   IRBuilder<> Builder(CallUnwind);
   LandingPadInst *LPad = Builder.CreateLandingPad(
-      UnwindDest->getLandingPadInst()->getType(), 1);
-  LPad->addClause(ConstantPointerNull::get(Builder.getInt8PtrTy()));
+      UnwindDest->getLandingPadInst()->getType(), 0);
+  LPad->setCleanup(true);
   // Create the normal return for the detached rethrow.
   BasicBlock *DRUnreachable = BasicBlock::Create(
       Ctx, CallUnwind->getName()+".unreachable", F);
@@ -555,7 +555,8 @@ void DACSpawning::implementDACIterSpawnOnHelper(
       // Use a fast calling convention for the outline.
       RecurCall->setCallingConv(CallingConv::Fast);
       RecurCall->setDebugLoc(TLDebugLoc);
-      RecurCall->setDoesNotThrow();
+      if (Helper->doesNotThrow())
+        RecurCall->setDoesNotThrow();
     } else {
       InvokeInst *RecurCall;
       BasicBlock *CallDest = SplitBlock(RecurDet, RecurDet->getTerminator());
@@ -1037,7 +1038,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   assert(Returns.empty() && "Returns cloned when cloning detached CFG.");
   // If the Tapir loop has no unwind destination, then the outlined function
   // cannot throw.
-  if (nullptr == TL->getUnwindDest())
+  if (F.doesNotThrow() && !TL->getUnwindDest())
     Helper->setDoesNotThrow();
 
   // Update cloned loop condition to use the end-iteration argument.
@@ -1248,10 +1249,12 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
         TL, LoopArgs[L], OutlineProcessors[TL]->getIVArgIndex(F, LoopArgs[L]),
         OutlineProcessors[TL]->getLimitArgIndex(F, LoopArgs[L]),
         &OutlineProcessors[TL]->getDestinationModule(), VMap, InputMap);
-    TaskToOutline[T] = TaskOutlineInfo(Outline, LoopInputSets[L],
-                                       LoopArgStarts[L],
-                                       L->getLoopPreheader()->getTerminator(),
-                                       TL->getExitBlock(), TL->getUnwindDest());
+    TaskToOutline[T] = TaskOutlineInfo(
+        Outline, cast<Instruction>(VMap[T->getDetach()]),
+        dyn_cast_or_null<Instruction>(VMap[T->getTaskFrameUsed()]),
+        LoopInputSets[L], LoopArgStarts[L],
+        L->getLoopPreheader()->getTerminator(), TL->getExitBlock(),
+        TL->getUnwindDest());
 
     // Do ABI-dependent processing of each outlined Tapir loop.
     {
@@ -1332,6 +1335,13 @@ bool LoopSpawningImpl::run() {
 
   // Perform any Target-dependent postprocessing of F.
   Target->postProcessFunction(F, true);
+
+#ifndef NDEBUG
+  if (verifyModule(*F.getParent(), &errs())) {
+    LLVM_DEBUG(dbgs() << "Module after loop spawning:" << *F.getParent());
+    llvm_unreachable("Loop spawning produced bad IR!");
+  }
+#endif
 
   return true;
 }

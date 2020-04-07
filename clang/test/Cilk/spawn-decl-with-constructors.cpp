@@ -3,7 +3,7 @@
 // Thanks to Dr. I-Ting Angelina Lee for contributing the original source code
 // for this test case.
 //
-// RUN: %clang_cc1 %s -std=c++11 -triple x86_64-unknown-linux-gnu -fcilkplus -fexceptions -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -std=c++11 -triple x86_64-unknown-linux-gnu -fcilkplus -fcxx-exceptions -fexceptions -ftapir=none -S -emit-llvm -o - | FileCheck %s
 
 template <typename T1, typename T2>
 struct pair {
@@ -155,11 +155,9 @@ pair<pair<point2d *, point2d *>, pair<point2d *, point2d *> > find_minmax_xy(poi
 }
 
 // CHECK-LABEL: @_Z14find_minmax_xyP8_point2dIdEl(
-// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]] unwind label %{{.+}}
+// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]:
-// CHECK: invoke void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmax_e1,
-// CHECK-NEXT: to label %[[AFTERINVOKE:.+]] unwind
-// CHECK: [[AFTERINVOKE]]:
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmax_e1,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
 _seq<point2d> hullP(point2d* P, intT n, point2d *Ptmp) {
@@ -235,47 +233,35 @@ _seq<point2d> hullP(point2d* P, intT n, point2d *Ptmp) {
 
 // CHECK-LABEL: @_Z5hullPP8_point2dIdElS1_(
 
-// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]] unwind label %{{.+}}
+// CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]:
-// CHECK: invoke void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy1,
-// CHECK-NEXT: to label %[[AFTERINVOKE:.+]] unwind
-// CHECK: [[AFTERINVOKE]]:
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy1,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
-// CHECK: detach within %[[SYNCREG]], label %[[DETACHED2:.+]], label %[[CONTINUE2:.+]] unwind label %{{.+}}
+// CHECK: detach within %[[SYNCREG]], label %[[DETACHED2:.+]], label %[[CONTINUE2:.+]]
 // CHECK: [[DETACHED2]]:
-// CHECK: invoke void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy2,
-// CHECK-NEXT: to label %[[AFTERINVOKE2:.+]] unwind
-// CHECK: [[AFTERINVOKE2]]:
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy2,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
 
-// CHECK: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]] unwind label %{{.+}}
+// CHECK: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]]
 // CHECK: [[DETACHED3]]:
-// CHECK: invoke void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy3,
-// CHECK-NEXT: to label %[[AFTERINVOKE3:.+]] unwind
-// CHECK: [[AFTERINVOKE3]]:
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy3,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
 
-// CHECK: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]] unwind label %{{.+}}
+// CHECK: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]]
 // CHECK: [[DETACHED4]]:
-// CHECK: %[[RET4:.+]] = invoke i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
-// CHECK-NEXT: to label %[[AFTERINVOKE4:.+]] unwind
-// CHECK: [[AFTERINVOKE4]]:
+// CHECK: %[[RET4:.+]] = call i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
 // CHECK-NEXT: store i64 %[[RET4]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE4]]
 
-// CHECK: detach within %[[SYNCREG]], label %[[DETACHED5:.+]], label %[[CONTINUE5:.+]] unwind label %{{.+}}
+// CHECK: detach within %[[SYNCREG]], label %[[DETACHED5:.+]], label %[[CONTINUE5:.+]]
 // CHECK: [[DETACHED5]]:
-// CHECK: %[[RET5:.+]] = invoke i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
-// CHECK-NEXT: to label %[[AFTERINVOKE5:.+]] unwind
-// CHECK: [[AFTERINVOKE5]]:
+// CHECK: %[[RET5:.+]] = call i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
 // CHECK-NEXT: store i64 %[[RET5]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE5]]
 
-// CHECK: detach within %[[SYNCREG]], label %[[DETACHED6:.+]], label %[[CONTINUE6:.+]] unwind label %{{.+}}
+// CHECK: detach within %[[SYNCREG]], label %[[DETACHED6:.+]], label %[[CONTINUE6:.+]]
 // CHECK: [[DETACHED6]]:
-// CHECK: %[[RET6:.+]] = invoke i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
-// CHECK-NEXT: to label %[[AFTERINVOKE6:.+]] unwind
-// CHECK: [[AFTERINVOKE6]]:
+// CHECK: %[[RET6:.+]] = call i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
 // CHECK-NEXT: store i64 %[[RET6]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE6]]

@@ -34,6 +34,12 @@ ModulePass *createLowerTapirToTargetPass();
 
 //===----------------------------------------------------------------------===//
 //
+// TaskCanonicalize - Canonicalize Tapir tasks
+//
+FunctionPass *createTaskCanonicalizePass();
+
+//===----------------------------------------------------------------------===//
+//
 // TaskSimplify - Simplify Tapir tasks
 //
 FunctionPass *createTaskSimplifyPass();

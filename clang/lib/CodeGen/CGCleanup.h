@@ -82,6 +82,9 @@ protected:
     /// Whether the EH cleanup should test the activation flag.
     unsigned TestFlagInEHCleanup : 1;
 
+    /// Whether this cleanup marks the exit of a task.
+    unsigned IsTaskExit : 1;
+
     /// The amount of extra storage needed by the Cleanup.
     /// Always a multiple of the scope-stack alignment.
     unsigned CleanupSize : 12;
@@ -297,6 +300,7 @@ public:
     CleanupBits.IsLifetimeMarker = false;
     CleanupBits.TestFlagInNormalCleanup = false;
     CleanupBits.TestFlagInEHCleanup = false;
+    CleanupBits.IsTaskExit = false;
     CleanupBits.CleanupSize = cleanupSize;
 
     assert(CleanupBits.CleanupSize == cleanupSize && "cleanup size overflow");
@@ -342,6 +346,9 @@ public:
   bool shouldTestFlagInEHCleanup() const {
     return CleanupBits.TestFlagInEHCleanup;
   }
+
+  bool isTaskExit() const { return CleanupBits.IsTaskExit; }
+  void setTaskExit() { CleanupBits.IsTaskExit = true; }
 
   unsigned getFixupDepth() const { return FixupDepth; }
   EHScopeStack::stable_iterator getEnclosingNormalCleanup() const {
