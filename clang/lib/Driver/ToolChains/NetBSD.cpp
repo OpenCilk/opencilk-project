@@ -310,7 +310,7 @@ void netbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     if (NeedsXRayDeps)
       linkXRayRuntimeDeps(ToolChain, CmdArgs);
     if (NeedsCilkSanitizerDeps)
-      linkCilkSanitizerRuntimeDeps(getToolChain(), CmdArgs);
+      linkCilkSanitizerRuntimeDeps(Args, getToolChain(), CmdArgs);
     if (Args.hasArg(options::OPT_pthread))
       CmdArgs.push_back("-lpthread");
     CmdArgs.push_back("-lc");
