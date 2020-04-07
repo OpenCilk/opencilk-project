@@ -589,7 +589,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         linkSanitizerRuntimeDeps(ToolChain, Args, CmdArgs);
 
       if (NeedsCilkSanitizerDeps)
-        linkCilkSanitizerRuntimeDeps(ToolChain, CmdArgs);
+        linkCilkSanitizerRuntimeDeps(ToolChain, Args, CmdArgs);
 
       if (NeedsXRayDeps)
         linkXRayRuntimeDeps(ToolChain, Args, CmdArgs);
