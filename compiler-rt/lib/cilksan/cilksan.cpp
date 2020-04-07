@@ -745,7 +745,7 @@ void CilkSanImpl_t::do_read(const csi_id_t load_id,
   cilksan_assert(CILKSAN_INITIALIZED);
   DBG_TRACE(DEBUG_MEMORY, "record read %lu: %lu bytes at addr %p and rip %p.\n",
             load_id, mem_size, addr,
-            (load_id != UNKNOWN_CSI_ID) ? load_pc[load_id] : NULL);
+            (load_id != UNKNOWN_CSI_ID) ? load_pc[load_id] : 0);
   ++num_reads_checked;
 
   bool on_stack = is_on_stack(addr);
