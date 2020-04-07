@@ -180,7 +180,7 @@ void tools::Myriad::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     if (NeedsSanitizerDeps)
       linkSanitizerRuntimeDeps(TC, CmdArgs);
     if (NeedsCilkSanitizerDeps)
-      linkCilkSanitizerRuntimeDeps(TC, CmdArgs);
+      linkCilkSanitizerRuntimeDeps(Args, TC, CmdArgs);
     if (C.getDriver().CCCIsCXX()) {
       if (TC.GetCXXStdlibType(Args) == ToolChain::CST_Libcxx) {
         CmdArgs.push_back("-lc++");
