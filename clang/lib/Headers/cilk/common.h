@@ -327,6 +327,9 @@ namespace cilk {
 #ifndef __CILKRTS_ABI_VERSION
 #   ifdef IN_CILK_RUNTIME
 #       define __CILKRTS_ABI_VERSION 1
+#   elif __cilk >= 300
+        // LLVM Tapir/OpenCilk
+#       define __CILKRTS_ABI_VERSION 2
 #   elif defined(__INTEL_COMPILER) && (__INTEL_COMPILER <= 1200)
         // Intel compilers prior to version 12.1 support only ABI 0
 #       define __CILKRTS_ABI_VERSION 0
