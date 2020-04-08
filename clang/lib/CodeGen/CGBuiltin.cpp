@@ -2687,6 +2687,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   case Builtin::BI__builtin_clrsbl:
   case Builtin::BI__builtin_clrsbll: {
     // clrsb(x) -> clz(x < 0 ? ~x : x) - 1 or
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitScalarExpr(E->getArg(0));
 
     llvm::Type *ArgType = ArgValue->getType();
@@ -2694,6 +2695,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
 
     llvm::Type *ResultType = ConvertType(E->getType());
     Value *Zero = llvm::Constant::getNullValue(ArgType);
+    MaybeDetach(this, SpawnedScp);
     Value *IsNeg = Builder.CreateICmpSLT(ArgValue, Zero, "isneg");
     Value *Inverse = Builder.CreateNot(ArgValue, "not");
     Value *Tmp = Builder.CreateSelect(IsNeg, Inverse, ArgValue);
@@ -2786,12 +2788,14 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   case Builtin::BI__lzcnt16:
   case Builtin::BI__lzcnt:
   case Builtin::BI__lzcnt64: {
+    IsSpawnedScope SpawnedScp(this);
     Value *ArgValue = EmitScalarExpr(E->getArg(0));
 
     llvm::Type *ArgType = ArgValue->getType();
     Function *F = CGM.getIntrinsic(Intrinsic::ctlz, ArgType);
 
     llvm::Type *ResultType = ConvertType(E->getType());
+    MaybeDetach(this, SpawnedScp);
     Value *Result = Builder.CreateCall(F, {ArgValue, Builder.getFalse()});
     if (Result->getType() != ResultType)
       Result = Builder.CreateIntCast(Result, ResultType, /*isSigned*/true,
@@ -2997,11 +3001,19 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, {Begin, End}));
   }
-  case Builtin::BI__builtin_trap:
+  case Builtin::BI__builtin_trap: {
+    IsSpawnedScope SpawnedScp(this);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(EmitTrapCall(Intrinsic::trap));
-  case Builtin::BI__debugbreak:
+  }
+  case Builtin::BI__debugbreak: {
+    IsSpawnedScope SpawnedScp(this);
+    MaybeDetach(this, SpawnedScp);
     return RValue::get(EmitTrapCall(Intrinsic::debugtrap));
+  }
   case Builtin::BI__builtin_unreachable: {
+    IsSpawnedScope SpawnedScp(this);
+    MaybeDetach(this, SpawnedScp);
     EmitUnreachable(E->getExprLoc());
 
     // We do need to preserve an insertion point.
