@@ -23,8 +23,7 @@ using namespace clang;
 using namespace llvm::opt;
 
 TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
-  // Use Cilk if -ftapir is not specified but either -fcilkplus or -fdetach is
-  // specified.
+  // Use Cilk if -ftapir is not specified but -fcilkplus is specified.
   if (!Args.hasArg(options::OPT_ftapir_EQ)) {
     if (Args.hasArg(options::OPT_fcilkplus))
       return TapirTargetID::Cilk;
