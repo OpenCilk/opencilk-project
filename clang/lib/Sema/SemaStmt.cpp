@@ -4148,7 +4148,9 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
                            ExpressionEvaluationContext::DiscardedStatement)
     return R;
 
-  if (getLangOpts().Cilk)
+  /* JFC: Is this guard needed?  The test seems correct without it
+     because spawn is not generated without Cilk.  */
+  if (getLangOpts().getCilk() != LangOptions::Cilk_none)
     if (const Expr *RV = cast<ReturnStmt>(R.get())->getRetValue())
       if (isa<CilkSpawnExpr>(RV))
         Diag(ReturnLoc, diag::warn_return_cilk_spawn);
