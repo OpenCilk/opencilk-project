@@ -3803,9 +3803,18 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
                       !Args.hasArg(OPT_fvisibility)))
     Opts.IgnoreXCOFFVisibility = 1;
 
-  Opts.Cilk = Args.hasArg(OPT_fcilkplus);
+  bool OpenCilk = Args.hasArg(OPT_fopencilk);
+  bool CilkPlus = Args.hasArg(OPT_fcilkplus);
+  if (OpenCilk) {
+    if (CilkPlus) {
+      Diags.Report(diag::err_drv_double_cilk);
+    }
+    Opts.setCilk(LangOptions::Cilk_opencilk);
+  } else if (CilkPlus) {
+    Opts.setCilk(LangOptions::Cilk_plus);
+  }
 
-  if (Opts.Cilk && Opts.ObjC)
+  if (Opts.getCilk() != LangOptions::Cilk_none && Opts.ObjC)
     Diags.Report(diag::err_drv_cilk_objc);
 
   if (Args.hasArg(OPT_ftrapv)) {
