@@ -247,6 +247,12 @@ public:
     Cilktool_Cilkscale
   };
 
+  enum CilkVersion {
+    Cilk_none = 0,
+    Cilk_plus = 1,
+    Cilk_opencilk = 2
+  };
+
 public:
   /// Set of enabled sanitizers.
   SanitizerSet Sanitize;
