@@ -841,21 +841,19 @@ protected:
      *  @param  leftmost    The address of the leftmost view in the reducer.
      */
     reducer_base(char* leftmost)
-    {
-        static const cilk_c_monoid c_monoid_initializer = {
+      : m_base{{
             (cilk_c_reducer_reduce_fn_t)     &reduce_wrapper,
             (cilk_c_reducer_identity_fn_t)   &identity_wrapper,
             (cilk_c_reducer_destroy_fn_t)    &destroy_wrapper,
             (cilk_c_reducer_allocate_fn_t)   &allocate_wrapper,
             (cilk_c_reducer_deallocate_fn_t) &deallocate_wrapper
-        };
-
-        m_base.__c_monoid = c_monoid_initializer;
-        m_base.__flags = 0;
-        m_base.__view_offset = (char*)leftmost - (char*)this;
-        m_base.__view_size = sizeof(view_type);
-        m_initialThis = this;
-
+          },
+          0, /* Cilk Plus flags or OpenCilk ID */
+          (char*)leftmost - (char*)this, /* __view_offset */
+          sizeof(view_type) /* __view_size */
+	},
+        m_initialThis(this)
+    {
         __cilkrts_hyper_create(&m_base);
     }
 
