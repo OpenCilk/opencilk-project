@@ -567,7 +567,7 @@ void CodeGenFunction::EmitCXXTryStmt(const CXXTryStmt &S) {
     EmitStmt(S.getTryBlock());
 
     // Pop the nested sync region after the try block.
-    if (LO.Cilk)
+    if (LO.getCilk() != LangOptions::Cilk_none)
       PopSyncRegion();
   }
   ExitCXXTryStmt(S);
