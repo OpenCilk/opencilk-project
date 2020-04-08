@@ -109,7 +109,12 @@ typedef struct cilk_c_monoid {
 typedef struct __cilkrts_hyperobject_base
 {
     cilk_c_monoid       __c_monoid;
+#if __cilk >= 300
+    uint32_t            __id_num;
+    /* hole here on 64 bit systems */
+#else
     unsigned long long  __flags;
+#endif
     __STDNS ptrdiff_t   __view_offset;  /* offset (in bytes) to leftmost view */
     __STDNS size_t      __view_size;    /* Size of each view */
 } __cilkrts_hyperobject_base;
