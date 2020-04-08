@@ -5455,8 +5455,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Forward flags for Cilk.
   Args.AddLastArg(CmdArgs, options::OPT_fcilkplus);
+  Args.AddLastArg(CmdArgs, options::OPT_fopencilk);
   Args.AddLastArg(CmdArgs, options::OPT_ftapir_EQ);
   if (Args.hasArg(options::OPT_fcilkplus) ||
+      Args.hasArg(options::OPT_fopencilk) ||
       Args.hasArg(options::OPT_ftapir_EQ)) {
     auto const &Triple = getToolChain().getTriple();
 

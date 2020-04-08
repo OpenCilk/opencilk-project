@@ -275,6 +275,12 @@ public:
     Cilktool_Cilkscale
   };
 
+  enum CilkVersion {
+    Cilk_none = 0,
+    Cilk_plus = 1,
+    Cilk_opencilk = 2
+  };
+
 public:
   /// The used language standard.
   LangStandard::Kind LangStd;

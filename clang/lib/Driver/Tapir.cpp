@@ -27,6 +27,8 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
   if (!Args.hasArg(options::OPT_ftapir_EQ)) {
     if (Args.hasArg(options::OPT_fcilkplus))
       return TapirTargetID::Cilk;
+    if (Args.hasArg(options::OPT_fopencilk))
+      return TapirTargetID::OpenCilk;
     return TapirTargetID::None;
   }
 
