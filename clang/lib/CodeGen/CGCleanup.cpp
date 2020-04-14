@@ -418,9 +418,10 @@ void CodeGenFunction::ResolveBranchFixups(llvm::BasicBlock *Block) {
 /// Pops cleanup blocks until the given savepoint is reached.
 void CodeGenFunction::PopCleanupBlocks(
     EHScopeStack::stable_iterator Old,
-    std::initializer_list<llvm::Value **> ValuesToReload) {
+    std::initializer_list<llvm::Value **> ValuesToReload, bool AfterSync) {
   assert(Old.isValid());
 
+  bool EmitSync = AfterSync;
   bool HadBranches = false;
   while (EHStack.stable_begin() != Old) {
     EHCleanupScope &Scope = cast<EHCleanupScope>(*EHStack.begin());
@@ -432,7 +433,8 @@ void CodeGenFunction::PopCleanupBlocks(
     bool FallThroughIsBranchThrough =
       Old.strictlyEncloses(Scope.getEnclosingNormalCleanup());
 
-    PopCleanupBlock(FallThroughIsBranchThrough);
+    PopCleanupBlock(FallThroughIsBranchThrough, EmitSync);
+    EmitSync = false;
   }
 
   // If we didn't have any branches, the insertion point before cleanups must
@@ -474,8 +476,8 @@ void CodeGenFunction::PopCleanupBlocks(
 /// cleanups from the given savepoint in the lifetime-extended cleanups stack.
 void CodeGenFunction::PopCleanupBlocks(
     EHScopeStack::stable_iterator Old, size_t OldLifetimeExtendedSize,
-    std::initializer_list<llvm::Value **> ValuesToReload) {
-  PopCleanupBlocks(Old, ValuesToReload);
+    std::initializer_list<llvm::Value **> ValuesToReload, bool AfterSync) {
+  PopCleanupBlocks(Old, ValuesToReload, AfterSync);
 
   // Move our deferred cleanups onto the EH stack.
   for (size_t I = OldLifetimeExtendedSize,
@@ -643,7 +645,8 @@ static void destroyOptimisticNormalEntry(CodeGenFunction &CGF,
 /// Pops a cleanup block.  If the block includes a normal cleanup, the
 /// current insertion point is threaded through the cleanup, as are
 /// any branch fixups on the cleanup.
-void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
+void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough,
+                                      bool AfterSync) {
   assert(!EHStack.empty() && "cleanup stack is empty!");
   assert(isa<EHCleanupScope>(*EHStack.begin()) && "top not a cleanup!");
   EHCleanupScope &Scope = cast<EHCleanupScope>(*EHStack.begin());
@@ -775,6 +778,9 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
       destroyOptimisticNormalEntry(*this, Scope);
       EHStack.popCleanup();
 
+      if (AfterSync)
+        EmitImplicitSyncCleanup();
+
       EmitCleanup(*this, Fn, cleanupFlags, NormalActiveFlag);
 
     // Otherwise, the best approach is to thread everything through
@@ -895,6 +901,9 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
       // IV.  Pop the cleanup and emit it.
       EHStack.popCleanup();
       assert(EHStack.hasNormalCleanups() == HasEnclosingCleanups);
+
+      if (AfterSync)
+        EmitImplicitSyncCleanup();
 
       EmitCleanup(*this, Fn, cleanupFlags, NormalActiveFlag);
 

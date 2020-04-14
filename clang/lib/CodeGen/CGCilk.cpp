@@ -47,6 +47,20 @@ void CodeGenFunction::IsSpawnedScope::RestoreOldScope() {
   CGF->SpawnedCleanup = OldSpawnedCleanup;
 }
 
+void CodeGenFunction::EmitImplicitSyncCleanup(llvm::Instruction *SyncRegion) {
+  llvm::Instruction *SR = SyncRegion;
+  // If a sync region wasn't specified with this cleanup initially, try to grab
+  // the current sync region.
+  if (!SR && CurSyncRegion && CurSyncRegion->getSyncRegionStart())
+    SR = CurSyncRegion->getSyncRegionStart();
+  if (!SR)
+    return;
+
+  llvm::BasicBlock *ContinueBlock = createBasicBlock("sync.continue");
+  Builder.CreateSync(ContinueBlock, SR);
+  EmitBlockAfterUses(ContinueBlock);
+}
+
 void CodeGenFunction::DetachScope::CreateTaskFrameEHState() {
   // Save the old EH state.
   OldEHResumeBlock = CGF.EHResumeBlock;
@@ -385,6 +399,10 @@ void CodeGenFunction::EmitCilkSpawnStmt(const CilkSpawnStmt &S) {
   PushDetachScope();
   CurDetachScope->StartDetach();
 
+  SyncedScopeRAII SyncedScp(*this);
+  if (isa<CompoundStmt>(S.getSpawnedStmt()))
+    ScopeIsSynced = true;
+
   // Emit the spawned statement.
   EmitStmt(S.getSpawnedStmt());
 
@@ -590,6 +608,10 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     // Create a separate cleanup scope for the body, in case it is not
     // a compound statement.
     RunCleanupsScope BodyScope(*this);
+
+    SyncedScopeRAII SyncedScp(*this);
+    if (isa<CompoundStmt>(S.getBody()))
+      ScopeIsSynced = true;
     EmitStmt(S.getBody());
 
     if (HaveInsertPoint())
