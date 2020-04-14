@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'lld/**'
       - 'llvm/**'
@@ -22,7 +24,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - windows-latest
+          # - windows-latest
           - macOS-latest
     steps:
     - name: Setup Windows
