@@ -479,8 +479,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   Continue = getJumpDestInCurrentScope("pfor.inc");
 
   // Ensure that the _Cilk_for loop iterations are synced on exit from the loop.
-  EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup,
-                                           SyncRegion);
+  EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup, SyncRegion);
 
   // Create a cleanup scope for the condition variable cleanups.
   LexicalScope ConditionScope(*this, S.getSourceRange());
@@ -523,7 +522,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
 
     EmitBranch(DetachBlock);
 
-    EmitBlock(DetachBlock);
+    EmitBlockAfterUses(DetachBlock);
 
     // Get the value of the loop variable initialization before we emit the
     // detach.
@@ -592,7 +591,9 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     // a compound statement.
     RunCleanupsScope BodyScope(*this);
     EmitStmt(S.getBody());
-    Builder.CreateBr(Preattach.getBlock());
+
+    if (HaveInsertPoint())
+      Builder.CreateBr(Preattach.getBlock());
   }
 
   // Finish detached body and emit the reattach.
@@ -652,7 +653,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   }
 
   // Emit the increment next.
-  EmitBlock(Continue.getBlock());
+  EmitBlockAfterUses(Continue.getBlock());
   EmitStmt(Inc);
 
   {
