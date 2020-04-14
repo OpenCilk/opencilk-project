@@ -493,6 +493,7 @@ Address CodeGenFunction::EmitCompoundStmt(const CompoundStmt &S, bool GetLast,
   // Keep track of the current cleanup stack depth, including debug scopes.
   LexicalScope Scope(*this, S.getSourceRange());
 
+  SyncRegionRAII StmtSR(*this);
   return EmitCompoundStmtWithoutScope(S, GetLast, AggSlot);
 }
 

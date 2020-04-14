@@ -363,6 +363,7 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
   bool HasOnlyLifetimeMarkers =
       HasCleanups && EHStack.containsOnlyLifetimeMarkers(PrologueCleanupDepth);
   bool EmitRetDbgLoc = !HasCleanups || HasOnlyLifetimeMarkers;
+  bool SyncEmitted = false;
 
   std::optional<ApplyDebugLocation> OAL;
   if (HasCleanups) {
@@ -377,11 +378,22 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
         OAL = ApplyDebugLocation::CreateDefaultArtificial(*this, EndLoc);
     }
 
-    PopCleanupBlocks(PrologueCleanupDepth);
+    PopCleanupBlocks(PrologueCleanupDepth, {}, getLangOpts().Cilk);
+    SyncEmitted = true;
+  } else if (getLangOpts().Cilk && Builder.GetInsertBlock()) {
+    // If we're compiling Cilk, emit an implicit sync for the function.
+    EmitImplicitSyncCleanup();
+    SyncEmitted = true;
   }
 
   // Emit function epilog (to return).
   llvm::DebugLoc Loc = EmitReturnBlock();
+
+  if (getLangOpts().Cilk && !SyncEmitted) {
+    // If we're compiling Cilk, emit an implicit sync for the function.
+    EmitImplicitSyncCleanup();
+    SyncEmitted = true;
+  }
 
   if (ShouldInstrumentFunction()) {
     if (CGM.getCodeGenOpts().InstrumentFunctions)
