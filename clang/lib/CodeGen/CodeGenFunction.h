@@ -780,9 +780,13 @@ public:
   void PushDestructorCleanup(const CXXDestructorDecl *Dtor, QualType T,
                              Address Addr);
 
+  /// EmitImplicitSyncCleanup - Emit an implicit sync.
+  void EmitImplicitSyncCleanup(llvm::Instruction *SyncRegion = nullptr);
+
   /// PopCleanupBlock - Will pop the cleanup entry on the stack and
   /// process all branch fixups.
-  void PopCleanupBlock(bool FallThroughIsBranchThrough = false);
+  void PopCleanupBlock(bool FallThroughIsBranchThrough = false,
+                       bool AfterSync = false);
 
   /// DeactivateCleanupBlock - Deactivates the given cleanup block.
   /// The block cannot be reactivated.  Pops it if it's the top of the
@@ -813,6 +817,10 @@ public:
     bool OldDidCallStackSave;
   protected:
     bool PerformCleanup;
+    bool CleanupAfterSync;
+    /// Protected method to control whether a sync is inserted before any
+    /// cleanups.
+    void setCleanupAfterSync(bool V = true) { CleanupAfterSync = V; }
   private:
 
     RunCleanupsScope(const RunCleanupsScope &) = delete;
@@ -824,7 +832,7 @@ public:
   public:
     /// Enter a new cleanup scope.
     explicit RunCleanupsScope(CodeGenFunction &CGF)
-      : PerformCleanup(true), CGF(CGF)
+      : PerformCleanup(true), CleanupAfterSync(false), CGF(CGF)
     {
       CleanupStackDepth = CGF.EHStack.stable_begin();
       LifetimeExtendedCleanupStackSize =
@@ -856,7 +864,7 @@ public:
       assert(PerformCleanup && "Already forced cleanup");
       CGF.DidCallStackSave = OldDidCallStackSave;
       CGF.PopCleanupBlocks(CleanupStackDepth, LifetimeExtendedCleanupStackSize,
-                           ValuesToReload);
+                           ValuesToReload, CleanupAfterSync);
       PerformCleanup = false;
       CGF.CurrentCleanupScopeDepth = OldCleanupScopeDepth;
     }
@@ -1132,11 +1140,51 @@ public:
     void RestoreOldScope();
   };
 
+  /// Cleanup to ensure a sync is inserted.  If no SyncRegion is specified, then
+  /// this cleanup actually serves as a placeholder in EHStack, which ensures
+  /// that an implicit sync is inserted before any normal cleanups.
+  struct ImplicitSyncCleanup final : public EHScopeStack::Cleanup {
+    llvm::Instruction *SyncRegion;
+  public:
+    ImplicitSyncCleanup(llvm::Instruction *SyncRegion = nullptr)
+        : SyncRegion(SyncRegion) {}
+
+    void Emit(CodeGenFunction &CGF, Flags F) {
+      if (SyncRegion)
+        CGF.EmitImplicitSyncCleanup(SyncRegion);
+    }
+  };
+
+  // Subclass of RunCleanupsScope that ensures an implicit sync is emitted
+  // before cleanups.
+  class ImplicitSyncScope : public RunCleanupsScope {
+    ImplicitSyncScope(const ImplicitSyncScope &) = delete;
+    void operator=(const ImplicitSyncScope &) = delete;
+  public:
+    explicit ImplicitSyncScope(CodeGenFunction &CGF) : RunCleanupsScope(CGF) {
+      setCleanupAfterSync();
+      CGF.EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup);
+    }
+
+    ~ImplicitSyncScope() {
+      if (PerformCleanup)
+        ForceCleanup();
+    }
+
+    void ForceCleanup() {
+      RunCleanupsScope::ForceCleanup();
+    }
+  };
+
+  /// A sync region is a collection of spawned tasks and syncs such that, based
+  /// on control flow, the sync may wait on the spawned task.  In Cilk, certain
+  /// constructs, such as functions or _Cilk_for loop bodies, use a separate
+  /// sync region to handle spawning and syncing of tasks within that construct.
   class SyncRegion {
     CodeGenFunction &CGF;
     SyncRegion *ParentRegion;
     llvm::Instruction *SyncRegionStart = nullptr;
-    RunCleanupsScope *InnerSyncScope = nullptr;
+    ImplicitSyncScope *InnerSyncScope = nullptr;
 
     SyncRegion(const SyncRegion &) = delete;
     void operator=(const SyncRegion &) = delete;
@@ -1153,36 +1201,13 @@ public:
     llvm::Instruction *getSyncRegionStart() const {
       return SyncRegionStart;
     }
-
     void setSyncRegionStart(llvm::Instruction *SRStart) {
       SyncRegionStart = SRStart;
     }
 
     void addImplicitSync() {
-      if (!InnerSyncScope) {
-        InnerSyncScope = new RunCleanupsScope(CGF);
-        CGF.EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup);
-      }
-    }
-  };
-
-  /// Cleanup to ensure parent stack frame is synced.
-  struct ImplicitSyncCleanup final : public EHScopeStack::Cleanup {
-    llvm::Instruction *SyncRegion;
-  public:
-    ImplicitSyncCleanup(llvm::Instruction *SyncRegion = nullptr)
-        : SyncRegion(SyncRegion) {}
-    void Emit(CodeGenFunction &CGF, Flags F) {
-      llvm::Instruction *SR = SyncRegion;
-      // If a sync region wasn't specified with this cleanup initially, try to
-      // graph the current sync region.
-      if (!SR && CGF.CurSyncRegion)
-        SR = CGF.CurSyncRegion->getSyncRegionStart();
-      if (SR) {
-        llvm::BasicBlock *ContinueBlock = CGF.createBasicBlock("sync.continue");
-        CGF.Builder.CreateSync(ContinueBlock, SR);
-        CGF.EmitBlock(ContinueBlock);
-      }
+      if (!InnerSyncScope)
+        InnerSyncScope = new ImplicitSyncScope(CGF);
     }
   };
 
@@ -1207,6 +1232,45 @@ public:
     if (!CurSyncRegion->getSyncRegionStart())
       CurSyncRegion->setSyncRegionStart(EmitSyncRegionStart());
   }
+
+  // Flag to indicate whether the current scope is synced.  Currently this flag
+  // is used to optionally push a SyncRegion inside of a lexical scope, so that
+  // any cleanups run within that lexical scope occur after an implicit sync.
+  bool ScopeIsSynced = false;
+
+  // RAII for maintaining CodeGenFunction::ScopeIsSynced.
+  class SyncedScopeRAII {
+    CodeGenFunction &CGF;
+    bool OldScopeIsSynced;
+  public:
+    SyncedScopeRAII(CodeGenFunction &CGF)
+        : CGF(CGF), OldScopeIsSynced(CGF.ScopeIsSynced) {}
+    ~SyncedScopeRAII() { CGF.ScopeIsSynced = OldScopeIsSynced; }
+  };
+
+  // RAII for pushing and popping a sync region.
+  class SyncRegionRAII {
+    CodeGenFunction &CGF;
+    bool OldScopeIsSynced;
+  public:
+    SyncRegionRAII(CodeGenFunction &CGF, bool addImplicitSync = true)
+        : CGF(CGF), OldScopeIsSynced(CGF.ScopeIsSynced) {
+      if (CGF.ScopeIsSynced) {
+        CGF.PushSyncRegion();
+        // If requested, add an implicit sync onto this sync region.
+        if (addImplicitSync)
+          CGF.CurSyncRegion->addImplicitSync();
+
+        CGF.ScopeIsSynced = false;
+      }
+    }
+    ~SyncRegionRAII() {
+      if (OldScopeIsSynced) {
+        CGF.PopSyncRegion();
+        CGF.ScopeIsSynced = OldScopeIsSynced;
+      }
+    }
+  };
 
   /// Testing lifetime-like cleanup for invoking taskframe.end.
   /// Cleanup to ensure task frame is ended.
@@ -1386,7 +1450,8 @@ public:
   /// that have been added.
   void
   PopCleanupBlocks(EHScopeStack::stable_iterator OldCleanupStackSize,
-                   std::initializer_list<llvm::Value **> ValuesToReload = {});
+                   std::initializer_list<llvm::Value **> ValuesToReload = {},
+                   bool AfterSync = false);
 
   /// Takes the old cleanup stack size and emits the cleanup blocks
   /// that have been added, then adds all lifetime-extended cleanups from
@@ -1394,7 +1459,8 @@ public:
   void
   PopCleanupBlocks(EHScopeStack::stable_iterator OldCleanupStackSize,
                    size_t OldLifetimeExtendedStackSize,
-                   std::initializer_list<llvm::Value **> ValuesToReload = {});
+                   std::initializer_list<llvm::Value **> ValuesToReload = {},
+                   bool AfterSync = false);
 
   void PopCleanupBlocksAndDetach(
       EHScopeStack::stable_iterator OldCleanupStackSize,
