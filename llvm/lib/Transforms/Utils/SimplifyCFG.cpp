@@ -4653,6 +4653,15 @@ bool SimplifyCFGOpt::simplifyUnreachable(UnreachableInst *UI) {
       new UnreachableInst(TI->getContext(), TI);
       TI->eraseFromParent();
       Changed = true;
+    } else if (DetachInst *DI = dyn_cast<DetachInst>(TI)) {
+      if (DI->getUnwindDest() == BB) {
+        // If the unwind destination of the detach is unreachable, simply remove
+        // the unwind edge.
+        removeUnwindEdge(DI->getParent());
+        Changed = true;
+      }
+      // Detaches of unreachables are handled via
+      // serializeDetachOfUnreachable.
     }
   }
 

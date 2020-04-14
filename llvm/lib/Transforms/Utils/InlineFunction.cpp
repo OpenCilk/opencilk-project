@@ -851,6 +851,53 @@ static void HandleInlinedTasks(
   }
 }
 
+static void GetInlinedLPads(SmallPtrSetImpl<BasicBlock *> &BlocksToProcess,
+                            SmallPtrSetImpl<LandingPadInst *> &InlinedLPads) {
+  SmallVector<BasicBlock *, 32> Worklist;
+  SmallPtrSet<BasicBlock *, 32> Visited;
+
+  // Push all blocks to process that are terminated by a resume onto the
+  // worklist.
+  for (BasicBlock *BB : BlocksToProcess)
+    if (isa<ResumeInst>(BB->getTerminator()))
+      Worklist.push_back(BB);
+
+  // Traverse the blocks to process from the resumes going backwards (through
+  // predecessors).
+  while(!Worklist.empty()) {
+    BasicBlock *BB = Worklist.pop_back_val();
+    // Skip blocks we've seen before
+    if (!Visited.insert(BB).second)
+      continue;
+    // Skip blocks not in the set to process.
+    if (!BlocksToProcess.count(BB))
+      continue;
+
+    // If BB is a landingpad...
+    if (BB->isLandingPad()) {
+      // Record BB's landingpad instruction.
+      InlinedLPads.insert(BB->getLandingPadInst());
+
+      // Add predecessors of BB to the worklist, skipping predecessors via a
+      // detached.rethrow or taskframe.resume.
+      for (BasicBlock *Predecessor : predecessors(BB))
+        if (!isDetachedRethrow(Predecessor->getTerminator()) &&
+            !isTaskFrameResume(Predecessor->getTerminator()))
+          Worklist.push_back(Predecessor);
+
+      continue;
+    }
+
+    // In the normal case, add predecessors of BB to the worklist, excluding
+    // predecessors via reattach, detached.rethrow, or taskframe.resume
+    for (BasicBlock *Predecessor : predecessors(BB))
+      if (!isa<ResumeInst>(Predecessor->getTerminator()) &&
+          !isDetachedRethrow(Predecessor->getTerminator()) &&
+          !isTaskFrameResume(Predecessor->getTerminator()))
+        Worklist.push_back(Predecessor);
+  }
+}
+
 /// If we inlined an invoke site, we need to convert calls
 /// in the body of the inlined function into invokes.
 ///
@@ -867,6 +914,41 @@ static void HandleInlinedLandingPad(InvokeInst *II, BasicBlock *FirstNewBlock,
   // start of the inlined code to its end, checking for stuff we need to
   // rewrite.
   LandingPadInliningInfo Invoke(II);
+
+  // Special processing is needed to inline a function that contains a task.
+  if (InlinedCodeInfo.ContainsDetach) {
+    // Get the set of blocks for the inlined function.
+    SmallPtrSet<BasicBlock *, 32> BlocksToProcess;
+    for (Function::iterator BB = FirstNewBlock->getIterator(),
+                                 E = Caller->end(); BB != E; ++BB)
+      BlocksToProcess.insert(&*BB);
+
+    // Get all of the inlined landing pad instructions.
+    SmallPtrSet<LandingPadInst*, 16> InlinedLPads;
+    GetInlinedLPads(BlocksToProcess, InlinedLPads);
+
+    // Append the clauses from the outer landing pad instruction into the
+    // inlined landing pad instructions.
+    LandingPadInst *OuterLPad = Invoke.getLandingPadInst();
+    for (LandingPadInst *InlinedLPad : InlinedLPads) {
+      unsigned OuterNum = OuterLPad->getNumClauses();
+      InlinedLPad->reserveClauses(OuterNum);
+      for (unsigned OuterIdx = 0; OuterIdx != OuterNum; ++OuterIdx)
+        InlinedLPad->addClause(OuterLPad->getClause(OuterIdx));
+      if (OuterLPad->isCleanup())
+        InlinedLPad->setCleanup(true);
+    }
+
+    // Process inlined subtasks.
+    HandleInlinedTasks(BlocksToProcess, FirstNewBlock,
+                       Invoke.getOuterResumeDest(), Invoke, InlinedLPads);
+    // Now that everything is happy, we have one final detail.  The PHI nodes in
+    // the exception destination block still have entries due to the original
+    // invoke instruction. Eliminate these entries (which might even delete the
+    // PHI node) now.
+    InvokeDest->removePredecessor(II->getParent());
+    return;
+  }
 
   // Get all of the inlined landing pad instructions.
   SmallPtrSet<LandingPadInst*, 16> InlinedLPads;
@@ -885,23 +967,6 @@ static void HandleInlinedLandingPad(InvokeInst *II, BasicBlock *FirstNewBlock,
       InlinedLPad->addClause(OuterLPad->getClause(OuterIdx));
     if (OuterLPad->isCleanup())
       InlinedLPad->setCleanup(true);
-  }
-
-  if (InlinedCodeInfo.ContainsDetach) {
-    // Get the set of blocks for the inlined function.
-    SmallPtrSet<BasicBlock *, 32> BlocksToProcess;
-    for (Function::iterator BB = FirstNewBlock->getIterator(),
-                                 E = Caller->end(); BB != E; ++BB)
-      BlocksToProcess.insert(&*BB);
-    // Process inlined subtasks.
-    HandleInlinedTasks(BlocksToProcess, FirstNewBlock,
-                       Invoke.getOuterResumeDest(), Invoke, InlinedLPads);
-    // Now that everything is happy, we have one final detail.  The PHI nodes in
-    // the exception destination block still have entries due to the original
-    // invoke instruction. Eliminate these entries (which might even delete the
-    // PHI node) now.
-    InvokeDest->removePredecessor(II->getParent());
-    return;
   }
 
   for (Function::iterator BB = FirstNewBlock->getIterator(), E = Caller->end();
