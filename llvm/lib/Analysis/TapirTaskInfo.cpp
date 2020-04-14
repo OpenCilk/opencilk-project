@@ -70,11 +70,40 @@ static cl::opt<bool> PrintMayHappenInParallel(
 
 /// Returns the taskframe.create at the start of BB if one exists, nullptr
 /// otherwise.
-static Value *getTaskFrameCreate(BasicBlock *BB) {
+static const Instruction *getTaskFrameCreate(const BasicBlock *BB) {
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&BB->front()))
     if (Intrinsic::taskframe_create == II->getIntrinsicID())
       return &BB->front();
   return nullptr;
+}
+static Instruction *getTaskFrameCreate(BasicBlock *BB) {
+  return const_cast<Instruction *>(
+      getTaskFrameCreate(const_cast<const BasicBlock *>(BB)));
+}
+
+/// Checks if the given taskframe.create instruction is in canonical form.  This
+/// function mirrors the behavior of needToSplitTaskFrameCreate in
+/// Transforms/Utils/TapirUtils.
+static bool isCanonicalTaskFrameCreate(const Instruction *TFCreate) {
+  // If the taskframe.create is not the first instruction, split.
+  if (TFCreate != &TFCreate->getParent()->front())
+    return true;
+
+  // The taskframe.create is at the front of the block.  Check that we have a
+  // single predecessor.
+  const BasicBlock *Pred = TFCreate->getParent()->getSinglePredecessor();
+  if (!Pred)
+    return true;
+
+  // Check that the single predecessor has a single successor.
+  if (!Pred->getSingleSuccessor())
+    return true;
+
+  // Check whether the single predecessor is terminated with a sync.
+  if (isa<SyncInst>(Pred->getTerminator()))
+    return true;
+
+  return false;
 }
 
 /// Returns true if the given instruction performs a taskframe resume, false
@@ -373,8 +402,8 @@ static void recordContinuationSpindles(TaskInfo *TI) {
       // PHI nodes in these blocks.
       while (TI->getSpindleFor(Unwind) == S) {
         assert(Unwind->getUniqueSuccessor() &&
-               "Unwind destination of detach has many successors, but belongs to \
-               the same spindle as the detach.");
+               "Unwind destination of detach has many successors, but belongs to "
+               "the same spindle as the detach.");
         Unwind = Unwind->getUniqueSuccessor();
         LPadVal = FindUserAmongPHIs(LPadVal, Unwind);
       }
@@ -392,7 +421,7 @@ static void recordContinuationSpindles(TaskInfo *TI) {
           if (!TaskIsPredecessor)
             // Report that an unusual exceptional continuation was found.  This
             // can happen, for example, due to splitting of landing pads or when
-            // part of the CFG becomes disconnected due to functioning inlining.
+            // part of the CFG becomes disconnected due to function inlining.
             dbgs() << "TaskInfo: Found exceptional continuation at "
                    << Unwind->getName() << " with no predecessors in task\n";
         });
@@ -446,6 +475,13 @@ static bool shouldCreateSpindleAtDetachUnwind(const BasicBlock *MaybeUnwind,
   // detach-unwind spindle.
   const Spindle *S = TI.getSpindleFor(UnwindSpindleEntry);
   return !S->isPhi();
+}
+
+static bool isTaskFrameCreateSpindleEntry(const BasicBlock *B) {
+  if (const Instruction *TFCreate = getTaskFrameCreate(B))
+    if (!isCanonicalTaskFrameCreate(TFCreate))
+      return true;
+  return false;
 }
 
 void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
@@ -504,7 +540,7 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
     }
     // Create new spindles based on taskframe instrinsics.  We need only work
     // about taskframe.create and taskframe.resume.
-    if (getTaskFrameCreate(&B)) {
+    if (isTaskFrameCreateSpindleEntry(&B)) {
       // This block starts with a taskframe.create.  Mark is as a spindle entry.
       DefiningBlocks.insert(&B);
       if (!getSpindleFor(&B)) {
