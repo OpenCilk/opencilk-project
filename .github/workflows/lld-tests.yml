@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'lld/**'
       - '.github/workflows/lld-tests.yml'
@@ -25,7 +27,7 @@ concurrency:
 jobs:
   check_lld:
     name: Test lld
-    uses: llvm/llvm-project/.github/workflows/llvm-project-tests.yml@release/14.x
+    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@dev/14.x
     with:
       build_target: check-lld
       projects: lld

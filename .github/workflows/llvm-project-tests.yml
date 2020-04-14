@@ -32,7 +32,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - windows-latest
+          # - windows-latest
           # Use a specific version of macOS to ensure the CPLUS_INCLUDE_PATH workaround works.
           - macOS-10.15
     steps:
