@@ -288,6 +288,8 @@ class CallAnalyzer : public InstVisitor<CallAnalyzer, bool> {
   bool visitCleanupReturnInst(CleanupReturnInst &RI);
   bool visitCatchReturnInst(CatchReturnInst &RI);
   bool visitUnreachableInst(UnreachableInst &I);
+  bool visitReattachInst(ReattachInst &RI);
+  bool visitSyncInst(SyncInst &RI);
 
 public:
   CallAnalyzer(const TargetTransformInfo &TTI,
@@ -1268,6 +1270,11 @@ bool CallAnalyzer::visitCallBase(CallBase &Call) {
       case Intrinsic::vastart:
         InitsVargArgs = true;
         return false;
+      case Intrinsic::detached_rethrow:
+      case Intrinsic::taskframe_resume:
+        // Similarly to returns from a spawned task, we treat detached.rethrow
+        // and taskframe.resume intrinsics as free.
+        return true;
       }
     }
 
@@ -1545,6 +1552,16 @@ bool CallAnalyzer::visitUnreachableInst(UnreachableInst &I) {
   // to unreachable as they have the lowest possible impact on both runtime and
   // code size.
   return true; // No actual code is needed for unreachable.
+}
+
+bool CallAnalyzer::visitReattachInst(ReattachInst &RI) {
+  // We model reattach instructions as free, sort of like return instructions.
+  return true;
+}
+
+bool CallAnalyzer::visitSyncInst(SyncInst &SI) {
+  // We model sync instructions as free, sort of like unconditional branches.
+  return true;
 }
 
 bool CallAnalyzer::visitInstruction(Instruction &I) {
