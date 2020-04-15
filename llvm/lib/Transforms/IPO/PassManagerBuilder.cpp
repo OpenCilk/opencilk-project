@@ -376,7 +376,7 @@ void PassManagerBuilder::addPGOInstrPasses(legacy::PassManagerBase &MPM,
 
     MPM.add(createFunctionInliningPass(IP));
     MPM.add(createSROAPass());
-    MPM.add(createEarlyCSEPass(false));        // Catch trivial redundancies
+    MPM.add(createEarlyCSEPass());             // Catch trivial redundancies
     MPM.add(createCFGSimplificationPass());    // Merge & remove BBs
     MPM.add(createInstructionCombiningPass()); // Combine silly seq's
     addExtensionsToPM(EP_Peephole, MPM);
@@ -971,7 +971,7 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createTaskSimplifyPass());
     MPM.add(createLoopSimplifyCFGPass());
     MPM.add(createIndVarSimplifyPass());        // Canonicalize indvars
-    MPM.add(createEarlyCSEPass(false));
+    MPM.add(createEarlyCSEPass());
     MPM.add(createJumpThreadingPass());         // Thread jumps
     MPM.add(createCorrelatedValuePropagationPass());
     addInstructionCombiningPass(MPM);
