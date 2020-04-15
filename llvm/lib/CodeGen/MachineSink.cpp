@@ -598,16 +598,6 @@ bool MachineSinking::isProfitableToSinkTo(unsigned Reg, MachineInstr &MI,
   return false;
 }
 
-// Helper routine to check if a predecessor machine basic block is terminated by
-// an instruction with side effects, such as setjmp.
-static inline bool hasPredWithSideEffects(MachineBasicBlock *MBB) {
-  for (MachineBasicBlock *Pred : MBB->predecessors())
-    for (MachineInstr &Term : Pred->terminators())
-      if (Term.hasUnmodeledSideEffects())
-        return true;
-  return false;
-}
-
 /// Get the sorted sequence of successors for this MachineBasicBlock, possibly
 /// computing it if it was not already cached.
 SmallVector<MachineBasicBlock *, 4> &
@@ -644,8 +634,7 @@ MachineSinking::GetAllSortedSuccessors(MachineInstr &MI, MachineBasicBlock *MBB,
     Unstable = false;
     SmallPtrSet<MachineBasicBlock*, 10> toRemove;
     for (MachineBasicBlock *MBB : AllSuccs0) {
-      if (toRemove.count(MBB) == 0 &&
-          (hasPredWithSideEffects(MBB) || MBB->hasAddressTaken())) {
+      if (toRemove.count(MBB) == 0 && MBB->hasAddressTaken()) {
         // Enqueue MBB for removal.
         toRemove.insert(MBB);
         // Scan the successors of MBB and enqueue them for removal as well.
