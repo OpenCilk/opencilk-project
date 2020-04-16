@@ -465,7 +465,7 @@ Function *CilkRABI::Get__cilkrts_detach() {
   return Fn;
 }
 
-/// Get or create a LLVM function for __cilk_sync.  Calls to this function is
+/// Get or create a LLVM function for __cilk_sync.  Calls to this function are
 /// always inlined, as it saves the current stack/frame pointer values. This
 /// function must be marked as returns_twice to allow it to be inlined, since
 /// the call to setjmp is marked returns_twice.
@@ -584,8 +584,8 @@ Function *CilkRABI::GetCilkSyncFn() {
   return Fn;
 }
 
-/// Get or create a LLVM function for __cilk_sync.  Calls to this function is
-/// always inlined, as it saves the current stack/frame pointer values. This
+/// Get or create a LLVM function for __cilk_pause_frame. Calls to this function
+/// are always inlined, as it saves the current stack/frame pointer values. This
 /// function must be marked as returns_twice to allow it to be inlined, since
 /// the call to setjmp is marked returns_twice.
 ///
@@ -1100,6 +1100,13 @@ void CilkRABI::processOutlinedTask(Function &F, Instruction *DetachPt,
 
 void CilkRABI::processSpawner(Function &F) {
   GetOrInitCilkStackFrame(F, /*Helper=*/false);
+
+  // Use the Cilk personality function.
+  FunctionType *FTy = M.getFunction("__gxx_personality_v0")->getFunctionType();
+  Function *Personality = cast<Function>(M.getOrInsertFunction(
+                                            "__cilk_personality_v0",
+                                            FTy).getCallee());
+  F.setPersonalityFn(Personality);
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
