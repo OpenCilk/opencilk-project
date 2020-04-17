@@ -1268,7 +1268,8 @@ int spawn_trycatch(int a) {
 // CHECK-LABEL: define {{.*}}i32 @_Z14spawn_trycatchi(
 // CHECK: %[[SYNCREG:.+]] = {{.*}}call token @llvm.syncregion.start()
 // CHECK: %[[TASKFRAME1:.+]] = {{.*}}call token @llvm.taskframe.create()
-// CHECK: detach within %[[SYNCREG]], label %[[DETACHED1:.+]], label %[[CONTINUE1:.+]] unwind label %[[DETUNWIND1:.+]]
+// CHECK-O0: detach within %[[SYNCREG]], label %[[DETACHED1:.+]], label %[[CONTINUE1:.+]] unwind label %[[DETUNWIND1:.+]]
+// CHECK-O1: detach within %[[SYNCREG]], label %[[DETACHED1:.+]], label %[[CONTINUE1:.+]]
 
 // CHECK: [[DETACHED1]]:
 // CHECK-DAG: %[[TRYSYNCREG1:.+]] = {{.*}}call token @llvm.syncregion.start()
@@ -1311,9 +1312,9 @@ int spawn_trycatch(int a) {
 // CHECK-O0: br label %[[CATCHDISPATCH1:.+]]
 
 // CHECK-O0: [[CATCHDISPATCH1]]:
-// CHECK: br i1 {{.+}}, label %[[CATCH1:.+]], label %[[TASKCLEANUP1:.+]]
+// CHECK-O0: br i1 {{.+}}, label %[[CATCH1:.+]], label %[[TASKCLEANUP1:.+]]
 
-// CHECK: [[CATCH1]]:
+// CHECK-O0: [[CATCH1]]:
 // CHECK: call void @_Z9catchfn_iii(i32 1,
 // CHECK: br label %[[TRYCONT1]]
 
@@ -1322,7 +1323,8 @@ int spawn_trycatch(int a) {
 
 // CHECK: [[CONTINUE1]]:
 // CHECK: %[[TASKFRAME3:.+]] = {{.*}}call token @llvm.taskframe.create()
-// CHECK: detach within %[[SYNCREG]], label %[[DETACHED2:.+]], label %[[CONTINUE2:.+]] unwind label %[[DETUNWIND2:.+]]
+// CHECK-O0: detach within %[[SYNCREG]], label %[[DETACHED2:.+]], label %[[CONTINUE2:.+]] unwind label %[[DETUNWIND2:.+]]
+// CHECK-O1: detach within %[[SYNCREG]], label %[[DETACHED2:.+]], label %[[CONTINUE2:.+]]
 
 // CHECK: [[DETACHED2]]:
 // CHECK-DAG: %[[TRYSYNCREG2:.+]] = {{.*}}call token @llvm.syncregion.start()
@@ -1346,24 +1348,20 @@ int spawn_trycatch(int a) {
 // CHECK-O0: [[TRYSYNCCONT2]]:
 // CHECK-O0-NEXT: br label %[[TRYCONT2:.+]]
 
-// CHECK: [[TASKCLEANUP1]]:
-// CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[DETUNWIND1]]
+// CHECK-O0: [[TASKCLEANUP1]]:
+// CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[DETUNWIND1]]
 
-// CHECK: [[DETUNWIND1]]:
-// CHECK-NEXT: landingpad
-// CHECK-NEXT: cleanup
-// CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME1]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1:.+]]
+// CHECK-O0: [[DETUNWIND1]]:
+// CHECK-O0-NEXT: landingpad
+// CHECK-O0-NEXT: cleanup
+// CHECK-O0: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME1]],
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1:.+]]
 
-// CHECK-O0: [[RESUME1:.+]]:
-// CHECK-O0: resume
-
-// CHECK: [[TFUNWIND1]]:
-// CHECK-NEXT: landingpad
-// CHECK-NEXT: cleanup
-// CHECK-O0: br label %[[RESUME1]]
-// CHECK-O1-NEXT: resume
+// CHECK-O0: [[TFUNWIND1]]:
+// CHECK-O0-NEXT: landingpad
+// CHECK-O0-NEXT: cleanup
+// CHECK-O0: br label %[[RESUME:.+]]
 
 // CHECK: [[LPAD2]]:
 // CHECK-NEXT: landingpad
@@ -1384,9 +1382,9 @@ int spawn_trycatch(int a) {
 // CHECK-O0: br label %[[CATCHDISPATCH2:.+]]
 
 // CHECK-O0: [[CATCHDISPATCH2]]:
-// CHECK: br i1 {{.+}}, label %[[CATCH2:.+]], label %[[TASKCLEANUP2:.+]]
+// CHECK-O0: br i1 {{.+}}, label %[[CATCH2:.+]], label %[[TASKCLEANUP2:.+]]
 
-// CHECK: [[CATCH2]]:
+// CHECK-O0: [[CATCH2]]:
 // CHECK: call void @_Z9catchfn_iii(i32 2,
 // CHECK: br label %[[TRYCONT2]]
 
@@ -1408,24 +1406,23 @@ int spawn_trycatch(int a) {
 // CHECK: [[SYNCCONT2]]:
 // CHECK-NEXT: ret i32 0
 
-// CHECK: [[TASKCLEANUP2]]:
-// CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[DETUNWIND2]]
+// CHECK-O0: [[TASKCLEANUP2]]:
+// CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[DETUNWIND2]]
 
-// CHECK: [[DETUNWIND2]]:
-// CHECK-NEXT: landingpad
-// CHECK-NEXT: cleanup
-// CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND3:.+]]
+// CHECK-O0: [[DETUNWIND2]]:
+// CHECK-O0-NEXT: landingpad
+// CHECK-O0-NEXT: cleanup
+// CHECK-O0: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND3:.+]]
 
-// CHECK-O0: [[RESUME2:.+]]:
+// CHECK-O0: [[TFUNWIND3]]:
+// CHECK-O0-NEXT: landingpad
+// CHECK-O0-NEXT: cleanup
+// CHECK-O0: br label %[[RESUME]]
+
+// CHECK-O0: [[RESUME]]:
 // CHECK-O0: resume
-
-// CHECK: [[TFUNWIND3]]:
-// CHECK-NEXT: landingpad
-// CHECK-NEXT: cleanup
-// CHECK-O0: br label %[[RESUME2]]
-// CHECK-O1-NEXT: resume
 
 // CHECK: [[UNREACHABLE]]:
 // CHECK-NEXT: unreachable

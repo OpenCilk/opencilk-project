@@ -19,14 +19,6 @@
 using namespace clang;
 using namespace CodeGen;
 
-// Stolen from CodeGenFunction.cpp
-static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
-  if (!BB) return;
-  if (!BB->use_empty())
-    return CGF.CurFn->getBasicBlockList().push_back(BB);
-  delete BB;
-}
-
 CodeGenFunction::IsSpawnedScope::IsSpawnedScope(CodeGenFunction *CGF)
     : CGF(CGF), OldIsSpawned(CGF->IsSpawned),
       OldSpawnedCleanup(CGF->SpawnedCleanup) {
@@ -85,20 +77,22 @@ void CodeGenFunction::DetachScope::CreateDetachedEHState() {
   CGF.NormalCleanupDest = Address::invalid();
 }
 
-void CodeGenFunction::DetachScope::RestoreTaskFrameEHState() {
-  EmitIfUsed(CGF, CGF.EHResumeBlock);
+llvm::BasicBlock *CodeGenFunction::DetachScope::RestoreTaskFrameEHState() {
+  llvm::BasicBlock *NestedEHResumeBlock = CGF.EHResumeBlock;
   CGF.EHResumeBlock = TFEHResumeBlock;
   CGF.ExceptionSlot = TFExceptionSlot;
   CGF.EHSelectorSlot = TFEHSelectorSlot;
   CGF.NormalCleanupDest = TFNormalCleanupDest;
+  return NestedEHResumeBlock;
 }
 
-void CodeGenFunction::DetachScope::RestoreParentEHState() {
-  EmitIfUsed(CGF, CGF.EHResumeBlock);
+llvm::BasicBlock *CodeGenFunction::DetachScope::RestoreParentEHState() {
+  llvm::BasicBlock *NestedEHResumeBlock = CGF.EHResumeBlock;
   CGF.EHResumeBlock = OldEHResumeBlock;
   CGF.ExceptionSlot = OldExceptionSlot;
   CGF.EHSelectorSlot = OldEHSelectorSlot;
   CGF.NormalCleanupDest = OldNormalCleanupDest;
+  return NestedEHResumeBlock;
 }
 
 void CodeGenFunction::DetachScope::EnsureTaskFrame() {
@@ -255,7 +249,8 @@ void CodeGenFunction::DetachScope::FinishDetach() {
   }
 
   // Restore the task frame's EH state.
-  RestoreTaskFrameEHState();
+  llvm::BasicBlock *TaskResumeBlock = RestoreTaskFrameEHState();
+  assert(!TaskResumeBlock && "Emission of task produced a resume block");
 
   llvm::BasicBlock *InvokeDest = nullptr;
   if (TempInvokeDest) {
@@ -268,6 +263,7 @@ void CodeGenFunction::DetachScope::FinishDetach() {
       TempInvokeDest = nullptr;
     }
   }
+
   // Emit the continue block.
   CGF.EmitBlock(ContinueBlock);
 
@@ -298,13 +294,28 @@ void CodeGenFunction::DetachScope::FinishDetach() {
   }
 
   // Restore the original EH state.
-  RestoreParentEHState();
+  llvm::BasicBlock *NestedEHResumeBlock = RestoreParentEHState();
 
   if (TempInvokeDest) {
     if (llvm::BasicBlock *InvokeDest = CGF.getInvokeDest()) {
       TempInvokeDest->replaceAllUsesWith(InvokeDest);
     } else
       EmitTrivialLandingPad(CGF, TempInvokeDest);
+  }
+
+  // If invocations in the parallel task led to the creation of EHResumeBlock,
+  // we need to create for outside the task.  In particular, the new
+  // EHResumeBlock must use an ExceptionSlot and EHSelectorSlot allocated
+  // outside of the task.
+  if (NestedEHResumeBlock) {
+    if (!NestedEHResumeBlock->use_empty()) {
+      // Translate the nested EHResumeBlock into an appropriate EHResumeBlock in
+      // the outer scope.
+      NestedEHResumeBlock->replaceAllUsesWith(
+          CGF.getEHResumeBlock(
+              isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
+    }
+    delete NestedEHResumeBlock;
   }
 }
 
@@ -665,12 +676,14 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   // we need to create for outside the task.  In particular, the new
   // EHResumeBlock must use an ExceptionSlot and EHSelectorSlot allocated
   // outside of the task.
-  if (NestedEHResumeBlock && !NestedEHResumeBlock->use_empty()) {
-    // Translate the nested EHResumeBlock into an appropriate EHResumeBlock in
-    // the outer scope.
-    NestedEHResumeBlock->replaceAllUsesWith(
-        getEHResumeBlock(
-            isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
+  if (NestedEHResumeBlock) {
+    if (!NestedEHResumeBlock->use_empty()) {
+      // Translate the nested EHResumeBlock into an appropriate EHResumeBlock in
+      // the outer scope.
+      NestedEHResumeBlock->replaceAllUsesWith(
+          getEHResumeBlock(
+              isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
+    }
     delete NestedEHResumeBlock;
   }
 
