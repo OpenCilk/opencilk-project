@@ -87,23 +87,23 @@ static Instruction *getTaskFrameCreate(BasicBlock *BB) {
 static bool isCanonicalTaskFrameCreate(const Instruction *TFCreate) {
   // If the taskframe.create is not the first instruction, split.
   if (TFCreate != &TFCreate->getParent()->front())
-    return true;
+    return false;
 
   // The taskframe.create is at the front of the block.  Check that we have a
   // single predecessor.
   const BasicBlock *Pred = TFCreate->getParent()->getSinglePredecessor();
   if (!Pred)
-    return true;
+    return false;
 
   // Check that the single predecessor has a single successor.
   if (!Pred->getSingleSuccessor())
-    return true;
+    return false;
 
   // Check whether the single predecessor is terminated with a sync.
   if (isa<SyncInst>(Pred->getTerminator()))
-    return true;
+    return false;
 
-  return false;
+  return true;
 }
 
 /// Returns true if the given instruction performs a taskframe resume, false
@@ -164,7 +164,10 @@ bool Spindle::succInSubTask(const Spindle *Succ) const {
 /// Return the taskframe.create intrinsic at the start of the entry block of
 /// this Spindle, or nullptr if no such intrinsic exists.
 Value *Spindle::getTaskFrameCreate() const {
-  return ::getTaskFrameCreate(getEntry());
+  if (Instruction *TFCreate = ::getTaskFrameCreate(getEntry()))
+    if (isCanonicalTaskFrameCreate(TFCreate))
+      return TFCreate;
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -479,7 +482,7 @@ static bool shouldCreateSpindleAtDetachUnwind(const BasicBlock *MaybeUnwind,
 
 static bool isTaskFrameCreateSpindleEntry(const BasicBlock *B) {
   if (const Instruction *TFCreate = getTaskFrameCreate(B))
-    if (!isCanonicalTaskFrameCreate(TFCreate))
+    if (isCanonicalTaskFrameCreate(TFCreate))
       return true;
   return false;
 }
