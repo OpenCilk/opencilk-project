@@ -1176,10 +1176,11 @@ public:
     }
   };
 
-  /// A sync region is a collection of spawned tasks and syncs such that, based
-  /// on control flow, the sync may wait on the spawned task.  In Cilk, certain
-  /// constructs, such as functions or _Cilk_for loop bodies, use a separate
-  /// sync region to handle spawning and syncing of tasks within that construct.
+  /// A sync region is a collection of spawned tasks and syncs such that syncs
+  /// in the collection may wait on the spawned tasks in the same collection
+  /// (control-flow permitting).  In Cilk, certain constructs, such as functions
+  /// _Cilk_spawn bodies, or _Cilk_for loop bodies, use a separate sync region
+  /// to handle spawning and syncing of tasks within that construct.
   class SyncRegion {
     CodeGenFunction &CGF;
     SyncRegion *ParentRegion;
@@ -1272,8 +1273,8 @@ public:
     }
   };
 
-  /// Testing lifetime-like cleanup for invoking taskframe.end.
-  /// Cleanup to ensure task frame is ended.
+  /// Cleanup to ensure a taskframe is ended with a taskframe.resume on an
+  /// exception-handling path.
   struct CallTaskEnd final : public EHScopeStack::Cleanup {
     llvm::Value *TaskFrame;
   public:
@@ -1301,7 +1302,8 @@ public:
     }
   };
 
-  /// Cleanup to ensure detached task is ended.
+  /// Cleanup to ensure spawned task is ended with a detached.rethrow on an
+  /// exception-handling path.
   struct CallDetRethrow final : public EHScopeStack::Cleanup {
     llvm::Value *SyncRegion;
     llvm::BasicBlock *TempInvokeDest;
@@ -1334,7 +1336,13 @@ public:
     }
   };
 
-  /// RAII object to manage creation of detach/reattach instructions.
+  /// Object to manage creation of spawned tasks using Tapir instructions.
+  ///
+  /// Conceptually, each spawned task corresponds to a detach scope, which gets
+  /// its own copy of specific CodeGenFunction state, such as its own alloca
+  /// insert point and exception-handling state.  In practice, detach scopes
+  /// maintain two scopes for each spawned task: a scope corresponding with the
+  /// taskframe of the task, and a scope for the task itself.
   class DetachScope {
     CodeGenFunction &CGF;
     bool DetachStarted = false;
@@ -1343,22 +1351,35 @@ public:
     llvm::BasicBlock *DetachedBlock = nullptr;
     llvm::BasicBlock *ContinueBlock = nullptr;
 
+    // Pointer to the parent detach scope.
     DetachScope *ParentScope;
 
-    std::unique_ptr<RunCleanupsScope> TaskFrameCleanups = nullptr;
-    std::unique_ptr<RunCleanupsScope> DetRethrowScope = nullptr;
+    // Possible cleanup scope from a child ExprWithCleanups of a CilkSpawnStmt.
+    // We keep track of this scope in order to properly adjust the scope when
+    // the emission of the task itself injects an additional cleanup onto
+    // EHStack.
     RunCleanupsScope *StmtCleanupsScope = nullptr;
 
-    // Old state from the CGF to restore when we're done with the detach.
+    // Old alloca insertion points from the CGF to restore when we're done
+    // emitting the spawned task and associated taskframe.
     llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = nullptr;
+    // Alloca insertion point for the taskframe, which we save and restore
+    // around the emission of the spawned task itself.
     llvm::AssertingVH<llvm::Instruction> TFAllocaInsertPt = nullptr;
+    // A temporary invoke destination, maintained to handle the emission of
+    // detached.rethrow and taskframe.resume intrinsics on exception-handling
+    // paths out of a spawned task or its taskframe.
     llvm::BasicBlock *TempInvokeDest = nullptr;
 
+    // Old EH state from the CGF to restore when we're done emitting the spawned
+    // task and associated taskframe.
     llvm::BasicBlock *OldEHResumeBlock = nullptr;
     llvm::Value *OldExceptionSlot = nullptr;
     llvm::AllocaInst *OldEHSelectorSlot = nullptr;
     Address OldNormalCleanupDest = Address::invalid();
 
+    // EH state for the taskframe, which we save and restore around the emission
+    // of the spawned task itself.
     llvm::BasicBlock *TFEHResumeBlock = nullptr;
     llvm::Value *TFExceptionSlot = nullptr;
     llvm::AllocaInst *TFEHSelectorSlot = nullptr;
@@ -1396,6 +1417,8 @@ public:
       CGF.CurDetachScope = ParentScope;
     }
 
+    // Optionally save the specified cleanups scope, so it can be properly
+    // updated when a spawned task is emitted.
     bool MaybeSaveCleanupsScope(RunCleanupsScope *Scope) {
       if (!StmtCleanupsScope) {
         StmtCleanupsScope = Scope;
@@ -1404,30 +1427,45 @@ public:
       return false;
     }
 
+    // Methods to handle the taskframe associated with the spawned task.
     void EnsureTaskFrame();
     llvm::Value *GetTaskFrame() { return TaskFrame; }
 
+    // Create nested exception-handling state for a taskframe or spawned task.
     void CreateTaskFrameEHState();
     void CreateDetachedEHState();
-    void RestoreTaskFrameEHState();
-    void RestoreParentEHState();
+    // Restore ancestor exception-handling state of a spawned task or taskframe.
+    // Returns a pointer to any EHResumeBlock that was generated during the
+    // emission of the spawned task or taskframe.
+    llvm::BasicBlock *RestoreTaskFrameEHState();
+    llvm::BasicBlock *RestoreParentEHState();
 
+    // Get a temporary destination for an invoke, creating a new one if
+    // necessary.
     llvm::BasicBlock *getTempInvokeDest() {
       if (!TempInvokeDest)
         TempInvokeDest = CGF.createBasicBlock("temp.invoke.dest");
       return TempInvokeDest;
     }
 
+    // Start the spawned task, i.e., by emitting a detach instruction and
+    // setting up nested CGF state.
     void StartDetach();
+    // Returns true if the spawned task has started.
+    bool IsDetachStarted() const { return DetachStarted; }
+    // Push a terminator for the spawned task onto EHStack.
     void PushSpawnedTaskTerminate();
+    // Clean up state for the spawned task.
     void CleanupDetach();
+    // Emit the end of the spawned task, i.e., a reattach.
     void EmitTaskEnd();
+    // Finish the spawned task.
     void FinishDetach();
 
+    // Create a temporary for the spawned task, specifically, before the spawned
+    // task has started.
     Address CreateDetachedMemTemp(QualType Ty, StorageDuration SD,
                                   const Twine &Name = "det.tmp");
-
-    bool IsDetachStarted() const { return DetachStarted; }
   };
 
   /// The current detach scope.
@@ -1461,11 +1499,6 @@ public:
                    size_t OldLifetimeExtendedStackSize,
                    std::initializer_list<llvm::Value **> ValuesToReload = {},
                    bool AfterSync = false);
-
-  void PopCleanupBlocksAndDetach(
-      EHScopeStack::stable_iterator OldCleanupStackSize,
-      size_t OldLifetimeExtendedStackSize,
-      std::initializer_list<llvm::Value **> ValuesToReload = {});
 
   void ResolveBranchFixups(llvm::BasicBlock *Target);
 
