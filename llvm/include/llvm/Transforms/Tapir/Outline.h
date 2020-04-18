@@ -58,6 +58,7 @@ Function *CreateHelper(
     SmallPtrSetImpl<BasicBlock *> *DetachedRethrowBlocks = nullptr,
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries = nullptr,
     const BasicBlock *OldUnwind = nullptr,
+    SmallPtrSetImpl<BasicBlock *> *UnreachableExits = nullptr,
     const Instruction *InputSyncRegion = nullptr,
     Type *ReturnType = nullptr,
     ClonedCodeInfo *CodeInfo = nullptr,
