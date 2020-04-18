@@ -271,6 +271,22 @@ public:
     }
   }
 
+  LandingPadInliningInfo(InvokeInst *TaskFrameResume,
+                         DominatorTree *DT = nullptr)
+      : OuterResumeDest(TaskFrameResume->getUnwindDest()),
+        SpawnerLPad(TaskFrameResume->getLandingPadInst()), DT(DT) {
+    // If there are PHI nodes in the unwind destination block, we need to keep
+    // track of which values came into them from the detach before removing the
+    // edge from this block.
+    BasicBlock *InvokeBB = TaskFrameResume->getParent();
+    BasicBlock::iterator I = OuterResumeDest->begin();
+    for (; isa<PHINode>(I); ++I) {
+      // Save the value to use for this edge.
+      PHINode *PHI = cast<PHINode>(I);
+      UnwindDestPHIValues.push_back(PHI->getIncomingValueForBlock(InvokeBB));
+    }
+  }
+
   /// The outer unwind destination is the target of unwind edges introduced for
   /// calls within the inlined function.
   BasicBlock *getOuterResumeDest() const {
@@ -279,11 +295,13 @@ public:
 
   BasicBlock *getInnerResumeDest();
 
-  /// Forward the 'detached_rethrow' instruction to the spawner's landing pad
-  /// block.  When the landing pad block has only one predecessor, this is a
-  /// simple branch. When there is more than one predecessor, we need to split
-  /// the landing pad block after the landingpad instruction and jump to there.
-  void forwardDetachedRethrow(InvokeInst *DR);
+  /// Forward a task resume - a terminator, such as a detached.rethrow or
+  /// taskframe.resume, marking the exit from a task for exception handling - to
+  /// the spawner's landing pad block.  When the landing pad block has only one
+  /// predecessor, this is a simple branch. When there is more than one
+  /// predecessor, we need to split the landing pad block after the landingpad
+  /// instruction and jump to there.
+  void forwardTaskResume(InvokeInst *TR);
 
   /// Add incoming-PHI values to the unwind destination block for the given
   /// basic block, using the values for the original invoke's source block.
@@ -350,13 +368,15 @@ BasicBlock *LandingPadInliningInfo::getInnerResumeDest() {
   return InnerResumeDest;
 }
 
-/// Forward the 'detached_rethrow' instruction to the spawner's landing pad
-/// block.  When the landing pad block has only one predecessor, this is a
-/// simple branch. When there is more than one predecessor, we need to split the
-/// landing pad block after the landingpad instruction and jump to there.
-void LandingPadInliningInfo::forwardDetachedRethrow(InvokeInst *DR) {
+/// Forward a task resume - a terminator, such as a detached.rethrow or
+/// taskframe.resume, marking the exit from a task for exception handling - to
+/// the spawner's landing pad block.  When the landing pad block has only one
+/// predecessor, this is a simple branch. When there is more than one
+/// predecessor, we need to split the landing pad block after the landingpad
+/// instruction and jump to there.
+void LandingPadInliningInfo::forwardTaskResume(InvokeInst *TR) {
   BasicBlock *Dest = getInnerResumeDest();
-  BasicBlock *Src = DR->getParent();
+  BasicBlock *Src = TR->getParent();
 
   BranchInst::Create(Dest, Src);
   if (DT)
@@ -367,33 +387,33 @@ void LandingPadInliningInfo::forwardDetachedRethrow(InvokeInst *DR) {
   // makes this work.
   addIncomingPHIValuesForInto(Src, Dest);
 
-  InnerEHValuesPHI->addIncoming(DR->getOperand(1), Src);
+  InnerEHValuesPHI->addIncoming(TR->getOperand(1), Src);
 
   // Update the DT
   BasicBlock *NormalDest = nullptr, *UnwindDest = nullptr;
   if (DT) {
-    if (DR->getNormalDest()->getSinglePredecessor()) {
-      NormalDest = DR->getNormalDest();
-      DT->eraseNode(DR->getNormalDest());
+    if (TR->getNormalDest()->getSinglePredecessor()) {
+      NormalDest = TR->getNormalDest();
+      DT->eraseNode(TR->getNormalDest());
     } else
-      DT->deleteEdge(Src, DR->getNormalDest());
+      DT->deleteEdge(Src, TR->getNormalDest());
 
-    if (DR->getUnwindDest()->getSinglePredecessor()) {
-      UnwindDest = DR->getUnwindDest();
-      DT->eraseNode(DR->getUnwindDest());
+    if (TR->getUnwindDest()->getSinglePredecessor()) {
+      UnwindDest = TR->getUnwindDest();
+      DT->eraseNode(TR->getUnwindDest());
     } else
-      DT->deleteEdge(Src, DR->getUnwindDest());
+      DT->deleteEdge(Src, TR->getUnwindDest());
   }
 
-  // Remove the DR
+  // Remove the TR
   if (!NormalDest)
-    for (PHINode &PN : DR->getNormalDest()->phis())
+    for (PHINode &PN : TR->getNormalDest()->phis())
       PN.removeIncomingValue(Src);
   if (!UnwindDest)
-    for (PHINode &PN : DR->getUnwindDest()->phis())
+    for (PHINode &PN : TR->getUnwindDest()->phis())
       PN.removeIncomingValue(Src);
 
-  DR->eraseFromParent();
+  TR->eraseFromParent();
   if (NormalDest)
     NormalDest->eraseFromParent();
   if (UnwindDest)
@@ -421,7 +441,7 @@ static void handleDetachedLandingPads(
 
   // Forward the detached rethrows.
   for (Instruction *DR : DetachedRethrows)
-    DetUnwind.forwardDetachedRethrow(cast<InvokeInst>(DR));
+    DetUnwind.forwardTaskResume(cast<InvokeInst>(DR));
 }
 
 static void cloneEHBlocks(Function *F, Value *SyncRegion,
@@ -534,6 +554,82 @@ static void cloneEHBlocks(Function *F, Value *SyncRegion,
   }
 }
 
+// Helper function to find landingpads in the specified taskframe.
+static void getTaskFrameLandingPads(
+    Value *TaskFrame, Instruction *TaskFrameResume,
+    SmallPtrSetImpl<LandingPadInst *> &InlinedLPads) {
+  const BasicBlock *TaskFrameBB = cast<Instruction>(TaskFrame)->getParent();
+  SmallVector<BasicBlock *, 8> Worklist;
+  SmallPtrSet<BasicBlock *, 8> Visited;
+  // Add the parent of TaskFrameResume to the worklist.
+  Worklist.push_back(TaskFrameResume->getParent());
+
+  while (!Worklist.empty()) {
+    BasicBlock *BB = Worklist.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+
+    // Terminate the search once we encounter the BB where the taskframe is
+    // defined.
+    if (TaskFrameBB == BB)
+      continue;
+
+    // If we find a landingpad, add it to the set.
+    if (BB->isLandingPad())
+      InlinedLPads.insert(BB->getLandingPadInst());
+
+    // Add predecessors to the worklist, but skip any predecessors within nested
+    // tasks or nested taskframes.
+    for (BasicBlock *Pred : predecessors(BB)) {
+      if (isa<ReattachInst>(Pred->getTerminator()) ||
+          isDetachedRethrow(Pred->getTerminator()) ||
+          isTaskFrameResume(Pred->getTerminator()))
+        continue;
+      Worklist.push_back(Pred);
+    }
+  }
+}
+
+// Helper method to handle a given taskframe.resume.
+static void handleTaskFrameResume(Value *TaskFrame,
+                                  Instruction *TaskFrameResume,
+                                  DominatorTree *DT = nullptr) {
+  // Get landingpads to inline.
+  SmallPtrSet<LandingPadInst *, 1> InlinedLPads;
+  getTaskFrameLandingPads(TaskFrame, TaskFrameResume, InlinedLPads);
+
+  InvokeInst *TFR = cast<InvokeInst>(TaskFrameResume);
+  LandingPadInliningInfo TFResumeDest(TFR);
+
+  // Append the clauses from the outer landing pad instruction into the inlined
+  // landing pad instructions.
+  LandingPadInst *OuterLPad = TFR->getLandingPadInst();
+  for (LandingPadInst *InlinedLPad : InlinedLPads) {
+    unsigned OuterNum = OuterLPad->getNumClauses();
+    InlinedLPad->reserveClauses(OuterNum);
+    for (unsigned OuterIdx = 0; OuterIdx != OuterNum; ++OuterIdx)
+      InlinedLPad->addClause(OuterLPad->getClause(OuterIdx));
+    if (OuterLPad->isCleanup())
+      InlinedLPad->setCleanup(true);
+  }
+
+  // Forward the taskframe.resume.
+  TFResumeDest.forwardTaskResume(TFR);
+}
+
+void llvm::InlineTaskFrameResumes(Value *TaskFrame, DominatorTree *DT) {
+  SmallVector<Instruction *, 1> TaskFrameResumes;
+  // Record all taskframe.resume markers that use TaskFrame.
+  for (User *U : TaskFrame->users())
+    if (Instruction *I = dyn_cast<Instruction>(U))
+      if (isTaskFrameResume(I))
+        TaskFrameResumes.push_back(I);
+
+  // Handle all taskframe.resume markers.
+  for (Instruction *TFR : TaskFrameResumes)
+    handleTaskFrameResume(TaskFrame, TFR, DT);
+}
+
 void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
                            BasicBlock *EHContinue, Value *LPadValInEHContinue,
                            SmallVectorImpl<Instruction *> &Reattaches,
@@ -546,6 +642,10 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   BasicBlock *TaskEntry = DI->getDetached();
   BasicBlock *Continue = DI->getContinue();
   Value *SyncRegion = DI->getSyncRegion();
+
+  // If the spawned task has a taskframe, serialize the taskframe.
+  if (Value *TaskFrame = getTaskFrameUsed(TaskEntry))
+    InlineTaskFrameResumes(TaskFrame, DT);
 
   // Clone any EH blocks that need cloning.
   if (EHBlocksToClone) {
