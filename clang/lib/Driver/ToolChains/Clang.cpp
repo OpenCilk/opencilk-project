@@ -4513,13 +4513,30 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Forward flags for Cilk.
   Args.AddLastArg(CmdArgs, options::OPT_fcilkplus);
+  Args.AddLastArg(CmdArgs, options::OPT_fopencilk);
   Args.AddLastArg(CmdArgs, options::OPT_ftapir_EQ);
   if (Args.hasArg(options::OPT_fcilkplus) ||
-      Args.hasArg(options::OPT_ftapir_EQ))
-    if (getToolChain().getTriple().getOS() != llvm::Triple::Linux &&
-        getToolChain().getTriple().getOS() != llvm::Triple::UnknownOS &&
-        !getToolChain().getTriple().isMacOSX())
+      Args.hasArg(options::OPT_fopencilk) ||
+      Args.hasArg(options::OPT_ftapir_EQ)) {
+    auto const &Triple = getToolChain().getTriple();
+
+    // At least one runtime has been implemented for these operating systems.
+    if (!Triple.isOSLinux() && !Triple.isOSFreeBSD() && !Triple.isMacOSX())
       D.Diag(diag::err_drv_cilk_unsupported);
+
+    if (Arg *TapirRuntime = Args.getLastArgNoClaim(options::OPT_ftapir_EQ)) {
+      // Cheetah runtime is x86 only.
+      if (TapirRuntime->getValue() == StringRef("cheetah")) {
+	if (Triple.getArch() != llvm::Triple::x86_64)
+	  D.Diag(diag::err_drv_cilk_unsupported);
+      }
+      // OpenCilk will additionally support 64 bit ARM.
+      if (TapirRuntime->getValue() == StringRef("opencilk")) {
+	if (Triple.getArch() != llvm::Triple::x86_64 && !Triple.isAArch64())
+	  D.Diag(diag::err_drv_cilk_unsupported);
+      }
+    }
+  }
 
   // Forward flags for OpenMP. We don't do this if the current action is an
   // device offloading action other than OpenMP.

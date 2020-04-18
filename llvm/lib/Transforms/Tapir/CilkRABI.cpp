@@ -32,7 +32,8 @@ using namespace llvm;
 #define DEBUG_TYPE "cilkrabi"
 
 enum {
-  __CILKRTS_ABI_VERSION = 1
+  __CILKRTS_ABI_VERSION_CILKR = 1, /* includes Cheetah */
+  __CILKRTS_ABI_VERSION_OPENCILK = 2
 };
 
 enum {
@@ -47,7 +48,6 @@ enum {
   CILK_FRAME_UNWINDING        = 0x10000
 };
 
-#define CILK_FRAME_VERSION (__CILKRTS_ABI_VERSION << 24)
 #define CILK_FRAME_VERSION_MASK  0xFF000000
 #define CILK_FRAME_FLAGS_MASK    0x00FFFFFF
 #define CILK_FRAME_VERSION_VALUE(_flags) (((_flags) & CILK_FRAME_VERSION_MASK) >> 24)
@@ -64,33 +64,93 @@ enum {
 
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
 
-CilkRABI::CilkRABI(Module &M) : TapirTarget(M) {
+CilkRABI::CilkRABI(Module &M, bool OpenCilk)
+  : TapirTarget(M),
+    FrameVersion(OpenCilk ?
+                 __CILKRTS_ABI_VERSION_OPENCILK :
+                 __CILKRTS_ABI_VERSION_CILKR)
+{
   LLVMContext &C = M.getContext();
   Type *VoidPtrTy = Type::getInt8PtrTy(C);
   Type *Int32Ty = Type::getInt32Ty(C);
   Type *Int16Ty = Type::getInt16Ty(C);
 
   // Get or create local definitions of Cilk RTS structure types.
-  StackFrameTy = StructType::lookupOrCreate(C, "struct.__cilkrts_stack_frame");
+  const char *StackFrameName;
+  if (OpenCilk) {
+    StackFrameName = "struct.__opencilk_stack_frame";
+  }
+  else {
+    StackFrameName = "struct.__cilkrts_stack_frame";
+  }
+  StackFrameTy = StructType::lookupOrCreate(C, StackFrameName);
   WorkerTy = StructType::lookupOrCreate(C, "struct.__cilkrts_worker");
 
-  if (StackFrameTy->isOpaque())
-    StackFrameTy->setBody(Int32Ty, // flags
-                          PointerType::getUnqual(StackFrameTy), // call_parent
-                          PointerType::getUnqual(WorkerTy), // worker
-                          // VoidPtrTy, // except_data
-                          ArrayType::get(VoidPtrTy, 5), // ctx
-                          Int32Ty, // mxcsr
-                          Int16Ty, // fpcsr
-                          Int16Ty, // reserved
-                          Int32Ty // magic
-                          );
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
+  ArrayType *ContextTy = ArrayType::get(VoidPtrTy, 5);
+
+  if (OpenCilk) {
+    Triple T(M.getTargetTriple());
+    if (T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64) {
+      if (StackFrameTy->isOpaque())
+        StackFrameTy->setBody(Int32Ty, // flags
+                              Int32Ty, // magic
+                              StackFramePtrTy, // call_parent
+                              WorkerPtrTy, // worker
+                              // VoidPtrTy, // except_data
+                              ContextTy, // ctx
+                              Int32Ty // mxcsr only
+                              );
+      StackFrameFieldFlags = 0;
+      StackFrameFieldParent = 2;
+      StackFrameFieldWorker = 3;
+      StackFrameFieldContext = 4;
+      StackFrameFieldMXCSR = 5;
+      StackFrameFieldFPCSR = -1;
+    }
+    else {
+      if (StackFrameTy->isOpaque())
+        StackFrameTy->setBody(Int32Ty, // flags
+                              Int32Ty, // magic
+                              StackFramePtrTy, // call_parent
+                              WorkerPtrTy, // worker
+                              // VoidPtrTy, // except_data
+                              ContextTy // ctx
+                              );
+      StackFrameFieldFlags = 0;
+      StackFrameFieldParent = 2;
+      StackFrameFieldWorker = 3;
+      StackFrameFieldContext = 4;
+      StackFrameFieldMXCSR = -1;
+      StackFrameFieldFPCSR = -1;
+    }
+  } else {
+    if (StackFrameTy->isOpaque())
+      StackFrameTy->setBody(Int32Ty, // flags
+                            StackFramePtrTy, // call_parent
+                            WorkerPtrTy, // worker
+                            // VoidPtrTy, // except_data
+                            ContextTy, // ctx
+                            Int32Ty, // mxcsr
+                            Int16Ty, // fpcsr
+                            Int16Ty, // reserved
+                            Int32Ty // magic
+                            );
+    StackFrameFieldFlags = 0;
+    StackFrameFieldParent = 1;
+    StackFrameFieldWorker = 2;
+    StackFrameFieldContext = 3;
+    StackFrameFieldMXCSR = 4;
+    StackFrameFieldFPCSR = 5;
+  }
+
+  PointerType *StackFramePtrPtrTy = PointerType::getUnqual(StackFramePtrTy);
   if (WorkerTy->isOpaque())
-    WorkerTy->setBody(PointerType::getUnqual(StackFramePtrTy), // tail
-                      PointerType::getUnqual(StackFramePtrTy), // head
-                      PointerType::getUnqual(StackFramePtrTy), // exc
-                      PointerType::getUnqual(StackFramePtrTy), // ltq_limit
+    WorkerTy->setBody(StackFramePtrPtrTy, // tail
+                      StackFramePtrPtrTy, // head
+                      StackFramePtrPtrTy, // exc
+                      StackFramePtrPtrTy, // ltq_limit
                       Int32Ty, // self
                       VoidPtrTy, // g
                       VoidPtrTy, // l
@@ -122,11 +182,15 @@ FunctionCallee CilkRABI::Get__cilkrts_leave_frame() {
   if (CilkRTSLeaveFrame)
     return CilkRTSLeaveFrame;
 
+  const char *name = "__cilkrts_leave_frame";
+  if (FrameVersion == __CILKRTS_ABI_VERSION_OPENCILK) {
+    name = "__opencilk_leave_frame";
+  }
+
   LLVMContext &C = M.getContext();
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSLeaveFrame = M.getOrInsertFunction("__cilkrts_leave_frame", VoidTy,
-                                            StackFramePtrTy);
+  CilkRTSLeaveFrame = M.getOrInsertFunction(name, VoidTy, StackFramePtrTy);
 
   return CilkRTSLeaveFrame;
 }
@@ -235,23 +299,28 @@ static Value *LoadSTyField(
 /// Emit inline assembly code to save the floating point state, for x86 Only.
 void CilkRABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
   LLVMContext &C = B.getContext();
-  FunctionType *FTy =
-    FunctionType::get(Type::getVoidTy(C),
-                      {PointerType::getUnqual(Type::getInt32Ty(C)),
-                       PointerType::getUnqual(Type::getInt16Ty(C))},
-                      false);
-
-  Value *Asm = InlineAsm::get(FTy,
-                              "stmxcsr $0\n\t" "fnstcw $1",
-                              "*m,*m,~{dirflag},~{fpsr},~{flags}",
-                              /*sideeffects*/ true);
-
-  Value *Args[2] = {
-    GEP(B, SF, StackFrameFields::mxcsr),
-    GEP(B, SF, StackFrameFields::fpcsr)
-  };
-
-  B.CreateCall(Asm, Args);
+  if (StackFrameFieldMXCSR >= 0) {
+    FunctionType *FTy =
+      FunctionType::get(Type::getVoidTy(C),
+			{PointerType::getUnqual(Type::getInt32Ty(C))},
+			false);
+    Value *Asm = InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
+    Value *Args[1] = {
+      GEP(B, SF, StackFrameFieldMXCSR),
+    };
+    B.CreateCall(Asm, Args);
+  }
+  if (StackFrameFieldFPCSR >= 0) {
+    FunctionType *FTy =
+      FunctionType::get(Type::getVoidTy(C),
+			{PointerType::getUnqual(Type::getInt16Ty(C))},
+			false);
+    Value *Asm = InlineAsm::get(FTy, "fnstcw $0", "*m", /*sideeffects*/ true);
+    Value *Args[1] = {
+      GEP(B, SF, StackFrameFieldFPCSR)
+    };
+    B.CreateCall(Asm, Args);
+  }
 }
 
 /// Helper to find a function with the given name, creating it if it doesn't
@@ -285,7 +354,7 @@ CallInst *CilkRABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
 
   // Get the buffer to store program state
   // Buffer is a void**.
-  Value *Buf = GEP(B, SF, StackFrameFields::ctx);
+  Value *Buf = GEP(B, SF, StackFrameFieldContext);
 
   // Store the frame pointer in the 0th slot
   Value *FrameAddr =
@@ -340,24 +409,30 @@ Function *CilkRABI::Get__cilkrts_pop_frame() {
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
   IRBuilder<> B(Entry);
 
+  // TODO(jfc): Relaxed memory order is probably allowed for all
+  // operations here.  All communication with other threads is
+  // gated by the Dekker protocol which has a store-load memory barrier.
+  // The compiler does need to be aware that values of the apparently
+  // local stack frame can not be saved in registers across calls that
+  // might cause the frame to be stolen.
   // sf->worker->current_stack_frame = sf->call_parent;
   StoreSTyField(B, DL, WorkerTy,
                 LoadSTyField(B, DL, StackFrameTy, SF,
-                             StackFrameFields::call_parent,
+                             StackFrameFieldParent,
                              /*isVolatile=*/false,
-                             AtomicOrdering::NotAtomic),
+                             AtomicOrdering::Unordered),
                 LoadSTyField(B, DL, StackFrameTy, SF,
-                             StackFrameFields::worker,
+                             StackFrameFieldWorker,
                              /*isVolatile=*/false,
-                             AtomicOrdering::Acquire),
-                WorkerFields::current_stack_frame,
+                             AtomicOrdering::Unordered),
+                WorkerFieldFrame,
                 /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                AtomicOrdering::Unordered);
 
   // sf->call_parent = nullptr;
   StoreSTyField(B, DL, StackFrameTy,
                 Constant::getNullValue(PointerType::getUnqual(StackFrameTy)),
-                SF, StackFrameFields::call_parent, /*isVolatile=*/false,
+                SF, StackFrameFieldParent, /*isVolatile=*/false,
                 AtomicOrdering::Release);
 
   B.CreateRetVoid();
@@ -406,41 +481,42 @@ Function *CilkRABI::Get__cilkrts_detach() {
 
   // struct __cilkrts_worker *w = sf->worker;
   Value *W = LoadSTyField(B, DL, StackFrameTy, SF,
-                          StackFrameFields::worker, /*isVolatile=*/false,
-                          AtomicOrdering::NotAtomic);
+                          StackFrameFieldWorker, /*isVolatile=*/false,
+                          AtomicOrdering::Unordered);
 
   // __cilkrts_stack_frame *parent = sf->call_parent;
   Value *Parent = LoadSTyField(B, DL, StackFrameTy, SF,
-                               StackFrameFields::call_parent,
+                               StackFrameFieldParent,
                                /*isVolatile=*/false,
-                               AtomicOrdering::NotAtomic);
-
-  // __cilkrts_stack_frame *volatile *tail = w->tail;
-  Value *Tail = LoadSTyField(B, DL, WorkerTy, W,
-                             WorkerFields::tail, /*isVolatile=*/false,
-                             AtomicOrdering::Acquire);
-
-  // StoreStore_fence();
-  B.CreateFence(AtomicOrdering::Release);
-
-  // *tail++ = parent;
-  B.CreateStore(Parent, Tail, /*isVolatile=*/true);
-  Tail = B.CreateConstGEP1_32(Tail, 1);
-
-  // w->tail = tail;
-  StoreSTyField(B, DL, WorkerTy, Tail, W, WorkerFields::tail,
-                /*isVolatile=*/false, AtomicOrdering::Release);
+                               AtomicOrdering::Unordered);
 
   // sf->flags |= CILK_FRAME_DETACHED;
   {
+    // This change is not visible until the store-with-release of tail.
+    // It may not even need to be volatile.
     Value *F = LoadSTyField(B, DL, StackFrameTy, SF,
-                            StackFrameFields::flags, /*isVolatile=*/false,
-                            AtomicOrdering::Acquire);
+                            StackFrameFieldFlags, /*isVolatile=*/false,
+                            AtomicOrdering::Unordered);
     F = B.CreateOr(F, ConstantInt::get(F->getType(), CILK_FRAME_DETACHED));
     StoreSTyField(B, DL, StackFrameTy, F, SF,
-                  StackFrameFields::flags, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+                  StackFrameFieldFlags, /*isVolatile=*/true,
+                  AtomicOrdering::Unordered);
   }
+
+  // __cilkrts_stack_frame *volatile *tail = w->tail;
+  Value *Tail = LoadSTyField(B, DL, WorkerTy, W,
+                             WorkerFieldTail, /*isVolatile=*/false,
+                             AtomicOrdering::Unordered);
+
+  // *tail++ = parent;
+  B.CreateStore(Parent, Tail, /*isVolatile=*/false);
+  Tail = B.CreateConstGEP1_32(Tail, 1);
+
+  // This store has release ordering to ensure the store above
+  // completes before it is published by incrementing tail.
+  // w->tail = tail;
+  StoreSTyField(B, DL, WorkerTy, Tail, W, WorkerFieldTail,
+                /*isVolatile=*/false, AtomicOrdering::Release);
 
   B.CreateRetVoid();
 
@@ -498,10 +574,13 @@ Function *CilkRABI::GetCilkSyncFn() {
   {
     IRBuilder<> B(Entry);
 
+    // JFC: I removed Acquire here.  The runtime has a fence in any path
+    // between setting and reading the bit.  The compiler should know that
+    // memory changes at the setjmp that precedes this test.
     // if (sf->flags & CILK_FRAME_UNSYNCHED)
     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
+                                StackFrameFieldFlags, /*isVolatile=*/false,
+                                AtomicOrdering::Unordered);
     Flags = B.CreateAnd(Flags,
                         ConstantInt::get(Flags->getType(),
                                          CILK_FRAME_UNSYNCHED));
@@ -535,7 +614,7 @@ Function *CilkRABI::GetCilkSyncFn() {
   //   IRBuilder<> B(Excepting);
   //   if (Rethrow) {
   //     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-  //                                 StackFrameFields::flags,
+  //                                 StackFrameFieldFlags,
   //                                 /*isVolatile=*/false,
   //                                 AtomicOrdering::Acquire);
   //     Flags = B.CreateAnd(Flags,
@@ -702,10 +781,10 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
   //   // w = __cilkrts_bind_thread_1();
   //   Wslow = B.CreateCall(CILKRTS_FUNC(bind_thread_1));
   //   // sf->flags = CILK_FRAME_LAST | CILK_FRAME_VERSION;
-  //   Type *Ty = SFTy->getElementType(StackFrameFields::flags);
+  //   Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
   //   StoreSTyField(B, DL, StackFrameTy,
   //                 ConstantInt::get(Ty, CILK_FRAME_LAST | CILK_FRAME_VERSION),
-  //                 SF, StackFrameFields::flags, /*isVolatile=*/false,
+  //                 SF, StackFrameFieldFlags, /*isVolatile=*/false,
   //                 AtomicOrdering::Release);
   //   B.CreateBr(Cont);
   // }
@@ -713,11 +792,11 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
   {
     IRBuilder<> B(FastPath);
     // sf->flags = CILK_FRAME_VERSION;
-    Type *Ty = SFTy->getElementType(StackFrameFields::flags);
+    Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
     StoreSTyField(B, DL, StackFrameTy,
-                  ConstantInt::get(Ty, CILK_FRAME_VERSION),
-                  SF, StackFrameFields::flags, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+                  ConstantInt::get(Ty, FrameVersion << 24),
+                  SF, StackFrameFieldFlags, /*isVolatile=*/false,
+                  AtomicOrdering::Unordered);
     B.CreateBr(Cont);
   }
   // Block  (Cont)
@@ -731,18 +810,18 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
     // sf->call_parent = w->current_stack_frame;
     StoreSTyField(B, DL, StackFrameTy,
                   LoadSTyField(B, DL, WorkerTy, Wkr,
-                               WorkerFields::current_stack_frame,
+                               WorkerFieldFrame,
                                /*isVolatile=*/false,
-                               AtomicOrdering::Acquire),
-                  SF, StackFrameFields::call_parent, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+                               AtomicOrdering::Unordered),
+                  SF, StackFrameFieldParent, /*isVolatile=*/false,
+                  AtomicOrdering::Unordered);
     // sf->worker = w;
     StoreSTyField(B, DL, StackFrameTy, Wkr, SF,
-                  StackFrameFields::worker, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+                  StackFrameFieldWorker, /*isVolatile=*/false,
+                  AtomicOrdering::Unordered);
     // w->current_stack_frame = sf;
     StoreSTyField(B, DL, WorkerTy, SF, Wkr,
-                  WorkerFields::current_stack_frame, /*isVolatile=*/false,
+                  WorkerFieldFrame, /*isVolatile=*/false,
                   AtomicOrdering::Release);
 
     B.CreateRetVoid();
@@ -796,28 +875,26 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
     W = B.CreateCall(CILKRTS_FUNC(get_tls_worker));
 
   StructType *SFTy = StackFrameTy;
-  Type *Ty = SFTy->getElementType(StackFrameFields::flags);
+  Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
 
   // sf->flags = CILK_FRAME_VERSION;
   StoreSTyField(B, DL, StackFrameTy,
-                ConstantInt::get(Ty, CILK_FRAME_VERSION),
-                SF, StackFrameFields::flags, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                ConstantInt::get(Ty, FrameVersion << 24),
+                SF, StackFrameFieldFlags, /*isVolatile=*/false,
+                AtomicOrdering::Unordered);
   // sf->call_parent = w->current_stack_frame;
   StoreSTyField(B, DL, StackFrameTy,
                 LoadSTyField(B, DL, WorkerTy, W,
-                             WorkerFields::current_stack_frame,
+                             WorkerFieldFrame,
                              /*isVolatile=*/false,
-                             AtomicOrdering::Acquire),
-                SF, StackFrameFields::call_parent, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                             AtomicOrdering::Unordered),
+                SF, StackFrameFieldParent, /*isVolatile=*/false,
+                AtomicOrdering::Unordered);
   // sf->worker = w;
-  StoreSTyField(B, DL, StackFrameTy, W, SF,
-                StackFrameFields::worker, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+  StoreSTyField(B, DL, StackFrameTy, W, SF, StackFrameFieldWorker,
+                /*isVolatile=*/false, AtomicOrdering::Unordered);
   // w->current_stack_frame = sf;
-  StoreSTyField(B, DL, WorkerTy, SF, W,
-                WorkerFields::current_stack_frame, /*isVolatile=*/false,
+  StoreSTyField(B, DL, WorkerTy, SF, W, WorkerFieldFrame, /*isVolatile=*/false,
                 AtomicOrdering::Release);
 
   B.CreateRetVoid();
@@ -865,12 +942,14 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     // __cilkrts_pop_frame(sf)
     B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
 
+    // JFC: I removed AtomicOrdering::Acquire here.  If flags have been
+    // changed at least one change was in this function.
     // if (sf->flags != CILK_FRAME_VERSION)
     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
+                                StackFrameFieldFlags, /*isVolatile=*/false,
+                                AtomicOrdering::Unordered);
     Value *Cond = B.CreateICmpNE(
-        Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_VERSION));
+        Flags, ConstantInt::get(Flags->getType(), FrameVersion << 24));
     B.CreateCondBr(Cond, B1, Exit);
   }
 
@@ -1003,22 +1082,22 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
       //   sf.flags = sf.flags | CILK_FRAME_EXCEPTING;
       //   sf.except_data = Exn;
       // */
-      //IRBuilder<> B(RI);
-      //Value *Exn = AtExit->CreateExtractValue(RI->getValue(),
-      //                                        ArrayRef<unsigned>(0));
-      //Value *Flags = LoadSTyField(*AtExit, DL, StackFrameTy, SF,
-      //                            StackFrameFields::flags,
-      //                            /*isVolatile=*/false,
-      //                            AtomicOrdering::Acquire);
-      //Flags = AtExit->CreateOr(Flags,
-      //                         ConstantInt::get(Flags->getType(),
-      //                                          CILK_FRAME_EXCEPTING));
-      //StoreSTyField(*AtExit, DL, StackFrameTy, Flags, SF,
-      //              StackFrameFields::flags, /*isVolatile=*/false,
-      //              AtomicOrdering::Release);
-      //StoreSTyField(*AtExit, DL, StackFrameTy, Exn, SF,
-      //              StackFrameFields::except_data, /*isVolatile=*/false,
-      //              AtomicOrdering::Release);
+      // IRBuilder<> B(RI);
+      // Value *Exn = AtExit->CreateExtractValue(RI->getValue(),
+      //                                         ArrayRef<unsigned>(0));
+      // Value *Flags = LoadSTyField(*AtExit, DL, StackFrameTy, SF,
+      //                             StackFrameFieldFlags,
+      //                             /*isVolatile=*/false,
+      //                             AtomicOrdering::Acquire);
+      // Flags = AtExit->CreateOr(Flags,
+      //                          ConstantInt::get(Flags->getType(),
+      //                                           CILK_FRAME_EXCEPTING));
+      // StoreSTyField(*AtExit, DL, StackFrameTy, Flags, SF,
+      //               StackFrameFieldFlags, /*isVolatile=*/false,
+      //               AtomicOrdering::Release);
+      // StoreSTyField(*AtExit, DL, StackFrameTy, Exn, SF,
+      //               StackFrameFields::except_data, /*isVolatile=*/false,
+      //               AtomicOrdering::Release);
       /*
         __cilkrts_pop_frame(&sf);
         if (sf->flags)

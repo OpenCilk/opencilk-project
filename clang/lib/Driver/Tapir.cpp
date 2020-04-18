@@ -28,6 +28,8 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
   if (!Args.hasArg(options::OPT_ftapir_EQ)) {
     if (Args.hasArg(options::OPT_fcilkplus))
       return TapirTargetID::Cilk;
+    if (Args.hasArg(options::OPT_fopencilk))
+      return TapirTargetID::OpenCilk;
     return TapirTargetID::None;
   }
 
@@ -40,6 +42,8 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       .Case("cheetah", TapirTargetID::Cheetah)
       .Case("cilk", TapirTargetID::Cilk)
       .Case("cilkr", TapirTargetID::CilkR)
+      .Case("cheetah", TapirTargetID::Cheetah)
+      .Case("opencilk", TapirTargetID::OpenCilk)
       .Case("cuda", TapirTargetID::Cuda)
       .Case("openmp", TapirTargetID::OpenMP)
       .Case("qthreads", TapirTargetID::Qthreads)
