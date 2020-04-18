@@ -1083,7 +1083,8 @@ static bool needToSplitTaskFrameCreate(Instruction *TFCreate) {
 
 /// Split blocks in function F containing taskframe.create calls to canonicalize
 /// the representation of Tapir taskframes in F.
-bool llvm::splitTaskFrameCreateBlocks(Function &F) {
+bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
+                                      TaskInfo *TI) {
   if (F.empty())
     return false;
 
@@ -1125,9 +1126,13 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F) {
   for (Instruction *I : TFCreateToSplit)
     if (needToSplitTaskFrameCreate(I)) {
       LLVM_DEBUG(dbgs() << "Splitting at " << *I << "\n");
-      SplitBlock(I->getParent(), I);
+      SplitBlock(I->getParent(), I, DT);
       Changed = true;
     }
+
+  // Recalculate TaskInfo if necessary.
+  if (Changed && DT && TI)
+    TI->recalculate(F, *DT);
 
   return Changed;
 }
