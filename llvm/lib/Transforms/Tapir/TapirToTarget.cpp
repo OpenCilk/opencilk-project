@@ -287,6 +287,7 @@ void TapirToTargetImpl::processFunction(
   // Get the necessary analysis results.
   DominatorTree &DT = GetDT(F);
   TaskInfo &TI = GetTI(F);
+  splitTaskFrameCreateBlocks(F, &DT, &TI);
   TI.findTaskFrameSubtasks();
   AssumptionCache &AC = GetAC(F);
 
@@ -353,8 +354,10 @@ bool TapirToTargetImpl::run() {
     // Process the next function.
     Function *F = WorkList.pop_back_val();
     SmallVector<Function *, 4> NewHelpers;
+
     processFunction(*F, NewHelpers);
     Changed |= !NewHelpers.empty();
+
     // Check the generated helper functions to see if any need to be processed,
     // that is, to see if any of them themselves detach a subtask.
     for (Function *Helper : NewHelpers)
