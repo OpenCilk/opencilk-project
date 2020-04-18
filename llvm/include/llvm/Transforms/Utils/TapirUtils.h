@@ -114,7 +114,8 @@ Value *getTaskFrameUsed(BasicBlock *Detached);
 /// splitTaskFrameCreateBlocks - Split basic blocks in function F at
 /// taskframe.create intrinsics.  Returns true if anything changed, false
 /// otherwise.
-bool splitTaskFrameCreateBlocks(Function &F);
+bool splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT = nullptr,
+                                TaskInfo *TI = nullptr);
 
 /// fixupTaskFrameExternalUses - Fix any uses of variables defined in
 /// taskframes, but outside of tasks themselves.  For each such variable, insert
