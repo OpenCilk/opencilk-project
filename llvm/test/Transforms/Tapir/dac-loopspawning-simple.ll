@@ -62,8 +62,7 @@ pfor.detach:                                      ; preds = %pfor.detach.prehead
 ; CHECK-NEXT: br label %[[DACSTART]]
   %i.06 = phi i32 [ %inc, %pfor.inc ], [ 0, %pfor.detach.preheader ]
   detach within %syncreg, label %pfor.body, label %pfor.inc
-; CHECK: sync within [[NEWSYNCREG]]
-; CHECL: pfor.detach.ls1:
+; CHECK: pfor.detach.ls1:
 ; CHECK: br label %pfor.body.ls1
 
 pfor.body:                                        ; preds = %pfor.detach
@@ -81,6 +80,8 @@ pfor.inc:                                         ; preds = %pfor.body, %pfor.de
   %exitcond = icmp eq i32 %inc, %n
 ; CHECK: br i1 [[LOCALCMP]]
   br i1 %exitcond, label %pfor.cond.cleanup.loopexit, label %pfor.detach, !llvm.loop !1
+
+; CHECK: sync within [[NEWSYNCREG]]
 }
 
 declare void @bar(i32) local_unnamed_addr #1
