@@ -342,7 +342,7 @@ Function *llvm::CreateHelper(
       Header->getContext(), OldEntry->getName()+NameSuffix, NewFunc);
   // The new function also needs an exit node.
   BasicBlock *NewExit = BasicBlock::Create(
-      Header->getContext(), OldExit->getName()+NameSuffix, NewFunc);
+      Header->getContext(), OldExit->getName()+NameSuffix);
 
   // Add mappings to the NewEntry and NewExit.
   VMap[OldEntry] = NewEntry;
@@ -352,7 +352,7 @@ Function *llvm::CreateHelper(
   // Create a new unwind destination for the cloned blocks if it's needed.
   if (OldUnwind) {
     NewUnwind = BasicBlock::Create(
-        NewFunc->getContext(), OldUnwind->getName()+NameSuffix, NewFunc);
+        NewFunc->getContext(), OldUnwind->getName()+NameSuffix);
     VMap[OldUnwind] = NewUnwind;
   }
 
@@ -373,6 +373,7 @@ Function *llvm::CreateHelper(
 
   // Add a branch in the new function to the cloned Header.
   BranchInst::Create(cast<BasicBlock>(VMap[Header]), NewEntry);
+  NewExit->insertInto(NewFunc);
   // Add a return in the new function, with a default null value if necessary.
   if (VoidRet)
     ReturnInst::Create(Header->getContext(), NewExit);
@@ -383,6 +384,7 @@ Function *llvm::CreateHelper(
   // If needed, create a landingpad and resume for the unwind destination in the
   // new function.
   if (OldUnwind) {
+    NewUnwind->insertInto(NewFunc);
     LandingPadInst *LPad =
       LandingPadInst::Create(OldUnwind->getLandingPadInst()->getType(), 0,
                              "lpadval", NewUnwind);
