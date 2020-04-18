@@ -4,8 +4,8 @@
 ; Credit to Tim Kaler for producing the source code that inspired this test
 ; case.
 ;
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -S | FileCheck %s
-; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg,instcombine)' -S | FileCheck %s
+; RUN: opt < %s -loop-spawning-ti -S | FileCheck %s
+; RUN: opt < %s -passes='loop-spawning' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -137,7 +137,7 @@ pfor.detach.lr.ph:                                ; preds = %invoke.cont4
   br label %pfor.detach
 ; CHECK: {{^pfor.detach.lr.ph:}}
 ; CHECK: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(i64 0
-; CHECK-NEXT: to label %sync.continue87 unwind label %lpad80.loopexit
+; CHECK-NEXT: to label %pfor.cond.cleanup.loopexit unwind label %lpad80.loopexit
 
 pfor.cond.cleanup.loopexit:                       ; preds = %pfor.inc78
   br label %pfor.cond.cleanup
@@ -1098,8 +1098,10 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 ; CHECK: {{^.split}}:
 ; CHECK-NEXT: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach29.ls2(i64
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LSUNWIND:.+]]
-; CHECK: [[DUNWIND]]:
 ; CHECK: sync within %[[SYNCREG]]
+; CHECK: ret void
+; CHECK: [[DUNWIND]]:
+; CHECK: resume
 ; CHECK: [[LSUNWIND]]:
 ; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad [[LPADTYPE:.+]]
 ; CHECK-NEXT: cleanup
@@ -1112,10 +1114,12 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 ; CHECK: {{^.split:}}
 ; CHECK-NEXT: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(i64
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LSUNWIND:.+]]
-; CHECK: [[DUNWIND]]:
-; CHECK: sync within %[[SYNCREG]]
 ; CHECK: {{^pfor.detach29.preheader.ls1:}}
 ; CHECK: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach29.ls2(i64 0,
+; CHECK: sync within %[[SYNCREG]]
+; CHECK: ret void
+; CHECK: [[DUNWIND]]:
+; CHECK resume
 ; CHECK: [[LSUNWIND]]:
 ; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad [[LPADTYPE:.+]]
 ; CHECK-NEXT: cleanup

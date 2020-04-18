@@ -168,9 +168,10 @@ void llvm::CloneIntoFunction(
                        TimePassesIsEnabled);
   for (const BasicBlock *BB : Blocks) {
     BasicBlock *CBB = cast<BasicBlock>(VMap[BB]);
+    LLVM_DEBUG(dbgs() << "In block " << CBB->getName() << "\n");
     // Loop over all instructions, fixing each one as we find it...
     for (Instruction &II : *CBB) {
-      LLVM_DEBUG(dbgs() << "Remapping " << II << "\n");
+      LLVM_DEBUG(dbgs() << "  Remapping " << II << "\n");
       RemapInstruction(&II, VMap,
                        ModuleLevelChanges ? RF_None : RF_NoModuleLevelChanges,
                        TypeMapper, Materializer);
@@ -192,7 +193,9 @@ Function *llvm::CreateHelper(
     SmallPtrSetImpl<BasicBlock *> *ReattachBlocks,
     SmallPtrSetImpl<BasicBlock *> *DetachRethrowBlocks,
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries,
-    const BasicBlock *OldUnwind, const Instruction *InputSyncRegion,
+    const BasicBlock *OldUnwind,
+    SmallPtrSetImpl<BasicBlock *> *UnreachableExits,
+    const Instruction *InputSyncRegion,
     Type *ReturnType, ClonedCodeInfo *CodeInfo,
     ValueMapTypeRemapper *TypeMapper, ValueMaterializer *Materializer) {
   LLVM_DEBUG(dbgs() << "inputs: " << Inputs.size() << "\n");
@@ -366,6 +369,16 @@ Function *llvm::CreateHelper(
     VMap[InputSyncRegion] = NewSR;
   }
 
+  // Create an new unreachable exit block, if needed.
+  BasicBlock *NewUnreachable = nullptr;
+  if (UnreachableExits && !UnreachableExits->empty()) {
+    NewUnreachable = BasicBlock::Create(
+        NewFunc->getContext(), "unreachable"+NameSuffix);
+    new UnreachableInst(NewFunc->getContext(), NewUnreachable);
+    for (BasicBlock *Unreachable : *UnreachableExits)
+      VMap[Unreachable] = NewUnreachable;
+  }
+
   // Clone Blocks into the new function.
   CloneIntoFunction(NewFunc, OldFunc, Blocks, VMap, ModuleLevelChanges,
                     Returns, NameSuffix, ReattachBlocks, DetachRethrowBlocks,
@@ -391,6 +404,10 @@ Function *llvm::CreateHelper(
     LPad->setCleanup(true);
     ResumeInst::Create(LPad, NewUnwind);
   }
+
+  // If needed, add the new unreachable destination.
+  if (NewUnreachable)
+    NewUnreachable->insertInto(NewFunc);
 
   return NewFunc;
 }
