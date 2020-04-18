@@ -45,6 +45,10 @@ bool ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
 bool MoveStaticAllocasInBlock(BasicBlock *Entry, BasicBlock *Block,
                               SmallVectorImpl<Instruction *> &ExitPoints);
 
+/// Inline any taskframe.resume markers associated with the given taskframe.  If
+/// \p DT is provided, then it will be updated to reflect the CFG changes.
+void InlineTaskFrameResumes(Value *TaskFrame, DominatorTree *DT = nullptr);
+
 /// Serialize the detach DI.  \p ParentEntry should be the entry block of the
 /// task that contains DI.  \p Reattaches, \p InlinedLPads, and \p
 /// DetachedRethrows identify the reattaches, landing pads, and detached
