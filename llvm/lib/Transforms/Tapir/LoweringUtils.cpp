@@ -574,7 +574,7 @@ Function *llvm::createHelperForTask(
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
   Helper =
-    CreateHelper(Args, Outputs, TaskBlocks, Header,Entry, DI->getContinue(),
+    CreateHelper(Args, Outputs, TaskBlocks, Header, Entry, DI->getContinue(),
                  VMap, DestM, F.getSubprogram() != nullptr, Returns,
                  NameSuffix.str(), &ReattachBlocks,
                  &DetachedRethrowBlocks, &SharedEHEntries, nullptr,
