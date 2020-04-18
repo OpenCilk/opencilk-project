@@ -38,10 +38,10 @@ bool isTaskFrameResume(const Instruction *I, const Value *TaskFrame = nullptr);
 bool ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
                            DominatorTree *DT = nullptr);
 
-// Move static allocas in Block into Entry, which is assumed to dominate
-// Block.  Leave lifetime markers behind in Block and before each instruction in
-// ExitPoints for those static allocas.  Returns true if Block still contains
-// dynamic allocas, which cannot be moved.
+/// Move static allocas in Block into Entry, which is assumed to dominate Block.
+/// Leave lifetime markers behind in Block and before each instruction in
+/// ExitPoints for those static allocas.  Returns true if Block still contains
+/// dynamic allocas, which cannot be moved.
 bool MoveStaticAllocasInBlock(BasicBlock *Entry, BasicBlock *Block,
                               SmallVectorImpl<Instruction *> &ExitPoints);
 
