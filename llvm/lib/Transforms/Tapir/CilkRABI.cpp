@@ -132,21 +132,6 @@ FunctionCallee CilkRABI::Get__cilkrts_leave_frame() {
   return CilkRTSLeaveFrame;
 }
 
-FunctionCallee CilkRABI::Get__cilkrts_store_exn_sel() {
-  if (CilkRTSStoreExnSel)
-    return CilkRTSStoreExnSel;
-
-  LLVMContext &C = M.getContext();
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
-  IntegerType *SelTy = Type::getInt32Ty(C);
-  CilkRTSStoreExnSel = M.getOrInsertFunction("__cilkrts_store_exn_sel", VoidTy,
-                                            StackFramePtrTy, ExnPtrTy, SelTy);
-
-  return CilkRTSStoreExnSel;
-}
-
 FunctionCallee CilkRABI::Get__cilkrts_pause_frame() {
   if (CilkRTSPauseFrame)
     return CilkRTSPauseFrame;
@@ -154,8 +139,9 @@ FunctionCallee CilkRABI::Get__cilkrts_pause_frame() {
   LLVMContext &C = M.getContext();
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
   CilkRTSPauseFrame = M.getOrInsertFunction("__cilkrts_pause_frame", VoidTy,
-                                            StackFramePtrTy);
+                                            StackFramePtrTy, ExnPtrTy);
 
   return CilkRTSPauseFrame;
 }
@@ -590,7 +576,7 @@ Function *CilkRABI::GetCilkSyncFn() {
 }
 
 /// Get or create a LLVM function for __cilk_pause_frame. Calls to this function
-/// are always inlined, as it saves the current stack/frame pointer values. This
+/// uRways inlined, as it saves the current stack/frame pointer values. This
 /// function must be marked as returns_twice to allow it to be inlined, since
 /// the call to setjmp is marked returns_twice.
 ///
@@ -608,15 +594,18 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  PointerType *ExnPtrTy = Type::getInt8PtrTy(Ctx);
   Function *Fn = nullptr;
   if (GetOrCreateFunction(M, "__cilk_pause_frame",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
+                          FunctionType::get(VoidTy, {StackFramePtrTy, ExnPtrTy}, false),
                           Fn))
     return Fn;
 
   // Create the body of __cilk_pause_frame.
   Function::arg_iterator Args = Fn->arg_begin();
   Value *SF = &*Args;
+  ++Args;
+  Value *Exn = &*Args;
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.pause.frame.test", Fn);
   BasicBlock *PauseFrameCall = BasicBlock::Create(Ctx, "cilk.pause.frame.runtimecall", Fn);
@@ -636,8 +625,8 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   {
     IRBuilder<> B(PauseFrameCall);
 
-    // __cilkrts_pause_frame(&sf);
-    B.CreateCall(CILKRTS_FUNC(pause_frame), SF);
+    // __cilkrts_pause_frame(&sf, &exn);
+    B.CreateCall(CILKRTS_FUNC(pause_frame), {SF, Exn});
     B.CreateBr(Exit);
     // TODO: should this be unreachable? We don't want to return from this sj...
     //B.CreateUnreachable();
@@ -996,13 +985,10 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
     if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
       Value *Exn = Builder->CreateExtractValue(RI->getValue(),
                                                {0});
-      Value *Sel = Builder->CreateExtractValue(RI->getValue(),
-                                               {1});
-      Builder->CreateCall(CILKRTS_FUNC(store_exn_sel), {SF, Exn, Sel} );
       // Return to runtime
       Builder->CreateCall(CILKRTS_FUNC(pop_frame), SF);
       // inlined
-      Builder->CreateCall(GetCilkPauseFrameFn(), SF);
+      Builder->CreateCall(GetCilkPauseFrameFn(), {SF, Exn});
     } else {
       // Return to runtime
       Builder->CreateCall(CILKRTS_FUNC(pop_frame), SF);
