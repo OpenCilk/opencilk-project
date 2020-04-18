@@ -434,8 +434,8 @@ Instruction *fixupHelperInputs(Function &F, Task *T, ValueSet &TaskInputs,
                                ValueToValueMapTy &InputsMap,
                                Loop *TapirL = nullptr);
 
-/// Returns true if BasicBlock \p B is the immediate successor of a
-/// detached-rethrow instruction.
+/// Returns true if BasicBlock \p B is the immediate successor of only
+/// detached-rethrow instructions.
 bool isSuccessorOfDetachedRethrow(const BasicBlock *B);
 
 /// Collect the set of blocks in task \p T.  All blocks enclosed by \p T will be
