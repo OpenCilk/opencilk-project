@@ -176,6 +176,10 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
     cast<Value>(VMap[TL.getTask()->getDetach()->getSyncRegion()]);
   EscapeEnumerator EE(*Out.Outline, "ls.sync", false);
   while (IRBuilder<> *AtExit = EE.Next()) {
+    // TODO: Add an option to insert syncs before resumes.
+    if (!isa<ReturnInst>(*AtExit->GetInsertPoint()))
+      continue;
+
     BasicBlock *Exit = AtExit->GetInsertBlock();
     BasicBlock *NewExit = SplitBlock(Exit, Exit->getTerminator());
     SyncInst *NewSync = SyncInst::Create(NewExit, SyncRegion);
