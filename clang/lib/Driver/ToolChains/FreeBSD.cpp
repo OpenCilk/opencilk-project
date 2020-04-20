@@ -292,6 +292,8 @@ void freebsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   addCSIRuntime(ToolChain, Args, CmdArgs);
   addCilktoolRuntime(ToolChain, Args, CmdArgs);
 
+  ToolChain.AddTapirRuntimeLibArgs(Args, CmdArgs);
+
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs,
                    options::OPT_r)) {
     // Use the static OpenMP runtime with -static-openmp
