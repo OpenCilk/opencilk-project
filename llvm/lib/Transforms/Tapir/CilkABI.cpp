@@ -168,8 +168,6 @@ FunctionCallee CilkABI::Get__cilkrts_get_nworkers() {
   AttributeList AL;
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
                        Attribute::ReadNone);
-  // AL = AL.addAttribute(C, AttributeSet::FunctionIndex,
-  //                      Attribute::InaccessibleMemOnly);
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
                        Attribute::NoUnwind);
   FunctionType *FTy = FunctionType::get(Type::getInt32Ty(C), {}, false);
@@ -193,9 +191,12 @@ FunctionCallee CilkABI::Get__cilkrts_leave_frame() {
     return CilkRTSLeaveFrame;
 
   LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSLeaveFrame = M.getOrInsertFunction("__cilkrts_leave_frame", VoidTy,
+  CilkRTSLeaveFrame = M.getOrInsertFunction("__cilkrts_leave_frame", AL, VoidTy,
                                             StackFramePtrTy);
 
   return CilkRTSLeaveFrame;
@@ -231,8 +232,12 @@ FunctionCallee CilkABI::Get__cilkrts_get_tls_worker() {
   if (CilkRTSGetTLSWorker)
     return CilkRTSGetTLSWorker;
 
+  LLVMContext &C = M.getContext();
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
-  CilkRTSGetTLSWorker = M.getOrInsertFunction("__cilkrts_get_tls_worker",
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  CilkRTSGetTLSWorker = M.getOrInsertFunction("__cilkrts_get_tls_worker", AL,
                                               WorkerPtrTy);
 
   return CilkRTSGetTLSWorker;
@@ -242,9 +247,13 @@ FunctionCallee CilkABI::Get__cilkrts_get_tls_worker_fast() {
   if (CilkRTSGetTLSWorkerFast)
     return CilkRTSGetTLSWorkerFast;
 
+  LLVMContext &C = M.getContext();
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
   CilkRTSGetTLSWorkerFast = M.getOrInsertFunction(
-      "__cilkrts_get_tls_worker_fast", WorkerPtrTy);
+      "__cilkrts_get_tls_worker_fast", AL, WorkerPtrTy);
 
   return CilkRTSGetTLSWorkerFast;
 }
@@ -253,8 +262,12 @@ FunctionCallee CilkABI::Get__cilkrts_bind_thread_1() {
   if (CilkRTSBindThread1)
     return CilkRTSBindThread1;
 
+  LLVMContext &C = M.getContext();
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
-  CilkRTSBindThread1 = M.getOrInsertFunction("__cilkrts_bind_thread_1",
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  CilkRTSBindThread1 = M.getOrInsertFunction("__cilkrts_bind_thread_1", AL,
                                              WorkerPtrTy);
 
   return CilkRTSBindThread1;
