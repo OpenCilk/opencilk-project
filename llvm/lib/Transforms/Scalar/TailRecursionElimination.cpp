@@ -875,7 +875,8 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
   } else if (SyncInst *SI = dyn_cast<SyncInst>(TI)) {
 
     BasicBlock *Succ = SI->getSuccessor(0);
-    ReturnInst *Ret = dyn_cast<ReturnInst>(Succ->getFirstNonPHIOrDbg(true));
+    ReturnInst *Ret =
+        dyn_cast<ReturnInst>(Succ->getFirstNonPHIOrDbgOrSyncUnwind(true));
 
     if (!Ret)
       return false;
@@ -928,6 +929,8 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
     // the CFG.
     if (EliminatedTail) {
       // Move the sync region start to the new entry block.
+      Function *SyncUnwindFn = Intrinsic::getDeclaration(
+          OldEntryBlock->getModule(), Intrinsic::sync_unwind);
       BasicBlock *NewEntry = &OldEntryBlock->getParent()->getEntryBlock();
       cast<Instruction>(SyncRegion)->moveBefore(&*(NewEntry->begin()));
       // Insert syncs before relevant return blocks.
@@ -938,9 +941,8 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
                             SyncInst::Create(NewRetBlock, SyncRegion));
 
         if (!OldEntry->getParent()->doesNotThrow())
-          CallInst::Create(Intrinsic::getDeclaration(RetBlock->getModule(),
-                                                     Intrinsic::sync_unwind),
-                           {SyncRegion}, "", NewRetBlock->getTerminator());
+          CallInst::Create(SyncUnwindFn, {SyncRegion}, "",
+                           NewRetBlock->getTerminator());
       }
     } else {
       // Restore the sync that was eliminated.
