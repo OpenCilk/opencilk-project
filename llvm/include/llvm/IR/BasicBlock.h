@@ -187,11 +187,12 @@ public:
 
   /// Returns a pointer to the first instruction in this block that is not a
   /// PHINode, a debug intrinsic, or a sync.unwind intrinsic.
-  const Instruction* getFirstNonPHIOrDbgOrSyncUnwind() const;
-  Instruction* getFirstNonPHIOrDbgOrSyncUnwind() {
+  const Instruction *
+  getFirstNonPHIOrDbgOrSyncUnwind(bool SkipPseudoOp = false) const;
+  Instruction *getFirstNonPHIOrDbgOrSyncUnwind(bool SkipPseudoOp = false) {
     return const_cast<Instruction *>(
-        static_cast<const BasicBlock *>(this)
-        ->getFirstNonPHIOrDbgOrSyncUnwind());
+        static_cast<const BasicBlock *>(this)->getFirstNonPHIOrDbgOrSyncUnwind(
+            SkipPseudoOp));
   }
 
   /// Returns an iterator to the first instruction in this block that is
