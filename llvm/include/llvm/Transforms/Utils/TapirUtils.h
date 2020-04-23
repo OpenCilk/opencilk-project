@@ -33,6 +33,15 @@ bool isDetachedRethrow(const Instruction *I, const Value *SyncRegion = nullptr);
 /// otherwise.
 bool isTaskFrameResume(const Instruction *I, const Value *TaskFrame = nullptr);
 
+/// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
+/// \p SyncRegion is specified, then additionally checks that the sync.unwind
+/// uses \p SyncRegion.
+bool isSyncUnwind(const Instruction *I, const Value *SyncRegion = nullptr);
+
+// Removes the given sync.unwind instruction, if it is dead.  Returns true if
+// the sync.unwind was removed, false otherwise.
+bool removeDeadSyncUnwind(CallBase *SyncUnwind);
+
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.
 bool ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
