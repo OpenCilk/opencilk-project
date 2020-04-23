@@ -936,6 +936,11 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
             SplitBlock(RetBlock, RetBlock->getTerminator(), &DTU);
         ReplaceInstWithInst(RetBlock->getTerminator(),
                             SyncInst::Create(NewRetBlock, SyncRegion));
+
+        if (!OldEntry->getParent()->doesNotThrow())
+          CallInst::Create(Intrinsic::getDeclaration(RetBlock->getModule(),
+                                                     Intrinsic::sync_unwind),
+                           {SyncRegion}, "", NewRetBlock->getTerminator());
       }
     } else {
       // Restore the sync that was eliminated.
@@ -943,6 +948,8 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
       BasicBlock *NewRetBlock = SplitBlock(RetBlock, RI, &DTU);
       ReplaceInstWithInst(RetBlock->getTerminator(),
                           SyncInst::Create(NewRetBlock, SyncRegion));
+      // The earlier call to FoldReturnIntoUncondBranch did not remove the
+      // sync.unwind, so there's nothing to do to restore the sync.unwind.
     }
 
     return EliminatedCall;
