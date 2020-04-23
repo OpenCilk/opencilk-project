@@ -246,6 +246,21 @@ BasicBlock::getFirstNonPHIOrDbgOrLifetime(bool SkipPseudoOp) const {
   return nullptr;
 }
 
+const Instruction* BasicBlock::getFirstNonPHIOrDbgOrSyncUnwind() const {
+  for (const Instruction &I : *this) {
+    if (isa<PHINode>(I) || isa<DbgInfoIntrinsic>(I))
+      continue;
+
+    if (auto *CB = dyn_cast_or_null<CallBase>(&I))
+      if (const Function *Called = CB->getCalledFunction())
+        if (Intrinsic::sync_unwind == Called->getIntrinsicID())
+          continue;
+
+    return &I;
+  }
+  return nullptr;
+}
+
 BasicBlock::const_iterator BasicBlock::getFirstInsertionPt() const {
   const Instruction *FirstNonPHI = getFirstNonPHI();
   if (!FirstNonPHI)
