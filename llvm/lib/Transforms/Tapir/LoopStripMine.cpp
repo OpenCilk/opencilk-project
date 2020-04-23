@@ -992,6 +992,7 @@ Loop *llvm::StripMineLoop(
   // Detach the stripmined loop.
   Value *SyncReg = DI->getSyncRegion(), *NewSyncReg;
   BasicBlock *EpilogPred, *LoopDetEntry, *LoopReattach;
+  Module *M = F->getParent();
   if (ParallelEpilog) {
     ORE->emit([&]() {
                 return OptimizationRemark(LSM_NAME, "ParallelEpil",
@@ -999,7 +1000,6 @@ Loop *llvm::StripMineLoop(
                   << "allowing epilog to execute in parallel with stripmined "
                   << "loop";
               });
-    Module *M = F->getParent();
     BasicBlock *LoopDetach = SplitBlock(NewPreheader,
                                         NewPreheader->getTerminator(), DT, LI);
     LoopDetach->setName(NewPreheader->getName() + ".strpm.detachloop");
@@ -1128,11 +1128,17 @@ Loop *llvm::StripMineLoop(
     // updating until OrigDUBB equals the exceptional continuation or, as in the
     // case of a parallel epilog, we reach a detached-rethrow.
     BasicBlock *OrigDUBB = OrigUnwindDest;
+    BasicBlock *NewDomCandidate = NewHeader;
+    if (ParallelEpilog && NeedNestedSync)
+      // We will insert a sync.unwind to OrigUnwindDest, which changes the
+      // dominator.
+      NewDomCandidate =
+          DT->findNearestCommonDominator(NewHeader, LoopReattach);
     while (OrigDUBB && (OrigDUBB != EHCont)) {
       BasicBlock *OldIDom =
         DT->getNode(OrigDUBB)->getIDom()->getBlock();
       DT->changeImmediateDominator(
-          OrigDUBB, DT->findNearestCommonDominator(OldIDom, NewHeader));
+          OrigDUBB, DT->findNearestCommonDominator(OldIDom, NewDomCandidate));
       // Get the next block along the path.  If we reach the end of the path at
       // a detached-rethrow, then getUniqueSuccessor() returns nullptr.
       OrigDUBB = OrigDUBB->getUniqueSuccessor();
@@ -1141,7 +1147,7 @@ Loop *llvm::StripMineLoop(
     if (OrigDUBB == EHCont) {
       BasicBlock *OldIDom = DT->getNode(EHCont)->getIDom()->getBlock();
       DT->changeImmediateDominator(
-          EHCont, DT->findNearestCommonDominator(OldIDom, NewHeader));
+          EHCont, DT->findNearestCommonDominator(OldIDom, NewDomCandidate));
     }
   } else
     ReplaceInstWithInst(NewHeader->getTerminator(),
@@ -1258,6 +1264,32 @@ Loop *llvm::StripMineLoop(
     NestedSyncBlock->setName(Header->getName() + ".strpm.detachloop.sync");
     ReplaceInstWithInst(NestedSyncBlock->getTerminator(),
                         SyncInst::Create(LoopReattach, NewSyncReg));
+    if (!OrigUnwindDest && F->doesNotThrow()) {
+      // Insert a call to sync.unwind.
+      CallInst *SyncUnwind = CallInst::Create(
+          Intrinsic::getDeclaration(M, Intrinsic::sync_unwind), { NewSyncReg },
+          "", LoopReattach->getFirstNonPHIOrDbg());
+      // If the Tapir loop has an unwind destination, change the sync.unwind to
+      // an invoke that unwinds to the cloned unwind destination.
+      if (OrigUnwindDest) {
+        BasicBlock *NewBB =
+            changeToInvokeAndSplitBasicBlock(SyncUnwind, OrigUnwindDest);
+
+        // Update LI.
+        if (Loop *L = LI->getLoopFor(LoopReattach))
+          L->addBasicBlockToLoop(NewBB, *LI);
+
+        // Update DT: LoopReattach dominates Split, which dominates all other
+        // nodes previously dominated by LoopReattach.
+        if (DomTreeNode *OldNode = DT->getNode(LoopReattach)) {
+          std::vector<DomTreeNode *> Children(OldNode->begin(), OldNode->end());
+
+          DomTreeNode *NewNode = DT->addNewBlock(NewBB, LoopReattach);
+          for (DomTreeNode *I : Children)
+            DT->changeImmediateDominator(I, NewNode);
+        }
+      }
+    }
   }
 
   // Fixup the LoopInfo for the new loop.
