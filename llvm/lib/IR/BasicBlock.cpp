@@ -246,9 +246,13 @@ BasicBlock::getFirstNonPHIOrDbgOrLifetime(bool SkipPseudoOp) const {
   return nullptr;
 }
 
-const Instruction* BasicBlock::getFirstNonPHIOrDbgOrSyncUnwind() const {
+const Instruction *
+BasicBlock::getFirstNonPHIOrDbgOrSyncUnwind(bool SkipPseudoOp) const {
   for (const Instruction &I : *this) {
     if (isa<PHINode>(I) || isa<DbgInfoIntrinsic>(I))
+      continue;
+
+    if (SkipPseudoOp && isa<PseudoProbeInst>(I))
       continue;
 
     if (auto *CB = dyn_cast_or_null<CallBase>(&I))
