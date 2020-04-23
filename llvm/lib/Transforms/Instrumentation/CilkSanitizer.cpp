@@ -651,7 +651,7 @@ static bool InstrBreaksNoRecurse(Instruction &I, const SCCNodeSet &SCCNodes,
     if (isa<DbgInfoIntrinsic>(I))
       return false;
 
-    if (isDetachedRethrow(&I))
+    if (isDetachedRethrow(&I) || isTaskFrameResume(&I))
       return false;
 
     const Function *Callee = CS.getCalledFunction();
@@ -685,6 +685,10 @@ static bool InstrBreaksNoRecurse(Instruction &I, const SCCNodeSet &SCCNodes,
         case Intrinsic::coro_param:
         case Intrinsic::coro_subfn_addr:
         case Intrinsic::syncregion_start:
+        case Intrinsic::taskframe_create:
+        case Intrinsic::taskframe_use:
+        case Intrinsic::taskframe_load_guard:
+        case Intrinsic::sync_unwind:
           return false;
         }
       }

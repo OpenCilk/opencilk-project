@@ -442,6 +442,12 @@ void AliasSetTracker::addUnknown(Instruction *Inst) {
     case Intrinsic::sideeffect:
     case Intrinsic::pseudoprobe:
     case Intrinsic::syncregion_start:
+    case Intrinsic::detached_rethrow:
+    case Intrinsic::taskframe_create:
+    case Intrinsic::taskframe_use:
+    case Intrinsic::taskframe_resume:
+    case Intrinsic::taskframe_load_guard:
+    case Intrinsic::sync_unwind:
       return;
     }
   }
