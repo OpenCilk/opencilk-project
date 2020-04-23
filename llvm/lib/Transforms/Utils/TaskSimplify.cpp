@@ -59,9 +59,24 @@ static bool removeRedundantSyncs(MaybeParallelTasks &MPTasks, Task *T) {
         }
 
   // Replace all unnecesary syncs with unconditional branches.
+  SmallPtrSet<CallBase *, 1> MaybeDeadSyncUnwinds;
   for (SyncInst *Y : RedundantSyncs) {
+    // Check for any sync.unwinds that might now be dead.
+    Instruction *MaybeSyncUnwind =
+        Y->getSuccessor(0)->getFirstNonPHIOrDbgOrLifetime();
+    if (isSyncUnwind(MaybeSyncUnwind, Y->getSyncRegion()))
+      MaybeDeadSyncUnwinds.insert(cast<CallBase>(MaybeSyncUnwind));
+
     LLVM_DEBUG(dbgs() << "Removing redundant sync " << *Y << "\n");
     ReplaceInstWithInst(Y, BranchInst::Create(Y->getSuccessor(0)));
+  }
+  // Remove any dead sync.unwinds.
+  for (CallBase *CB : MaybeDeadSyncUnwinds) {
+    LLVM_DEBUG(dbgs() << "Remove dead sync unwind " << *CB << "?  ");
+    if (removeDeadSyncUnwind(CB))
+      LLVM_DEBUG(dbgs() << "Yes.\n");
+    else
+      LLVM_DEBUG(dbgs() << "No.\n");
   }
 
   Changed |= !RedundantSyncs.empty();
