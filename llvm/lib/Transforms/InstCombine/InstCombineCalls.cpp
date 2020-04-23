@@ -69,6 +69,7 @@
 #include "llvm/Transforms/InstCombine/InstCombiner.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SimplifyLibCalls.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -1489,11 +1490,44 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
         }))
       return nullptr;
     break;
-  case Intrinsic::syncregion_start: {
+  case Intrinsic::sync_unwind: {
+    // If the function does not throw, we don't need the sync.unwind.
+    if (II->getFunction()->doesNotThrow())
+      return eraseInstFromFunction(CI);
+
+    if (II != II->getParent()->getFirstNonPHIOrDbgOrLifetime()) {
+      // Check if the instruction at the start of II's block is a redundant
+      // sync.unwind.
+      const Value *SyncReg = CI.getArgOperand(0);
+      if (isSyncUnwind(II->getParent()->getFirstNonPHIOrDbgOrLifetime(),
+                       SyncReg))
+        return eraseInstFromFunction(CI);
+    }
+    // Check for any syncs that might use this sync.unwind.
     int NumUsers = 0;
-    for (User *U : II->users())
+    for (BasicBlock *Pred : predecessors(CI.getParent()))
+      if (isa<SyncInst>(Pred->getTerminator())) {
+        ++NumUsers;
+        break;
+      }
+    // If didn't find any syncs that use this sync.unwind, remove it.
+    if (!NumUsers)
+      return eraseInstFromFunction(CI);
+    break;
+  }
+  case Intrinsic::syncregion_start: {
+    // Check for any users of this syncregion.
+    int NumUsers = 0;
+    for (User *U : II->users()) {
+      // Check for any Tapir instructions using this syncregion.
       if (isa<DetachInst>(U) || isa<ReattachInst>(U) || isa<SyncInst>(U))
         ++NumUsers;
+      // Check for any Tapir intrinsics using this syncregion.
+      if (CallBase *CB = dyn_cast<CallBase>(U))
+        if (isSyncUnwind(CB))
+          ++NumUsers;
+    }
+    // If we have no users, it's safe to delete this syncregion.
     if (!NumUsers)
       return eraseInstFromFunction(CI);
     break;
