@@ -1292,6 +1292,10 @@ def int_taskframe_load_guard : Intrinsic<[], [llvm_anyptr_ty], [IntrArgMemOnly,
 def int_detached_rethrow : Intrinsic<[], [llvm_token_ty, llvm_any_ty],
                                      [IntrArgMemOnly, Throws]>;
 
+// Invokable intrinsic to keep track of a landingpad associated with a
+// sync.
+def int_sync_unwind : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly, Throws]>;
+
 def int_tapir_loop_grainsize : Intrinsic<[llvm_anyint_ty], [LLVMMatchType<0>],
                                          [IntrNoMem, IntrSpeculatable]>;
 
