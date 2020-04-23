@@ -51,6 +51,8 @@ void CodeGenFunction::EmitImplicitSyncCleanup(llvm::Instruction *SyncRegion) {
   llvm::BasicBlock *ContinueBlock = createBasicBlock("sync.continue");
   Builder.CreateSync(ContinueBlock, SR);
   EmitBlockAfterUses(ContinueBlock);
+  if (getLangOpts().Exceptions && !CurFn->doesNotThrow())
+    EmitCallOrInvoke(CGM.getIntrinsic(llvm::Intrinsic::sync_unwind), { SR });
 }
 
 void CodeGenFunction::DetachScope::CreateTaskFrameEHState() {
@@ -358,6 +360,9 @@ void CodeGenFunction::EmitCilkSyncStmt(const CilkSyncStmt &S) {
 
   Builder.CreateSync(ContinueBlock, SRStart);
   EmitBlock(ContinueBlock);
+  if (getLangOpts().Exceptions && !CurFn->doesNotThrow())
+    EmitCallOrInvoke(CGM.getIntrinsic(llvm::Intrinsic::sync_unwind),
+                     { SRStart });
 }
 
 static const Stmt *IgnoreImplicitAndCleanups(const Stmt *S) {
