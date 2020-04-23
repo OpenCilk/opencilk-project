@@ -170,6 +170,15 @@ public:
         static_cast<const BasicBlock *>(this)->getFirstNonPHIOrDbgOrLifetime());
   }
 
+  /// Returns a pointer to the first instruction in this block that is not a
+  /// PHINode, a debug intrinsic, or a sync.unwind intrinsic.
+  const Instruction* getFirstNonPHIOrDbgOrSyncUnwind() const;
+  Instruction* getFirstNonPHIOrDbgOrSyncUnwind() {
+    return const_cast<Instruction *>(
+        static_cast<const BasicBlock *>(this)
+        ->getFirstNonPHIOrDbgOrSyncUnwind());
+  }
+
   /// Returns an iterator to the first instruction in this block that is
   /// suitable for inserting a non-PHI instruction.
   ///
