@@ -112,8 +112,14 @@ void parallelfor_tryblock(int n) {
       // CHECK-NOT: detach within %[[SYNCREG1]], label %{{.+}}, label %{{.+}} unwind
       _Cilk_for (int i = 0; i < n; ++i)
         quuz(i);
+      // CHECK: invoke void @llvm.sync.unwind(token %[[SYNCREG1]])
+      // CHECK-NEXT: to label %{{.+}} unwind label %[[CATCH:.+]]
+      // CHECK: [[CATCH]]:
+      // CHECK: landingpad [[LPADTYPE]]
+      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+      // CHECK-NEXT: catch i8* null
 
-      // CHECK: detach within %[[SYNCREG2]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
+      // CHECK: detach within %[[SYNCREG2]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[CATCH]]
       // CHECK: [[DETACHED]]:
       // CHECK: %[[OBJ:.+]] = invoke i8* @_Znwm(i64 1)
       // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
@@ -138,11 +144,7 @@ void parallelfor_tryblock(int n) {
       // CHECK: [[TASKRESUME]]:
       // CHECK: invoke void @llvm.detached.rethrow
       // CHECK: (token %[[SYNCREG2]], [[LPADTYPE]] {{.+}})
-      // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
-      // CHECK: [[DUNWIND]]:
-      // CHECK: landingpad [[LPADTYPE]]
-      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-      // CHECK-NEXT: catch i8* null
+      // CHECK-NEXT: to label {{.+}} unwind label %[[CATCH]]
       _Cilk_for (int i = 0; i < n; ++i)
         bar(new Foo());
     }
