@@ -3,7 +3,7 @@
 int return_stuff(int i);
 
 int return_spawn_test(int i){
-  return _Cilk_spawn return_stuff(i);
+  return _Cilk_spawn return_stuff(i); // expected-warning{{no parallelism from a '_Cilk_spawn' in a return statement}}
 }
 
 // CHECK-LABEL: define {{(dso_local )?}}i32 @_Z17return_spawn_testi(i32 %i)
@@ -15,6 +15,7 @@ int return_spawn_test(int i){
 // CHECK: [[CONTINUE]]
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]
+// CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: %[[RETVALLOAD:.+]] = load i32
 // CHECK: ret i32 %[[RETVALLOAD]]
 
@@ -28,7 +29,7 @@ public:
   Bar &operator=(Bar that);
   friend void swap(Bar &left, Bar &right);
 
-  const int getValSpawn(int i) const { return _Cilk_spawn return_stuff(val[i]); }
+  const int getValSpawn(int i) const { return _Cilk_spawn return_stuff(val[i]); } // expected-warning{{no parallelism from a '_Cilk_spawn' in a return statement}}
 };
 
 int foo(const Bar &b);
@@ -67,5 +68,6 @@ void spawn_infinite_loop() {
 // CHECK: [[CONTINUE]]
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]
+// CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: %[[RETVALLOAD:.+]] = load i32
 // CHECK: ret i32 %[[RETVALLOAD]]
