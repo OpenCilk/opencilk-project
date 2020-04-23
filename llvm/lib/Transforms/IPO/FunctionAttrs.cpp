@@ -1499,6 +1499,11 @@ static bool InstrBreaksNonThrowing(Instruction &I, const SCCNodeSet &SCCNodes) {
     return false;
   if (const auto *CI = dyn_cast<CallInst>(&I)) {
     if (Function *Callee = CI->getCalledFunction()) {
+      // Ignore sync.unwind when checking if a function can throw, since
+      // sync.unwind is simply a placeholder.
+      if (Intrinsic::sync_unwind == Callee->getIntrinsicID())
+        return false;
+
       // I is a may-throw call to a function inside our SCC. This doesn't
       // invalidate our current working assumption that the SCC is no-throw; we
       // just have to scan that other function.
