@@ -81,6 +81,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "tailcallelim"
@@ -431,6 +432,9 @@ class TailRecursionEliminator {
   bool foldReturnAndProcessPred(ReturnInst *Ret,
                                 bool CannotTailCallElimCallsMarkedTail);
 
+  bool foldReturnIntoSyncUnwind(ReturnInst *Ret,
+                                bool CannotTailCallElimCallsMarkedTail);
+
   bool processReturningBlock(ReturnInst *Ret,
                              bool CannotTailCallElimCallsMarkedTail);
 
@@ -718,7 +722,7 @@ bool TailRecursionEliminator::foldReturnAndProcessPred(
   bool Change = false;
 
   // Make sure this block is a trivial return block.
-  assert(BB->getFirstNonPHIOrDbg() == Ret &&
+  assert(BB->getFirstNonPHIOrDbgOrSyncUnwind() == Ret &&
          "Trying to fold non-trivial return block");
 
   // If the return block contains nothing but the return and PHI's,
@@ -841,6 +845,52 @@ bool TailRecursionEliminator::foldReturnAndProcessPred(
   return Change;
 }
 
+bool TailRecursionEliminator::foldReturnIntoSyncUnwind(
+    ReturnInst *Ret, bool CannotTailCallElimCallsMarkedTail) {
+  BasicBlock *BB = Ret->getParent();
+
+  if (BB->getFirstNonPHIOrDbg() != Ret)
+    return false;
+
+  SmallVector<BranchInst*, 8> UncondBranchPreds;
+  for (pred_iterator PI = pred_begin(BB), E = pred_end(BB); PI != E; ++PI) {
+    BasicBlock *Pred = *PI;
+    Instruction *PTI = Pred->getTerminator();
+    if (BranchInst *BI = dyn_cast<BranchInst>(PTI))
+      if (BI->isUnconditional())
+        // Check for a sync.unwind.
+        if (isSyncUnwind(Pred->getFirstNonPHIOrDbg()) &&
+            (Pred->getFirstNonPHIOrDbgOrSyncUnwind() == PTI)) {
+          dbgs() << "Block contains only a sync.unwind\n";
+          UncondBranchPreds.push_back(BI);
+        }
+  }
+
+  if (UncondBranchPreds.empty())
+    return false;
+
+  while (!UncondBranchPreds.empty()) {
+    BranchInst *BI = UncondBranchPreds.pop_back_val();
+    BasicBlock *Pred = BI->getParent();
+    LLVM_DEBUG(dbgs() << "FOLDING: " << *BB
+                      << "INTO UNCOND BRANCH PRED: " << *Pred);
+    ReturnInst *RI = FoldReturnIntoUncondBranch(Ret, BB, Pred, &DTU);
+
+    // Cleanup: if all predecessors of BB have been eliminated by
+    // FoldReturnIntoUncondBranch, delete it.  It is important to empty it,
+    // because the ret instruction in there is still using a value which
+    // eliminateRecursiveTailCall will attempt to remove.
+    if (!BB->hasAddressTaken() && pred_begin(BB) == pred_end(BB))
+      DTU.deleteBB(BB);
+
+    // Now try to eliminate a recursive tail call from the new return.
+    if (Pred->getFirstNonPHIOrDbgOrSyncUnwind() == RI)
+      foldReturnAndProcessPred(RI, CannotTailCallElimCallsMarkedTail);
+    ++NumRetDuped;
+  }
+  return true;
+}
+
 bool TailRecursionEliminator::processReturningBlock(
     ReturnInst *Ret, bool CannotTailCallElimCallsMarkedTail) {
   CallInst *CI = findTRECandidate(Ret, CannotTailCallElimCallsMarkedTail);
@@ -958,8 +1008,11 @@ bool TailRecursionEliminator::eliminate(Function &F,
     BasicBlock *BB = &*BBI++; // foldReturnAndProcessPred may delete BB.
     if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB->getTerminator())) {
       bool Change = TRE.processReturningBlock(Ret, !CanTRETailMarkedCall);
-      if (!Change && BB->getFirstNonPHIOrDbg() == Ret)
-        Change = TRE.foldReturnAndProcessPred(Ret, !CanTRETailMarkedCall);
+      if (!Change && BB->getFirstNonPHIOrDbg() == Ret) {
+        Change = TRE.foldReturnIntoSyncUnwind(Ret, !CanTRETailMarkedCall);
+        if (!Change)
+          Change = TRE.foldReturnAndProcessPred(Ret, !CanTRETailMarkedCall);
+      }
       MadeChange |= Change;
     }
   }
