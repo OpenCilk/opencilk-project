@@ -48,6 +48,41 @@ bool llvm::isTaskFrameResume(const Instruction *I, const Value *TaskFrame) {
   return false;
 }
 
+/// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
+/// \p SyncRegion is specified, then additionally checks that the sync.unwind
+/// uses \p SyncRegion.
+bool llvm::isSyncUnwind(const Instruction *I, const Value *SyncRegion) {
+  if (const CallBase *CB = dyn_cast<CallBase>(I))
+    if (const Function *Called = CB->getCalledFunction())
+      if (Intrinsic::sync_unwind == Called->getIntrinsicID())
+        if (!SyncRegion || (SyncRegion == CB->getArgOperand(0)))
+          return true;
+  return false;
+}
+
+// Removes the given sync.unwind instruction, if it is dead.  Returns true if
+// the sync.unwind was removed, false otherwise.
+bool llvm::removeDeadSyncUnwind(CallBase *SyncUnwind) {
+  assert(isSyncUnwind(SyncUnwind) &&
+         "removeDeadSyncUnwind not called on a sync.unwind.");
+  const Value *SyncRegion = SyncUnwind->getArgOperand(0);
+
+  // Scan predecessor blocks for syncs using this sync.unwind.
+  for (BasicBlock *Pred : predecessors(SyncUnwind->getParent()))
+    if (SyncInst *SI = dyn_cast<SyncInst>(Pred->getTerminator()))
+      if (SyncRegion == SI->getSyncRegion())
+        return false;
+
+  // We found no predecessor syncs that use this sync.unwind, so remove it.
+  if (InvokeInst *II = dyn_cast<InvokeInst>(SyncUnwind)) {
+    II->getUnwindDest()->removePredecessor(II->getParent());
+    ReplaceInstWithInst(II, BranchInst::Create(II->getNormalDest()));
+  } else {
+    SyncUnwind->eraseFromParent();
+  }
+  return true;
+}
+
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.
 ///
