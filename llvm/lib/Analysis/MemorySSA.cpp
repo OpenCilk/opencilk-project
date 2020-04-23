@@ -298,6 +298,12 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
     case Intrinsic::invariant_start:
     case Intrinsic::invariant_end:
     case Intrinsic::syncregion_start:
+    case Intrinsic::detached_rethrow:
+    case Intrinsic::taskframe_create:
+    case Intrinsic::taskframe_use:
+    case Intrinsic::taskframe_resume:
+    case Intrinsic::taskframe_load_guard:
+    case Intrinsic::sync_unwind:
     case Intrinsic::assume:
       return {false, NoAlias};
     case Intrinsic::dbg_addr:

@@ -272,6 +272,12 @@ bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
     case Intrinsic::coro_param:
     case Intrinsic::coro_subfn_addr:
     case Intrinsic::syncregion_start:
+    case Intrinsic::detached_rethrow:
+    case Intrinsic::taskframe_create:
+    case Intrinsic::taskframe_use:
+    case Intrinsic::taskframe_resume:
+    case Intrinsic::taskframe_load_guard:
+    case Intrinsic::sync_unwind:
       // These intrinsics don't actually represent code after lowering.
       return true;
     }

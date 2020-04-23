@@ -408,6 +408,10 @@ static bool checkInstructionForRace(const Instruction *I,
       case Intrinsic::ptr_annotation:
       case Intrinsic::var_annotation:
       case Intrinsic::syncregion_start:
+      case Intrinsic::taskframe_create:
+      case Intrinsic::taskframe_use:
+      case Intrinsic::taskframe_load_guard:
+      case Intrinsic::sync_unwind:
         return false;
       }
 

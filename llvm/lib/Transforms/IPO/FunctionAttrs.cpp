@@ -1658,6 +1658,8 @@ static bool addNoRecurseAttrs(const SCCNodeSet &SCCNodes) {
             case Intrinsic::taskframe_create:
             case Intrinsic::taskframe_use:
             case Intrinsic::taskframe_resume:
+            case Intrinsic::taskframe_load_guard:
+            case Intrinsic::sync_unwind:
               continue;
             }
           else
