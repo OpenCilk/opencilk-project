@@ -251,9 +251,15 @@ static bool removeUselessSyncs(Function &F, DomTreeUpdater *DTU) {
       // If no detach reaches this sync, then this sync can be removed.
       if (!ReachingDetach) {
         BasicBlock* Succ = Sync->getSuccessor(0);
+        const Value *SyncReg = Sync->getSyncRegion();
+        Instruction *MaybeSyncUnwind = Succ->getFirstNonPHIOrDbgOrLifetime();
         ReplaceInstWithInst(Sync, BranchInst::Create(Succ));
         Changed = true;
-        if (MergeBlockIntoPredecessor(Succ, DTU)) goto check;
+        bool Recheck = false;
+        if (isSyncUnwind(MaybeSyncUnwind, SyncReg))
+          Recheck |= removeDeadSyncUnwind(cast<CallBase>(MaybeSyncUnwind), DTU);
+        Recheck |= MergeBlockIntoPredecessor(Succ, DTU);
+        if (Recheck) goto check;
       }
     }
   }

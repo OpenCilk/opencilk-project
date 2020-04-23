@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Utils/TapirUtils.h"
+#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DIBuilder.h"
@@ -62,7 +63,8 @@ bool llvm::isSyncUnwind(const Instruction *I, const Value *SyncRegion) {
 
 // Removes the given sync.unwind instruction, if it is dead.  Returns true if
 // the sync.unwind was removed, false otherwise.
-bool llvm::removeDeadSyncUnwind(CallBase *SyncUnwind) {
+bool llvm::removeDeadSyncUnwind(CallBase *SyncUnwind,
+                                DomTreeUpdater *DTU) {
   assert(isSyncUnwind(SyncUnwind) &&
          "removeDeadSyncUnwind not called on a sync.unwind.");
   const Value *SyncRegion = SyncUnwind->getArgOperand(0);
@@ -76,6 +78,9 @@ bool llvm::removeDeadSyncUnwind(CallBase *SyncUnwind) {
   // We found no predecessor syncs that use this sync.unwind, so remove it.
   if (InvokeInst *II = dyn_cast<InvokeInst>(SyncUnwind)) {
     II->getUnwindDest()->removePredecessor(II->getParent());
+    if (DTU)
+      DTU->applyUpdates(
+          {{DominatorTree::Delete, II->getUnwindDest(), II->getParent()}});
     ReplaceInstWithInst(II, BranchInst::Create(II->getNormalDest()));
   } else {
     SyncUnwind->eraseFromParent();
