@@ -184,6 +184,20 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
     BasicBlock *NewExit = SplitBlock(Exit, Exit->getTerminator());
     SyncInst *NewSync = SyncInst::Create(NewExit, SyncRegion);
     ReplaceInstWithInst(Exit->getTerminator(), NewSync);
+
+    // If the helper does not throw, there's no need to insert a sync.unwind.
+    if (Out.Outline->doesNotThrow())
+      return;
+
+    // Insert a call to sync.unwind.
+    CallInst *SyncUnwind = CallInst::Create(
+        Intrinsic::getDeclaration(&M, Intrinsic::sync_unwind),
+        { SyncRegion }, "", NewExit->getFirstNonPHIOrDbg());
+    // If the Tapir loop has an unwind destination, change the sync.unwind to an
+    // invoke that unwinds to the cloned unwind destination.
+    if (TL.getUnwindDest())
+      changeToInvokeAndSplitBasicBlock(
+          SyncUnwind, cast<BasicBlock>(VMap[TL.getUnwindDest()]));
   }
 }
 
