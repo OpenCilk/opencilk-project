@@ -6686,8 +6686,25 @@ static bool removeEmptySyncs(BasicBlock *BB) {
     }
     // If the sync region is empty, then remove all sync instructions in it.
     if (SyncRegionIsEmpty) {
-      for (SyncInst *Sync : Syncs)
+      SmallPtrSet<CallBase *, 1> MaybeDeadSyncUnwinds;
+      for (SyncInst *Sync : Syncs) {
+        // Check for any sync.unwinds that might now be dead.
+        Instruction *MaybeSyncUnwind =
+            Sync->getSuccessor(0)->getFirstNonPHIOrDbgOrLifetime();
+        if (isSyncUnwind(MaybeSyncUnwind, SyncRegion))
+          MaybeDeadSyncUnwinds.insert(cast<CallBase>(MaybeSyncUnwind));
+
+        LLVM_DEBUG(dbgs() << "Removing empty sync " << *Sync << "\n");
         ReplaceInstWithInst(Sync, BranchInst::Create(Sync->getSuccessor(0)));
+      }
+      // Remove any dead sync.unwinds.
+      for (CallBase *CB : MaybeDeadSyncUnwinds) {
+        LLVM_DEBUG(dbgs() << "Remove dead sync unwind " << *CB << "?  ");
+        if (removeDeadSyncUnwind(CB))
+          LLVM_DEBUG(dbgs() << "Yes.\n");
+        else
+          LLVM_DEBUG(dbgs() << "No.\n");
+      }
       return true;
     }
   }
