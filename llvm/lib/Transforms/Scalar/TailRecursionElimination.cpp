@@ -81,6 +81,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "tailcallelim"
@@ -729,7 +730,7 @@ static bool foldReturnAndProcessPred(
   bool Change = false;
 
   // Make sure this block is a trivial return block.
-  assert(BB->getFirstNonPHIOrDbg() == Ret &&
+  assert(BB->getFirstNonPHIOrDbgOrSyncUnwind() == Ret &&
          "Trying to fold non-trivial return block");
 
   // If the return block contains nothing but the return and PHI's,
@@ -865,6 +866,55 @@ static bool processReturningBlock(
                                     ArgumentPHIs, AA, ORE, DTU);
 }
 
+static bool foldReturnIntoSyncUnwind(
+    BasicBlock *BB, ReturnInst *Ret, BasicBlock *&OldEntry,
+    bool &TailCallsAreMarkedTail, SmallVectorImpl<PHINode *> &ArgumentPHIs,
+    bool CannotTailCallElimCallsMarkedTail, const TargetTransformInfo *TTI,
+    AliasAnalysis *AA, OptimizationRemarkEmitter *ORE, DomTreeUpdater &DTU) {
+  if (BB->getFirstNonPHIOrDbg() != Ret)
+    return false;
+
+  SmallVector<BranchInst*, 8> UncondBranchPreds;
+  for (pred_iterator PI = pred_begin(BB), E = pred_end(BB); PI != E; ++PI) {
+    BasicBlock *Pred = *PI;
+    Instruction *PTI = Pred->getTerminator();
+    if (BranchInst *BI = dyn_cast<BranchInst>(PTI))
+      if (BI->isUnconditional())
+        // Check for a sync.unwind.
+        if (isSyncUnwind(Pred->getFirstNonPHIOrDbg()) &&
+            (Pred->getFirstNonPHIOrDbgOrSyncUnwind() == PTI)) {
+          dbgs() << "Block contains only a sync.unwind\n";
+          UncondBranchPreds.push_back(BI);
+        }
+  }
+
+  if (UncondBranchPreds.empty())
+    return false;
+
+  while (!UncondBranchPreds.empty()) {
+    BranchInst *BI = UncondBranchPreds.pop_back_val();
+    BasicBlock *Pred = BI->getParent();
+    LLVM_DEBUG(dbgs() << "FOLDING: " << *BB
+                      << "INTO UNCOND BRANCH PRED: " << *Pred);
+    ReturnInst *RI = FoldReturnIntoUncondBranch(Ret, BB, Pred, &DTU);
+
+    // Cleanup: if all predecessors of BB have been eliminated by
+    // FoldReturnIntoUncondBranch, delete it.  It is important to empty it,
+    // because the ret instruction in there is still using a value which
+    // eliminateRecursiveTailCall will attempt to remove.
+    if (!BB->hasAddressTaken() && pred_begin(BB) == pred_end(BB))
+      DTU.deleteBB(BB);
+
+    // Now try to eliminate a recursive tail call from the new return.
+    if (Pred->getFirstNonPHIOrDbgOrSyncUnwind() == RI)
+      foldReturnAndProcessPred(Pred, RI, OldEntry, TailCallsAreMarkedTail,
+                               ArgumentPHIs, CannotTailCallElimCallsMarkedTail,
+                               TTI, AA, ORE, DTU);
+    ++NumRetDuped;
+  }
+  return true;
+}
+
 static bool eliminateTailRecursion(Function &F, const TargetTransformInfo *TTI,
                                    AliasAnalysis *AA,
                                    OptimizationRemarkEmitter *ORE,
@@ -904,10 +954,15 @@ static bool eliminateTailRecursion(Function &F, const TargetTransformInfo *TTI,
       bool Change = processReturningBlock(Ret, OldEntry, TailCallsAreMarkedTail,
                                           ArgumentPHIs, !CanTRETailMarkedCall,
                                           TTI, AA, ORE, DTU);
-      if (!Change && BB->getFirstNonPHIOrDbg() == Ret)
-        Change = foldReturnAndProcessPred(
+      if (!Change && BB->getFirstNonPHIOrDbgOrSyncUnwind() == Ret) {
+        Change = foldReturnIntoSyncUnwind(
             BB, Ret, OldEntry, TailCallsAreMarkedTail, ArgumentPHIs,
             !CanTRETailMarkedCall, TTI, AA, ORE, DTU);
+        if (!Change)
+          Change = foldReturnAndProcessPred(
+              BB, Ret, OldEntry, TailCallsAreMarkedTail, ArgumentPHIs,
+              !CanTRETailMarkedCall, TTI, AA, ORE, DTU);
+      }
       MadeChange |= Change;
     }
   }
