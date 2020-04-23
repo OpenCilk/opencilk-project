@@ -21,6 +21,7 @@ namespace llvm {
 
 class BasicBlock;
 class DominatorTree;
+class DomTreeUpdater;
 class Loop;
 class Task;
 class TaskInfo;
@@ -40,7 +41,7 @@ bool isSyncUnwind(const Instruction *I, const Value *SyncRegion = nullptr);
 
 // Removes the given sync.unwind instruction, if it is dead.  Returns true if
 // the sync.unwind was removed, false otherwise.
-bool removeDeadSyncUnwind(CallBase *SyncUnwind);
+bool removeDeadSyncUnwind(CallBase *SyncUnwind, DomTreeUpdater *DTU);
 
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.
