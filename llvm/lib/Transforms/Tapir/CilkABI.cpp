@@ -1498,23 +1498,38 @@ Value *CilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
 }
 
 void CilkABI::lowerSync(SyncInst &SI) {
-  Function &Fn = *(SI.getFunction());
+  Function &Fn = *SI.getFunction();
 
   Value *SF = GetOrInitCilkStackFrame(Fn, /*Helper*/false, false);
   Value *args[] = { SF };
   assert(args[0] && "sync used in function without frame!");
-  CallInst *CI;
 
-  if (Fn.doesNotThrow())
-    CI = CallInst::Create(GetCilkSyncNothrowFn(), args, "",
+  Instruction *SyncUnwind = nullptr;
+  BasicBlock *SyncCont = SI.getSuccessor(0);
+  BasicBlock *SyncUnwindDest = nullptr;
+  if (InvokeInst *II =
+      dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
+    if (const Function *Called = II->getCalledFunction()) {
+      if (Intrinsic::sync_unwind == Called->getIntrinsicID()) {
+        // TODO? Rewrite PHI nodes in landingpad of sync_unwind.  I don't think
+        // that case can happen.
+        SyncUnwind = II;
+        SyncCont = II->getNormalDest();
+        SyncUnwindDest = II->getUnwindDest();
+      }
+    }
+  }
+  CallBase *CB;
+  if (!SyncUnwindDest) {
+    CB = CallInst::Create(GetCilkSyncNothrowFn(), args, "",
                           /*insert before*/&SI);
-  else
-    CI = CallInst::Create(GetCilkSyncFn(), args, "",
-                          /*insert before*/&SI);
-  CI->setDebugLoc(SI.getDebugLoc());
-  BasicBlock *Succ = SI.getSuccessor(0);
+    BranchInst::Create(SyncCont, CB->getParent());
+  } else
+    CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, SyncUnwindDest, args, "",
+                            /*insert before*/&SI);
+  CB->setDebugLoc(SI.getDebugLoc());
   SI.eraseFromParent();
-  BranchInst::Create(Succ, CI->getParent());
+
   // Mark this function as stealable.
   Fn.addFnAttr(Attribute::Stealable);
 }
