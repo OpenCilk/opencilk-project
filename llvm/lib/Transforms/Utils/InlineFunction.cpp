@@ -1981,32 +1981,37 @@ static BasicBlock *SplitResume(ResumeInst *RI, Intrinsic::ID TermFunc,
   return NewBB;
 }
 
-static void HandleInlinedResumeInTask(BasicBlock *DetachedBlock,
+static void HandleInlinedResumeInTask(BasicBlock *EntryBlock,
                                       ResumeInst *Resume,
                                       BasicBlock *Unreachable) {
   // If the DetachedBlock has no predecessor, then it is the entry of the
   // function.  There's nothing to do in this case, so simply return.
-  if (pred_empty(DetachedBlock))
+  if (pred_empty(EntryBlock))
     return;
 
-  BasicBlock *Detacher = DetachedBlock->getSinglePredecessor();
-  DetachInst *DI = cast<DetachInst>(Detacher->getTerminator());
-  Value *SyncRegion = DI->getSyncRegion();
-  Value *TaskFrame = getTaskFrameUsed(DetachedBlock);
-
-  // Insert an invocation of detached.rethrow before the resume.
-  BasicBlock *NewBB = SplitResume(Resume, Intrinsic::detached_rethrow,
-                                  SyncRegion, Unreachable);
-  // Add NewBB as the unwind destination of DI.
-  ReplaceInstWithInst(DI, DetachInst::Create(DetachedBlock, DI->getContinue(),
-                                             NewBB, SyncRegion));
-  // If we have a taskframe, insert an invocation of taskframe.resume before the
-  // resume.
-  if (TaskFrame)
+  BasicBlock *Parent = EntryBlock->getSinglePredecessor();
+  if (isTaskFrameCreate(EntryBlock->front())) {
+    Value *TaskFrame = &EntryBlock->front();
     SplitResume(Resume, Intrinsic::taskframe_resume, TaskFrame, Unreachable);
 
-  // Recursively handle parent tasks.
-  HandleInlinedResumeInTask(GetDetachedCtx(Detacher), Resume, Unreachable);
+    // Recursively handle parent tasks.
+    HandleInlinedResumeInTask(GetDetachedCtx(Parent), Resume, Unreachable);
+
+  } else {
+    // BasicBlock *Detacher = EntryBlock->getSinglePredecessor();
+    DetachInst *DI = cast<DetachInst>(Parent->getTerminator());
+    Value *SyncRegion = DI->getSyncRegion();
+    // Value *TaskFrame = getTaskFrameUsed(EntryBlock);
+
+    // Insert an invocation of detached.rethrow before the resume.
+    BasicBlock *NewBB = SplitResume(Resume, Intrinsic::detached_rethrow,
+                                    SyncRegion, Unreachable);
+    // Add NewBB as the unwind destination of DI.
+    ReplaceInstWithInst(DI, DetachInst::Create(EntryBlock, DI->getContinue(),
+                                               NewBB, SyncRegion));
+    // Recursively handle parent tasks.
+    HandleInlinedResumeInTask(GetDetachedCtx(Parent), Resume, Unreachable);
+  }
 }
 
 /// This function inlines the called function into the basic block of the
