@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
 namespace llvm {
@@ -26,12 +27,20 @@ class Loop;
 class Task;
 class TaskInfo;
 
-/// Returns true if the given instruction performs a detached rethrow, false
-/// otherwise.
+// Check if the given instruction is an intrinsic with the specified ID.  If a
+// value \p V is specified, then additionally checks that the first argument of
+// the intrinsic matches \p V.
+bool isTapirIntrinsic(Intrinsic::ID ID, const Instruction *I,
+                      const Value *V = nullptr);
+
+/// Returns true if the given instruction performs a detached.rethrow, false
+/// otherwise.  If \p SyncRegion is specified, then additionally checks that the
+/// detached.rethrow uses \p SyncRegion.
 bool isDetachedRethrow(const Instruction *I, const Value *SyncRegion = nullptr);
 
-/// Returns true if the given instruction performs a taskframe resume, false
-/// otherwise.
+/// Returns true if the given instruction performs a taskframe.resume, false
+/// otherwise.  If \p TaskFrame is specified, then additionally checks that the
+/// taskframe.resume uses \p TaskFrame.
 bool isTaskFrameResume(const Instruction *I, const Value *TaskFrame = nullptr);
 
 /// Returns true if the given instruction is a sync.uwnind, false otherwise.  If

@@ -27,38 +27,40 @@ using namespace llvm;
 
 #define DEBUG_TYPE "tapirutils"
 
-/// Returns true if the given instruction performs a detached rethrow, false
-/// otherwise.
-bool llvm::isDetachedRethrow(const Instruction *I, const Value *SyncRegion) {
-  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
-    if (const Function *Called = II->getCalledFunction())
-      if (Intrinsic::detached_rethrow == Called->getIntrinsicID())
-        if (!SyncRegion || (SyncRegion == II->getArgOperand(0)))
+// Check if the given instruction is an intrinsic with the specified ID.  If a
+// value \p V is specified, then additionally checks that the first argument of
+// the intrinsic matches \p V.
+bool llvm::isTapirIntrinsic(Intrinsic::ID ID, const Instruction *I,
+                            const Value *V) {
+  if (const CallBase *CB = dyn_cast<CallBase>(I))
+    if (const Function *Called = CB->getCalledFunction())
+      if (ID == Called->getIntrinsicID())
+        if (!V || (V == CB->getArgOperand(0)))
           return true;
   return false;
 }
 
-/// Returns true if the given instruction performs a taskframe resume, false
-/// otherwise.
+/// Returns true if the given instruction performs a detached.rethrow, false
+/// otherwise.  If \p SyncRegion is specified, then additionally checks that the
+/// detached.rethrow uses \p SyncRegion.
+bool llvm::isDetachedRethrow(const Instruction *I, const Value *SyncRegion) {
+  return isa<InvokeInst>(I) &&
+      isTapirIntrinsic(Intrinsic::detached_rethrow, I, SyncRegion);
+}
+
+/// Returns true if the given instruction performs a taskframe.resume, false
+/// otherwise.  If \p TaskFrame is specified, then additionally checks that the
+/// taskframe.resume uses \p TaskFrame.
 bool llvm::isTaskFrameResume(const Instruction *I, const Value *TaskFrame) {
-  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
-    if (const Function *Called = II->getCalledFunction())
-      if (Intrinsic::taskframe_resume == Called->getIntrinsicID())
-        if (!TaskFrame || (TaskFrame == II->getArgOperand(0)))
-          return true;
-  return false;
+  return isa<InvokeInst>(I) &&
+      isTapirIntrinsic(Intrinsic::taskframe_resume, I, TaskFrame);
 }
 
 /// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
 /// \p SyncRegion is specified, then additionally checks that the sync.unwind
 /// uses \p SyncRegion.
 bool llvm::isSyncUnwind(const Instruction *I, const Value *SyncRegion) {
-  if (const CallBase *CB = dyn_cast<CallBase>(I))
-    if (const Function *Called = CB->getCalledFunction())
-      if (Intrinsic::sync_unwind == Called->getIntrinsicID())
-        if (!SyncRegion || (SyncRegion == CB->getArgOperand(0)))
-          return true;
-  return false;
+  return isTapirIntrinsic(Intrinsic::sync_unwind, I, SyncRegion);
 }
 
 // Removes the given sync.unwind instruction, if it is dead.  Returns true if
