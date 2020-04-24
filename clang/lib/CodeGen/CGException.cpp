@@ -559,7 +559,7 @@ void CodeGenFunction::EmitCXXTryStmt(const CXXTryStmt &S) {
     // sync, for the try-catch.
     const LangOptions &LO = CGM.getLangOpts();
     SyncedScopeRAII SyncedScp(*this);
-    if (LO.Cilk) {
+    if (LO.getCilk() != LangOptions::Cilk_none) {
       PushSyncRegion()->addImplicitSync();
       if (isa<CompoundStmt>(S.getTryBlock()))
         ScopeIsSynced = true;
