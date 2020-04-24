@@ -31,6 +31,7 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/Attributor.h"
 #include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
@@ -570,6 +571,7 @@ void PassManagerBuilder::populateModulePassManager(
       MPM.add(createLowerTapirToTargetPass());
       // The lowering pass may leave cruft around.  Clean it up.
       MPM.add(createCFGSimplificationPass());
+      MPM.add(createAlwaysInlinerLegacyPass());
     }
 
     // FIXME: The BarrierNoopPass is a HACK! The inliner pass above implicitly
@@ -1037,12 +1039,7 @@ void PassManagerBuilder::populateModulePassManager(
 
     // Start of CallGraph SCC passes.
     MPM.add(createPruneEHPass()); // Remove dead EH info
-    bool RunInliner = false;
-    if (Inliner) {
-      MPM.add(Inliner);
-      Inliner = nullptr;
-      RunInliner = true;
-    }
+    MPM.add(createAlwaysInlinerLegacyPass());
 
     MPM.add(createPostOrderFunctionAttrsLegacyPass());
     if (OptLevel > 2)
