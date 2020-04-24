@@ -1246,7 +1246,7 @@ static inline void inlineCilkFunctions(Function &F) {
   do {
     Changed = false;
     for (Instruction &I : instructions(F))
-      if (CallInst *Call = dyn_cast<CallInst>(&I))
+      if (CallBase *Call = dyn_cast<CallBase>(&I))
         if (Function *Fn = Call->getCalledFunction())
           if (Fn->getName().startswith("__cilk")) {
             InlineFunctionInfo IFI;
