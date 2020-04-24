@@ -31,6 +31,8 @@ using namespace llvm;
 
 #define DEBUG_TYPE "cilkrabi"
 
+extern cl::opt<bool> DebugABICalls;
+
 enum {
   __CILKRTS_ABI_VERSION = 1
 };
@@ -352,9 +354,10 @@ Function *CilkRABI::Get__cilkrts_pop_frame() {
 
   B.CreateRetVoid();
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -434,9 +437,10 @@ Function *CilkRABI::Get__cilkrts_detach() {
 
   B.CreateRetVoid();
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -553,9 +557,10 @@ Function *CilkRABI::GetCilkSyncFn() {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
-  Fn->addFnAttr(Attribute::AlwaysInline);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->addFnAttr(Attribute::ReturnsTwice);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -667,9 +672,10 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -741,9 +747,10 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
 
   B.CreateRetVoid();
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -776,13 +783,14 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn),
     *B1 = BasicBlock::Create(Ctx, "body", Fn),
     *Exit  = BasicBlock::Create(Ctx, "exit", Fn);
+  CallInst *PopFrame;
 
   // Entry
   {
     IRBuilder<> B(Entry);
 
     // __cilkrts_pop_frame(sf)
-    B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
+    PopFrame = B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
 
     // if (sf->flags != CILK_FRAME_VERSION)
     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
@@ -808,9 +816,13 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
+  // Inline the pop_frame call.
+  CallsToInline.insert(PopFrame);
+
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -995,6 +1007,9 @@ void CilkRABI::lowerSync(SyncInst &SI) {
   CB->setDebugLoc(SI.getDebugLoc());
   SI.eraseFromParent();
 
+  // Remember to inline this call later.
+  CallsToInline.insert(CB);
+
   // Mark this function as stealable.
   Fn.addFnAttr(Attribute::Stealable);
 }
@@ -1047,27 +1062,15 @@ void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
 // Helper function to inline calls to compiler-generated Cilk Plus runtime
 // functions when possible.  This inlining is necessary to properly implement
-// some Cilk runtime "calls," such as __cilkrts_detach().
-static inline void inlineCilkFunctions(Function &F) {
-  bool Changed;
-  do {
-    Changed = false;
-    for (Instruction &I : instructions(F))
-      if (CallInst *Call = dyn_cast<CallInst>(&I))
-        if (Function *Fn = Call->getCalledFunction())
-          if (Fn->getName().startswith("__cilk")) {
-            InlineFunctionInfo IFI;
-            if (InlineFunction(Call, IFI)) {
-              if (Fn->hasNUses(0))
-                Fn->eraseFromParent();
-              Changed = true;
-              break;
-            }
-          }
-  } while (Changed);
-
-  if (verifyFunction(F, &errs()))
-    llvm_unreachable("Tapir->CilkABI lowering produced bad IR!");
+// some Cilk runtime "calls," such as __cilk_sync().
+static inline void inlineCilkFunctions(
+    Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
+  for (CallBase *CB : CallsToInline) {
+    Function *Fn = CB->getCalledFunction();
+    InlineFunctionInfo IFI;
+    InlineFunction(CB, IFI);
+  }
+  CallsToInline.clear();
 }
 
 void CilkRABI::preProcessFunction(Function &F, TaskInfo &TI,
@@ -1085,12 +1088,11 @@ void CilkRABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
     // Don't do any postprocessing when outlining Tapir loops.
     return;
 
-  inlineCilkFunctions(F);
+  if (!DebugABICalls)
+    inlineCilkFunctions(F, CallsToInline);
 }
 
-void CilkRABI::postProcessHelper(Function &F) {
-  inlineCilkFunctions(F);
-}
+void CilkRABI::postProcessHelper(Function &F) {}
 
 LoopOutlineProcessor *CilkRABI::getLoopOutlineProcessor(
     const TapirLoopInfo *TL) const {
