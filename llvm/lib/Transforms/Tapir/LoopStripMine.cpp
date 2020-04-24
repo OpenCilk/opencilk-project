@@ -1088,7 +1088,6 @@ Loop *llvm::StripMineLoop(
 
   // Move the detach/reattach instructions to surround the stripmined loop.
   BasicBlock *NewHeader;
-  bool RecalculateDT = false;
   {
     SmallVector<BasicBlock*, 4> HeaderPreds;
     for (BasicBlock *Pred : predecessors(Header))
@@ -1416,12 +1415,6 @@ Loop *llvm::StripMineLoop(
   simplifyLoopAfterStripMine(NewLoop, /*SimplifyIVs*/true, LI, SE, DT, AC);
   simplifyLoopAfterStripMine(remainderLoop, /*SimplifyIVs*/true, LI, SE, DT,
                              AC);
-
-  // Recalculate DT if necessary
-  if (RecalculateDT) {
-    LLVM_DEBUG(dbgs() << "[LoopStripMine] Recalculating DT.\n");
-    DT->recalculate(*F);
-  }
 
 #ifndef NDEBUG
   DT->verify();
