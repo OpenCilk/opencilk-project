@@ -914,6 +914,13 @@ BranchInst *llvm::SerializeDetachedCFG(DetachInst *DI, DominatorTree *DT) {
   return ReplacementBr;
 }
 
+static const Value *getCanonicalTaskFrameCreate(const BasicBlock *BB) {
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&BB->front()))
+    if (Intrinsic::taskframe_create == II->getIntrinsicID())
+      return II;
+  return nullptr;
+}
+
 /// GetDetachedCtx - Get the entry basic block to the detached context
 /// that contains the specified block.
 ///
@@ -927,11 +934,18 @@ const BasicBlock *llvm::GetDetachedCtx(const BasicBlock *BB) {
   // function or we find a detach instruction that detaches the current block.
   SmallPtrSet<const BasicBlock *, 32> Visited;
   SmallVector<const BasicBlock *, 32> WorkList;
+  SmallPtrSet<const Value *, 2> TaskFramesToIgnore;
   WorkList.push_back(BB);
   while (!WorkList.empty()) {
     const BasicBlock *CurrBB = WorkList.pop_back_val();
     if (!Visited.insert(CurrBB).second)
       continue;
+
+    // If we find a canonical taskframe.create that we're not ignoring, then
+    // we've found the context.
+    if (const Value *TaskFrame = getCanonicalTaskFrameCreate(CurrBB))
+      if (!TaskFramesToIgnore.count(TaskFrame))
+        return CurrBB;
 
     for (auto PI = pred_begin(CurrBB), PE = pred_end(CurrBB);
          PI != PE; ++PI) {
@@ -947,6 +961,13 @@ const BasicBlock *llvm::GetDetachedCtx(const BasicBlock *BB) {
       if (isDetachedRethrow(PredBB->getTerminator()))
         continue;
 
+      // If we find a taskframe.resume, add its taskframe to the set of
+      // taskframes to ignore.
+      if (isTaskFrameResume(PredBB->getTerminator())) {
+        const InvokeInst *II = cast<InvokeInst>(PredBB->getTerminator());
+        TaskFramesToIgnore.insert(II->getArgOperand(0));
+      }
+
       // If the predecessor is terminated by a detach, check to see if
       // that detach detached the current basic block.
       if (isa<DetachInst>(PredBB->getTerminator())) {
@@ -955,6 +976,10 @@ const BasicBlock *llvm::GetDetachedCtx(const BasicBlock *BB) {
           // Return the current block, which is the entry of this detached
           // sub-CFG.
           return CurrBB;
+        else if (const Value *SubTaskFrame =
+                 getTaskFrameUsed(DI->getDetached()))
+          // Ignore this tasks's taskframe, if it has one.
+          TaskFramesToIgnore.insert(SubTaskFrame);
       }
 
       // Otherwise, add the predecessor block to the work list to search.
