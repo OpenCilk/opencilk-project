@@ -339,9 +339,9 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
       if (OnlySimpleReturnStmts)
         DI->EmitLocation(Builder, EndLoc);
 
-    PopCleanupBlocks(PrologueCleanupDepth, {}, getLangOpts().Cilk);
+    PopCleanupBlocks(PrologueCleanupDepth, {}, (getLangOpts().getCilk() != LangOptions::Cilk_none));
     SyncEmitted = true;
-  } else if (getLangOpts().Cilk && Builder.GetInsertBlock()) {
+  } else if ((getLangOpts().getCilk() != LangOptions::Cilk_none) && Builder.GetInsertBlock()) {
     // If we're compiling Cilk, emit an implicit sync for the function.
     EmitImplicitSyncCleanup();
     SyncEmitted = true;
@@ -350,7 +350,7 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
   // Emit function epilog (to return).
   llvm::DebugLoc Loc = EmitReturnBlock();
 
-  if (getLangOpts().Cilk && !SyncEmitted) {
+  if ((getLangOpts().getCilk() != LangOptions::Cilk_none) && !SyncEmitted) {
     // If we're compiling Cilk, emit an implicit sync for the function.
     EmitImplicitSyncCleanup();
     SyncEmitted = true;
