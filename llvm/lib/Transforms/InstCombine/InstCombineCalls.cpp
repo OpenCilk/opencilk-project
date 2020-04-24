@@ -2362,7 +2362,7 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
         ++NumUsers;
       // Check for any Tapir intrinsics using this syncregion.
       if (CallBase *CB = dyn_cast<CallBase>(U))
-        if (isSyncUnwind(CB))
+        if (isSyncUnwind(CB) || isDetachedRethrow(CB))
           ++NumUsers;
     }
     // If we have no users, it's safe to delete this syncregion.
@@ -2393,10 +2393,10 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     // Remove a taskframe.create if there is no taskframe.use among its users.
     int NumUsers = 0;
     for (User *U : II->users()) {
-      if (const CallBase *CB = dyn_cast<CallBase>(U))
-        if (const Function *Called = CB->getCalledFunction())
-          if (Intrinsic::taskframe_use == Called->getIntrinsicID())
-            ++NumUsers;
+      if (Instruction *I = dyn_cast<Instruction>(U))
+        if (isTapirIntrinsic(Intrinsic::taskframe_use, I) ||
+            isTaskFrameResume(I))
+          ++NumUsers;
     }
     if (!NumUsers)
       return eraseInstFromFunction(CI);
