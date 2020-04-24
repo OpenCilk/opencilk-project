@@ -13,6 +13,7 @@
 #ifndef CILK_RABI_H_
 #define CILK_RABI_H_
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
 
@@ -22,6 +23,7 @@ class TapirLoopInfo;
 
 class CilkRABI : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
+  SmallPtrSet<CallBase *, 8> CallsToInline;
 
   // Cilk RTS data types
   StructType *StackFrameTy = nullptr;

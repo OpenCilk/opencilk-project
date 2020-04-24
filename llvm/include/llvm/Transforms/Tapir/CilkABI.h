@@ -13,6 +13,7 @@
 #ifndef CILK_ABI_H_
 #define CILK_ABI_H_
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
 
@@ -22,6 +23,7 @@ class TapirLoopInfo;
 
 class CilkABI : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
+  SmallPtrSet<CallBase *, 8> CallsToInline;
 
   // Cilk RTS data types
   StructType *PedigreeTy = nullptr;
