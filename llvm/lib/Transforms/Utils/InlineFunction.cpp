@@ -644,8 +644,7 @@ static bool isTaskFrameUnwind(const BasicBlock *UnwindEdge) {
   return false;
 }
 
-// Recursively check the task starting at TaskEntry to find detached-rethrows
-// for tasks that cannot throw.
+// Recursively handle inlined tasks.
 static void HandleInlinedTasksHelper(
     SmallPtrSetImpl<BasicBlock *> &BlocksToProcess,
     BasicBlock *FirstNewBlock, BasicBlock *UnwindEdge,
@@ -701,7 +700,8 @@ static void HandleInlinedTasksHelper(
       // Update any PHI nodes in the exceptional block to indicate that there
       // is now a new entry in them.
       Invoke.addIncomingPHIValuesFor(NewBB);
-      BlocksToProcess.insert(NewBB);
+      BlocksToProcess.insert(
+          cast<InvokeInst>(NewBB->getTerminator())->getNormalDest());
     }
 
     // Forward any resumes that are remaining here.
