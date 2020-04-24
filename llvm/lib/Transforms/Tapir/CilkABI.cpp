@@ -39,13 +39,11 @@ using namespace llvm;
 
 #define DEBUG_TYPE "cilkabi"
 
+extern cl::opt<bool> DebugABICalls;
+
 static cl::opt<bool> fastCilk(
     "fast-cilk", cl::init(false), cl::Hidden,
     cl::desc("Attempt faster Cilk call implementation"));
-
-static cl::opt<bool> DebugABICalls(
-    "debug-abi-calls", cl::init(false), cl::Hidden,
-    cl::desc("Insert ABI calls for debugging"));
 
 static cl::opt<bool> ArgStruct(
     "cilk-use-arg-struct", cl::init(false), cl::Hidden,
@@ -433,9 +431,10 @@ Function *CilkABI::Get__cilkrts_pop_frame() {
 
   B.CreateRetVoid();
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -551,9 +550,10 @@ Function *CilkABI::Get__cilkrts_detach() {
 
   B.CreateRetVoid();
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -708,8 +708,9 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
-  Fn->addFnAttr(Attribute::AlwaysInline);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
   Fn->addFnAttr(Attribute::ReturnsTwice);
 
   return Fn;
@@ -833,9 +834,10 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::PrivateLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::AlwaysInline);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
   Fn->addFnAttr(Attribute::ReturnsTwice);
 
   return Fn;
@@ -988,8 +990,9 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
     B.CreateRet(ExnPN);
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
-  Fn->addFnAttr(Attribute::AlwaysInline);
+  Fn->setLinkage(Function::PrivateLinkage);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
   Fn->addFnAttr(Attribute::ReturnsTwice);
 
   return Fn;
@@ -1104,9 +1107,10 @@ Function *CilkABI::Get__cilkrts_enter_frame_1() {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -1178,9 +1182,10 @@ Function *CilkABI::Get__cilkrts_enter_frame_fast_1() {
 
   B.CreateRetVoid();
 
-  Fn->setLinkage(Function::InternalLinkage);
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -1244,6 +1249,7 @@ Function *CilkABI::GetCilkParentEpilogueFn(bool instrument) {
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn),
     *B1 = BasicBlock::Create(Ctx, "body", Fn),
     *Exit  = BasicBlock::Create(Ctx, "exit", Fn);
+  CallInst *PopFrame;
 
   // Entry
   {
@@ -1254,7 +1260,7 @@ Function *CilkABI::GetCilkParentEpilogueFn(bool instrument) {
     //   B.CreateCall(CILK_CSI_FUNC(leave_begin, M), SF);
 
     // __cilkrts_pop_frame(sf)
-    B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
+    PopFrame = B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
 
     // if (sf->flags != CILK_FRAME_VERSION)
     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
@@ -1283,9 +1289,13 @@ Function *CilkABI::GetCilkParentEpilogueFn(bool instrument) {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::InternalLinkage);
+  // Inline the pop_frame call.
+  CallsToInline.insert(PopFrame);
+
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  Fn->addFnAttr(Attribute::InlineHint);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
 }
@@ -1543,6 +1553,9 @@ void CilkABI::lowerSync(SyncInst &SI) {
   CB->setDebugLoc(SI.getDebugLoc());
   SI.eraseFromParent();
 
+  // Remember to inline this call later.
+  CallsToInline.insert(CB);
+
   // Mark this function as stealable.
   Fn.addFnAttr(Attribute::Stealable);
 }
@@ -1715,27 +1728,15 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
 // Helper function to inline calls to compiler-generated Cilk Plus runtime
 // functions when possible.  This inlining is necessary to properly implement
-// some Cilk runtime "calls," such as __cilkrts_detach().
-static inline void inlineCilkFunctions(Function &F) {
-  bool Changed;
-  do {
-    Changed = false;
-    for (Instruction &I : instructions(F))
-      if (CallInst *Call = dyn_cast<CallInst>(&I))
-        if (Function *Fn = Call->getCalledFunction())
-          if (Fn->getName().startswith("__cilk")) {
-            InlineFunctionInfo IFI;
-            if (InlineFunction(Call, IFI)) {
-              if (Fn->hasNUses(0))
-                Fn->eraseFromParent();
-              Changed = true;
-              break;
-            }
-          }
-  } while (Changed);
-
-  if (verifyFunction(F, &errs()))
-    llvm_unreachable("Tapir->CilkABI lowering produced bad IR!");
+// some Cilk runtime "calls," such as __cilk_sync().
+static inline void inlineCilkFunctions(
+    Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
+  for (CallBase *CB : CallsToInline) {
+    Function *Fn = CB->getCalledFunction();
+    InlineFunctionInfo IFI;
+    InlineFunction(CB, IFI);
+  }
+  CallsToInline.clear();
 }
 
 void CilkABI::preProcessFunction(Function &F, TaskInfo &TI,
@@ -1760,16 +1761,10 @@ void CilkABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
   if (!DebugABICalls)
-    inlineCilkFunctions(F);
+    inlineCilkFunctions(F, CallsToInline);
 }
 
-void CilkABI::postProcessHelper(Function &F) {
-  NamedRegionTimer NRT("postProcessHelper", "Post-process helper",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
-  if (!DebugABICalls)
-    inlineCilkFunctions(F);
-}
+void CilkABI::postProcessHelper(Function &F) {}
 
 LoopOutlineProcessor *CilkABI::getLoopOutlineProcessor(
     const TapirLoopInfo *TL) const {
