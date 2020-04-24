@@ -828,9 +828,9 @@ static bool foldReturnAndProcessPred(
         cast<Instruction>(SyncRegion)->moveBefore(&*(NewEntry->begin()));
         // Insert syncs before relevant return blocks.
         for (BasicBlock *RetBlock : ReturnBlocksToSync) {
-          BasicBlock *NewRetBlock = SplitBlock(RetBlock,
-                                               RetBlock->getTerminator(),
-                                               &DTU.getDomTree());
+          BasicBlock *NewRetBlock = SplitBlock(
+              RetBlock, RetBlock->getTerminator(),
+              (DTU.hasDomTree() ? &DTU.getDomTree() : nullptr));
           ReplaceInstWithInst(RetBlock->getTerminator(),
                               SyncInst::Create(NewRetBlock, SyncRegion));
 
@@ -883,10 +883,8 @@ static bool foldReturnIntoSyncUnwind(
       if (BI->isUnconditional())
         // Check for a sync.unwind.
         if (isSyncUnwind(Pred->getFirstNonPHIOrDbg()) &&
-            (Pred->getFirstNonPHIOrDbgOrSyncUnwind() == PTI)) {
-          dbgs() << "Block contains only a sync.unwind\n";
+            (Pred->getFirstNonPHIOrDbgOrSyncUnwind() == PTI))
           UncondBranchPreds.push_back(BI);
-        }
   }
 
   if (UncondBranchPreds.empty())
