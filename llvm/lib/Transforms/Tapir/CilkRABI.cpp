@@ -203,15 +203,50 @@ FunctionCallee CilkRABI::Get__cilkrts_pause_frame() {
     return CilkRTSPauseFrame;
 
   LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
-  CilkRTSPauseFrame = M.getOrInsertFunction("__cilkrts_pause_frame", VoidTy,
+  CilkRTSPauseFrame = M.getOrInsertFunction("__cilkrts_pause_frame", AL, VoidTy,
                                             StackFramePtrTy, ExnPtrTy);
 
   return CilkRTSPauseFrame;
 }
 
+FunctionCallee CilkRABI::Get__cilkrts_check_exception_resume() {
+  if (CilkRTSCheckExceptionResume)
+    return CilkRTSCheckExceptionResume;
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkRTSCheckExceptionResume = M.getOrInsertFunction(
+                                            "__cilkrts_check_exception_resume",
+                                            AL, VoidTy, StackFramePtrTy);
+
+  return CilkRTSCheckExceptionResume;
+}
+FunctionCallee CilkRABI::Get__cilkrts_check_exception_raise() {
+  if (CilkRTSCheckExceptionRaise)
+    return CilkRTSCheckExceptionRaise;
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkRTSCheckExceptionRaise = M.getOrInsertFunction(
+                                            "__cilkrts_check_exception_raise",
+                                            AL, VoidTy, StackFramePtrTy);
+
+  return CilkRTSCheckExceptionRaise;
+}
 
 // FunctionCallee CilkRABI::Get__cilkrts_rethrow() {
 //   if (CilkRTSRethrow)
@@ -550,6 +585,7 @@ Function *CilkRABI::Get__cilkrts_detach() {
 ///       __cilkrts_sync(sf);
 ///     // else if (sf->flags & CILK_FRAME_EXCEPTING)
 ///     //   __cilkrts_rethrow(sf);
+///     __cilkrts_check_exception_raise(sf);
 ///   }
 /// }
 ///
@@ -648,6 +684,8 @@ Function *CilkRABI::GetCilkSyncFn() {
   {
     IRBuilder<> B(Exit);
 
+    // __cilkrts_check_exception_raise(sf);
+    B.CreateCall(CILKRTS_FUNC(check_exception_raise), {SF});
     B.CreateRetVoid();
   }
 
@@ -669,6 +707,7 @@ Function *CilkRABI::GetCilkSyncFn() {
 /// void __cilk_pause_frame(struct __cilkrts_stack_frame *sf) {
 ///   if (!CILK_SETJMP(sf->ctx))
 ///     __cilkrts_pause_frame(sf);
+///   __cilkrts_check_exception_resume(sf);
 /// }
 ///
 /// With exceptions disabled in the compiler, the function
@@ -712,13 +751,13 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
     // __cilkrts_pause_frame(&sf, &exn);
     B.CreateCall(CILKRTS_FUNC(pause_frame), {SF, Exn});
     B.CreateBr(Exit);
-    // TODO: should this be unreachable? We don't want to return from this sj...
-    //B.CreateUnreachable();
   }
+
   // Exit
   {
     IRBuilder<> B(Exit);
 
+    B.CreateCall(CILKRTS_FUNC(check_exception_resume), {SF});
     B.CreateRetVoid();
   }
 
