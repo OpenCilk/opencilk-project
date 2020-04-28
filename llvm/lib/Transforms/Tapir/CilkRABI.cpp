@@ -953,7 +953,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
 ///
 /// void __cilk_parent_epilogue(__cilkrts_stack_frame *sf) {
 ///   __cilkrts_pop_frame(sf);
-///   if (sf->flags != CILK_FRAME_VERSION)
+///   // if (sf->flags != CILK_FRAME_VERSION)
 ///     __cilkrts_leave_frame(sf);
 /// }
 Function *CilkRABI::GetCilkParentEpilogueFn() {
@@ -974,7 +974,7 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
   Value *SF = &*Args;
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn),
-    *B1 = BasicBlock::Create(Ctx, "body", Fn),
+    // *B1 = BasicBlock::Create(Ctx, "body", Fn),
     *Exit  = BasicBlock::Create(Ctx, "exit", Fn);
 
   // Entry
@@ -984,25 +984,29 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     // __cilkrts_pop_frame(sf)
     B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
 
-    // JFC: I removed AtomicOrdering::Acquire here.  If flags have been
-    // changed at least one change was in this function.
-    // if (sf->flags != CILK_FRAME_VERSION)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFieldFlags, /*isVolatile=*/false,
-                                AtomicOrdering::Unordered);
-    Value *Cond = B.CreateICmpNE(
-        Flags, ConstantInt::get(Flags->getType(), FrameVersion << 24));
-    B.CreateCondBr(Cond, B1, Exit);
-  }
-
-  // B1
-  {
-    IRBuilder<> B(B1);
-
     // __cilkrts_leave_frame(sf);
     B.CreateCall(CILKRTS_FUNC(leave_frame), SF);
     B.CreateBr(Exit);
+
+  //   // JFC: I removed AtomicOrdering::Acquire here.  If flags have been
+  //   // changed at least one change was in this function.
+  //   // if (sf->flags != CILK_FRAME_VERSION)
+  //   Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
+  //                               StackFrameFieldFlags, /*isVolatile=*/false,
+  //                               AtomicOrdering::Unordered);
+  //   Value *Cond = B.CreateICmpNE(
+  //       Flags, ConstantInt::get(Flags->getType(), FrameVersion << 24));
+  //   B.CreateCondBr(Cond, B1, Exit);
   }
+
+  // // B1
+  // {
+  //   IRBuilder<> B(B1);
+
+  //   // __cilkrts_leave_frame(sf);
+  //   B.CreateCall(CILKRTS_FUNC(leave_frame), SF);
+  //   B.CreateBr(Exit);
+  // }
 
   // Exit
   {
