@@ -128,13 +128,18 @@ TapirToTargetImpl::outlineAllTasks(Function &F, DominatorTree &DT,
   // Traverse the tasks in this function in post order.
   // TODO: Make sure to traverse subtasks first.
   for (Task *T : post_order(TI.getRootTask())) {
+    LLVM_DEBUG(dbgs() << "outlineAllTasks: task@" << T->getEntry()->getName()
+               << "\n");
     // At this point, all subtasks of T must have been processed.  Replace their
     // detaches with calls.
-    for (Task *SubT : T->subtasks())
+    for (Task *SubT : T->subtasks()) {
+      LLVM_DEBUG(dbgs() << "  inserting call for subtask@"
+                 << SubT->getEntry()->getName() << "\n");
       // TODO: Rename replaceDetachWithCallToOutline.
       TaskToOutline[SubT].replaceReplCall(
           replaceDetachWithCallToOutline(SubT, TaskToOutline[SubT],
                                          HelperInputs[SubT]));
+    }
 
     // Outline the task, if necessary, and add the outlined function to the
     // mapping.
@@ -172,8 +177,11 @@ TapirToTargetImpl::outlineAllTasks(Function &F, DominatorTree &DT,
 
     // Update subtask outline info to reflect the fact that their spawner was
     // outlined.
-    for (Task *SubT : T->subtasks())
+    for (Task *SubT : T->subtasks()) {
+      LLVM_DEBUG(dbgs() << "  remapOutlineInfo for subtask@"
+                 << SubT->getEntry()->getName() << "\n");
       TaskToOutline[SubT].remapOutlineInfo(VMap, InputMap);
+    }
   }
 
   return TaskToOutline;
@@ -268,7 +276,6 @@ bool TapirToTargetImpl::processOutlinedTask(
   Function &F = *TaskToOutline[T].Outline;
   Instruction *DetachPt = TaskToOutline[T].DetachPt;
   Instruction *TaskFrameCreate = TaskToOutline[T].TaskFrameCreate;
-  Target->processOutlinedTask(F, DetachPt, TaskFrameCreate);
   if (!T->isSerial()) {
     // Process outlined function F for a task as a spawner.
     Target->processSpawner(F);
@@ -277,6 +284,7 @@ bool TapirToTargetImpl::processOutlinedTask(
     for (Task *SubT : T->subtasks())
       Target->processSubTaskCall(TaskToOutline[SubT], DT);
   }
+  Target->processOutlinedTask(F, DetachPt, TaskFrameCreate);
   // Process the Tapir instructions in F directly.
   processSimpleABI(F);
   return true;
