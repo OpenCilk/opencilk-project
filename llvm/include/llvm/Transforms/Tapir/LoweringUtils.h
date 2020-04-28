@@ -259,9 +259,16 @@ public:
   virtual void processOutlinedTask(Function &F, Instruction *DetachPt,
                                    Instruction *TaskFrameCreate) = 0;
 
+  // TODO: Replace this routine with preProcessSpawner throughout the backends.
+  virtual void processSpawner(Function &F) = 0;
+
   // Process the Function F as a function that can spawn subtasks.  This routine
   // is called after processOutlinedTask.
-  virtual void processSpawner(Function &F) = 0;
+  virtual void preProcessSpawner(Function &F) { processSpawner(F); }
+
+  // Process the Function F as a function that can spawn subtasks.  This routine
+  // is called after processOutlinedTask.
+  virtual void postProcessSpawner(Function &F) {};
 
   // Process the invocation of a task for an outlined function.  This routine is
   // invoked after processSpawner once for each child subtask.
