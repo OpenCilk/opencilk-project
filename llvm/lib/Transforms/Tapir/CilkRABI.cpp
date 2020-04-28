@@ -222,14 +222,11 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_resume() {
     return CilkRTSCheckExceptionResume;
 
   LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   CilkRTSCheckExceptionResume = M.getOrInsertFunction(
                                             "__cilkrts_check_exception_resume",
-                                            AL, VoidTy, StackFramePtrTy);
+                                            VoidTy, StackFramePtrTy);
 
   return CilkRTSCheckExceptionResume;
 }
@@ -238,14 +235,11 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_raise() {
     return CilkRTSCheckExceptionRaise;
 
   LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   CilkRTSCheckExceptionRaise = M.getOrInsertFunction(
                                             "__cilkrts_check_exception_raise",
-                                            AL, VoidTy, StackFramePtrTy);
+                               VoidTy, StackFramePtrTy);
 
   return CilkRTSCheckExceptionRaise;
 }
@@ -1215,8 +1209,8 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
     }
   }
   for (ResumeInst *RI : Resumes) {
-    Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
     if (InsertPauseFrame) {
+      Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
       CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
       // If throwing an exception, store the exception object and selector value
       // in the closure, call setjmp, and call pause_frame.
