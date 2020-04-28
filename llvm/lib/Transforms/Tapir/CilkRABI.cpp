@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/CilkRABI.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -220,14 +221,11 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_resume() {
     return CilkRTSCheckExceptionResume;
 
   LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   CilkRTSCheckExceptionResume = M.getOrInsertFunction(
                                             "__cilkrts_check_exception_resume",
-                                            AL, VoidTy, StackFramePtrTy);
+                                            VoidTy, StackFramePtrTy);
 
   return CilkRTSCheckExceptionResume;
 }
@@ -236,14 +234,11 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_raise() {
     return CilkRTSCheckExceptionRaise;
 
   LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   CilkRTSCheckExceptionRaise = M.getOrInsertFunction(
                                             "__cilkrts_check_exception_raise",
-                                            AL, VoidTy, StackFramePtrTy);
+                               VoidTy, StackFramePtrTy);
 
   return CilkRTSCheckExceptionRaise;
 }
@@ -1107,23 +1102,29 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
     IRB.CreateCall(CILKRTS_FUNC(detach), Args);
   }
 
+  SmallPtrSet<ReturnInst*, 8> Returns;
+  SmallPtrSet<ResumeInst*, 8> Resumes;
+
   // Add eh cleanup that returns control to the runtime
   EscapeEnumerator EE(Extracted, "cilkrabi_cleanup", true);
   while (IRBuilder<> *Builder = EE.Next()) {
+    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
+      Resumes.insert(RI);
+    } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint())) {
+      Returns.insert(RI);
+    }
+  }
+
+  for (ReturnInst *RI : Returns) {
+    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+    CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+  }
+  for (ResumeInst *RI : Resumes) {
     // If throwing an exception, store the exception object and selector value
     // in fiber local storage, call setjmp, and call pause_frame.
-    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
-      Value *Exn = Builder->CreateExtractValue(RI->getValue(),
-                                               {0});
-      // Return to runtime
-      Builder->CreateCall(CILKRTS_FUNC(pop_frame), SF);
-      // inlined
-      Builder->CreateCall(GetCilkPauseFrameFn(), {SF, Exn});
-    } else {
-      // Return to runtime
-      Builder->CreateCall(CILKRTS_FUNC(pop_frame), SF);
-      Builder->CreateCall(CILKRTS_FUNC(leave_frame), SF);
-    }
+    Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
+    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+    CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
   }
 
   // NOTE(grace): This currently doesn't do anything anyways b/c
