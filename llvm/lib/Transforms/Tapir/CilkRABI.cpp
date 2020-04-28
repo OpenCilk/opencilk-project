@@ -975,7 +975,6 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     return Fn;
 
   // Create the body of __cilk_parent_epilogue.
-  const DataLayout &DL = M.getDataLayout();
 
   Function::arg_iterator Args = Fn->arg_begin();
   Value *SF = &*Args;
@@ -1064,11 +1063,11 @@ Value* CilkRABI::GetOrInitCilkStackFrame(Function &F, bool Helper = true) {
   else
     IRB.CreateCall(CILKRTS_FUNC(enter_frame), Args);
 
-  EscapeEnumerator EE(F, "cilkabi_epilogue", false);
-  while (IRBuilder<> *AtExit = EE.Next()) {
-    if (isa<ReturnInst>(AtExit->GetInsertPoint()))
-      AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
-  }
+  // EscapeEnumerator EE(F, "cilkabi_epilogue", false);
+  // while (IRBuilder<> *AtExit = EE.Next()) {
+  //   if (isa<ReturnInst>(AtExit->GetInsertPoint()))
+  //     AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
+  // }
   return SF;
 }
 
@@ -1112,30 +1111,30 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
     IRB.CreateCall(CILKRTS_FUNC(detach), Args);
   }
 
-  SmallPtrSet<ReturnInst*, 8> Returns;
-  SmallPtrSet<ResumeInst*, 8> Resumes;
+  // SmallPtrSet<ReturnInst*, 8> Returns;
+  // SmallPtrSet<ResumeInst*, 8> Resumes;
 
-  // Add eh cleanup that returns control to the runtime
-  EscapeEnumerator EE(Extracted, "cilkrabi_cleanup", true);
-  while (IRBuilder<> *Builder = EE.Next()) {
-    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
-      Resumes.insert(RI);
-    } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint())) {
-      Returns.insert(RI);
-    }
-  }
-
-  // for (ReturnInst *RI : Returns) {
-  //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-  //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+  // // Add eh cleanup that returns control to the runtime
+  // EscapeEnumerator EE(Extracted, "cilkrabi_cleanup", true);
+  // while (IRBuilder<> *Builder = EE.Next()) {
+  //   if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
+  //     Resumes.insert(RI);
+  //   } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint())) {
+  //     Returns.insert(RI);
+  //   }
   // }
-  for (ResumeInst *RI : Resumes) {
-    // If throwing an exception, store the exception object and selector value
-    // in fiber local storage, call setjmp, and call pause_frame.
-    Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
-    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
-  }
+
+  // // for (ReturnInst *RI : Returns) {
+  // //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+  // //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+  // // }
+  // for (ResumeInst *RI : Resumes) {
+  //   // If throwing an exception, store the exception object and selector value
+  //   // in fiber local storage, call setjmp, and call pause_frame.
+  //   Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
+  //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+  //   CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
+  // }
 
   // NOTE(grace): This currently doesn't do anything anyways b/c
   //              CatchExceptions == false
@@ -1254,10 +1253,16 @@ void CilkRABI::lowerSync(SyncInst &SI) {
 
 void CilkRABI::processOutlinedTask(Function &F, Instruction *DetachPt,
                                    Instruction *TaskFrameCreate) {
+  if (!DetachCtxToStackFrame.count(&F)) {
+    // We need to set up the stack frame in this outlined task.  For CilkRABI,
+    // the setup is the same as if F were a spawner.
+    preProcessSpawner(F);
+    postProcessSpawner(F);
+  }
   makeFunctionDetachable(F, DetachPt, TaskFrameCreate);
 }
 
-void CilkRABI::processSpawner(Function &F) {
+void CilkRABI::preProcessSpawner(Function &F) {
   GetOrInitCilkStackFrame(F, /*Helper=*/false);
   // AllocaInst *SF = CreateStackFrame(F);
   // DetachCtxToStackFrame[&F] = SF;
@@ -1272,6 +1277,34 @@ void CilkRABI::processSpawner(Function &F) {
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
+}
+
+void CilkRABI::postProcessSpawner(Function &F) {
+  Value *SF = GetOrInitCilkStackFrame(F, /*Helper=*/false);
+  SmallPtrSet<ReturnInst*, 8> Returns;
+  SmallPtrSet<ResumeInst*, 8> Resumes;
+
+  // Add eh cleanup that returns control to the runtime
+  EscapeEnumerator EE(F, "cilkrabi_cleanup", true);
+  while (IRBuilder<> *Builder = EE.Next()) {
+    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
+      Resumes.insert(RI);
+    } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint())) {
+      Returns.insert(RI);
+    }
+  }
+
+  for (ReturnInst *RI : Returns) {
+    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+    CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+  }
+  for (ResumeInst *RI : Resumes) {
+    // If throwing an exception, store the exception object and selector value
+    // in fiber local storage, call setjmp, and call pause_frame.
+    Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
+    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+    CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
+  }
 }
 
 void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
