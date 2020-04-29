@@ -44,6 +44,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee CilkRTSPauseFrame = nullptr;
   FunctionCallee CilkRTSCheckExceptionResume = nullptr;
   FunctionCallee CilkRTSCheckExceptionRaise = nullptr;
+  FunctionCallee CilkRTSSetExnSel = nullptr;
 
   int FrameVersion;
 
@@ -56,6 +57,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee Get__cilkrts_pause_frame();
   FunctionCallee Get__cilkrts_check_exception_resume();
   FunctionCallee Get__cilkrts_check_exception_raise();
+  FunctionCallee Get__cilkrts_set_exn_sel();
 
   // Accessors for generated Cilk RTS functions
   Function *Get__cilkrts_enter_frame();
@@ -73,6 +75,8 @@ class CilkRABI : public TapirTarget {
   CallInst *EmitCilkSetJmp(IRBuilder<> &B, Value *SF);
   bool makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
                               Instruction *TaskFrameCreate);
+  void processExceptionHandling(Function &F);
+  void replaceLPadExnSel(Function &F, LandingPadInst *LPI);
 
 public:
   CilkRABI(Module &M, bool OpenCilk);

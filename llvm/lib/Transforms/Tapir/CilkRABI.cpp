@@ -208,11 +208,34 @@ FunctionCallee CilkRABI::Get__cilkrts_pause_frame() {
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
+  IntegerType *SelTy = Type::getInt32Ty(C);
   CilkRTSPauseFrame = M.getOrInsertFunction("__cilkrts_pause_frame", AL, VoidTy,
-                                            StackFramePtrTy, ExnPtrTy);
+                                            StackFramePtrTy, ExnPtrTy, SelTy);
 
   return CilkRTSPauseFrame;
 }
+
+FunctionCallee CilkRABI::Get__cilkrts_set_exn_sel() {
+  if (CilkRTSSetExnSel)
+    return CilkRTSSetExnSel;
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
+  IntegerType *SelTy = Type::getInt32Ty(C);
+  PointerType *NewExnPtrPtrTy = PointerType::getUnqual(ExnPtrTy);
+  PointerType *NewSelPtrTy = Type::getInt32PtrTy(C);
+
+  CilkRTSSetExnSel = M.getOrInsertFunction("__cilkrts_set_exn_sel", AL, VoidTy,
+                                            ExnPtrTy, SelTy, NewExnPtrPtrTy,
+                                            NewSelPtrTy);
+
+  return CilkRTSSetExnSel;
+}
+
 
 FunctionCallee CilkRABI::Get__cilkrts_check_exception_resume() {
   if (CilkRTSCheckExceptionResume)
@@ -711,9 +734,10 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   PointerType *ExnPtrTy = Type::getInt8PtrTy(Ctx);
+  IntegerType *SelTy = Type::getInt32Ty(Ctx);
   Function *Fn = nullptr;
   if (GetOrCreateFunction(M, "__cilk_pause_frame",
-                          FunctionType::get(VoidTy, {StackFramePtrTy, ExnPtrTy}, false),
+                          FunctionType::get(VoidTy, {StackFramePtrTy, ExnPtrTy, SelTy}, false),
                           Fn))
     return Fn;
 
@@ -722,6 +746,8 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   Value *SF = &*Args;
   ++Args;
   Value *Exn = &*Args;
+  ++Args;
+  Value *Sel = &*Args;
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.pause.frame.test", Fn);
   BasicBlock *PauseFrameCall = BasicBlock::Create(Ctx, "cilk.pause.frame.runtimecall", Fn);
@@ -741,8 +767,8 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   {
     IRBuilder<> B(PauseFrameCall);
 
-    // __cilkrts_pause_frame(&sf, &exn);
-    B.CreateCall(CILKRTS_FUNC(pause_frame), {SF, Exn});
+    // __cilkrts_pause_frame(&sf, &exn, sel);
+    B.CreateCall(CILKRTS_FUNC(pause_frame), {SF, Exn, Sel});
     B.CreateBr(Exit);
   }
 
@@ -1244,6 +1270,80 @@ void CilkRABI::processOutlinedTask(Function &F, Instruction *DetachPt,
   makeFunctionDetachable(F, DetachPt, TaskFrameCreate);
 }
 
+
+// HERE
+void CilkRABI::replaceLPadExnSel(Function &F, LandingPadInst *LPI) {
+  const DataLayout &DL = F.getParent()->getDataLayout();
+  LLVMContext &C = M.getContext();
+
+  BasicBlock *BB = LPI->getParent();
+  IRBuilder<> B(&*BB->getFirstInsertionPt());
+
+  // types
+  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
+  IntegerType *SelTy = Type::getInt32Ty(C);
+
+  // extract Exn and Sel from the landingpad
+  Value *Exn = B.CreateExtractValue(LPI, { 0 });
+  Value *Sel = B.CreateExtractValue(LPI, { 1 });
+
+  // allocate space for NewExn and NewSel
+  AllocaInst *NewExn = B.CreateAlloca(ExnPtrTy, DL.getAllocaAddrSpace(),
+                                      /*ArraySize*/nullptr,
+                                      /*Name*/"new_exn");
+  AllocaInst *NewSel = B.CreateAlloca(SelTy, DL.getAllocaAddrSpace(),
+                                      /*ArraySize*/nullptr,
+                                      /*Name*/"new_sel");
+
+  // load from NewExn and NewSel
+  LoadInst *NewExnVal = B.CreateLoad(NewExn);
+  LoadInst *NewSelVal = B.CreateLoad(NewSel);
+
+  // find all (non-Exn + Sel) ExtractValueInst uses of LPI, and replace their
+  // uses with NewExnVal and NewSelVal
+  for (auto UI = LPI->user_begin(), E = LPI->user_end(); UI != E; ++UI) {
+    if (ExtractValueInst *EVI = dyn_cast<ExtractValueInst>(*UI)) {
+      // should only have one index
+      unsigned idx = EVI->getIndices().front();
+      if (idx == 0) {
+        EVI->replaceAllUsesWith(NewExnVal);
+      } else if (idx == 1) {
+        EVI->replaceAllUsesWith(NewSelVal);
+      } else {
+        // something's weird...
+      }
+    } else if (ResumeInst *RI = dyn_cast<ResumeInst>(*UI)) {
+      IRBuilder<> BRI(RI);
+      auto NewPair = BRI.CreateInsertValue(
+                                        UndefValue::get(
+                                          StructType::get(Type::getInt8PtrTy(C),
+                                          Type::getInt32Ty(C))), NewExnVal, {0});
+      NewPair = BRI.CreateInsertValue(NewPair, NewSelVal, {1});
+      BRI.CreateResume(NewPair);
+      RI->eraseFromParent();
+    }
+  }
+
+  // call __cilkrts_set_exn_sel
+  // (Doing this last because we don't want the ReplaceAllUsesWith to
+  // affect this function.)
+  IRBuilder<> B2(NewExnVal);
+  B2.CreateCall(CILKRTS_FUNC(set_exn_sel), {Exn, Sel, NewExn, NewSel});
+}
+
+void CilkRABI::processExceptionHandling(Function &F) {
+  SmallPtrSet<BasicBlock*, 4> UnwindDests;
+  // iterate over BBs in F. Look for BBs that end in an InvokeInst, then
+  // fix their lpads. (don't repeat lpads)
+  for (BasicBlock &BB : F) {
+    if (InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator())) {
+      auto p = UnwindDests.insert(II->getUnwindDest());
+      if (p.second)
+        replaceLPadExnSel(F, II->getLandingPadInst());
+    }
+  }
+}
+
 void CilkRABI::preProcessSpawner(Function &F) {
   GetOrInitCilkStackFrame(F, /*Helper=*/false);
   // AllocaInst *SF = CreateStackFrame(F);
@@ -1256,6 +1356,9 @@ void CilkRABI::preProcessSpawner(Function &F) {
                                             "__cilk_personality_v0",
                                             FTy).getCallee());
   F.setPersonalityFn(Personality);
+
+  // Fix landingpads to look up the correct exn + sel from the closure
+  processExceptionHandling(F);
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
@@ -1284,8 +1387,9 @@ void CilkRABI::postProcessSpawner(Function &F) {
     // If throwing an exception, store the exception object and selector value
     // in fiber local storage, call setjmp, and call pause_frame.
     Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
+    Value *Sel = ExtractValueInst::Create(RI->getValue(), { 1 }, "", RI);
     CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
+    CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn, Sel}, "", RI);
   }
 }
 
