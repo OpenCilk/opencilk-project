@@ -755,7 +755,7 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   {
     IRBuilder<> B(Exit);
 
-    B.CreateCall(CILKRTS_FUNC(check_exception_resume), {SF});
+    //B.CreateCall(CILKRTS_FUNC(check_exception_resume), {SF});
     B.CreateRetVoid();
   }
 
@@ -1256,7 +1256,7 @@ void CilkRABI::processOutlinedTask(Function &F, Instruction *DetachPt,
   if (!DetachCtxToStackFrame.count(&F)) {
     // We need to set up the stack frame in this outlined task.  For CilkRABI,
     // the setup is the same as if F were a spawner.
-    preProcessSpawner(F);
+    //preProcessSpawner(F);
     postProcessSpawner(F);
   }
   makeFunctionDetachable(F, DetachPt, TaskFrameCreate);
