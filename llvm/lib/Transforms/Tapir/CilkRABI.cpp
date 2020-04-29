@@ -842,7 +842,7 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
   {
     IRBuilder<> B(Exit);
 
-    B.CreateCall(CILKRTS_FUNC(check_exception_resume), {SF});
+    //B.CreateCall(CILKRTS_FUNC(check_exception_resume), {SF});
     B.CreateRetVoid();
   }
 
