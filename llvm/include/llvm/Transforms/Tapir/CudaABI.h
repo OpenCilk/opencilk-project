@@ -36,9 +36,14 @@ public:
     override final;
   void postProcessHelper(Function &F) override final;
 
-  void processOutlinedTask(Function &F, Instruction *DetachPt,
-                           Instruction *TaskFrameCreate) override final;
-  void processSpawner(Function &F) override final;
+  void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                              Instruction *TaskFrameCreate,
+                              bool IsSpawner) override final;
+  void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                               Instruction *TaskFrameCreate,
+                               bool IsSpawner) override final;
+  void preProcessRootSpawner(Function &F) override final;
+  void postProcessRootSpawner(Function &F) override final;
   void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT)
     override final;
 
