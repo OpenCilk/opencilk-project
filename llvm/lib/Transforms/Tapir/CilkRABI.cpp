@@ -926,32 +926,18 @@ AllocaInst *CilkRABI::CreateStackFrame(Function &F) {
   return SF;
 }
 
-Value* CilkRABI::GetOrInitCilkStackFrame(Function &F, bool Helper = true) {
+Value* CilkRABI::GetOrCreateCilkStackFrame(Function &F) {
   if (DetachCtxToStackFrame.count(&F))
     return DetachCtxToStackFrame[&F];
 
   AllocaInst *SF = CreateStackFrame(F);
   DetachCtxToStackFrame[&F] = SF;
-  BasicBlock::iterator InsertPt = ++SF->getIterator();
-  IRBuilder<> IRB(&(F.getEntryBlock()), InsertPt);
 
-  Value *Args[1] = { SF };
-  if (Helper)
-    IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
-  else
-    IRB.CreateCall(CILKRTS_FUNC(enter_frame), Args);
-
-  EscapeEnumerator EE(F, "cilkabi_epilogue", false);
-  while (IRBuilder<> *AtExit = EE.Next()) {
-    if (isa<ReturnInst>(AtExit->GetInsertPoint()))
-      AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
-  }
   return SF;
 }
 
-bool CilkRABI::makeFunctionDetachable(Function &Extracted,
-                                      Instruction *DetachPt,
-                                      Instruction *TaskFrameCreate) {
+void CilkRABI::InsertDetach(Function &F, Instruction *DetachPt,
+                            Instruction *TaskFrameCreate) {
   /*
     __cilkrts_stack_frame sf;
     __cilkrts_enter_frame_fast(&sf);
@@ -959,28 +945,21 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
     *x = f(y);
   */
 
-  // const DataLayout& DL = M->getDataLayout();
-  // AllocaInst *SF = CreateStackFrame(Extracted);
-  // DetachCtxToStackFrame[&Extracted] = SF;
-  AllocaInst *SF =
-      cast<AllocaInst>(GetOrInitCilkStackFrame(Extracted, /*Helper*/false));
+  AllocaInst *SF = cast<AllocaInst>(GetOrCreateCilkStackFrame(F));
   assert(SF && "No Cilk stack frame for Cilk function.");
   Value *Args[1] = { SF };
 
   // Scan function to see if it detaches.
   LLVM_DEBUG({
-      bool SimpleHelper = !canDetach(&Extracted);
+      bool SimpleHelper = !canDetach(&F);
       if (!SimpleHelper)
         dbgs() << "NOTE: Detachable helper function itself detaches.\n";
     });
 
   BasicBlock::iterator InsertPt = ++SF->getIterator();
-  IRBuilder<> IRB(&(Extracted.getEntryBlock()), InsertPt);
+  IRBuilder<> IRB(&(F.getEntryBlock()), InsertPt);
   if (TaskFrameCreate)
     IRB.SetInsertPoint(TaskFrameCreate);
-
-  // dbgs() << "  Inserting enter_frame for function " << Extracted.getName() << "\n";
-  // IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
 
   // Call __cilkrts_detach
   {
@@ -989,34 +968,9 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
     IRB.CreateCall(CILKRTS_FUNC(detach), Args);
   }
 
-  SmallPtrSet<ReturnInst*, 8> Returns;
-  SmallPtrSet<ResumeInst*, 8> Resumes;
-
-  // Add eh cleanup that returns control to the runtime
-  EscapeEnumerator EE(Extracted, "cilkrabi_cleanup", true);
-  while (IRBuilder<> *Builder = EE.Next()) {
-    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
-      Resumes.insert(RI);
-    } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint())) {
-      Returns.insert(RI);
-    }
-  }
-
-  // for (ReturnInst *RI : Returns) {
-  //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-  //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
-  // }
-  for (ResumeInst *RI : Resumes) {
-    // If throwing an exception, store the exception object and selector value
-    // in fiber local storage, call setjmp, and call pause_frame.
-    Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
-    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
-  }
-
   // NOTE(grace): This currently doesn't do anything anyways b/c
   //              CatchExceptions == false
-  //EscapeEnumerator EE(Extracted, "cilkrabi_epilogue", false);
+  //EscapeEnumerator EE(F, "cilkrabi_epilogue", false);
   //while (IRBuilder<> *AtExit = EE.Next()) {
   //  if (isa<ReturnInst>(AtExit->GetInsertPoint()))
   //    AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
@@ -1047,11 +1001,75 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
         if (sf->flags)
           __cilkrts_leave_frame(&sf);
       */
-      AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
+  //    AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
+  //  }
+  //}
+}
+
+void CilkRABI::InsertStackFramePush(Function &F, Instruction *TaskFrameCreate,
+                                    bool Helper) {
+  AllocaInst *SF = cast<AllocaInst>(GetOrCreateCilkStackFrame(F));
+
+  BasicBlock::iterator InsertPt = ++SF->getIterator();
+  IRBuilder<> IRB(&(F.getEntryBlock()), InsertPt);
+  if (TaskFrameCreate)
+    IRB.SetInsertPoint(TaskFrameCreate);
+
+  Value *Args[1] = { SF };
+  if (Helper)
+    IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
+  else
+    IRB.CreateCall(CILKRTS_FUNC(enter_frame), Args);
+}
+
+void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
+                                   bool InsertPauseFrame) {
+  Value *SF = GetOrCreateCilkStackFrame(F);
+  SmallPtrSet<ReturnInst*, 8> Returns;
+  SmallPtrSet<ResumeInst*, 8> Resumes;
+
+  // Add eh cleanup that returns control to the runtime
+  EscapeEnumerator EE(F, "cilkrabi_cleanup", PromoteCallsToInvokes);
+  while (IRBuilder<> *Builder = EE.Next()) {
+    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
+      Resumes.insert(RI);
+    } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint())) {
+      Returns.insert(RI);
     }
   }
 
-  return true;
+  for (ReturnInst *RI : Returns) {
+    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+    CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+  }
+  for (ResumeInst *RI : Resumes) {
+    // Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
+    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+    if (InsertPauseFrame)
+      // // If throwing an exception, store the exception object and selector value
+      // // in the closure, call setjmp, and call pause_frame.
+      // CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
+      CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+    else
+      CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+  }
+}
+
+void CilkRABI::MarkSpawner(Function &F) {
+  // if (F.hasPersonalityFn()) {
+  //   // Use the Cilk personality function.
+  //   Function *GXXPersonality = M.getFunction("__gxx_personality_v0");
+  //   assert(GXXPersonality &&
+  //          "Personality function __gxx_personality_v0 not found");
+  //   FunctionType *FTy = GXXPersonality->getFunctionType();
+  //   Function *Personality = cast<Function>(M.getOrInsertFunction(
+  //                                              "__cilk_personality_v0",
+  //                                              FTy).getCallee());
+  //   F.setPersonalityFn(Personality);
+  // }
+
+  // Mark this function as stealable.
+  F.addFnAttr(Attribute::Stealable);
 }
 
 /// Lower a call to get the grainsize of this Tapir loop.
@@ -1088,7 +1106,12 @@ Value *CilkRABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
 
 void CilkRABI::lowerSync(SyncInst &SI) {
   Function &Fn = *SI.getFunction();
-  Value *SF = GetOrInitCilkStackFrame(Fn, /*Helper*/false);
+  if (!DetachCtxToStackFrame[&Fn])
+    // If we have not created a stackframe for this function, then we don't need
+    // to handle the sync.
+    return;
+
+  Value *SF = GetOrCreateCilkStackFrame(Fn);
   Value *Args[] = { SF };
   assert(Args[0] && "sync used in function without frame!");
 
@@ -1129,19 +1152,46 @@ void CilkRABI::lowerSync(SyncInst &SI) {
   Fn.addFnAttr(Attribute::Stealable);
 }
 
-void CilkRABI::processOutlinedTask(Function &F, Instruction *DetachPt,
-                                   Instruction *TaskFrameCreate) {
-  makeFunctionDetachable(F, DetachPt, TaskFrameCreate);
+void CilkRABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                      Instruction *TaskFrameCreate,
+                                      bool IsSpawner) {
+  // If the outlined task F itself performs spawns, set up F to support stealing
+  // continuations.
+  if (IsSpawner)
+    MarkSpawner(F);
+
+  InsertStackFramePush(F, TaskFrameCreate, /*Helper*/false);
+  InsertDetach(F, DetachPt, TaskFrameCreate);
 }
 
-void CilkRABI::processSpawner(Function &F) {
-  GetOrInitCilkStackFrame(F, /*Helper=*/false);
-  // AllocaInst *SF = CreateStackFrame(F);
-  // DetachCtxToStackFrame[&F] = SF;
-  // assert(SF && "No Cilk stack frame for Cilk function.");
+void CilkRABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                       Instruction *TaskFrameCreate,
+                                       bool IsSpawner) {
+  // Because F is a spawned task, we want to insert landingpads for all calls
+  // that can throw, so we can pop the stackframe correctly if they do throw.
+  // In particular, popping the stackframe of a spawned task may discover that
+  // the parent was stolen, in which case we want to save the exception for
+  // later reduction.
+  InsertStackFramePop(F, /*PromoteCallsToInvokes*/true,
+                      /*InsertPauseFrame*/true);
 
-  // Mark this function as stealable.
-  F.addFnAttr(Attribute::Stealable);
+  // TODO: If F is itself a spawner, see if we need to ensure that the Cilk
+  // personality function does not pop an already-popped frame.  We might be
+  // able to do this by checking if sf->call_parent == NULL before performing a
+  // pop in the personality function.
+}
+
+void CilkRABI::preProcessRootSpawner(Function &F) {
+  MarkSpawner(F);
+  InsertStackFramePush(F);
+}
+
+void CilkRABI::postProcessRootSpawner(Function &F) {
+  // F is a root spawner, not itself a spawned task.  We don't need to promote
+  // calls to invokes, since the Cilk personality function will take care of
+  // popping the frame if no landingpad exists for a given call.
+  InsertStackFramePop(F, /*PromoteCallsToInvokes*/false,
+                      /*InsertPauseFrame*/false);
 }
 
 void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
