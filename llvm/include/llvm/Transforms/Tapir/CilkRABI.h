@@ -63,11 +63,21 @@ class CilkRABI : public TapirTarget {
   Function *GetCilkSyncFn();
   Function *GetCilkParentEpilogueFn();
   void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
+
   AllocaInst *CreateStackFrame(Function &F);
-  Value *GetOrInitCilkStackFrame(Function &F, bool Helper);
+  Value *GetOrCreateCilkStackFrame(Function &F);
+
+  void InsertStackFramePush(Function &F, Instruction *TaskFrameCreate = nullptr,
+                            bool Helper = false);
+  void InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
+                           bool InsertPauseFrame);
+
   CallInst *EmitCilkSetJmp(IRBuilder<> &B, Value *SF);
-  bool makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
-                              Instruction *TaskFrameCreate);
+
+  void InsertDetach(Function &F, Instruction *DetachPt,
+                    Instruction *TaskFrameCreate);
+
+  void MarkSpawner(Function &F);
 
 public:
   CilkRABI(Module &M, bool OpenCilk);
@@ -86,9 +96,14 @@ public:
     override final;
   void postProcessHelper(Function &F) override final;
 
-  void processOutlinedTask(Function &F, Instruction *DetachPt,
-                           Instruction *TaskFrameCreate) override final;
-  void processSpawner(Function &F) override final;
+  void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                              Instruction *TaskFrameCreate,
+                              bool IsSpawner) override final;
+  void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                               Instruction *TaskFrameCreate,
+                               bool IsSpawner) override final;
+  void preProcessRootSpawner(Function &F) override final;
+  void postProcessRootSpawner(Function &F) override final;
   void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT)
     override final;
 

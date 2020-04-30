@@ -171,20 +171,19 @@ using TFOutlineMapTy = DenseMap<const Spindle *, TaskOutlineInfo>;
 ///
 ///   e) For each Tapir task T in F in post-order:
 ///
-///     i) Run TapirTarget::processOutlinedTask(Helper[T]).
+///     i) Run TapirTarget::preProcessOutlinedTask(Helper[T]).
 ///
-///     ii) If Helper[T] itself spawns tasks:
-///
-///       1. Run TapirTarget::processSpawner(Helper[T]).
-///
-///       2. For each subtask SubT spawned by Helper[T], run
+///     ii) For each subtask SubT spawned by Helper[T], run
 ///       TapirTarget::processSubTaskCall(Helper[SubT])
 ///
-///     iii) Process the grainsize calls, task-frameaddress calls, and sync
+///     iii) Run TapirTarget::postProcessOutlinedTask(Helper[T]).
+///
+///     iv) Process the grainsize calls, task-frameaddress calls, and sync
 ///     instructions in Helper[T].
 ///
-///   e) If F spawns tasks, run TapirTarget::processSpawner(F), and then for
-///   each child task T of F, run TapirTarget::processSubTaskCall(Helper[T]).
+///   e) If F spawns tasks, run TapirTarget::preProcessRootSpawner(F); then, for
+///   each child task T of F, run TapirTarget::processSubTaskCall(Helper[T]);
+///   and finally run TapirTarget::postProcessRootSpawner(F).
 ///
 ///   f) Process the grainsize calls, task-frameaddress calls, and sync
 ///   instructions in F.
@@ -254,15 +253,25 @@ public:
   // Add attributes to the Function Helper produced from outlining a task.
   virtual void addHelperAttributes(Function &Helper) {}
 
-  // Process the Function F that has just been outlined from a task.  This
+  // Pre-process the Function F that has just been outlined from a task.  This
   // routine is executed on each outlined function by traversing in post-order
   // the tasks in the original function.
-  virtual void processOutlinedTask(Function &F, Instruction *DetachPt,
-                                   Instruction *TaskFrameCreate) = 0;
+  virtual void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                      Instruction *TaskFrameCreate,
+                                      bool IsSpawner) = 0;
 
-  // Process the Function F as a function that can spawn subtasks.  This routine
-  // is called after processOutlinedTask.
-  virtual void processSpawner(Function &F) = 0;
+  // Post-process the Function F that has just been outlined from a task.  This
+  // routine is executed on each outlined function by traversing in post-order
+  // the tasks in the original function.
+  virtual void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                       Instruction *TaskFrameCreate,
+                                       bool IsSpawner) = 0;
+
+  // Pre-process the root Function F as a function that can spawn subtasks.
+  virtual void preProcessRootSpawner(Function &F) = 0;
+
+  // Post-process the root Function F as a function that can spawn subtasks.
+  virtual void postProcessRootSpawner(Function &F) = 0;
 
   // Process the invocation of a task for an outlined function.  This routine is
   // invoked after processSpawner once for each child subtask.
