@@ -6204,6 +6204,9 @@ static bool serializeDetachToImmediateSync(BasicBlock *BB) {
 /// a reattach or predecessor does terminate with detach.
 static bool serializeTrivialDetachedBlock(BasicBlock *BB) {
   Instruction *I = BB->getFirstNonPHIOrDbgOrLifetime();
+  // Skip a possible taskframe.use intrinsic in the task.
+  if (isTapirIntrinsic(Intrinsic::taskframe_use, I))
+    I = &*(++(I->getIterator()));
   if (ReattachInst *RI = dyn_cast<ReattachInst>(I)) {
     // This detached block is empty.
     // Scan predecessors to verify that all of them detach BB.
