@@ -268,11 +268,13 @@ bool TapirToTargetImpl::processRootTask(
   if (!TI.isSerial()) {
     Changed = true;
     // Process root-task function F as a spawner.
-    Target->processSpawner(F);
+    Target->preProcessRootSpawner(F);
 
     // Process each call to a subtask.
     for (Task *SubT : TI.getRootTask()->subtasks())
       Target->processSubTaskCall(TaskToOutline[SubT], DT);
+
+    Target->postProcessRootSpawner(F);
   }
   // Process the Tapir instructions in F directly.
   Changed |= processSimpleABI(F);
@@ -288,15 +290,16 @@ bool TapirToTargetImpl::processOutlinedTask(
   Function &F = *TaskToOutline[T].Outline;
   Instruction *DetachPt = TaskToOutline[T].DetachPt;
   Instruction *TaskFrameCreate = TaskToOutline[T].TaskFrameCreate;
-  if (!T->isSerial()) {
-    // Process outlined function F for a task as a spawner.
-    Target->processSpawner(F);
 
-    // Process each call to a subtask.
-    for (Task *SubT : T->subtasks())
-      Target->processSubTaskCall(TaskToOutline[SubT], DT);
-  }
-  Target->processOutlinedTask(F, DetachPt, TaskFrameCreate);
+  Target->preProcessOutlinedTask(F, DetachPt, TaskFrameCreate,
+                                 !T->isSerial());
+  // Process each call to a subtask.
+  for (Task *SubT : T->subtasks())
+    Target->processSubTaskCall(TaskToOutline[SubT], DT);
+
+  Target->postProcessOutlinedTask(F, DetachPt, TaskFrameCreate,
+                                  !T->isSerial());
+
   // Process the Tapir instructions in F directly.
   processSimpleABI(F);
   return true;
