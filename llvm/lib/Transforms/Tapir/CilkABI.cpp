@@ -1564,15 +1564,22 @@ void CilkABI::lowerSync(SyncInst &SI) {
   Fn.addFnAttr(Attribute::Stealable);
 }
 
-void CilkABI::processOutlinedTask(Function &F, Instruction *DetachPt,
-                                  Instruction *TaskFrameCreate) {
+void CilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                     Instruction *TaskFrameCreate,
+                                     bool IsSpawner) {
   NamedRegionTimer NRT("processOutlinedTask", "Process outlined task",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
   makeFunctionDetachable(F, DetachPt, TaskFrameCreate, false);
+  if (IsSpawner)
+    preProcessRootSpawner(F);
 }
 
-void CilkABI::processSpawner(Function &F) {
+void CilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                     Instruction *TaskFrameCreate,
+                                     bool IsSpawner) {}
+
+void CilkABI::preProcessRootSpawner(Function &F) {
   NamedRegionTimer NRT("processSpawner", "Process spawner",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -1581,6 +1588,8 @@ void CilkABI::processSpawner(Function &F) {
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
 }
+
+void CilkABI::postProcessRootSpawner(Function &F) {}
 
 void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   NamedRegionTimer NRT("processSubTaskCall", "Process subtask call",
