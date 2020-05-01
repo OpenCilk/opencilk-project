@@ -359,6 +359,7 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
       HasCleanups && EHStack.containsOnlyLifetimeMarkers(PrologueCleanupDepth);
   bool EmitRetDbgLoc = !HasCleanups || HasOnlyLifetimeMarkers;
   bool SyncEmitted = false;
+  bool CompilingCilk = (getLangOpts().getCilk() != LangOptions::Cilk_none);
   if (HasCleanups) {
     // Make sure the line table doesn't jump back into the body for
     // the ret after it's been at EndLoc.
@@ -372,9 +373,9 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
         AL = ApplyDebugLocation::CreateDefaultArtificial(*this, EndLoc);
     }
 
-    PopCleanupBlocks(PrologueCleanupDepth, {}, getLangOpts().Cilk);
+    PopCleanupBlocks(PrologueCleanupDepth, {}, CompilingCilk);
     SyncEmitted = true;
-  } else if (getLangOpts().Cilk && Builder.GetInsertBlock()) {
+  } else if (CompilingCilk && Builder.GetInsertBlock()) {
     // If we're compiling Cilk, emit an implicit sync for the function.
     EmitImplicitSyncCleanup();
     SyncEmitted = true;
@@ -383,7 +384,7 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
   // Emit function epilog (to return).
   llvm::DebugLoc Loc = EmitReturnBlock();
 
-  if (getLangOpts().Cilk && !SyncEmitted) {
+  if (CompilingCilk && !SyncEmitted) {
     // If we're compiling Cilk, emit an implicit sync for the function.
     EmitImplicitSyncCleanup();
     SyncEmitted = true;
