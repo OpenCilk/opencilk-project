@@ -774,9 +774,12 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough,
     if (HasFallthrough && !HasPrebranchedFallthrough &&
         !HasFixups && !HasExistingBranches) {
 
-      destroyOptimisticNormalEntry(*this, Scope);
-      if (AfterSync)
+      if (AfterSync) {
         EmitImplicitSyncCleanup();
+        return PopCleanupBlock(FallthroughIsBranchThrough, false);
+      }
+
+      destroyOptimisticNormalEntry(*this, Scope);
       EHStack.popCleanup();
 
       EmitCleanup(*this, Fn, cleanupFlags, NormalActiveFlag);
