@@ -2236,11 +2236,6 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
     }
   }
 
-  // For Cilk functions, ensure that a sync is implicitly executed before this
-  // function returns.
-  if (getLangOpts().getCilk() != LangOptions::Cilk_none)
-    EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup);
-
   // FIXME: We no longer need the types from FunctionArgList; lift up and
   // simplify.
 

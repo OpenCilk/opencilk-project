@@ -1105,11 +1105,8 @@ public:
     }
 
     void addImplicitSync() {
-      if (!InnerSyncScope) {
+      if (!InnerSyncScope)
         InnerSyncScope = new ImplicitSyncScope(CGF);
-        // >>>>>>> ?
-        CGF.EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup);
-      }
     }
   };
 
