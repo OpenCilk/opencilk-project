@@ -812,11 +812,13 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough,
           EmitSehTryScopeEnd();
       }
 
+      if (AfterSync) {
+        EmitImplicitSyncCleanup();
+        return PopCleanupBlock(FallthroughIsBranchThrough, false);
+      }
+
       destroyOptimisticNormalEntry(*this, Scope);
       EHStack.popCleanup();
-
-      if (AfterSync)
-        EmitImplicitSyncCleanup();
 
       EmitCleanup(*this, Fn, cleanupFlags, NormalActiveFlag);
 
@@ -952,11 +954,10 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough,
       }
 
       // IV.  Pop the cleanup and emit it.
-      EHStack.popCleanup();
-      assert(EHStack.hasNormalCleanups() == HasEnclosingCleanups);
-
       if (AfterSync)
         EmitImplicitSyncCleanup();
+      EHStack.popCleanup();
+      assert(EHStack.hasNormalCleanups() == HasEnclosingCleanups);
 
       EmitCleanup(*this, Fn, cleanupFlags, NormalActiveFlag);
 
