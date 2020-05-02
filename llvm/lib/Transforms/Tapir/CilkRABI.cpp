@@ -1069,7 +1069,6 @@ void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 static inline void inlineCilkFunctions(
     Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
   for (CallBase *CB : CallsToInline) {
-    Function *Fn = CB->getCalledFunction();
     InlineFunctionInfo IFI;
     InlineFunction(CB, IFI);
   }
