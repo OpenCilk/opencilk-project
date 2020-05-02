@@ -24,6 +24,7 @@ class BasicBlock;
 class DominatorTree;
 class DomTreeUpdater;
 class Loop;
+class Spindle;
 class Task;
 class TaskInfo;
 
@@ -148,12 +149,23 @@ Value *getTaskFrameUsed(BasicBlock *Detached);
 bool splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT = nullptr,
                                 TaskInfo *TI = nullptr);
 
+/// taskFrameContains - Returns true if the given basic block \p B is contained
+/// within the taskframe \p TF.
+bool taskFrameContains(const Spindle *TF, const BasicBlock *B,
+                       const TaskInfo &TI);
+
+/// taskFrameEncloses - Returns true if the given basic block \p B is enclosed
+/// within the taskframe \p TF.
+bool taskFrameEncloses(const Spindle *TF, const BasicBlock *B,
+                       const TaskInfo &TI);
+
 /// fixupTaskFrameExternalUses - Fix any uses of variables defined in
 /// taskframes, but outside of tasks themselves.  For each such variable, insert
 /// a memory allocation in the parent frame, add a store to that memory in the
 /// taskframe, and modify external uses to use the value in that memory loaded
 /// at the tasks continuation.
-void fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT);
+void fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
+                                const DominatorTree &DT);
 
 /// FindTaskFrameCreateInBlock - Return the taskframe.create intrinsic in \p BB,
 /// or nullptr if no taskframe.create intrinsic exists in \p BB.
