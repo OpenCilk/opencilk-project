@@ -240,7 +240,7 @@ bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
   if (isa<DbgInfoIntrinsic>(I))
     return true;
 
-  if (isDetachedRethrow(&I))
+  if (isDetachedRethrow(&I) || isTaskFrameResume(&I) || isSyncUnwind(&I))
     return true;
 
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
@@ -272,12 +272,9 @@ bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
     case Intrinsic::coro_param:
     case Intrinsic::coro_subfn_addr:
     case Intrinsic::syncregion_start:
-    case Intrinsic::detached_rethrow:
     case Intrinsic::taskframe_create:
     case Intrinsic::taskframe_use:
-    case Intrinsic::taskframe_resume:
     case Intrinsic::taskframe_load_guard:
-    case Intrinsic::sync_unwind:
       // These intrinsics don't actually represent code after lowering.
       return true;
     }
@@ -730,11 +727,11 @@ static BasicBlock *SplitOffPreds(BasicBlock *BB,
   if (BB->isLandingPad()) {
     SmallVector<BasicBlock *, 2> NewBBs;
     SplitLandingPadPredecessors(BB, Preds, ".csi-split-lp", ".csi-split",
-                                NewBBs, DT);
+                                NewBBs, DT, LI);
     return NewBBs[1];
   }
 
-  SplitBlockPredecessors(BB, Preds, ".csi-split", DT);
+  SplitBlockPredecessors(BB, Preds, ".csi-split", DT, LI);
   return BB;
 }
 
@@ -747,7 +744,9 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
 
   SmallVector<BasicBlock *, 4> DetachPreds;
   SmallVector<BasicBlock *, 4> DetRethrowPreds;
+  SmallVector<BasicBlock *, 4> TFResumePreds;
   SmallVector<BasicBlock *, 4> SyncPreds;
+  SmallVector<BasicBlock *, 4> SyncUnwindPreds;
   SmallVector<BasicBlock *, 4> AllocFnPreds;
   SmallVector<BasicBlock *, 4> InvokePreds;
   bool HasOtherPredTypes = false;
@@ -759,8 +758,12 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
       DetachPreds.push_back(Pred);
     else if (isDetachedRethrow(Pred->getTerminator()))
       DetRethrowPreds.push_back(Pred);
+    else if (isTaskFrameResume(Pred->getTerminator()))
+      TFResumePreds.push_back(Pred);
     else if (isa<SyncInst>(Pred->getTerminator()))
       SyncPreds.push_back(Pred);
+    else if (isSyncUnwind(Pred->getTerminator()))
+      SyncUnwindPreds.push_back(Pred);
     else if (isAllocationFn(Pred->getTerminator(), TLI))
       AllocFnPreds.push_back(Pred);
     else if (isa<InvokeInst>(Pred->getTerminator()))
@@ -771,7 +774,9 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
 
   NumPredTypes = static_cast<unsigned>(!DetachPreds.empty()) +
                  static_cast<unsigned>(!DetRethrowPreds.empty()) +
+                 static_cast<unsigned>(!TFResumePreds.empty()) +
                  static_cast<unsigned>(!SyncPreds.empty()) +
+                 static_cast<unsigned>(!SyncUnwindPreds.empty()) +
                  static_cast<unsigned>(!AllocFnPreds.empty()) +
                  static_cast<unsigned>(!InvokePreds.empty()) +
                  static_cast<unsigned>(HasOtherPredTypes);
@@ -786,8 +791,16 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
     BBToSplit = SplitOffPreds(BBToSplit, DetRethrowPreds, DT, LI);
     NumPredTypes--;
   }
+  if (!TFResumePreds.empty() && NumPredTypes > 1) {
+    BBToSplit = SplitOffPreds(BBToSplit, TFResumePreds, DT, LI);
+    NumPredTypes--;
+  }
   if (!SyncPreds.empty() && NumPredTypes > 1) {
     BBToSplit = SplitOffPreds(BBToSplit, SyncPreds, DT, LI);
+    NumPredTypes--;
+  }
+  if (!SyncUnwindPreds.empty() && NumPredTypes > 1) {
+    BBToSplit = SplitOffPreds(BBToSplit, SyncUnwindPreds, DT, LI);
     NumPredTypes--;
   }
   if (!AllocFnPreds.empty() && NumPredTypes > 1) {
