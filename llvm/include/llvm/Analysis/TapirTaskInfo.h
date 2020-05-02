@@ -71,8 +71,10 @@ private:
   // If this spindle starts with a taskframe.create, TaskFrameUser points to the
   // task that uses that created taskframe.
   Task *TaskFrameUser = nullptr;
-  SmallVector<Task *, 1> TaskFrameSubtasks;
-  SmallVector<Spindle *, 1> TaskFrameSpindles;
+  Spindle *TaskFrameParent = nullptr;
+  SetVector<Spindle *> SubTaskFrames;
+  SetVector<Task *> TaskFrameSubtasks;
+  SetVector<Spindle *> TaskFrameSpindles;
 
   Spindle(const Spindle &) = delete;
   const Spindle &operator=(const Spindle &) = delete;
@@ -90,15 +92,25 @@ public:
 
   Value *getTaskFrameCreate() const;
   Task *getTaskFrameUser() const { return TaskFrameUser; }
+  Spindle *getTaskFrameParent() const { return TaskFrameParent; }
 
-  /// Return true if the specified basic block is in this task.
+  Task *getTaskFromTaskFrame() const;
+
+  /// Return true if the specified basic block is in this spindle.
   bool contains(const BasicBlock *BB) const {
     return DenseBlockSet.count(BB);
   }
 
-  /// Return true if the specified instruction is in this task.
+  /// Return true if the specified instruction is in this spindle.
   bool contains(const Instruction *Inst) const {
     return contains(Inst->getParent());
+  }
+
+  /// Returns true if the given spindle \p S is in the set of this spindle's
+  /// taskframe spindles.  Returns false if this is not a taskframe.create
+  /// spindle or if \p S is not in the set.
+  bool taskFrameContains(Spindle *S) const {
+    return TaskFrameSpindles.count(S);
   }
 
   /// Return true if this spindle is a shared EH spindle.
@@ -240,7 +252,7 @@ public:
   using adj_range = iterator_range<adj_iterator>;
   using adj_const_range = iterator_range<adj_const_iterator>;
 
-  using tf_subtask_iterator = typename SmallVectorImpl<Task *>::const_iterator;
+  using tf_subtask_iterator = typename SetVector<Task *>::const_iterator;
   using tf_subtask_const_iterator = tf_subtask_iterator;
   inline tf_subtask_iterator tf_subtask_begin() const {
     return TaskFrameSubtasks.begin();
@@ -252,8 +264,19 @@ public:
     return make_range(tf_subtask_begin(), tf_subtask_end());
   }
 
-  using tf_spindle_iterator =
-      typename SmallVectorImpl<Spindle *>::const_iterator;
+  using subtaskframe_iterator = typename SetVector<Spindle *>::const_iterator;
+  using subtaskframe_const_iterator = subtaskframe_iterator;
+  inline subtaskframe_iterator subtaskframe_begin() const {
+    return SubTaskFrames.begin();
+  }
+  inline subtaskframe_iterator subtaskframe_end() const {
+    return SubTaskFrames.end();
+  }
+  inline iterator_range<subtaskframe_iterator> subtaskframes() const {
+    return make_range(subtaskframe_begin(), subtaskframe_end());
+  }
+
+  using tf_spindle_iterator = typename SetVector<Spindle *>::const_iterator;
   using tf_spindle_const_iterator = tf_spindle_iterator;
   inline tf_spindle_iterator tf_spindle_begin() const {
     return TaskFrameSpindles.begin();
@@ -477,8 +500,7 @@ struct GraphTraits<FilteredSuccessorSpindles<const Spindle *, Filter>> {
 // all subtasks of that task.
 template <typename SpindlePtrT>
 struct InTask
-  : public FilteredSuccessorSpindles<SpindlePtrT,
-                                     InTaskFilter> {
+  : public FilteredSuccessorSpindles<SpindlePtrT, InTaskFilter> {
   inline InTask(SpindlePtrT S)
       : FilteredSuccessorSpindles<SpindlePtrT, InTaskFilter>
       (S, InTaskFilter(S)) {}
@@ -498,6 +520,40 @@ template<> struct GraphTraits<InTask<const Spindle *>> :
   using NodeRef = const Spindle *;
   static NodeRef getEntryNode(InTask<const Spindle *> G) {
     return G.first;
+  }
+};
+
+// Wrapper to traversal of taskframe tree.
+template <class GraphType>
+struct TaskFrames {
+  const GraphType &Graph;
+
+  inline TaskFrames(const GraphType &G) : Graph(G) {}
+};
+
+template <> struct GraphTraits<TaskFrames<Spindle *>> {
+  using NodeRef = Spindle *;
+  using ChildIteratorType = Spindle::subtaskframe_iterator;
+
+  static NodeRef getEntryNode(TaskFrames<Spindle *> G) { return G.Graph; }
+  static ChildIteratorType child_begin(NodeRef N) {
+    return N->subtaskframe_begin();
+  }
+  static ChildIteratorType child_end(NodeRef N) {
+    return N->subtaskframe_end();
+  }
+};
+
+template <> struct GraphTraits<TaskFrames<const Spindle *>> {
+  using NodeRef = const Spindle *;
+  using ChildIteratorType = Spindle::subtaskframe_iterator;
+
+  static NodeRef getEntryNode(TaskFrames<const Spindle *> G) { return G.Graph; }
+  static ChildIteratorType child_begin(NodeRef N) {
+    return N->subtaskframe_begin();
+  }
+  static ChildIteratorType child_end(NodeRef N) {
+    return N->subtaskframe_end();
   }
 };
 
@@ -534,6 +590,9 @@ class Task {
 
   // Set of taskframe.create spindles that are children of this task.
   SmallVector<Spindle *, 4> TaskFrameCreates;
+
+  // Set of root taskframe.create spindles that are children of this task.
+  SmallVector<Spindle *, 4> TaskFrameRoots;
 
   Task(const Task &) = delete;
   const Task &operator=(const Task &) = delete;
@@ -673,6 +732,13 @@ public:
   inline tf_iterator tf_end() const { return TaskFrameCreates.end(); }
   inline iterator_range<tf_iterator> taskframe_creates() const {
     return make_range(tf_begin(), tf_end());
+  }
+  inline tf_iterator tf_roots_begin() const {
+    return TaskFrameRoots.begin();
+  }
+  inline tf_iterator tf_roots_end() const { return TaskFrameRoots.end(); }
+  inline iterator_range<tf_iterator> taskframe_roots() const {
+    return make_range(tf_roots_begin(), tf_roots_end());
   }
 
   /// Get the number of spindles in this task in constant time.
@@ -1054,6 +1120,11 @@ class TaskInfo {
   void operator=(const TaskInfo &) = delete;
   TaskInfo(const TaskInfo &) = delete;
 
+  // Helper for computing the spindles and subtasks contained in all taskframes.
+  void findTaskFrameTreeHelper(Spindle *TFSpindle,
+                               SmallVectorImpl<Spindle *> &ParentWorkList,
+                               SmallPtrSetImpl<Spindle *> &SubTFVisited);
+
 public:
   TaskInfo() {}
   ~TaskInfo() { releaseMemory(); }
@@ -1279,7 +1350,7 @@ public:
   void analyze(Function &F, DominatorTree &DomTree);
 
   /// Compute the spindles and subtasks contained in all taskframes.
-  void findTaskFrameSubtasks();
+  void findTaskFrameTree();
 
   /// Handle invalidation explicitly.
   bool invalidate(Function &F, const PreservedAnalyses &PA,
