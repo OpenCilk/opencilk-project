@@ -591,57 +591,10 @@ static BasicBlock *HandleCallsInBlockInlinedThroughInvoke(
   return nullptr;
 }
 
-// Helper method to find a taskframe.create intrinsic in the given basic block.
-static Instruction *FindTaskFrameCreateInBlock(BasicBlock *BB) {
-  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
-    Instruction *I = &*BBI++;
-
-    // Check if this instruction is a call to taskframe_create.
-    if (CallInst *CI = dyn_cast<CallInst>(I))
-      if (CI->getCalledFunction()->getIntrinsicID() ==
-          Intrinsic::taskframe_create)
-        return CI;
-  }
-  return nullptr;
-}
-
-// Helper method to create an unwind edge for a nested taskframe or spawned
-// task.  This unwind edge is a new basic block terminated by an appropriate
-// terminator, i.e., a taskframe.resume or detached.rethrow intrinsic.
-static BasicBlock *CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
-                                           BasicBlock *UnwindEdge,
-                                           BasicBlock *Unreachable) {
-  Function *Caller = UnwindEdge->getParent();
-  Module *M = Caller->getParent();
-  LandingPadInst *OldLPad = UnwindEdge->getLandingPadInst();
-
-  // Create a new unwind edge for the detached rethrow.
-  BasicBlock *NewUnwindEdge = BasicBlock::Create(
-      Caller->getContext(), UnwindEdge->getName(), Caller);
-  IRBuilder<> Builder(NewUnwindEdge);
-
-  // Add a landingpad to the new unwind edge.
-  LandingPadInst *LPad = Builder.CreateLandingPad(OldLPad->getType(), 0,
-                                                  OldLPad->getName());
-  LPad->setCleanup(true);
-
-  // Add the terminator-function invocation.
-  Builder.CreateInvoke(Intrinsic::getDeclaration(M, TermFunc,
-                                                 { LPad->getType() }),
-                       Unreachable, UnwindEdge, { Token, LPad });
-
-  return NewUnwindEdge;
-}
-
 // Helper method to check if the given UnwindEdge unwinds a taskframe, i.e., if
 // it is terminated with a taskframe.resume intrinsic.
 static bool isTaskFrameUnwind(const BasicBlock *UnwindEdge) {
-  if (const InvokeInst *II =
-      dyn_cast<InvokeInst>(UnwindEdge->getTerminator()))
-    if (II->getCalledFunction()->getIntrinsicID() ==
-        Intrinsic::taskframe_resume)
-      return true;
-  return false;
+  return isTaskFrameResume(UnwindEdge->getTerminator());
 }
 
 // Recursively handle inlined tasks.
