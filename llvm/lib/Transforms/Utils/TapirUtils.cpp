@@ -12,6 +12,7 @@
 
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
+#include "llvm/Analysis/EHPersonalities.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DIBuilder.h"
@@ -54,6 +55,26 @@ bool llvm::isDetachedRethrow(const Instruction *I, const Value *SyncRegion) {
 bool llvm::isTaskFrameResume(const Instruction *I, const Value *TaskFrame) {
   return isa<InvokeInst>(I) &&
       isTapirIntrinsic(Intrinsic::taskframe_resume, I, TaskFrame);
+}
+
+/// Returns a taskframe.resume that uses the given taskframe, or nullptr if no
+/// taskframe.resume uses this taskframe.
+InvokeInst *llvm::getTaskFrameResume(Value *TaskFrame) {
+  // It should suffice to get the unwind destination of the first
+  // taskframe.resume we find.
+  for (User *U : TaskFrame->users())
+    if (Instruction *I = dyn_cast<Instruction>(U))
+      if (isTaskFrameResume(I))
+        return cast<InvokeInst>(I);
+  return nullptr;
+}
+
+/// Returns the unwind destination of a taskframe.resume that uses the given
+/// taskframe, or nullptr if no such unwind destination exists.
+BasicBlock *llvm::getTaskFrameResumeDest(Value *TaskFrame) {
+  if (InvokeInst *TFResume = getTaskFrameResume(TaskFrame))
+    return TFResume->getUnwindDest();
+  return nullptr;
 }
 
 /// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
@@ -1031,7 +1052,6 @@ bool llvm::canDetach(const Function *F) {
   return false;
 }
 
-
 void llvm::GetDetachedCFG(const DetachInst &DI, const DominatorTree &DT,
                           SmallPtrSetImpl<BasicBlock *> &TaskBlocks,
                           SmallPtrSetImpl<BasicBlock *> &EHBlocks,
@@ -1176,7 +1196,6 @@ void llvm::GetDetachedCFG(const DetachInst &DI, const DominatorTree &DT,
       dbgs() << "\n";
     });
 }
-
 
 // Helper function to find PHI nodes that depend on the landing pad in the
 // unwind destination of this task's detach.
@@ -1418,6 +1437,243 @@ void llvm::fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT) {
         ValueHandleBase::ValueIsRAUWd(*UseToRewrite, ContinVal);
       UseToRewrite->set(ContinVal);
     }
+  }
+}
+
+// Helper method to find a taskframe.create intrinsic in the given basic block.
+Instruction *llvm::FindTaskFrameCreateInBlock(BasicBlock *BB) {
+  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
+    Instruction *I = &*BBI++;
+
+    // Check if this instruction is a call to taskframe_create.
+    if (CallInst *CI = dyn_cast<CallInst>(I))
+      if (isTapirIntrinsic(Intrinsic::taskframe_create, I))
+        return CI;
+  }
+  return nullptr;
+}
+
+// Helper method to create an unwind edge for a nested taskframe or spawned
+// task.  This unwind edge is a new basic block terminated by an appropriate
+// terminator, i.e., a taskframe.resume or detached.rethrow intrinsic.
+BasicBlock *llvm::CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
+                                          BasicBlock *UnwindEdge,
+                                          BasicBlock *Unreachable) {
+  Function *Caller = UnwindEdge->getParent();
+  Module *M = Caller->getParent();
+  LandingPadInst *OldLPad = UnwindEdge->getLandingPadInst();
+
+  // Create a new unwind edge for the detached rethrow.
+  BasicBlock *NewUnwindEdge = BasicBlock::Create(
+      Caller->getContext(), UnwindEdge->getName(), Caller);
+  IRBuilder<> Builder(NewUnwindEdge);
+
+  // Add a landingpad to the new unwind edge.
+  LandingPadInst *LPad = Builder.CreateLandingPad(OldLPad->getType(), 0,
+                                                  OldLPad->getName());
+  LPad->setCleanup(true);
+
+  // Add the terminator-function invocation.
+  Builder.CreateInvoke(Intrinsic::getDeclaration(M, TermFunc,
+                                                 { LPad->getType() }),
+                       Unreachable, UnwindEdge, { Token, LPad });
+
+  return NewUnwindEdge;
+}
+
+static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
+                                           BasicBlock *UnwindEdge) {
+  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
+    Instruction *I = &*BBI++;
+
+    // We only need to check for function calls: inlined invoke
+    // instructions require no special handling.
+    CallInst *CI = dyn_cast<CallInst>(I);
+
+    if (!CI || CI->doesNotThrow() || isa<InlineAsm>(CI->getCalledValue()))
+      continue;
+
+    // We do not need to (and in fact, cannot) convert possibly throwing calls
+    // to @llvm.experimental_deoptimize (resp. @llvm.experimental.guard) into
+    // invokes.  The caller's "segment" of the deoptimization continuation
+    // attached to the newly inlined @llvm.experimental_deoptimize
+    // (resp. @llvm.experimental.guard) call should contain the exception
+    // handling logic, if any.
+    if (auto *F = CI->getCalledFunction())
+      if (F->getIntrinsicID() == Intrinsic::experimental_deoptimize ||
+          F->getIntrinsicID() == Intrinsic::experimental_guard)
+        continue;
+
+    changeToInvokeAndSplitBasicBlock(CI, UnwindEdge);
+    return BB;
+  }
+  return nullptr;
+}
+
+// Recursively handle inlined tasks.
+static void PromoteCallsInTasksHelper(
+    BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
+    BasicBlock *Unreachable, Value *CurrentTaskFrame,
+    SmallVectorImpl<BasicBlock *> *ParentWorklist) {
+  SmallVector<DetachInst *, 8> DetachesToReplace;
+  SmallVector<BasicBlock *, 32> Worklist;
+  // TODO: See if we need a global Visited set over all recursive calls, i.e.,
+  // to handle shared exception-handling blocks.
+  SmallPtrSet<BasicBlock *, 32> Visited;
+  Worklist.push_back(EntryBlock);
+  do {
+    BasicBlock *BB = Worklist.pop_back_val();
+    // Skip blocks we've seen before
+    if (!Visited.insert(BB).second)
+      continue;
+
+    if (Instruction *TFCreate = FindTaskFrameCreateInBlock(BB)) {
+      if (TFCreate != CurrentTaskFrame) {
+        // Split the block at the taskframe.create, if necessary.
+        BasicBlock *NewBB;
+        if (TFCreate != &BB->front())
+          NewBB = SplitBlock(BB, TFCreate);
+        else
+          NewBB = BB;
+
+        // Create an unwind edge for the taskframe.
+        BasicBlock *TaskFrameUnwindEdge = CreateSubTaskUnwindEdge(
+            Intrinsic::taskframe_resume, TFCreate, UnwindEdge,
+            Unreachable);
+
+        // Recursively check all blocks
+        PromoteCallsInTasksHelper(NewBB, TaskFrameUnwindEdge, Unreachable,
+                                  TFCreate, &Worklist);
+
+        // Remove the unwind edge for the taskframe if it is not needed.
+        if (pred_empty(TaskFrameUnwindEdge))
+          TaskFrameUnwindEdge->eraseFromParent();
+        continue;
+      }
+    }
+
+    // Promote any calls in the block to invokes.
+    while (BasicBlock *NewBB = MaybePromoteCallInBlock(BB, UnwindEdge)) {
+      BB = cast<InvokeInst>(NewBB->getTerminator())->getNormalDest();
+    }
+
+    // Ignore reattach terminators.
+    if (isa<ReattachInst>(BB->getTerminator()) ||
+        isDetachedRethrow(BB->getTerminator()))
+      continue;
+
+    // If we find a taskframe.resume terminator, add its successor to the
+    // parent search.
+    if (isTaskFrameResume(BB->getTerminator())) {
+      assert(isTaskFrameResume(UnwindEdge->getTerminator()) &&
+             "Unexpected taskframe.resume, doesn't correspond to unwind edge");
+      InvokeInst *II = cast<InvokeInst>(BB->getTerminator());
+      assert(ParentWorklist &&
+             "Unexpected taskframe.resume: no parent worklist");
+      ParentWorklist->push_back(II->getUnwindDest());
+      continue;
+    }
+
+    // Process a detach instruction specially.  In particular, process th
+    // spawned task recursively.
+    if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      if (!DI->hasUnwindDest()) {
+        // Create an unwind edge for the subtask, which is terminated with a
+        // detached-rethrow.
+        BasicBlock *SubTaskUnwindEdge = CreateSubTaskUnwindEdge(
+            Intrinsic::detached_rethrow, DI->getSyncRegion(), UnwindEdge,
+            Unreachable);
+        // Recursively check all blocks in the detached task.
+        PromoteCallsInTasksHelper(DI->getDetached(), SubTaskUnwindEdge,
+                                  Unreachable, CurrentTaskFrame, &Worklist);
+        // If the new unwind edge is not used, remove it.
+        if (pred_empty(SubTaskUnwindEdge))
+          SubTaskUnwindEdge->eraseFromParent();
+        else
+          DetachesToReplace.push_back(DI);
+
+      } else {
+        PromoteCallsInTasksHelper(DI->getDetached(), DI->getUnwindDest(),
+                                  Unreachable, CurrentTaskFrame, &Worklist);
+
+        if (Visited.insert(DI->getUnwindDest()).second)
+          // If the detach-unwind isn't dead, add it to the worklist.
+          Worklist.push_back(DI->getUnwindDest());
+      }
+      // Add the continuation to the worklist.
+      if (isTaskFrameResume(UnwindEdge->getTerminator()) &&
+          (CurrentTaskFrame == getTaskFrameUsed(DI->getDetached()))) {
+        // This detach-continuation terminates the current taskframe, so push it
+        // onto the parent worklist.
+        assert(ParentWorklist && "Unexpected taskframe unwind edge");
+        ParentWorklist->push_back(DI->getContinue());
+      } else {
+        // We can process this detach-continuation directly, because it does not
+        // terminate the current taskframe.
+        Worklist.push_back(DI->getContinue());
+      }
+      continue;
+    }
+
+    // In the normal case, add all successors of BB to the worklist.
+    for (BasicBlock *Successor : successors(BB))
+      Worklist.push_back(Successor);
+
+  } while (!Worklist.empty());
+
+  // Replace detaches that now require unwind destinations.
+  while (!DetachesToReplace.empty()) {
+    DetachInst *DI = DetachesToReplace.pop_back_val();
+    ReplaceInstWithInst(DI, DetachInst::Create(
+                            DI->getDetached(), DI->getContinue(), UnwindEdge,
+                            DI->getSyncRegion()));
+  }
+}
+
+static FunctionCallee getDefaultPersonalityFn(Module *M) {
+  LLVMContext &C = M->getContext();
+  Triple T(M->getTargetTriple());
+  EHPersonality Pers = getDefaultEHPersonality(T);
+  return M->getOrInsertFunction(getEHPersonalityName(Pers),
+                                FunctionType::get(Type::getInt32Ty(C), true));
+}
+
+void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
+  // Create a cleanup block.
+  LLVMContext &C = F.getContext();
+  BasicBlock *CleanupBB = BasicBlock::Create(C, Name, &F);
+  Type *ExnTy = StructType::get(Type::getInt8PtrTy(C), Type::getInt32Ty(C));
+
+  LandingPadInst *LPad =
+      LandingPadInst::Create(ExnTy, 1, Name+".lpad", CleanupBB);
+  LPad->setCleanup(true);
+  ResumeInst *RI = ResumeInst::Create(LPad, CleanupBB);
+
+  // Create the normal return for the task resumes.
+  BasicBlock *UnreachableBlk = BasicBlock::Create(C, Name+".unreachable", &F);
+
+  // Recursively handle inlined tasks.
+  PromoteCallsInTasksHelper(&F.getEntryBlock(), CleanupBB, UnreachableBlk,
+                            nullptr, nullptr);
+
+  // Either finish inserting the cleanup block (and associated data) or remove
+  // it, depending on whether it is used.
+  if (!pred_empty(CleanupBB)) {
+    if (!F.hasPersonalityFn()) {
+      FunctionCallee PersFn = getDefaultPersonalityFn(F.getParent());
+      F.setPersonalityFn(cast<Constant>(PersFn.getCallee()));
+    }
+  } else {
+    CleanupBB->eraseFromParent();
+  }
+
+  // Either finish the unreachable block or remove it, depending on whether it
+  // is used.
+  if (!pred_empty(UnreachableBlk)) {
+    IRBuilder<> Builder(UnreachableBlk);
+    Builder.CreateUnreachable();
+  } else {
+    UnreachableBlk->eraseFromParent();
   }
 }
 
