@@ -676,6 +676,14 @@ Function *llvm::createHelperForTask(
     MoveStaticAllocasInBlock(&Helper->getEntryBlock(), ClonedDetachedBlock,
                              TaskEnds);
 
+    // If this task uses a taskframe, move allocas in cloned taskframe entry to
+    // entry of helper function.
+    if (Spindle *TFCreate = T->getTaskFrameCreateSpindle()) {
+      BasicBlock *ClonedTFEntry = cast<BasicBlock>(VMap[TFCreate->getEntry()]);
+      MoveStaticAllocasInBlock(&Helper->getEntryBlock(), ClonedTFEntry,
+                               TaskEnds);
+    }
+
     // We do not need to add new llvm.stacksave/llvm.stackrestore intrinsics,
     // because calling and returning from the helper will automatically manage
     // the stack appropriately.
