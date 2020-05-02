@@ -37,7 +37,7 @@ void llvm::CloneIntoFunction(
     std::vector<BasicBlock *> Blocks, ValueToValueMapTy &VMap,
     bool ModuleLevelChanges, SmallVectorImpl<ReturnInst *> &Returns,
     const StringRef NameSuffix, SmallPtrSetImpl<BasicBlock *> *ReattachBlocks,
-    SmallPtrSetImpl<BasicBlock *> *DetachedRethrowBlocks,
+    SmallPtrSetImpl<BasicBlock *> *TaskResumeBlocks,
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries,
     DISubprogram *SP, ClonedCodeInfo *CodeInfo,
     ValueMapTypeRemapper *TypeMapper, ValueMaterializer *Materializer) {
@@ -129,20 +129,20 @@ void llvm::CloneIntoFunction(
                           BranchInst::Create(Succ));
     }
   }
-  if (DetachedRethrowBlocks) {
-    NamedRegionTimer NRT("FixupDetachedRethrow",
-                         "Fixup detached-rethrow blocks",
+  if (TaskResumeBlocks) {
+    NamedRegionTimer NRT("FixupTaskResume", "Fixup task-resume blocks",
                          TimerGroupName, TimerGroupDescription,
                          TimePassesIsEnabled);
-    for (BasicBlock *DetRethrowBlk : *DetachedRethrowBlocks) {
-      // Skip blocks that are not terminated by a detached-rethrow.
-      if (!isDetachedRethrow(DetRethrowBlk->getTerminator()) &&
-          !isTaskFrameResume(DetRethrowBlk->getTerminator()))
+    for (BasicBlock *TaskResumeBlk : *TaskResumeBlocks) {
+      // Skip blocks that are not terminated by a detached.rethrow or
+      // taskframe.resume.
+      if (!isDetachedRethrow(TaskResumeBlk->getTerminator()) &&
+          !isTaskFrameResume(TaskResumeBlk->getTerminator()))
         continue;
 
-      BasicBlock *ClonedDRB = cast<BasicBlock>(VMap[DetRethrowBlk]);
-      // If this exit block terminates in a detached_rethrow, replace the
-      // terminator with a resume.
+      BasicBlock *ClonedDRB = cast<BasicBlock>(VMap[TaskResumeBlk]);
+      // If this exit block terminates in a detached.rethrow or
+      // taskframe.resume, replace the terminator with a resume.
       InvokeInst *II = cast<InvokeInst>(ClonedDRB->getTerminator());
       Value *RethrowArg = II->getArgOperand(1);
       ReplaceInstWithInst(ClonedDRB->getTerminator(),
