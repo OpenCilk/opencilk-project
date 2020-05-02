@@ -55,7 +55,7 @@ Function *CreateHelper(
     ValueToValueMapTy &VMap, Module *DestM, bool ModuleLevelChanges,
     SmallVectorImpl<ReturnInst *> &Returns, const StringRef NameSuffix,
     SmallPtrSetImpl<BasicBlock *> *ReattachBlocks = nullptr,
-    SmallPtrSetImpl<BasicBlock *> *DetachedRethrowBlocks = nullptr,
+    SmallPtrSetImpl<BasicBlock *> *TaskResumeBlocks = nullptr,
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries = nullptr,
     const BasicBlock *OldUnwind = nullptr,
     SmallPtrSetImpl<BasicBlock *> *UnreachableExits = nullptr,

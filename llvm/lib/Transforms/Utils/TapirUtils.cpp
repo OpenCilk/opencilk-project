@@ -1323,35 +1323,66 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
   return Changed;
 }
 
+/// taskFrameContains - Returns true if the given basic block \p B is contained
+/// within the taskframe \p TF.
+bool llvm::taskFrameContains(const Spindle *TF, const BasicBlock *B,
+                             const TaskInfo &TI) {
+  if (TF->getTaskFrameCreate()) {
+    if (TF->taskFrameContains(TI.getSpindleFor(B)))
+      return true;
+  } else {
+    // If TF is a task entry, check that that task encloses I's basic block.
+    return TF->getParentTask()->encloses(B);
+  }
+  return false;
+}
+
+/// taskFrameEncloses - Returns true if the given basic block \p B is enclosed
+/// within the taskframe \p TF.
+bool llvm::taskFrameEncloses(const Spindle *TF, const BasicBlock *B,
+                             const TaskInfo &TI) {
+  if (taskFrameContains(TF, B, TI))
+    return true;
+
+  if (!TF->getTaskFrameCreate())
+    return false;
+
+  // TF is a taskframe.create spindle.  Recursively check its subtaskframes.
+  for (const Spindle *SubTF : TF->subtaskframes())
+    if (taskFrameEncloses(SubTF, B, TI))
+      return true;
+
+  return false;
+}
+
 /// fixupTaskFrameExternalUses - Fix any uses of variables defined in
 /// taskframes, but outside of tasks themselves.  For each such variable, insert
 /// a memory allocation in the parent frame, add a store to that memory in the
 /// taskframe, and modify external uses to use the value in that memory loaded
 /// at the tasks continuation.
-void llvm::fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT) {
-  if (T->isRootTask())
-    // Nothing to be done for root tasks.
+void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
+                                      const DominatorTree &DT) {
+  Value *TaskFrame = TF->getTaskFrameCreate();
+  if (!TaskFrame)
+    // Nothing to do for taskframe spindles that are actually task entries.
     return;
+  Task *T = TF->getTaskFrameUser();
 
-  // Collects spindles in the taskframe for task T.
-  SetVector<Spindle *> TFSpindles;
-  if (Spindle *TFUsed = T->getTaskFrameCreateSpindle())
-    for (Spindle *S : TFUsed->taskframe_spindles())
-      TFSpindles.insert(S);
-
-  // If there are no taskframe spindles, there's nothing to do.
-  if (TFSpindles.empty())
-    return;
+  LLVM_DEBUG(dbgs() << "fixupTaskFrameExternalUses: spindle@"
+             << TF->getEntry()->getName() << "\n");
 
   // Get the set of basic blocks in the taskframe spindles.  At the same time,
   // find the continuation of corresponding taskframe.resume intrinsics.
+
   SmallPtrSet<BasicBlock *, 1> BlocksToCheck;
-  BasicBlock *Continuation = T->getContinuationSpindle()->getEntry();
   BasicBlock *TFResumeContin = nullptr;
-  for (Spindle *S : TFSpindles) {
+  for (Spindle *S : TF->taskframe_spindles()) {
+    // Skip taskframe spindles within the task itself.
+    if (T->contains(S))
+      continue;
     for (BasicBlock *BB : S->blocks()) {
       BlocksToCheck.insert(BB);
-      if (isTaskFrameResume(BB->getTerminator())) {
+      if (isTaskFrameResume(BB->getTerminator(), TaskFrame)) {
         InvokeInst *TFResume = cast<InvokeInst>(BB->getTerminator());
         assert((nullptr == TFResumeContin) ||
                (TFResumeContin == TFResume->getUnwindDest()) &&
@@ -1361,6 +1392,8 @@ void llvm::fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT) {
     }
   }
 
+  BasicBlock *Continuation = T->getContinuationSpindle()->getEntry();
+
   MapVector<Instruction *, SmallVector<Use *, 16>> ToRewrite;
   // Find instructions in the taskframe that are used outside of the taskframe.
   for (BasicBlock *BB : BlocksToCheck) {
@@ -1368,29 +1401,34 @@ void llvm::fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT) {
       // Ignore certain instructions from consideration: the taskframe.create
       // intrinsic for this taskframe, the detach instruction that spawns T, and
       // the landingpad value in T's EH continuation.
-      if ((T->getTaskFrameUsed() == &I) || (T->getDetach() == &I) ||
-          (T->getLPadValueInEHContinuationSpindle() == &I))
+      if (T && ((T->getTaskFrameUsed() == &I) || (T->getDetach() == &I) ||
+                (T->getLPadValueInEHContinuationSpindle() == &I)))
         continue;
 
       // Examine all users of this instruction.
       for (Use &U : I.uses()) {
         // If we find a live use outside of the task, it's an output.
         if (Instruction *UI = dyn_cast<Instruction>(U.getUser())) {
-          if (!T->encloses(UI->getParent()) &&
-              !BlocksToCheck.count(UI->getParent()) &&
-              DT.isReachableFromEntry(UI->getParent()))
+          if (!taskFrameEncloses(TF, UI->getParent(), TI)) {
+            LLVM_DEBUG(dbgs() << "  ToRewrite: " << I << " (user " << *UI
+                       << ")\n");
             ToRewrite[&I].push_back(&U);
+          }
         }
       }
     }
   }
 
-  Module *M = T->getEntry()->getModule();
+  Module *M = TF->getEntry()->getModule();
   for (auto &TFInstr : ToRewrite) {
     LLVM_DEBUG(dbgs() << "Fixing taskframe output " << *TFInstr.first << "\n");
     // Create an allocation to store the result of the instruction.
-    IRBuilder<> Builder(
-        &*T->getParentTask()->getEntry()->getFirstInsertionPt());
+    BasicBlock *ParentEntry;
+    if (Spindle *ParentTF = TF->getTaskFrameParent())
+      ParentEntry = ParentTF->getEntry();
+    else
+      ParentEntry = TF->getParentTask()->getEntry();
+    IRBuilder<> Builder(&*ParentEntry->getFirstInsertionPt());
     AllocaInst *AI = Builder.CreateAlloca(TFInstr.first->getType());
     AI->setName(TFInstr.first->getName());
 
@@ -1647,7 +1685,7 @@ void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
   LandingPadInst *LPad =
       LandingPadInst::Create(ExnTy, 1, Name+".lpad", CleanupBB);
   LPad->setCleanup(true);
-  ResumeInst *RI = ResumeInst::Create(LPad, CleanupBB);
+  ResumeInst::Create(LPad, CleanupBB);
 
   // Create the normal return for the task resumes.
   BasicBlock *UnreachableBlk = BasicBlock::Create(C, Name+".unreachable", &F);

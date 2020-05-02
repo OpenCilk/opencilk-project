@@ -38,7 +38,7 @@ class Value;
 
 using ValueSet = SetVector<Value *>;
 using SpindleSet = SetVector<Spindle *>;
-using TaskValueSetMap = DenseMap<Task *, ValueSet>;
+using TaskValueSetMap = DenseMap<const Task *, ValueSet>;
 
 /// Structure that captures relevant information about an outlined task,
 /// including the following:
@@ -126,7 +126,8 @@ struct TaskOutlineInfo {
 };
 
 // Map from tasks to TaskOutlineInfo structures.
-using TaskOutlineMapTy = DenseMap<Task *, TaskOutlineInfo>;
+using TaskOutlineMapTy = DenseMap<const Task *, TaskOutlineInfo>;
+using TFOutlineMapTy = DenseMap<const Spindle *, TaskOutlineInfo>;
 
 
 /// Abstract class for a parallel-runtime-system target for Tapir lowering.
@@ -399,14 +400,15 @@ TapirTarget *getTapirTargetFromID(Module &M, TapirTargetID TargetID);
 TaskValueSetMap findAllTaskInputs(Function &F, const DominatorTree &DT,
                                   const TaskInfo &TI);
 
-void getTaskFrameInputsOutputs(ValueSet &TFInputs, ValueSet &TFOutputs,
-                               const Task &T, const ValueSet &TaskInputs,
-                               const SpindleSet &TFSpindles,
+void getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
+                               TaskValueSetMap &TFOutputs,
+                               const Spindle &TF, const ValueSet &TaskInputs,
                                const TaskInfo &TI, const DominatorTree &DT);
 
 void findAllTaskFrameInputs(TaskValueSetMap &TFInputs,
-                            TaskValueSetMap &TFOutputs, Function &F,
-                            const DominatorTree &DT, TaskInfo &TI);
+                            TaskValueSetMap &TFOutputs,
+                            const SmallVectorImpl<Spindle *> &AllTaskFrames,
+                            Function &F, const DominatorTree &DT, TaskInfo &TI);
 
 /// Create a struct to store the inputs to pass to an outlined function for the
 /// task \p T.  Stores into the struct will be inserted \p StorePt, which should
@@ -438,6 +440,11 @@ Instruction *fixupHelperInputs(Function &F, Task *T, ValueSet &TaskInputs,
 /// detached-rethrow instructions.
 bool isSuccessorOfDetachedRethrow(const BasicBlock *B);
 
+/// Returns true if BasicBlock \p B is a placeholder successor, that is, it's
+/// the immediate successor of only detached-rethrow and taskframe-resume
+/// instructions.
+bool isPlaceholderSuccessor(const BasicBlock *B);
+
 /// Collect the set of blocks in task \p T.  All blocks enclosed by \p T will be
 /// pushed onto \p TaskBlocks.  The set of blocks terminated by reattaches from
 /// \p T are added to \p ReattachBlocks.  The set of blocks terminated by
@@ -446,7 +453,7 @@ bool isSuccessorOfDetachedRethrow(const BasicBlock *B);
 /// tasks in the same function are added to \p SharedEHEntries.
 void getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
                    SmallPtrSetImpl<BasicBlock *> &ReattachBlocks,
-                   SmallPtrSetImpl<BasicBlock *> &DetachedRethrowBlocks,
+                   SmallPtrSetImpl<BasicBlock *> &TaskResumeBlocks,
                    SmallPtrSetImpl<BasicBlock *> &SharedEHEntries);
 
 /// Outlines the content of task \p T in function \p F into a new helper
@@ -458,10 +465,9 @@ Function *createHelperForTask(
     ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
     DominatorTree *DT);
 
-/// Replaces the detach instruction that spawns task \p T, with associated
-/// TaskOutlineInfo \p Out, with a call or invoke to the outlined helper function
-/// created for \p T.
-Instruction *replaceDetachWithCallToOutline(
+/// Replaces the spawned task \p T, with associated TaskOutlineInfo \p Out, with
+/// a call or invoke to the outlined helper function created for \p T.
+Instruction *replaceTaskWithCallToOutline(
     Task *T, TaskOutlineInfo &Out, SmallVectorImpl<Value *> &OutlineInputs);
 
 /// Outlines a task \p T into a helper function that accepts the inputs \p
