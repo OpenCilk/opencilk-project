@@ -126,6 +126,8 @@ void CodeGenFunction::DetachScope::InitDetachScope() {
 
 void CodeGenFunction::DetachScope::PushSpawnedTaskTerminate() {
   CGF.pushFullExprCleanupImpl<CallDetRethrow>(
+      // This cleanup should not be a TaskExit, because we've pushed a TaskExit
+      // cleanup onto EHStack already, corresponding with the taskframe.
       static_cast<CleanupKind>(EHCleanup | LifetimeMarker),
       CGF.CurSyncRegion->getSyncRegionStart());
 }
