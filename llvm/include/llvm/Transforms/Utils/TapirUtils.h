@@ -43,6 +43,14 @@ bool isDetachedRethrow(const Instruction *I, const Value *SyncRegion = nullptr);
 /// taskframe.resume uses \p TaskFrame.
 bool isTaskFrameResume(const Instruction *I, const Value *TaskFrame = nullptr);
 
+/// Returns a taskframe.resume that uses the given taskframe, or nullptr if no
+/// taskframe.resume uses this taskframe.
+InvokeInst *getTaskFrameResume(Value *TaskFrame);
+
+/// Returns the unwind destination of a taskframe.resume that uses the given
+/// taskframe, or nullptr if no such unwind destination exists.
+BasicBlock *getTaskFrameResumeDest(Value *TaskFrame);
+
 /// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
 /// \p SyncRegion is specified, then additionally checks that the sync.unwind
 /// uses \p SyncRegion.
@@ -146,6 +154,21 @@ bool splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT = nullptr,
 /// taskframe, and modify external uses to use the value in that memory loaded
 /// at the tasks continuation.
 void fixupTaskFrameExternalUses(Task *T, const DominatorTree &DT);
+
+/// FindTaskFrameCreateInBlock - Return the taskframe.create intrinsic in \p BB,
+/// or nullptr if no taskframe.create intrinsic exists in \p BB.
+Instruction *FindTaskFrameCreateInBlock(BasicBlock *BB);
+
+/// CreateSubTaskUnwindEdge - Create a landingpad for the exit of a taskframe or
+/// task.
+BasicBlock *CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
+                                    BasicBlock *UnwindEdge,
+                                    BasicBlock *Unreachable);
+
+/// promoteCallsInTasksToInvokes - Traverse the control-flow graph of F to
+/// convert calls to invokes, recursively traversing tasks and taskframes to
+/// insert appropriate detached.rethrow and taskframe.resume terminators.
+void promoteCallsInTasksToInvokes(Function &F, const Twine Name = "cleanup");
 
 /// Utility class for getting and setting Tapir-related loop hints in the form
 /// of loop metadata.

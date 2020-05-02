@@ -718,11 +718,7 @@ void CSIImpl::initializeTapirHooks() {
 // Prepare any calls in the CFG for instrumentation, e.g., by making sure any
 // call that can throw is modeled with an invoke.
 void CSIImpl::setupCalls(Function &F) {
-  // We use the EscapeEnumerator's built-in functionality to promote calls to
-  // invokes.
-  EscapeEnumerator EE(F, "csi.cleanup", true);
-  while (EE.Next())
-    ;
+  promoteCallsInTasksToInvokes(F, "csi.cleanup");
 
   // TODO: Split each basic block immediately after each call, to ensure that
   // calls act like terminators?
