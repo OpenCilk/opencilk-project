@@ -1547,9 +1547,13 @@ void CilkABI::lowerSync(SyncInst &SI) {
     CB = CallInst::Create(GetCilkSyncNothrowFn(), args, "",
                           /*insert before*/&SI);
     BranchInst::Create(SyncCont, CB->getParent());
-  } else
+  } else {
     CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, SyncUnwindDest, args, "",
                             /*insert before*/&SI);
+    for (PHINode &PN : SyncUnwindDest->phis())
+      PN.addIncoming(PN.getIncomingValueForBlock(SyncUnwind->getParent()),
+                     SI.getParent());
+  }
   CB->setDebugLoc(SI.getDebugLoc());
   SI.eraseFromParent();
 

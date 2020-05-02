@@ -1003,6 +1003,9 @@ void CilkRABI::lowerSync(SyncInst &SI) {
   } else {
     CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, SyncUnwindDest, Args, "",
                             /*insert before*/&SI);
+    for (PHINode &PN : SyncUnwindDest->phis())
+      PN.addIncoming(PN.getIncomingValueForBlock(SyncUnwind->getParent()),
+                     SI.getParent());
   }
   CB->setDebugLoc(SI.getDebugLoc());
   SI.eraseFromParent();
