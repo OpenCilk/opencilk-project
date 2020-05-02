@@ -940,7 +940,7 @@ void LoopSpawningImpl::getAllTapirLoopInputs(
                        TimePassesIsEnabled);
 
   // Determine the inputs for all tasks.
-  DenseMap<Task *, ValueSet> TaskInputs = findAllTaskInputs(F, DT, TI);
+  TaskValueSetMap TaskInputs = findAllTaskInputs(F, DT, TI);
 
   // Combine these sets of inputs to determine inputs for each Tapir loop.
   DenseMap<Loop *, ValueSet> TapirLoopInputs;
