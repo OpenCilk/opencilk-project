@@ -671,7 +671,7 @@ unreachable:                                      ; preds = %lpad, %lpad5
 ; Function Attrs: nounwind
 declare void @llvm.assume(i1) #10
 
-; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont11.split.otd1(i32
+; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_entry.split.otd1(i32
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
@@ -721,7 +721,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: resume { i8*, i32 } %[[LPADVAL]]
 
 
-; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_entry.split.otd1(i32
+; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont11.split.otd1(i32
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
@@ -790,10 +790,10 @@ declare void @llvm.assume(i1) #10
 
 ; CHECK-LABEL: define private fastcc void @_Z21spawn_decl_destructori.outline_entry.split.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
+; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
 
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
-; CHECK-NEXT: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, %class.Foo* %[[REFTMP]], i64 0, i32 0
+; CHECK: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, %class.Foo* %[[REFTMP]], i64 0, i32 0
 ; CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[FOOARG]])
 ; CHECK-NEXT: call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[REFTMP]])
 ; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
@@ -813,10 +813,10 @@ declare void @llvm.assume(i1) #10
 
 ; CHECK-LABEL: define private fastcc void @_Z21spawn_stmt_destructori.outline_entry.split.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
+; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
 
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
-; CHECK-NEXT: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, %class.Foo* %[[REFTMP]], i64 0, i32 0
+; CHECK: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, %class.Foo* %[[REFTMP]], i64 0, i32 0
 ; CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[FOOARG]])
 ; CHECK-NEXT: call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[REFTMP]])
 ; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
