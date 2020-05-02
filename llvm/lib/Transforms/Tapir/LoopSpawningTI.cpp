@@ -1138,6 +1138,13 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
       MoveStaticAllocasInBlock(&Helper->getEntryBlock(), ClonedTaskEntry,
                                TaskEnds);
 
+    // If this task uses a taskframe, move allocas in cloned taskframe entry to
+    // entry of helper function.
+    if (Spindle *TFCreate = T->getTaskFrameCreateSpindle()) {
+      BasicBlock *ClonedTFEntry = cast<BasicBlock>(VMap[TFCreate->getEntry()]);
+      MoveStaticAllocasInBlock(&Helper->getEntryBlock(), ClonedTFEntry,
+                               TaskEnds);
+    }
     // If the cloned loop contained dynamic alloca instructions, wrap the cloned
     // loop with llvm.stacksave/llvm.stackrestore intrinsics.
     if (ContainsDynamicAllocas) {
