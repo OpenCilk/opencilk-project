@@ -54,18 +54,18 @@ attributes #1 = { argmemonly nounwind }
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd2<sp exit><task exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd<sp exit><task exit>}
 
-; CHECK-DAG: Spindle @ while.body may happen in parallel with:
-; CHECK-NEXT: task @ det.achd2
-; CHECK-NEXT: task @ det.achd
-; CHECK-DAG: Spindle @ sync.continue may happen in parallel with:
-; CHECK-NEXT: task @ det.achd2
-; CHECK-NOT:  task @ det.achd
-; CHECK-DAG: Spindle @ det.cont may happen in parallel with:
-; CHECK-NEXT: task @ det.achd
-; CHECK-NEXT: task @ det.achd2
-; CHECK-DAG: Spindle @ sync.continue1 may happen in parallel with:
-; CHECK-NEXT: task @ det.achd
-; CHECK-NOT:  task @ det.achd2
-; CHECK-DAG: Spindle @ det.cont4 may happen in parallel with:
-; CHECK-NEXT: task @ det.achd2
-; CHECK-NEXT: task @ det.achd
+; CHECK-DAG: spindle@while.body may happen in parallel with:
+; CHECK-NEXT: task@det.achd2
+; CHECK-NEXT: task@det.achd
+; CHECK-DAG: spindle@sync.continue may happen in parallel with:
+; CHECK-NEXT: task@det.achd2
+; CHECK-NOT:  task@det.achd
+; CHECK-DAG: spindle@det.cont may happen in parallel with:
+; CHECK-NEXT: task@det.achd
+; CHECK-NEXT: task@det.achd2
+; CHECK-DAG: spindle@sync.continue1 may happen in parallel with:
+; CHECK-NEXT: task@det.achd
+; CHECK-NOT:  task@det.achd2
+; CHECK-DAG: spindle@det.cont4 may happen in parallel with:
+; CHECK-NEXT: task@det.achd2
+; CHECK-NEXT: task@det.achd
