@@ -292,7 +292,7 @@ void TapirToTargetImpl::processFunction(
   DominatorTree &DT = GetDT(F);
   TaskInfo &TI = GetTI(F);
   splitTaskFrameCreateBlocks(F, &DT, &TI);
-  TI.findTaskFrameSubtasks();
+  TI.findTaskFrameTree();
   AssumptionCache &AC = GetAC(F);
 
   {
