@@ -1943,26 +1943,56 @@ static void HandleInlinedResumeInTask(BasicBlock *EntryBlock,
     return;
 
   BasicBlock *Parent = EntryBlock->getSinglePredecessor();
+  Module *M = Parent->getModule();
   if (isTaskFrameCreate(EntryBlock->front())) {
     Value *TaskFrame = &EntryBlock->front();
+    if (BasicBlock *ResumeDest = getTaskFrameResumeDest(TaskFrame)) {
+      // Replace the resume with a taskframe.resume, whose unwind destination
+      // matches the unwind destination of the taskframe.
+      InvokeInst *NewTFResume = InvokeInst::Create(
+          Intrinsic::getDeclaration(M, Intrinsic::taskframe_resume,
+                                    { Resume->getValue()->getType() }),
+          Unreachable, ResumeDest, { TaskFrame, Resume->getValue() });
+      ReplaceInstWithInst(Resume, NewTFResume);
+
+      // No need to continue up the stack of contexts.
+      return;
+    }
+
+    // Otherwise, split the resume to insert a novel invocation of
+    // taskframe.resume for this taskframe.
     SplitResume(Resume, Intrinsic::taskframe_resume, TaskFrame, Unreachable);
 
-    // Recursively handle parent tasks.
+    // Recursively handle parent contexts.
     HandleInlinedResumeInTask(GetDetachedCtx(Parent), Resume, Unreachable);
 
   } else {
     // BasicBlock *Detacher = EntryBlock->getSinglePredecessor();
     DetachInst *DI = cast<DetachInst>(Parent->getTerminator());
     Value *SyncRegion = DI->getSyncRegion();
-    // Value *TaskFrame = getTaskFrameUsed(EntryBlock);
+
+    if (DI->hasUnwindDest()) {
+      // Replace the resume with a detached.rethrow, whose unwind destination
+      // matches the unwind destination of the detach.
+      BasicBlock *DetUnwind = DI->getUnwindDest();
+      InvokeInst *NewDetRethrow = InvokeInst::Create(
+          Intrinsic::getDeclaration(M, Intrinsic::detached_rethrow,
+                                    { Resume->getValue()->getType() }),
+          Unreachable, DetUnwind, { SyncRegion, Resume->getValue() });
+      ReplaceInstWithInst(Resume, NewDetRethrow);
+
+      // No need to continue up the stack of contexts.
+      return;
+    }
 
     // Insert an invocation of detached.rethrow before the resume.
     BasicBlock *NewBB = SplitResume(Resume, Intrinsic::detached_rethrow,
                                     SyncRegion, Unreachable);
+
     // Add NewBB as the unwind destination of DI.
     ReplaceInstWithInst(DI, DetachInst::Create(EntryBlock, DI->getContinue(),
                                                NewBB, SyncRegion));
-    // Recursively handle parent tasks.
+    // Recursively handle parent contexts.
     HandleInlinedResumeInTask(GetDetachedCtx(Parent), Resume, Unreachable);
   }
 }
