@@ -67,15 +67,15 @@ class CilkRABI : public TapirTarget {
   AllocaInst *CreateStackFrame(Function &F);
   Value *GetOrCreateCilkStackFrame(Function &F);
 
-  void InsertStackFramePush(Function &F, Instruction *TaskFrameCreate = nullptr,
-                            bool Helper = false);
+  CallInst *InsertStackFramePush(Function &F,
+                                 Instruction *TaskFrameCreate = nullptr,
+                                 bool Helper = false);
   void InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
                            bool InsertPauseFrame);
 
   CallInst *EmitCilkSetJmp(IRBuilder<> &B, Value *SF);
 
-  void InsertDetach(Function &F, Instruction *DetachPt,
-                    Instruction *TaskFrameCreate);
+  void InsertDetach(Function &F, Instruction *DetachPt);
 
   void MarkSpawner(Function &F);
 
