@@ -936,12 +936,11 @@ Value* CilkRABI::GetOrCreateCilkStackFrame(Function &F) {
   return SF;
 }
 
-void CilkRABI::InsertDetach(Function &F, Instruction *DetachPt,
-                            Instruction *TaskFrameCreate) {
+void CilkRABI::InsertDetach(Function &F, Instruction *DetachPt) {
   /*
     __cilkrts_stack_frame sf;
-    __cilkrts_enter_frame_fast(&sf);
-    __cilkrts_detach();
+    ...
+    __cilkrts_detach(sf);
     *x = f(y);
   */
 
@@ -956,58 +955,14 @@ void CilkRABI::InsertDetach(Function &F, Instruction *DetachPt,
         dbgs() << "NOTE: Detachable helper function itself detaches.\n";
     });
 
-  BasicBlock::iterator InsertPt = ++SF->getIterator();
-  IRBuilder<> IRB(&(F.getEntryBlock()), InsertPt);
-  if (TaskFrameCreate)
-    IRB.SetInsertPoint(TaskFrameCreate);
-
   // Call __cilkrts_detach
-  {
-    if (DetachPt)
-      IRB.SetInsertPoint(DetachPt);
-    IRB.CreateCall(CILKRTS_FUNC(detach), Args);
-  }
-
-  // NOTE(grace): This currently doesn't do anything anyways b/c
-  //              CatchExceptions == false
-  //EscapeEnumerator EE(F, "cilkrabi_epilogue", false);
-  //while (IRBuilder<> *AtExit = EE.Next()) {
-  //  if (isa<ReturnInst>(AtExit->GetInsertPoint()))
-  //    AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
-  //  else if (ResumeInst *RI = dyn_cast<ResumeInst>(AtExit->GetInsertPoint())) {
-      // TODO: Handle exceptions.
-      // /*
-      //   sf.flags = sf.flags | CILK_FRAME_EXCEPTING;
-      //   sf.except_data = Exn;
-      // */
-      // IRBuilder<> B(RI);
-      // Value *Exn = AtExit->CreateExtractValue(RI->getValue(),
-      //                                         ArrayRef<unsigned>(0));
-      // Value *Flags = LoadSTyField(*AtExit, DL, StackFrameTy, SF,
-      //                             StackFrameFieldFlags,
-      //                             /*isVolatile=*/false,
-      //                             AtomicOrdering::Acquire);
-      // Flags = AtExit->CreateOr(Flags,
-      //                          ConstantInt::get(Flags->getType(),
-      //                                           CILK_FRAME_EXCEPTING));
-      // StoreSTyField(*AtExit, DL, StackFrameTy, Flags, SF,
-      //               StackFrameFieldFlags, /*isVolatile=*/false,
-      //               AtomicOrdering::Release);
-      // StoreSTyField(*AtExit, DL, StackFrameTy, Exn, SF,
-      //               StackFrameFields::except_data, /*isVolatile=*/false,
-      //               AtomicOrdering::Release);
-      /*
-        __cilkrts_pop_frame(&sf);
-        if (sf->flags)
-          __cilkrts_leave_frame(&sf);
-      */
-  //    AtExit->CreateCall(GetCilkParentEpilogueFn(), Args, "");
-  //  }
-  //}
+  IRBuilder<> IRB(DetachPt);
+  IRB.CreateCall(CILKRTS_FUNC(detach), Args);
 }
 
-void CilkRABI::InsertStackFramePush(Function &F, Instruction *TaskFrameCreate,
-                                    bool Helper) {
+CallInst *CilkRABI::InsertStackFramePush(Function &F,
+                                         Instruction *TaskFrameCreate,
+                                         bool Helper) {
   AllocaInst *SF = cast<AllocaInst>(GetOrCreateCilkStackFrame(F));
 
   BasicBlock::iterator InsertPt = ++SF->getIterator();
@@ -1017,9 +972,9 @@ void CilkRABI::InsertStackFramePush(Function &F, Instruction *TaskFrameCreate,
 
   Value *Args[1] = { SF };
   if (Helper)
-    IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
+    return IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
   else
-    IRB.CreateCall(CILKRTS_FUNC(enter_frame), Args);
+    return IRB.CreateCall(CILKRTS_FUNC(enter_frame), Args);
 }
 
 void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
@@ -1160,8 +1115,10 @@ void CilkRABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
   if (IsSpawner)
     MarkSpawner(F);
 
-  InsertStackFramePush(F, TaskFrameCreate, /*Helper*/false);
-  InsertDetach(F, DetachPt, TaskFrameCreate);
+  CallInst *EnterFrame =
+      InsertStackFramePush(F, TaskFrameCreate, /*Helper*/false);
+  // InsertDetach(F, DetachPt, TaskFrameCreate);
+  InsertDetach(F, (DetachPt ? DetachPt : &*(++EnterFrame->getIterator())));
 }
 
 void CilkRABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
