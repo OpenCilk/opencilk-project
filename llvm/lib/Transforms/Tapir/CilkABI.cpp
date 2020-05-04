@@ -1534,8 +1534,6 @@ void CilkABI::lowerSync(SyncInst &SI) {
       dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
     if (const Function *Called = II->getCalledFunction()) {
       if (Intrinsic::sync_unwind == Called->getIntrinsicID()) {
-        // TODO? Rewrite PHI nodes in landingpad of sync_unwind.  I don't think
-        // that case can happen.
         SyncUnwind = II;
         SyncCont = II->getNormalDest();
         SyncUnwindDest = II->getUnwindDest();
