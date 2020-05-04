@@ -1317,6 +1317,9 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
 
   switch (TapirTarget) {
   case TapirTargetID::Cheetah:
+    CmdArgs.push_back("-lcheetah");
+    CmdArgs.push_back("-lpthread");
+    break;
   case TapirTargetID::OpenCilk:
     // Link the static Cheetah library because it's easier to do that than add
     // all the linker arguments to find a shared library a both link time and
