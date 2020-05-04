@@ -44,7 +44,8 @@ class CilkRABI : public TapirTarget {
   FunctionCallee CilkRTSGetNworkers = nullptr;
   FunctionCallee CilkRTSGetTLSWorker = nullptr;
 
-  int FrameVersion;
+  const int FrameVersion;
+  int FrameVersionFlag() const { return FrameVersion << 24; }
 
   // Accessors for opaque Cilk RTS functions
   FunctionCallee Get__cilkrts_leave_frame();

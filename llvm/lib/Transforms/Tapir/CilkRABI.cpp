@@ -722,7 +722,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
     // sf->flags = CILK_FRAME_VERSION;
     Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
     StoreSTyField(B, DL, StackFrameTy,
-                  ConstantInt::get(Ty, FrameVersion << 24),
+                  ConstantInt::get(Ty, FrameVersionFlag()),
                   SF, StackFrameFieldFlags, /*isVolatile=*/false,
                   AtomicOrdering::Unordered);
     B.CreateBr(Cont);
@@ -808,7 +808,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
 
   // sf->flags = CILK_FRAME_VERSION;
   StoreSTyField(B, DL, StackFrameTy,
-                ConstantInt::get(Ty, FrameVersion << 24),
+                ConstantInt::get(Ty, FrameVersionFlag()),
                 SF, StackFrameFieldFlags, /*isVolatile=*/false,
                 AtomicOrdering::Unordered);
   // sf->call_parent = w->current_stack_frame;
@@ -880,7 +880,7 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
                                 StackFrameFieldFlags, /*isVolatile=*/false,
                                 AtomicOrdering::Unordered);
     Value *Cond = B.CreateICmpNE(
-        Flags, ConstantInt::get(Flags->getType(), FrameVersion << 24));
+        Flags, ConstantInt::get(Flags->getType(), FrameVersionFlag()));
     B.CreateCondBr(Cond, B1, Exit);
   }
 
