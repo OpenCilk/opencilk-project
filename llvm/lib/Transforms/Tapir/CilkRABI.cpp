@@ -1068,7 +1068,7 @@ CallInst *CilkRABI::InsertStackFramePush(Function &F,
 }
 
 void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
-                                   bool InsertPauseFrame) {
+                                   bool InsertPauseFrame, bool Helper) {
   Value *SF = GetOrCreateCilkStackFrame(F);
   SmallPtrSet<ReturnInst*, 8> Returns;
   SmallPtrSet<ResumeInst*, 8> Resumes;
@@ -1084,8 +1084,12 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   }
 
   for (ReturnInst *RI : Returns) {
-    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+    if (Helper) {
+      CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+      CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+    } else {
+      CallInst::Create(GetCilkParentEpilogueFn(), {SF}, "", RI);
+    }
   }
   for (ResumeInst *RI : Resumes) {
     // Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
@@ -1225,7 +1229,7 @@ void CilkRABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
   // the parent was stolen, in which case we want to save the exception for
   // later reduction.
   InsertStackFramePop(F, /*PromoteCallsToInvokes*/true,
-                      /*InsertPauseFrame*/true);
+                      /*InsertPauseFrame*/true, /*Helper*/true);
 
   // TODO: If F is itself a spawner, see if we need to ensure that the Cilk
   // personality function does not pop an already-popped frame.  We might be
@@ -1243,7 +1247,7 @@ void CilkRABI::postProcessRootSpawner(Function &F) {
   // calls to invokes, since the Cilk personality function will take care of
   // popping the frame if no landingpad exists for a given call.
   InsertStackFramePop(F, /*PromoteCallsToInvokes*/false,
-                      /*InsertPauseFrame*/false);
+                      /*InsertPauseFrame*/false, /*Helper*/false);
 }
 
 void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
