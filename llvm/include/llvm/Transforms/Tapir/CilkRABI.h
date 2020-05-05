@@ -46,6 +46,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee CilkRTSPauseFrame = nullptr;
   FunctionCallee CilkRTSCheckExceptionResume = nullptr;
   FunctionCallee CilkRTSCheckExceptionRaise = nullptr;
+  FunctionCallee CilkRTSCleanupFiber = nullptr;
 
   const int FrameVersion;
   int FrameVersionFlag() const { return FrameVersion << 24; }
@@ -59,6 +60,7 @@ class CilkRABI : public TapirTarget {
   FunctionCallee Get__cilkrts_pause_frame();
   FunctionCallee Get__cilkrts_check_exception_resume();
   FunctionCallee Get__cilkrts_check_exception_raise();
+  FunctionCallee Get__cilkrts_cleanup_fiber();
 
   // Accessors for generated Cilk RTS functions
   Function *Get__cilkrts_enter_frame();
