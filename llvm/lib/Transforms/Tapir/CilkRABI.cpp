@@ -244,18 +244,25 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_raise() {
   return CilkRTSCheckExceptionRaise;
 }
 
-// FunctionCallee CilkRABI::Get__cilkrts_rethrow() {
-//   if (CilkRTSRethrow)
-//     return CilkRTSRethrow;
+FunctionCallee CilkRABI::Get__cilkrts_cleanup_fiber() {
+  if (CilkRTSCleanupFiber)
+    return CilkRTSCleanupFiber;
 
-//   LLVMContext &C = M.getContext();
-//   Type *VoidTy = Type::getVoidTy(C);
-//   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-//   CilkRTSRethrow = M.getOrInsertFunction("__cilkrts_rethrow", VoidTy,
-//                                          StackFramePtrTy);
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoReturn);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  Type *Int32Ty = Type::getInt32Ty(C);
+  CilkRTSCleanupFiber = M.getOrInsertFunction(
+                                            "__cilkrts_cleanup_fiber",
+                        VoidTy, StackFramePtrTy, Int32Ty);
 
-//   return CilkRTSRethrow;
-// }
+  return CilkRTSCleanupFiber;
+}
 
 FunctionCallee CilkRABI::Get__cilkrts_sync() {
   if (CilkRTSSync)
@@ -1359,6 +1366,24 @@ void CilkRABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
 void CilkRABI::preProcessRootSpawner(Function &F) {
   MarkSpawner(F);
   InsertStackFramePush(F);
+  Value *SF = DetachCtxToStackFrame[&F];
+  for (BasicBlock &BB : F) {
+    if (BB.isLandingPad()) {
+      LandingPadInst *LPad = BB.getLandingPadInst();
+      Instruction *InsertPt = &*BB.getFirstInsertionPt();
+      IRBuilder<> Builder(InsertPt);
+
+      Value *Sel = Builder.CreateExtractValue(LPad, 1, "sel");
+      CallInst *SetjmpCall = EmitCilkSetJmp(Builder, SF);
+
+      Value *Cond = Builder.CreateICmpEQ(
+          SetjmpCall, ConstantInt::get(SetjmpCall->getType(), 0));
+      Instruction *ThenTerm = SplitBlockAndInsertIfThen(Cond, InsertPt, true);
+      Builder.SetInsertPoint(ThenTerm);
+      CallInst *CleanupCall =
+          Builder.CreateCall(CILKRTS_FUNC(cleanup_fiber), {SF, Sel});
+    }
+  }
 }
 
 void CilkRABI::postProcessRootSpawner(Function &F) {
