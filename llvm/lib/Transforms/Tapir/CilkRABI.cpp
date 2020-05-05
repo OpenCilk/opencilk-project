@@ -40,29 +40,29 @@ enum {
 };
 
 enum {
-  CILK_FRAME_STOLEN           =    0x01,
-  CILK_FRAME_UNSYNCHED        =    0x02,
-  CILK_FRAME_DETACHED         =    0x04,
-  CILK_FRAME_EXCEPTION_PROBED =    0x08,
-  CILK_FRAME_EXCEPTING        =    0x10,
-  CILK_FRAME_LAST             =    0x80,
-  CILK_FRAME_EXITING          =  0x0100,
-  CILK_FRAME_SUSPENDED        =  0x8000,
-  CILK_FRAME_UNWINDING        = 0x10000
+  CILK_FRAME_STOLEN            =    0x01,
+  CILK_FRAME_UNSYNCHED         =    0x02,
+  CILK_FRAME_DETACHED          =    0x04,
+  CILK_FRAME_EXCEPTION_PENDING =    0x08,
+  CILK_FRAME_EXCEPTING         =    0x10,
+  CILK_FRAME_LAST              =    0x80,
+  CILK_FRAME_EXITING           =  0x0100,
+  CILK_FRAME_SUSPENDED         =  0x8000,
+  CILK_FRAME_UNWINDING         = 0x10000
 };
 
 #define CILK_FRAME_VERSION_MASK  0xFF000000
 #define CILK_FRAME_FLAGS_MASK    0x00FFFFFF
 #define CILK_FRAME_VERSION_VALUE(_flags) (((_flags) & CILK_FRAME_VERSION_MASK) >> 24)
-#define CILK_FRAME_MBZ  (~ (CILK_FRAME_STOLEN           |       \
-                            CILK_FRAME_UNSYNCHED        |       \
-                            CILK_FRAME_DETACHED         |       \
-                            CILK_FRAME_EXCEPTION_PROBED |       \
-                            CILK_FRAME_EXCEPTING        |       \
-                            CILK_FRAME_LAST             |       \
-                            CILK_FRAME_EXITING          |       \
-                            CILK_FRAME_SUSPENDED        |       \
-                            CILK_FRAME_UNWINDING        |       \
+#define CILK_FRAME_MBZ  (~ (CILK_FRAME_STOLEN            |       \
+                            CILK_FRAME_UNSYNCHED         |       \
+                            CILK_FRAME_DETACHED          |       \
+                            CILK_FRAME_EXCEPTION_PENDING |       \
+                            CILK_FRAME_EXCEPTING         |       \
+                            CILK_FRAME_LAST              |       \
+                            CILK_FRAME_EXITING           |       \
+                            CILK_FRAME_SUSPENDED         |       \
+                            CILK_FRAME_UNWINDING         |       \
                             CILK_FRAME_VERSION_MASK))
 
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
@@ -229,6 +229,7 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_resume() {
 
   return CilkRTSCheckExceptionResume;
 }
+
 FunctionCallee CilkRABI::Get__cilkrts_check_exception_raise() {
   if (CilkRTSCheckExceptionRaise)
     return CilkRTSCheckExceptionRaise;
@@ -583,7 +584,8 @@ Function *CilkRABI::Get__cilkrts_detach() {
 ///       __cilkrts_sync(sf);
 ///     // else if (sf->flags & CILK_FRAME_EXCEPTING)
 ///     //   __cilkrts_rethrow(sf);
-///     __cilkrts_check_exception_raise(sf);
+///     if (sf->flags & CILK_FRAME_EXCEPTION_PENDING)
+///       __cilkrts_check_exception_raise(sf);
 ///   }
 /// }
 ///
@@ -609,8 +611,123 @@ Function *CilkRABI::GetCilkSyncFn() {
   BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.sync.test", Fn);
   BasicBlock *SaveState = BasicBlock::Create(Ctx, "cilk.sync.savestate", Fn);
   BasicBlock *SyncCall = BasicBlock::Create(Ctx, "cilk.sync.runtimecall", Fn);
-  // BasicBlock *Excepting = BasicBlock::Create(Ctx, "cilk.sync.excepting", Fn);
-  // BasicBlock *Rethrow = BasicBlock::Create(Ctx, "cilk.sync.rethrow", Fn);
+  BasicBlock *ExnCheck = BasicBlock::Create(Ctx, "cilk.sync.exn.check", Fn);
+  BasicBlock *Rethrow = BasicBlock::Create(Ctx, "cilk.sync.rethrow", Fn);
+  BasicBlock *Exit = BasicBlock::Create(Ctx, "cilk.sync.end", Fn);
+
+  // Entry
+  {
+    IRBuilder<> B(Entry);
+
+    // JFC: I removed Acquire here.  The runtime has a fence in any path
+    // between setting and reading the bit.  The compiler should know that
+    // memory changes at the setjmp that precedes this test.
+    // if (sf->flags & CILK_FRAME_UNSYNCHED)
+    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
+                                StackFrameFieldFlags, /*isVolatile=*/false,
+                                AtomicOrdering::Unordered);
+    Flags = B.CreateAnd(Flags,
+                        ConstantInt::get(Flags->getType(),
+                                         CILK_FRAME_UNSYNCHED));
+    Value *Zero = ConstantInt::get(Flags->getType(), 0);
+    Value *Unsynced = B.CreateICmpEQ(Flags, Zero);
+    B.CreateCondBr(Unsynced, Exit, SaveState);
+  }
+
+  // SaveState
+  {
+    IRBuilder<> B(SaveState);
+
+    // if (!CILK_SETJMP(sf.ctx))
+    Value *C = EmitCilkSetJmp(B, SF);
+    C = B.CreateICmpEQ(C, ConstantInt::get(C->getType(), 0));
+    B.CreateCondBr(C, SyncCall, ExnCheck);
+  }
+
+  // SyncCall
+  {
+    IRBuilder<> B(SyncCall);
+
+    // __cilkrts_sync(&sf);
+    B.CreateCall(CILKRTS_FUNC(sync), SF);
+    B.CreateBr(ExnCheck);
+  }
+
+  // Excepting
+  {
+    IRBuilder<> B(ExnCheck);
+    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
+                                StackFrameFieldFlags,
+                                /*isVolatile=*/false,
+                                AtomicOrdering::Acquire);
+    Flags = B.CreateAnd(Flags,
+                        ConstantInt::get(Flags->getType(),
+                                         CILK_FRAME_EXCEPTION_PENDING));
+    Value *Zero = ConstantInt::get(Flags->getType(), 0);
+    Value *HasNoException = B.CreateICmpEQ(Flags, Zero);
+    B.CreateCondBr(HasNoException, Exit, Rethrow);
+  }
+
+  // Rethrow
+  {
+    IRBuilder<> B(Rethrow);
+    // __cilkrts_check_exception_raise(sf);
+    B.CreateCall(CILKRTS_FUNC(check_exception_raise), {SF});
+    B.CreateUnreachable();
+    // B.CreateBr(Exit);
+  }
+
+  // Exit
+  {
+    IRBuilder<> B(Exit);
+    B.CreateRetVoid();
+  }
+
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
+  Fn->addFnAttr(Attribute::ReturnsTwice);
+  if (!DebugABICalls)
+    Fn->addFnAttr(Attribute::AlwaysInline);
+
+  return Fn;
+}
+
+/// Get or create a LLVM function for __cilk_sync_nothrow.  Calls to this
+/// function are always inlined, as it saves the current stack/frame pointer
+/// values. This function must be marked as returns_twice to allow it to be
+/// inlined, since the call to setjmp is marked returns_twice.
+///
+/// It is equivalent to the following C code:
+///
+/// void __cilk_sync_nothrow(struct __cilkrts_stack_frame *sf) {
+///   if (sf->flags & CILK_FRAME_UNSYNCHED) {
+///     SAVE_FLOAT_STATE(*sf);
+///     if (!CILK_SETJMP(sf->ctx))
+///       __cilkrts_sync(sf);
+///   }
+/// }
+///
+/// With exceptions disabled in the compiler, the function
+/// does not call __cilkrts_rethrow()
+Function *CilkRABI::GetCilkSyncNoThrowFn() {
+  // Get or create the __cilk_sync_nothrow function.
+  LLVMContext &Ctx = M.getContext();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  Function *Fn = nullptr;
+  if (GetOrCreateFunction(M, "__cilk_sync_nothrow",
+                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
+                          Fn))
+    return Fn;
+
+  // Create the body of __cilk_sync.
+  const DataLayout &DL = M.getDataLayout();
+
+  Function::arg_iterator Args = Fn->arg_begin();
+  Value *SF = &*Args;
+
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.sync.test", Fn);
+  BasicBlock *SaveState = BasicBlock::Create(Ctx, "cilk.sync.savestate", Fn);
+  BasicBlock *SyncCall = BasicBlock::Create(Ctx, "cilk.sync.runtimecall", Fn);
   BasicBlock *Exit = BasicBlock::Create(Ctx, "cilk.sync.end", Fn);
 
   // Entry
@@ -652,38 +769,9 @@ Function *CilkRABI::GetCilkSyncFn() {
     B.CreateBr(Exit);
   }
 
-  // // Excepting
-  // {
-  //   IRBuilder<> B(Excepting);
-  //   if (Rethrow) {
-  //     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-  //                                 StackFrameFieldFlags,
-  //                                 /*isVolatile=*/false,
-  //                                 AtomicOrdering::Acquire);
-  //     Flags = B.CreateAnd(Flags,
-  //                         ConstantInt::get(Flags->getType(),
-  //                                          CILK_FRAME_EXCEPTING));
-  //     Value *Zero = ConstantInt::get(Flags->getType(), 0);
-  //     Value *CanExcept = B.CreateICmpEQ(Flags, Zero);
-  //     B.CreateCondBr(CanExcept, Exit, Rethrow);
-  //   } else {
-  //     B.CreateBr(Exit);
-  //   }
-  // }
-
-  // // Rethrow
-  // if (Rethrow) {
-  //   IRBuilder<> B(Rethrow);
-  //   B.CreateCall(CILKRTS_FUNC(rethrow), SF)->setDoesNotReturn();
-  //   B.CreateUnreachable();
-  // }
-
   // Exit
   {
     IRBuilder<> B(Exit);
-
-    // __cilkrts_check_exception_raise(sf);
-    B.CreateCall(CILKRTS_FUNC(check_exception_raise), {SF});
     B.CreateRetVoid();
   }
 
@@ -1214,7 +1302,12 @@ void CilkRABI::lowerSync(SyncInst &SI) {
 
   CallBase *CB;
   if (!SyncUnwindDest) {
-    CB = CallInst::Create(GetCilkSyncFn(), Args, "", /*insert before*/&SI);
+    if (Fn.doesNotThrow())
+      CB = CallInst::Create(GetCilkSyncNoThrowFn(), Args, "",
+                            /*insert before*/&SI);
+    else
+      CB = CallInst::Create(GetCilkSyncFn(), Args, "", /*insert before*/&SI);
+
     BranchInst::Create(SyncCont, CB->getParent());
   } else {
     CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, SyncUnwindDest, Args, "",
