@@ -1542,8 +1542,12 @@ void CilkABI::lowerSync(SyncInst &SI) {
   }
   CallBase *CB;
   if (!SyncUnwindDest) {
-    CB = CallInst::Create(GetCilkSyncNothrowFn(), args, "",
-                          /*insert before*/&SI);
+    if (Fn.doesNotThrow())
+      CB = CallInst::Create(GetCilkSyncNothrowFn(), args, "",
+                            /*insert before*/&SI);
+    else
+      CB = CallInst::Create(GetCilkSyncFn(), args, "", /*insert before*/&SI);
+
     BranchInst::Create(SyncCont, CB->getParent());
   } else {
     CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, SyncUnwindDest, args, "",
