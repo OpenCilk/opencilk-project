@@ -960,7 +960,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
 ///
 /// void __cilk_parent_epilogue(__cilkrts_stack_frame *sf) {
 ///   __cilkrts_pop_frame(sf);
-///   // if (sf->flags != CILK_FRAME_VERSION)
+///   if (sf->flags != CILK_FRAME_VERSION)
 ///     __cilkrts_leave_frame(sf);
 /// }
 Function *CilkRABI::GetCilkParentEpilogueFn() {
@@ -975,12 +975,13 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     return Fn;
 
   // Create the body of __cilk_parent_epilogue.
+  const DataLayout &DL = M.getDataLayout();
 
   Function::arg_iterator Args = Fn->arg_begin();
   Value *SF = &*Args;
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn),
-    // *B1 = BasicBlock::Create(Ctx, "body", Fn),
+    *B1 = BasicBlock::Create(Ctx, "body", Fn),
     *Exit  = BasicBlock::Create(Ctx, "exit", Fn);
   CallInst *PopFrame;
 
@@ -991,29 +992,29 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     // __cilkrts_pop_frame(sf)
     PopFrame = B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
 
+    // // __cilkrts_leave_frame(sf);
+    // B.CreateCall(CILKRTS_FUNC(leave_frame), SF);
+    // B.CreateBr(Exit);
+
+    // JFC: I removed AtomicOrdering::Acquire here.  If flags have been
+    // changed at least one change was in this function.
+    // if (sf->flags != CILK_FRAME_VERSION)
+    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
+                                StackFrameFieldFlags, /*isVolatile=*/false,
+                                AtomicOrdering::Unordered);
+    Value *Cond = B.CreateICmpNE(
+        Flags, ConstantInt::get(Flags->getType(), FrameVersionFlag()));
+    B.CreateCondBr(Cond, B1, Exit);
+  }
+
+  // B1
+  {
+    IRBuilder<> B(B1);
+
     // __cilkrts_leave_frame(sf);
     B.CreateCall(CILKRTS_FUNC(leave_frame), SF);
     B.CreateBr(Exit);
-
-  //   // JFC: I removed AtomicOrdering::Acquire here.  If flags have been
-  //   // changed at least one change was in this function.
-  //   // if (sf->flags != CILK_FRAME_VERSION)
-  //   Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-  //                               StackFrameFieldFlags, /*isVolatile=*/false,
-  //                               AtomicOrdering::Unordered);
-  //   Value *Cond = B.CreateICmpNE(
-  //       Flags, ConstantInt::get(Flags->getType(), FrameVersion << 24));
-  //   B.CreateCondBr(Cond, B1, Exit);
   }
-
-  // // B1
-  // {
-  //   IRBuilder<> B(B1);
-
-  //   // __cilkrts_leave_frame(sf);
-  //   B.CreateCall(CILKRTS_FUNC(leave_frame), SF);
-  //   B.CreateBr(Exit);
-  // }
 
   // Exit
   {
@@ -1100,7 +1101,7 @@ CallInst *CilkRABI::InsertStackFramePush(Function &F,
 }
 
 void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
-                                   bool InsertPauseFrame) {
+                                   bool InsertPauseFrame, bool Helper) {
   Value *SF = GetOrCreateCilkStackFrame(F);
   SmallPtrSet<ReturnInst*, 8> Returns;
   SmallPtrSet<ResumeInst*, 8> Resumes;
@@ -1116,8 +1117,12 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   }
 
   for (ReturnInst *RI : Returns) {
-    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+    if (Helper) {
+      CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+      CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+    } else {
+      CallInst::Create(GetCilkParentEpilogueFn(), {SF}, "", RI);
+    }
   }
   for (ResumeInst *RI : Resumes) {
     Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
@@ -1251,7 +1256,7 @@ void CilkRABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
   // the parent was stolen, in which case we want to save the exception for
   // later reduction.
   InsertStackFramePop(F, /*PromoteCallsToInvokes*/true,
-                      /*InsertPauseFrame*/true);
+                      /*InsertPauseFrame*/true, /*Helper*/true);
 
   // TODO: If F is itself a spawner, see if we need to ensure that the Cilk
   // personality function does not pop an already-popped frame.  We might be
@@ -1269,7 +1274,7 @@ void CilkRABI::postProcessRootSpawner(Function &F) {
   // calls to invokes, since the Cilk personality function will take care of
   // popping the frame if no landingpad exists for a given call.
   InsertStackFramePop(F, /*PromoteCallsToInvokes*/false,
-                      /*InsertPauseFrame*/false);
+                      /*InsertPauseFrame*/false, /*Helper*/false);
 }
 
 void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
