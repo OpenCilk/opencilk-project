@@ -73,7 +73,7 @@ class CilkRABI : public TapirTarget {
                                  Instruction *TaskFrameCreate = nullptr,
                                  bool Helper = false);
   void InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
-                           bool InsertPauseFrame);
+                           bool InsertPauseFrame, bool Helper);
 
   CallInst *EmitCilkSetJmp(IRBuilder<> &B, Value *SF);
 
