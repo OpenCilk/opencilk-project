@@ -217,9 +217,12 @@ FunctionCallee CilkRABI::Get__cilkrts_sync() {
     return CilkRTSSync;
 
   LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSSync = M.getOrInsertFunction("__cilkrts_sync", VoidTy,
+  CilkRTSSync = M.getOrInsertFunction("__cilkrts_sync", AL, VoidTy,
                                       StackFramePtrTy);
 
   return CilkRTSSync;
