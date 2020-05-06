@@ -957,8 +957,10 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
   */
 
   // const DataLayout& DL = M->getDataLayout();
-  AllocaInst *SF = CreateStackFrame(Extracted);
-  DetachCtxToStackFrame[&Extracted] = SF;
+  // AllocaInst *SF = CreateStackFrame(Extracted);
+  // DetachCtxToStackFrame[&Extracted] = SF;
+  AllocaInst *SF =
+      cast<AllocaInst>(GetOrInitCilkStackFrame(Extracted, /*Helper*/false));
   assert(SF && "No Cilk stack frame for Cilk function.");
   Value *Args[1] = { SF };
 
@@ -974,7 +976,8 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
   if (TaskFrameCreate)
     IRB.SetInsertPoint(TaskFrameCreate);
 
-  IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
+  // dbgs() << "  Inserting enter_frame for function " << Extracted.getName() << "\n";
+  // IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
 
   // Call __cilkrts_detach
   {
@@ -996,10 +999,10 @@ bool CilkRABI::makeFunctionDetachable(Function &Extracted,
     }
   }
 
-  for (ReturnInst *RI : Returns) {
-    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
-  }
+  // for (ReturnInst *RI : Returns) {
+  //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+  //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+  // }
   for (ResumeInst *RI : Resumes) {
     // If throwing an exception, store the exception object and selector value
     // in fiber local storage, call setjmp, and call pause_frame.
@@ -1082,7 +1085,6 @@ Value *CilkRABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
 
 void CilkRABI::lowerSync(SyncInst &SI) {
   Function &Fn = *SI.getFunction();
-
   Value *SF = GetOrInitCilkStackFrame(Fn, /*Helper*/false);
   Value *Args[] = { SF };
   assert(Args[0] && "sync used in function without frame!");
@@ -1131,6 +1133,9 @@ void CilkRABI::processOutlinedTask(Function &F, Instruction *DetachPt,
 
 void CilkRABI::processSpawner(Function &F) {
   GetOrInitCilkStackFrame(F, /*Helper=*/false);
+  // AllocaInst *SF = CreateStackFrame(F);
+  // DetachCtxToStackFrame[&F] = SF;
+  // assert(SF && "No Cilk stack frame for Cilk function.");
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
@@ -1140,7 +1145,7 @@ void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Instruction *ReplStart = TOI.ReplStart;
   Instruction *ReplCall = TOI.ReplCall;
 
-  Function &F = *ReplCall->getParent()->getParent();
+  Function &F = *ReplCall->getFunction();
   Value *SF = DetachCtxToStackFrame[&F];
   assert(SF && "No frame found for spawning task");
 
