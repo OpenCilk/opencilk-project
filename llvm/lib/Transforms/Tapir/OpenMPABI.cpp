@@ -443,10 +443,7 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
       CallerIRBuilder.getInt64(DL.getTypeAllocSize(KmpTaskTWithPrivatesTy));
 
   auto *VoidTy = Type::getVoidTy(C);
-  // auto *Int8PtrTy = Type::getInt8PtrTy(C);
   auto *Int32Ty = Type::getInt32Ty(C);
-
-  // auto *CopyFnTy = FunctionType::get(VoidTy, {Int8PtrTy}, true);
 
   auto *OutlinedFnTy = FunctionType::get(
       VoidTy,
