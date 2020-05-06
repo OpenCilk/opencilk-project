@@ -979,15 +979,17 @@ bool AccessPtrAnalysis::checkOpaqueAccesses(GeneralAccess &GA1,
     return false;
 
   if (!GA1.Loc && !GA2.Loc) {
-    const CallBase *Call1 = cast<CallBase>(GA1.I);
-    const CallBase *Call2 = cast<CallBase>(GA2.I);
+    LLVM_DEBUG({
+        const CallBase *Call1 = cast<CallBase>(GA1.I);
+        const CallBase *Call2 = cast<CallBase>(GA2.I);
 
-    assert(!AA->doesNotAccessMemory(Call1) && !AA->doesNotAccessMemory(Call2) &&
-           "Opaque call does not access memory.");
-    assert(!AA->onlyAccessesArgPointees(AA->getModRefBehavior(Call1)) &&
-           !AA->onlyAccessesArgPointees(AA->getModRefBehavior(Call2)) &&
-           "Opaque call only accesses arg pointees.");
-
+        assert(!AA->doesNotAccessMemory(Call1) &&
+               !AA->doesNotAccessMemory(Call2) &&
+               "Opaque call does not access memory.");
+        assert(!AA->onlyAccessesArgPointees(AA->getModRefBehavior(Call1)) &&
+               !AA->onlyAccessesArgPointees(AA->getModRefBehavior(Call2)) &&
+               "Opaque call only accesses arg pointees.");
+      });
     // // If both calls only read memory, then there's no dependence.
     // if (AA->onlyReadsMemory(Call1) && AA->onlyReadsMemory(Call2))
     //   return false;
