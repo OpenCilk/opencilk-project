@@ -436,19 +436,14 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
   IRBuilder<> CallerIRBuilder(cal);
   auto *SharedsTySize =
       CallerIRBuilder.getInt64(DL.getTypeAllocSize(SharedsTy));
-  // auto *KmpTaskTTy = createKmpTaskTTy(C);
-  auto *KmpTaskTWithPrivatesTy = createKmpTaskTWithPrivatesTy(SharedsTy);//KmpTaskTTy);
+  auto *KmpTaskTWithPrivatesTy = createKmpTaskTWithPrivatesTy(SharedsTy);
   auto *KmpTaskTWithPrivatesPtrTy =
       PointerType::getUnqual(KmpTaskTWithPrivatesTy);
   auto *KmpTaskTWithPrivatesTySize =
       CallerIRBuilder.getInt64(DL.getTypeAllocSize(KmpTaskTWithPrivatesTy));
 
   auto *VoidTy = Type::getVoidTy(C);
-  auto *Int8PtrTy = Type::getInt8PtrTy(C);
   auto *Int32Ty = Type::getInt32Ty(C);
-
-  auto *CopyFnTy = FunctionType::get(VoidTy, {Int8PtrTy}, true);
-  // auto *CopyFnPtrTy = PointerType::getUnqual(CopyFnTy);
 
   auto *OutlinedFnTy = FunctionType::get(
       VoidTy,
@@ -612,7 +607,7 @@ void OpenMPABI::postProcessFunction(Function &F,
     }
   }
 
-  for(size_t i=1; i<VisitedVec.size(); i++) {
+  for (size_t i=1; i<VisitedVec.size(); i++) {
       for (auto P : predecessors(VisitedVec[i])) {
         if (Visited.count(P) == 0) {
           std::swap(VisitedVec[0], VisitedVec[i]);
