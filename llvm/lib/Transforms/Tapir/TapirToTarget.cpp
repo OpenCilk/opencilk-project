@@ -288,7 +288,6 @@ bool TapirToTargetImpl::processOutlinedTask(
   Function &F = *TaskToOutline[T].Outline;
   Instruction *DetachPt = TaskToOutline[T].DetachPt;
   Instruction *TaskFrameCreate = TaskToOutline[T].TaskFrameCreate;
-  Target->processOutlinedTask(F, DetachPt, TaskFrameCreate);
   if (!T->isSerial()) {
     // Process outlined function F for a task as a spawner.
     Target->processSpawner(F);
@@ -297,6 +296,7 @@ bool TapirToTargetImpl::processOutlinedTask(
     for (Task *SubT : T->subtasks())
       Target->processSubTaskCall(TaskToOutline[SubT], DT);
   }
+  Target->processOutlinedTask(F, DetachPt, TaskFrameCreate);
   // Process the Tapir instructions in F directly.
   processSimpleABI(F);
   return true;
