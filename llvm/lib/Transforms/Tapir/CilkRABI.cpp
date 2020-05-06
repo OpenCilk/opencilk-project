@@ -1044,14 +1044,16 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   }
   for (ResumeInst *RI : Resumes) {
     // Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
-    CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    if (InsertPauseFrame)
+    if (InsertPauseFrame) {
+      CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
       // // If throwing an exception, store the exception object and selector value
       // // in the closure, call setjmp, and call pause_frame.
       // CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
       CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
-    else
-      CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+    // } else {
+    //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+    //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+    }
   }
 }
 
