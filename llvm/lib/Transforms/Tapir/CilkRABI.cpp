@@ -33,6 +33,7 @@ using namespace llvm;
 #define DEBUG_TYPE "cilkrabi"
 
 extern cl::opt<bool> DebugABICalls;
+extern cl::opt<bool> UseExternalABIFunctions;
 
 enum {
   __CILKRTS_ABI_VERSION_CILKR = 1, /* includes Cheetah */
@@ -487,7 +488,7 @@ Function *CilkRABI::Get__cilkrts_pop_frame() {
 
   Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  if (!DebugABICalls)
+  if (!DebugABICalls && !UseExternalABIFunctions)
     Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
@@ -571,7 +572,7 @@ Function *CilkRABI::Get__cilkrts_detach() {
 
   Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  if (!DebugABICalls)
+  if (!DebugABICalls && !UseExternalABIFunctions)
     Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
@@ -885,7 +886,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilk_enter_frame",
+  if (GetOrCreateFunction(M, "__cilkrts_enter_frame",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
                           Fn))
     return Fn;
@@ -971,7 +972,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
 
   Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  if (!DebugABICalls)
+  if (!DebugABICalls && !UseExternalABIFunctions)
     Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
@@ -1044,7 +1045,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
 
   Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
-  if (!DebugABICalls)
+  if (!DebugABICalls && !UseExternalABIFunctions)
     Fn->addFnAttr(Attribute::AlwaysInline);
 
   return Fn;
@@ -1118,7 +1119,8 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
   }
 
   // Inline the pop_frame call.
-  CallsToInline.insert(PopFrame);
+  if (!DebugABICalls && !UseExternalABIFunctions)
+    CallsToInline.insert(PopFrame);
 
   Fn->setLinkage(Function::AvailableExternallyLinkage);
   Fn->setDoesNotThrow();
@@ -1346,7 +1348,6 @@ void CilkRABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
 
   CallInst *EnterFrame =
       InsertStackFramePush(F, TaskFrameCreate, /*Helper*/false);
-  // InsertDetach(F, DetachPt, TaskFrameCreate);
   InsertDetach(F, (DetachPt ? DetachPt : &*(++EnterFrame->getIterator())));
 }
 
