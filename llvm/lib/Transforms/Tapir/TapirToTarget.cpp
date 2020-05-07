@@ -31,7 +31,12 @@ using namespace llvm;
 
 cl::opt<bool> DebugABICalls(
     "debug-abi-calls", cl::init(false), cl::Hidden,
-    cl::desc("Insert ABI calls for debugging"));
+    cl::desc("Insert ABI calls simply, to debug generated IR"));
+
+cl::opt<bool> UseExternalABIFunctions(
+    "use-external-abi-functions", cl::init(false), cl::Hidden,
+    cl::desc("Use ABI functions defined externally, rather than "
+             "compiler-generated versions"));
 
 static const char TimerGroupName[] = DEBUG_TYPE;
 static const char TimerGroupDescription[] = "Tapir to Target";
