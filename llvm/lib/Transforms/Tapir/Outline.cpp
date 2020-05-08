@@ -98,6 +98,9 @@ void llvm::CloneIntoFunction(
                          TimerGroupName, TimerGroupDescription,
                          TimePassesIsEnabled);
     for (BasicBlock *EHEntry : *SharedEHEntries) {
+      if (!VMap[EHEntry])
+        continue;
+
       // Get the predecessors of this exit block that were not cloned.
       SmallVector<BasicBlock *, 4> PredNotCloned;
       for (BasicBlock *Pred : predecessors(EHEntry))
