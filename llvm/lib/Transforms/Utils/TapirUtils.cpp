@@ -1433,7 +1433,11 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
     AI->setName(TFInstr.first->getName());
 
     // Store the result of the instruction into that alloca.
-    Builder.SetInsertPoint(&*(++TFInstr.first->getIterator()));
+    if (isa<PHINode>(TFInstr.first))
+      Builder.SetInsertPoint(
+          &*TFInstr.first->getParent()->getFirstInsertionPt());
+    else
+      Builder.SetInsertPoint(&*(++TFInstr.first->getIterator()));
     Builder.CreateStore(TFInstr.first, AI);
 
     // Load the result of the instruction at the continuation.
