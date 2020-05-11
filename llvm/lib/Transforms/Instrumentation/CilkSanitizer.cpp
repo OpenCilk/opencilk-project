@@ -2023,11 +2023,14 @@ static MemoryLocation getMemoryLocation(Instruction *I, unsigned OperandNum,
   }
 }
 
+// Evaluate the no-alias value in the suppression for Obj, and intersect that
+// result with the noalias information for other objects.
 Value *CilkSanitizerImpl::Instrumentor::getNoAliasSuppressionValue(
     Instruction *I, IRBuilder<> &IRB, unsigned OperandNum,
     MemoryLocation Loc, const RaceInfo::RaceData &RD, const Value *Obj,
     Value *ObjNoAliasFlag) {
   AliasAnalysis *AA = RI.getAA();
+
   for (const RaceInfo::RaceData &OtherRD : RI.getRaceData(I)) {
     // Skip checking other accesses that don't involve a pointer
     if (!OtherRD.Access.getPointer())
@@ -2035,6 +2038,7 @@ Value *CilkSanitizerImpl::Instrumentor::getNoAliasSuppressionValue(
     // Skip this operand when scanning for aliases
     if (OperandNum == OtherRD.OperandNum)
       continue;
+
     // If we can tell statically that these two memory locations don't alias,
     // move on.
     if (!AA->alias(Loc, getMemoryLocation(I, OtherRD.OperandNum,
@@ -2089,7 +2093,6 @@ Value *CilkSanitizerImpl::Instrumentor::getNoAliasSuppressionValue(
   return ObjNoAliasFlag;
 }
 
-// TODO: Combine the logic of getSuppressionValue and getSuppressionCheck.
 Value *CilkSanitizerImpl::Instrumentor::getSuppressionValue(
     Instruction *I, IRBuilder<> &IRB, unsigned OperandNum,
     SuppressionVal DefaultSV, bool CheckArgs) {
@@ -2100,30 +2103,80 @@ Value *CilkSanitizerImpl::Instrumentor::getSuppressionValue(
       IRB, static_cast<unsigned>(SuppressionVal::NoAccess));
   Value *DefaultSuppression = getSuppressionIRValue(
       IRB, static_cast<unsigned>(DefaultSV));
-
-  // // Check the other operands of this call to check for aliasing, e.g., because
-  // // the same pointer is passed twice.
-  // bool OperandMayAlias = false;
-  // for (const RaceInfo::RaceData &OtherRD : RI.getRaceData(I)) {
-  //   // Skip this operand when scanning for aliases
-  //   if (OperandNum == OtherRD.OperandNum)
-  //     continue;
-  //   // Check for aliasing.
-  //   if (OtherRD.OperandNum != static_cast<unsigned>(-1))
-  //     if (AA->alias(Loc, getMemoryLocation(I, OtherRD.OperandNum,
-  //                                          CilkSanImpl.TLI)))
-  //       OperandMayAlias = true;
-  // }
-
-  // bool ObjectsDontAlias = true;
   Value *NoAliasFlag = getSuppressionIRValue(
       IRB, static_cast<unsigned>(SuppressionVal::NoAlias));
+
+  // If I is a call, check if any other arguments of this call alias the
+  // specified operand.
+  if (const CallBase *CB = dyn_cast<CallBase>(I)) {
+    unsigned OpIdx = 0;
+    bool FoundAliasingArg = false;
+    for (const Value *Arg : CB->args()) {
+      // Skip this operand and any operands that are not pointers.
+      if (OpIdx == OperandNum ||
+          !Arg->getType()->isPtrOrPtrVectorTy()) {
+        ++OpIdx;
+        continue;
+      }
+
+      // If this argument does not alias Loc, skip it.
+      if (!AA->alias(Loc, getMemoryLocation(I, OpIdx, CilkSanImpl.TLI))) {
+        ++OpIdx;
+        continue;
+      }
+
+      // If the operands must alias, then discard the default noalias
+      // suppression value.
+      AliasResult ArgAlias =
+          AA->alias(Loc, getMemoryLocation(I, OpIdx, CilkSanImpl.TLI));
+      if (MustAlias == ArgAlias || PartialAlias == ArgAlias) {
+        NoAliasFlag = getSuppressionIRValue(IRB, 0);
+        break;
+      }
+
+      // Get objects corresponding to this argument.
+      SmallPtrSet<const Value *, 1> ArgObjects;
+      RI.getObjectsFor(RaceInfo::MemAccessInfo(
+                           Arg, isModSet(AA->getArgModRefInfo(CB, OpIdx))),
+                       ArgObjects);
+      for (const Value *Obj : ArgObjects) {
+        // If Loc and the racer object cannot alias, then there's nothing to
+        // check.
+        if (!AA->alias(Loc, MemoryLocation(Obj)))
+          continue;
+
+        // If we have no local suppression data for Obj, then act pessimally.
+        if (!LocalSuppressions.count(Obj)) {
+          FoundAliasingArg = true;
+          break;
+        }
+
+        // Intersect the dynamic noalias information for this object into the
+        // noalias flag.
+        Value *FlagLoad = readSuppressionVal(LocalSuppressions[Obj], IRB);
+        Value *ObjNoAliasFlag = IRB.CreateAnd(
+            FlagLoad, getSuppressionIRValue(
+                IRB, static_cast<unsigned>(SuppressionVal::NoAlias)));
+        NoAliasFlag = IRB.CreateAnd(NoAliasFlag, ObjNoAliasFlag);
+      }
+
+      if (FoundAliasingArg) {
+        // If we found an aliasing argument, fall back to noalias = false.
+        NoAliasFlag = getSuppressionIRValue(IRB, 0);
+        break;
+      }
+      ++OpIdx;
+    }
+  }
+
   // Check the recorded race data for I.
   for (const RaceInfo::RaceData &RD : RI.getRaceData(I)) {
     // Skip race data for different operands of the same instruction.
     if (OperandNum != RD.OperandNum)
       continue;
 
+    // Otherwise use information about the possibly accessed objects to
+    // determine the suppression value.
     SmallPtrSet<const Value *, 1> Objects;
     RI.getObjectsFor(RD.Access, Objects);
     // // Add objects to CilkSanImpl.ObjectMRForRace, to ensure ancillary
@@ -2145,7 +2198,6 @@ Value *CilkSanitizerImpl::Instrumentor::getSuppressionValue(
       Value *FlagCheck = IRB.CreateAnd(
           FlagLoad, getSuppressionIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
       SV = IRB.CreateOr(SV, FlagCheck);
-      // SV = IRB.CreateOr(SV, FlagLoad);
 
       // Get the dynamic no-alias bit from the suppression value.
       Value *ObjNoAliasFlag = IRB.CreateAnd(
@@ -2167,55 +2219,32 @@ Value *CilkSanitizerImpl::Instrumentor::getSuppressionValue(
           if (!AA->alias(Loc, MemoryLocation(&Arg)))
             continue;
           // If we have no local suppression information about the argument,
-          // give up.
+          // then there's nothing to check.
           if (!LocalSuppressions.count(&Arg)) {
             LLVM_DEBUG(dbgs() << "No local suppression found for arg " << Arg
                        << "\n");
             return DefaultSuppression;
           }
 
+          // These two objects may alias, based on static analysis.  Check the
+          // dynamic suppression values.  We can suppress the race if either
+          // this object or the racer object is dynamically noalias, i.e., if
+          // either was derived from an allocation or noalias function argument.
           Value *FlagLoad = readSuppressionVal(LocalSuppressions[&Arg], IRB);
+          Value *ArgNoAliasFlag = IRB.CreateAnd(
+              FlagLoad, getSuppressionIRValue(
+                  IRB, static_cast<unsigned>(SuppressionVal::NoAlias)));
+          Value *ArgNoAliasCheck = IRB.CreateICmpNE(
+              getSuppressionIRValue(IRB, 0), ArgNoAliasFlag);
           Value *FlagCheck = IRB.CreateSelect(
-              NoAliasCheck, getSuppressionIRValue(IRB, 0),
+              IRB.CreateOr(NoAliasCheck, ArgNoAliasCheck),
+              getSuppressionIRValue(IRB, 0),
               IRB.CreateAnd(
                   FlagLoad, getSuppressionIRValue(IRB,
                                                   RaceTypeToFlagVal(RD.Type))));
           SV = IRB.CreateOr(SV, FlagCheck);
-          // Value *FlagCheck = IRB.CreateAnd(
-          //     FlagLoad, getSuppressionIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
-          // SV = IRB.CreateOr(SV, FlagCheck);
         }
       }
-
-      // // Check for noalias attributes to determine if we can set the noalias
-      // // suppression bit in this value (at this call).
-      // bool ObjNoAlias = false;
-      // if (Argument *Arg = dyn_cast<Argument>(Obj))
-      //   ObjNoAlias = Arg->hasNoAliasAttr();
-      // else if (CallBase *CB = dyn_cast<CallBase>(Obj))
-      //   ObjNoAlias = CB->hasRetAttr(Attribute::NoAlias);
-      // ObjNoAliasFlag = IRB.CreateOr(
-      //     ObjNoAliasFlag,
-      //     getSuppressionIRValue(IRB, ObjNoAlias ? SuppressionVal::NoAlias : 0));
-
-      // // Look for instances of the same object
-      // //
-      // // TODO: Possibly optimize this quadratic algorithm, if it proves to be a
-      // // problem.
-      // for (const RaceInfo::RaceData &OtherRD : RI.getRaceData(I)) {
-      //   // Skip this operand when scanning for aliases
-      //   if (OperandNum == OtherRD.OperandNum)
-      //     continue;
-      //   SmallPtrSet<Value *, 1> OtherObjects;
-      //   RI.getObjectsFor(OtherRD.Access, OtherObjects);
-      //   for (Value *OtherObj : OtherObjects) {
-      //     // If we find another instance of this object in another argument,
-      //     // then we don't have "no alias".
-      //     if (Obj == OtherObj)
-      //       ObjNoAliasFlag = getSuppressionIRValue(IRB, 0);
-      //   }
-      // }
-
       // Call getNoAliasSuppressionValue to evaluate the no-alias value in the
       // suppression for Obj, and intersect that result with the noalias
       // information for other objects.
@@ -2281,7 +2310,8 @@ Value *CilkSanitizerImpl::Instrumentor::getSuppressionCheck(
           continue;
         // If we have no local suppression information about the argument, give up.
         if (!LocalSuppressions.count(&Arg)) {
-          dbgs() << "No local suppression found for arg " << Arg << "\n";
+          LLVM_DEBUG(dbgs() << "No local suppression found for arg " << Arg
+                     << "\n");
           return IRB.getFalse();
         }
 
@@ -2290,10 +2320,15 @@ Value *CilkSanitizerImpl::Instrumentor::getSuppressionCheck(
         Value *FlagLoad = readSuppressionVal(LocalSuppressions[&Arg], IRB);
         Value *FlagCheck = IRB.CreateAnd(
             FlagLoad, getSuppressionIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
+        Value *ArgNoAliasFlag = IRB.CreateAnd(
+            FlagLoad, getSuppressionIRValue(
+                IRB, static_cast<unsigned>(SuppressionVal::NoAlias)));
+        Value *ArgNoAliasCheck = IRB.CreateICmpNE(
+            getSuppressionIRValue(IRB, 0), ArgNoAliasFlag);
         SuppressionChk = IRB.CreateAnd(
             SuppressionChk, IRB.CreateOr(
-                NoAliasCheck, IRB.CreateICmpEQ(getSuppressionIRValue(IRB, 0),
-                                               FlagCheck)));
+                IRB.CreateOr(NoAliasCheck, ArgNoAliasCheck),
+                IRB.CreateICmpEQ(getSuppressionIRValue(IRB, 0), FlagCheck)));
       }
     }
   }
