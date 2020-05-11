@@ -411,11 +411,6 @@ private:
 
   DenseMap<DetachInst *, SmallVector<SyncInst *, 2>> DetachToSync;
 
-  SmallPtrSet<const Function *, 8> LocalNoRecurseFunctions;
-  bool FunctionIsNoRecurse(const Function &F) const {
-    return (F.doesNotRecurse() || LocalNoRecurseFunctions.count(&F));
-  }
-
   bool LocalBaseObj(const Value *Addr, LoopInfo *LI,
                     const TargetLibraryInfo *TLI) const;
   bool PossibleRaceByCapture(const Value *Addr, const TaskInfo &TI,
@@ -640,63 +635,6 @@ using SCCNodeSet = SmallSetVector<Function *, 8>;
 
 } // end anonymous namespace
 
-static bool InstrBreaksNoRecurse(Instruction &I, const SCCNodeSet &SCCNodes,
-                                 SmallPtrSetImpl<const Function *>
-                                 &LocalNoRecurFns) {
-  Function *F = *SCCNodes.begin();
-  if (F->doesNotRecurse())
-    return false;
-
-  if (auto CS = CallSite(&I)) {
-    if (isa<DbgInfoIntrinsic>(I))
-      return false;
-
-    if (isDetachedRethrow(&I) || isTaskFrameResume(&I) || isSyncUnwind(&I))
-      return false;
-
-    const Function *Callee = CS.getCalledFunction();
-    if (!Callee || Callee == F || (!Callee->doesNotRecurse() &&
-                                   !LocalNoRecurFns.count(Callee))) {
-      if (Callee && Callee != F) {
-        switch (Callee->getIntrinsicID()) {
-        default: return true;
-        case Intrinsic::annotation:
-        case Intrinsic::assume:
-        case Intrinsic::sideeffect:
-        case Intrinsic::invariant_start:
-        case Intrinsic::invariant_end:
-        case Intrinsic::launder_invariant_group:
-        case Intrinsic::strip_invariant_group:
-        case Intrinsic::is_constant:
-        case Intrinsic::lifetime_start:
-        case Intrinsic::lifetime_end:
-        case Intrinsic::objectsize:
-        case Intrinsic::ptr_annotation:
-        case Intrinsic::var_annotation:
-        case Intrinsic::experimental_gc_result:
-        case Intrinsic::experimental_gc_relocate:
-        case Intrinsic::coro_alloc:
-        case Intrinsic::coro_begin:
-        case Intrinsic::coro_free:
-        case Intrinsic::coro_end:
-        case Intrinsic::coro_frame:
-        case Intrinsic::coro_size:
-        case Intrinsic::coro_suspend:
-        case Intrinsic::coro_param:
-        case Intrinsic::coro_subfn_addr:
-        case Intrinsic::syncregion_start:
-        case Intrinsic::taskframe_create:
-        case Intrinsic::taskframe_use:
-        case Intrinsic::taskframe_load_guard:
-          return false;
-        }
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
 bool CilkSanitizerImpl::run() {
   // Initialize components of the CSI and Cilksan system.
   initializeCsi();
@@ -707,45 +645,6 @@ bool CilkSanitizerImpl::run() {
   // Evaluate the SCC's in the callgraph in post order to support
   // interprocedural analysis of potential races in the module.
   SmallVector<Function *, 16> InstrumentedFunctions;
-
-  // Fill SCCNodes with the elements of the SCC. Used for quickly looking up
-  // whether a given CallGraphNode is in this SCC. Also track whether there are
-  // any external or opt-none nodes that will prevent us from optimizing any
-  // part of the SCC.
-  for (scc_iterator<CallGraph *> I = scc_begin(CG); !I.isAtEnd(); ++I) {
-    const std::vector<CallGraphNode *> &SCC = *I;
-    SCCNodeSet SCCNodes;
-    for (CallGraphNode *N : SCC) {
-      Function *F = N->getFunction();
-      if (F)
-        SCCNodes.insert(F);
-    }
-    // Infer our own version of the norecurse attribute.  The norecurse
-    // attribute requires an exact definition of the function, and therefore
-    // does not get inferred on functions with weak or linkonce linkage.
-    // However, CilkSanitizer only requires this attribute in propagating
-    // analysis information across function boundaries.  Any alternative
-    // implementation of said function can simply propagate such information
-    // differently.  So CilkSanitizer infers the norecurse attribute itself,
-    // without the requirement of an exact definition.
-    AttributeInferer AI;
-    AI.registerAttrInference(AttributeInferer::InferenceDescriptor{
-        Attribute::NoRecurse,
-            // Skip functions already marked norecurse.
-            [](const Function &F) { return F.doesNotRecurse(); },
-            // Instructions that break NoRecurse
-            [this, SCCNodes](Instruction &I) {
-              return InstrBreaksNoRecurse(I, SCCNodes, LocalNoRecurseFunctions);
-            },
-            [this](Function &F) {
-              LLVM_DEBUG(dbgs() << "Setting function " << F.getName()
-                                << " as locally norecurse.\n");
-              LocalNoRecurseFunctions.insert(&F);
-            },
-            /* RequiresExactDefinition = */ false});
-    // Derive any local function attributes we want.
-    AI.run(SCCNodes);
-  }
 
   // Instrument functions.
   for (scc_iterator<CallGraph *> I = scc_begin(CG); !I.isAtEnd(); ++I) {
@@ -1703,30 +1602,6 @@ void CilkSanitizerImpl::Instrumentor::InsertArgSuppressionFlags(Function &F,
       if (Arg.hasNoAliasAttr())
         LocalSV |= static_cast<unsigned>(SuppressionVal::NoAlias);
 
-      // if (!F.hasFnAttribute(Attribute::NoRecurse) &&
-      if (!CilkSanImpl.FunctionIsNoRecurse(F) &&
-          RI.ObjectInvolvedInRace(&Arg)) {
-        LLVM_DEBUG(dbgs() << "Setting local SV in may-recurse function " <<
-                   F.getName() << " for arg " << Arg << "\n");
-        // This function might recursively call itself, so incorporate
-        // information we have about how this function reads or writes its own
-        // arguments into these suppression flags.
-        ModRefInfo ArgMR = RI.GetObjectMRForRace(&Arg);
-        // TODO: Possibly make these checks more precise using information we
-        // get from instrumenting functions previously.
-        if (isRefSet(ArgMR)) {
-          LLVM_DEBUG(dbgs() << "  Setting Mod\n");
-          // If ref is set, then race detection found a local instruction that
-          // might write arg, so we assume arg is modified.
-          LocalSV |= static_cast<unsigned>(SuppressionVal::Mod);
-        }
-        if (isModSet(ArgMR)) {
-          LLVM_DEBUG(dbgs() << "  Setting Ref\n");
-          // If mod is set, then race detection found a local instruction that
-          // might read or write  arg, so we assume arg is read.
-          LocalSV |= static_cast<unsigned>(SuppressionVal::Ref);
-        }
-      }
       // Store this local suppression value.
       FinalSV = IRB.CreateOr(getSuppressionIRValue(IRB, LocalSV),
                              IRB.CreateLoad(NewFlag));
