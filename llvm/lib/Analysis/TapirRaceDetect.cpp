@@ -771,6 +771,11 @@ bool AccessPtrAnalysis::checkDependence(std::unique_ptr<Dependence> D,
       break;
     }
   }
+
+  // If we didn't find any base objects, we have no common-object loop.
+  if (BaseObjs.empty())
+    CommonObjLoop = nullptr;
+
   // Set MinObjDepth to 0 if there are not base objects to check.
   if (BaseObjs.empty() || !CommonObjLoop)
     MinObjDepth = 0;
