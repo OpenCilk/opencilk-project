@@ -54,22 +54,24 @@ public:
     };
 
   static RaceType setLocalRace(const RaceType RT) {
-    return RaceType(static_cast<int>(RT) | static_cast<int>(Local));
+    return RaceType(static_cast<unsigned>(RT) | static_cast<unsigned>(Local));
   }
   static RaceType setRaceViaAncestorRef(const RaceType RT) {
-    return RaceType(static_cast<int>(RT) | static_cast<int>(ViaAncestorRef));
+    return RaceType(static_cast<unsigned>(RT) |
+                    static_cast<unsigned>(ViaAncestorRef));
   }
   static RaceType setRaceViaAncestorMod(const RaceType RT) {
-    return RaceType(static_cast<int>(RT) | static_cast<int>(ViaAncestorMod));
+    return RaceType(static_cast<unsigned>(RT) |
+                    static_cast<unsigned>(ViaAncestorMod));
   }
   static RaceType setOpaqueRace(const RaceType RT) {
-    return RaceType(static_cast<int>(RT) | static_cast<int>(Opaque));
+    return RaceType(static_cast<unsigned>(RT) | static_cast<unsigned>(Opaque));
   }
   static RaceType clearOpaqueRace(const RaceType RT) {
-    return RaceType(static_cast<int>(RT) & ~static_cast<int>(Opaque));
+    return RaceType(static_cast<unsigned>(RT) & ~static_cast<unsigned>(Opaque));
   }
   static RaceType unionRaceTypes(const RaceType RT1, const RaceType RT2) {
-    return RaceType(static_cast<int>(RT1) | static_cast<int>(RT2));
+    return RaceType(static_cast<unsigned>(RT1) | static_cast<unsigned>(RT2));
   }
 
   static bool isRace(const RaceType RT) {
