@@ -4154,7 +4154,13 @@ static
 const SCEV *getElementSize(GeneralAccess *A, ScalarEvolution *SE) {
   Type *Ty = getGeneralAccessPointerOperand(A)->getType();
   Type *ETy = SE->getEffectiveSCEVType(PointerType::getUnqual(Ty));
-  return SE->getSizeOfExpr(ETy, Ty);
+  if (A->Loc) {
+    if (A->Loc->Size.hasValue())
+      return SE->getConstant(ETy, A->Loc->Size.getValue());
+    else
+      return SE->getCouldNotCompute();
+  } else
+    return SE->getCouldNotCompute();
 }
 
 /// Check if we can delinearize the subscripts. If the SCEVs representing the
@@ -4299,6 +4305,8 @@ bool DependenceInfo::tryDelinearizeParametricSize(
          "expected src and dst scev unknowns to be equal");
 
   const SCEV *ElementSize = getElementSize(SrcA, SE);
+  if (isa<SCEVCouldNotCompute>(ElementSize))
+    return false;
   if (ElementSize != getElementSize(DstA, SE))
     return false;
 
@@ -4402,6 +4410,15 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
   case MustAlias:
     break; // The underlying objects alias; test accesses for dependence.
   }
+
+  // If either Src or Dst is a call, and we are uncertain about the accessed
+  // location's size, give up.
+  if (isa<CallBase>(Src))
+    if (!SrcA->Loc->Size.hasValue())
+      return make_unique<Dependence>(Src, Dst);
+  if (isa<CallBase>(Dst))
+    if (!DstA->Loc->Size.hasValue())
+      return make_unique<Dependence>(Src, Dst);
 
   // establish loop nesting levels
   establishNestingLevels(Src, Dst);
