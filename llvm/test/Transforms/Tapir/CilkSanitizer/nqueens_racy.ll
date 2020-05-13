@@ -155,7 +155,7 @@ for.body:                                         ; preds = %for.inc, %for.body.
   br i1 %tobool, label %for.inc, label %if.then11, !dbg !126
 ; CHECK-LABEL: for.body:
 ; CHECK: @__csan_store
-; CHECK-NEXT: store i8 %conv9, i8* %arrayidx
+; CHECK: store i8 %conv9, i8* %arrayidx
 ; CHECK: @__cilksan_disable_checking
 ; CHECK-NEXT: call i32 @ok(
 ; CHECK-NEXT: @__cilksan_enable_checking

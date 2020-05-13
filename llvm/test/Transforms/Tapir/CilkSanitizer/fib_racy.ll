@@ -27,8 +27,10 @@ det.achd:                                         ; preds = %if.end
   store i32 %call, i32* %x, align 4, !dbg !27
   reattach within %syncreg, label %det.cont, !dbg !27
 ; CHECK-LABEL: det.achd:
+; CHECK: call i32 @fib(
 ; CHECK: @__csan_store(
-; CHECK-NEXT: store i32 %call, i32* %x
+; CHECK: store i32 %call, i32* %x
+; CHECK: reattach within %syncreg,
 
 det.cont:                                         ; preds = %det.achd, %if.end
   %sub1 = add nsw i32 %n, -2, !dbg !28
@@ -40,8 +42,12 @@ det.cont:                                         ; preds = %det.achd, %if.end
   store i32 %add, i32* %x, align 4, !dbg !30
   sync within %syncreg, label %sync.continue, !dbg !31
 ; CHECK-LABEL: det.cont:
+; CHECK: call i32 @fib(
 ; CHECK: @__csan_store(
-; CHECK-NEXT: store i32 %add, i32* %x
+; CHECK: store i32 %add, i32* %x
+
+; CHECK: call void @__csan_sync(
+; CHECK: sync within %syncreg,
 
 sync.continue:                                    ; preds = %det.cont
   %x.0.load11 = load i32, i32* %x, align 4, !dbg !32
