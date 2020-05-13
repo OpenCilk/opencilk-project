@@ -1628,9 +1628,11 @@ void CilkSanitizerImpl::Instrumentor::InsertArgSuppressionFlags(Function &F,
       // Determine if this object is no-alias.
       //
       // TODO: Figure out what "no-alias" information we can derive for allocas.
-      if (const CallBase *CB = dyn_cast<CallBase>(ObjRD.first))
+      if (const CallBase *CB = dyn_cast<CallBase>(ObjRD.first)) {
         if (CB->hasRetAttr(Attribute::NoAlias))
           SupprVal |= static_cast<unsigned>(SuppressionVal::NoAlias);
+      } else if (isa<AllocaInst>(ObjRD.first))
+        SupprVal |= static_cast<unsigned>(SuppressionVal::NoAlias);
 
       LLVM_DEBUG(dbgs() << "Setting LocalSuppressions for " << *ObjRD.first
                  << " = " << SupprVal << "\n");
