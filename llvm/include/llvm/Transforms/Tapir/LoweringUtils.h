@@ -449,11 +449,6 @@ Instruction *fixupHelperInputs(Function &F, Task *T, ValueSet &TaskInputs,
 /// detached-rethrow instructions.
 bool isSuccessorOfDetachedRethrow(const BasicBlock *B);
 
-/// Returns true if BasicBlock \p B is a placeholder successor, that is, it's
-/// the immediate successor of only detached-rethrow and taskframe-resume
-/// instructions.
-bool isPlaceholderSuccessor(const BasicBlock *B);
-
 /// Collect the set of blocks in task \p T.  All blocks enclosed by \p T will be
 /// pushed onto \p TaskBlocks.  The set of blocks terminated by reattaches from
 /// \p T are added to \p ReattachBlocks.  The set of blocks terminated by

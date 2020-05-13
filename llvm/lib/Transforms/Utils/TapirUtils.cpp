@@ -84,6 +84,21 @@ bool llvm::isSyncUnwind(const Instruction *I, const Value *SyncRegion) {
   return isTapirIntrinsic(Intrinsic::sync_unwind, I, SyncRegion);
 }
 
+/// Returns true if BasicBlock \p B is a placeholder successor, that is, it's
+/// the immediate successor of only detached-rethrow and taskframe-resume
+/// instructions.
+bool llvm::isPlaceholderSuccessor(const BasicBlock *B) {
+  for (const BasicBlock *Pred : predecessors(B)) {
+    if (!isDetachedRethrow(Pred->getTerminator()) &&
+        !isTaskFrameResume(Pred->getTerminator()))
+      return false;
+    if (B == cast<InvokeInst>(
+            Pred->getTerminator())->getUnwindDest())
+      return false;
+  }
+  return true;
+}
+
 // Removes the given sync.unwind instruction, if it is dead.  Returns true if
 // the sync.unwind was removed, false otherwise.
 bool llvm::removeDeadSyncUnwind(CallBase *SyncUnwind,
@@ -704,6 +719,7 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   BasicBlock *Spawner = DI->getParent();
   BasicBlock *TaskEntry = DI->getDetached();
   BasicBlock *Continue = DI->getContinue();
+  BasicBlock *Unwind = DI->getUnwindDest();
   Value *SyncRegion = DI->getSyncRegion();
 
   // If the spawned task has a taskframe, serialize the taskframe.
@@ -778,9 +794,12 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   ReplaceInstWithInst(DI, BranchInst::Create(TaskEntry));
 
   // Update dominator tree.
-  if (DT)
+  if (DT) {
     if (DT->dominates(Spawner, Continue))
       DT->changeImmediateDominator(Continue, ReattachDom);
+    if (DI->hasUnwindDest())
+      DT->deleteEdge(Spawner, Unwind);
+  }
 }
 
 /// Analyze a task for serialization
@@ -798,6 +817,9 @@ void llvm::AnalyzeTaskForSerialization(
     for (BasicBlock *BB : S->blocks()) {
       // Record any shared-EH blocks that need to be cloned.
       if (S->isSharedEH()) {
+	// Skip basic blocks that are placeholder successors
+	if (isPlaceholderSuccessor(BB))
+	  continue;
         EHBlocksToClone.push_back(BB);
         if (S->getEntry() == BB)
           for (BasicBlock *Pred : predecessors(BB))
