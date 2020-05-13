@@ -118,44 +118,43 @@ static inline bool should_check() {
 
 Stack_t<uint8_t> parallel_execution;
 
-Stack_t<std::pair<csi_id_t, uint64_t>> suppressions;
-Stack_t<uint64_t> suppression_counts;
+Stack_t<std::pair<csi_id_t, uint64_t>> MAAPs;
+Stack_t<uint64_t> MAAP_counts;
 
-CILKSAN_API void __csan_set_suppression_flag(uint64_t val, csi_id_t id) {
-  DBG_TRACE(DEBUG_CALLBACK, "__csan_set_suppression_flag(%ld, %ld)\n",
+CILKSAN_API void __csan_set_MAAP(uint64_t val, csi_id_t id) {
+  DBG_TRACE(DEBUG_CALLBACK, "__csan_set_MAAP(%ld, %ld)\n",
             val, id);
-  suppressions.push();
-  *suppressions.head() = std::make_pair(id, val);
+  MAAPs.push();
+  *MAAPs.head() = std::make_pair(id, val);
 }
 
-CILKSAN_API void __csan_get_suppression_flag(uint64_t *ptr, csi_id_t id,
-                                             unsigned idx) {
-  DBG_TRACE(DEBUG_CALLBACK, "__csan_get_suppression_flag(%x, %d, %d)\n",
+CILKSAN_API void __csan_get_MAAP(uint64_t *ptr, csi_id_t id, unsigned idx) {
+  DBG_TRACE(DEBUG_CALLBACK, "__csan_get_MAAP(%x, %d, %d)\n",
             ptr, id, idx);
-  // We presume that __csan_get_suppression_flag runs early in the function, so
-  // if instrumentation is disabled, it's disabled for the whole function.
+  // We presume that __csan_get_MAAP runs early in the function, so if
+  // instrumentation is disabled, it's disabled for the whole function.
   if (!should_check()) {
     *ptr = /*NoModRef*/0;
     return;
   }
 
-  unsigned suppression_count = *suppression_counts.head();
-  if (idx >= suppression_count) {
-    DBG_TRACE(DEBUG_CALLBACK, "  No suppression found: idx %d >= count %d\n",
-              idx, suppression_count);
-    // The stack doesn't have suppressions for us, so assume the worst.
+  unsigned MAAP_count = *MAAP_counts.head();
+  if (idx >= MAAP_count) {
+    DBG_TRACE(DEBUG_CALLBACK, "  No MAAP found: idx %d >= count %d\n", idx,
+              MAAP_count);
+    // The stack doesn't have MAAPs for us, so assume the worst: modref with
+    // aliasing.
     *ptr = /*ModRef*/3;
     return;
   }
 
-  std::pair<csi_id_t, unsigned> suppression = *suppressions.ancestor(idx);
-  if (suppression.first == id) {
-    DBG_TRACE(DEBUG_CALLBACK, "  Found suppression: %d\n",
-              suppression.second);
-    *ptr = suppression.second;
+  std::pair<csi_id_t, unsigned> MAAP = *MAAPs.ancestor(idx);
+  if (MAAP.first == id) {
+    DBG_TRACE(DEBUG_CALLBACK, "  Found MAAP: %d\n", MAAP.second);
+    *ptr = MAAP.second;
   } else {
-    DBG_TRACE(DEBUG_CALLBACK, "  No suppression found\n");
-    // The stack doesn't have suppressions for us, so assume the worst.
+    DBG_TRACE(DEBUG_CALLBACK, "  No MAAP found\n");
+    // The stack doesn't have MAAPs for us, so assume the worst.
     *ptr = /*ModRef*/3;
   }
 }
@@ -444,7 +443,7 @@ CILKSAN_API void __csan_after_loop(const csi_id_t loop_id,
 
 CILKSAN_API void __csan_before_call(const csi_id_t call_id,
                                     const csi_id_t func_id,
-                                    unsigned suppression_count,
+                                    unsigned MAAP_count,
                                     const call_prop_t prop) {
   if (!should_check())
     return;
@@ -457,10 +456,10 @@ CILKSAN_API void __csan_before_call(const csi_id_t call_id,
   if (__builtin_expect(!call_pc[call_id], false))
     call_pc[call_id] = CALLERPC;
 
-  // Push the suppression count onto the stack.
-  suppression_counts.push();
-  *suppression_counts.head() = suppression_count;
-  // fprintf(stderr, "suppression count %d\n", suppression_count);
+  // Push the MAAP count onto the stack.
+  MAAP_counts.push();
+  *MAAP_counts.head() = MAAP_count;
+  // fprintf(stderr, "MAAP count %d\n", MAAP_count);
 
   // Push the call onto the call stack.
   CilkSanImpl.record_call(call_id, CALL);
@@ -468,7 +467,7 @@ CILKSAN_API void __csan_before_call(const csi_id_t call_id,
 
 CILKSAN_API void __csan_after_call(const csi_id_t call_id,
                                    const csi_id_t func_id,
-                                   unsigned suppression_count,
+                                   unsigned MAAP_count,
                                    const call_prop_t prop) {
   if (!should_check())
     return;
@@ -477,10 +476,10 @@ CILKSAN_API void __csan_after_call(const csi_id_t call_id,
   DBG_TRACE(DEBUG_CALLBACK, "__csan_after_call(%ld, %ld)\n",
             call_id, func_id);
 
-  // Pop any suppressions.
-  for (unsigned i = 0; i < suppression_count; ++i)
-    suppressions.pop();
-  suppression_counts.pop();
+  // Pop any MAAPs.
+  for (unsigned i = 0; i < MAAP_count; ++i)
+    MAAPs.pop();
+  MAAP_counts.pop();
 
   // Pop the call off of the call stack.
   CilkSanImpl.record_call_return(call_id, CALL);
