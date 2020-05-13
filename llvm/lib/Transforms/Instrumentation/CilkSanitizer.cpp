@@ -1741,7 +1741,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
     // Get current race data for this call.
     RaceInfo::RaceType CallRT = RI.getRaceType(I);
     LLVM_DEBUG({
-        dbgs() << "Call " << *I << ":";
+        dbgs() << "Call " << *I << ": ";
         RaceInfo::printRaceType(CallRT, dbgs());
         dbgs() << "\n";
       });
@@ -1754,7 +1754,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
         FuncRT = CilkSanImpl.FunctionRaceType[CF];
 
     LLVM_DEBUG({
-        dbgs() << "  FuncRT:";
+        dbgs() << "  FuncRT: ";
         RaceInfo::printRaceType(FuncRT, dbgs());
         dbgs() << "\n";
       });
@@ -1764,7 +1764,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
       CallRT = RaceInfo::clearOpaqueRace(CallRT);
 
     LLVM_DEBUG({
-        dbgs() << "  New CallRT:";
+        dbgs() << "  New CallRT: ";
         RaceInfo::printRaceType(CallRT, dbgs());
         dbgs() << "\n";
       });
@@ -2229,9 +2229,10 @@ Value *CilkSanitizerImpl::Instrumentor::getSuppressionCheck(
 
       // If we find an object with no suppression, give up.
       if (!LocalSuppressions.count(Obj)) {
-        dbgs() << "No local suppression found for obj " << *Obj << "\n";
-        dbgs() << "  I: " << *I << "\n";
-        dbgs() << "  Ptr: " << *RD.Access.getPointer() << "\n";
+        LLVM_DEBUG(
+            dbgs() << "No local suppression found for obj " << *Obj << "\n"
+            << "  I: " << *I << "\n"
+            << "  Ptr: " << *RD.Access.getPointer() << "\n");
         return IRB.getFalse();
       }
 
