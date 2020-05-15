@@ -1241,6 +1241,9 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     Builder.ClearInsertionPoint();
   }
 
+  if (getLangOpts().getCilk() != LangOptions::Cilk_none)
+    EmitImplicitSyncCleanup();
+
   // Emit the result value, even if unused, to evaluate the side effects.
   const Expr *RV = S.getRetValue();
 
