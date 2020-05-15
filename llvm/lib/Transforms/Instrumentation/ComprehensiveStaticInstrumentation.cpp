@@ -783,18 +783,6 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
 
   BasicBlock *BBToSplit = BB;
   // Split off the predecessors of each type.
-  if (!DetachPreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, DetachPreds, DT, LI);
-    NumPredTypes--;
-  }
-  if (!DetRethrowPreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, DetRethrowPreds, DT, LI);
-    NumPredTypes--;
-  }
-  if (!TFResumePreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, TFResumePreds, DT, LI);
-    NumPredTypes--;
-  }
   if (!SyncPreds.empty() && NumPredTypes > 1) {
     BBToSplit = SplitOffPreds(BBToSplit, SyncPreds, DT, LI);
     NumPredTypes--;
@@ -811,6 +799,24 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
     BBToSplit = SplitOffPreds(BBToSplit, InvokePreds, DT, LI);
     NumPredTypes--;
   }
+  if (!TFResumePreds.empty() && NumPredTypes > 1) {
+    BBToSplit = SplitOffPreds(BBToSplit, TFResumePreds, DT, LI);
+    NumPredTypes--;
+  }
+  // We handle detach and detached.rethrow predecessors at the end to preserve
+  // invariants on the CFG structure about the deadness of basic blocks after
+  // detached-rethrows.
+  if (!DetachPreds.empty() && NumPredTypes > 1) {
+    BBToSplit = SplitOffPreds(BBToSplit, DetachPreds, DT, LI);
+    NumPredTypes--;
+  }
+  // There is no need to split off detached-rethrow predecessors, since those
+  // successors of a detached-rethrow are dead up to where control flow merges
+  // with the unwind destination of a detach.
+  // if (!DetRethrowPreds.empty() && NumPredTypes > 1) {
+  //   BBToSplit = SplitOffPreds(BBToSplit, DetRethrowPreds, DT, LI);
+  //   NumPredTypes--;
+  // }
 }
 
 // Setup all basic blocks such that each block's predecessors belong entirely to
