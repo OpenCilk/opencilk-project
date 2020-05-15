@@ -558,8 +558,9 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
         createSpindleWithEntry(SPEntry, Spindle::SPType::Sync);
         SpindleCount++;
       }
-      assert(getSpindleFor(SPEntry)->isSync() &&
-             "Before computing phis, discovered non-sync spindle after sync");
+      assert((getSpindleFor(SPEntry)->isSync() ||
+              getSpindleFor(SPEntry)->isPhi()) &&
+             "Discovered early a non-sync, non-phi spindle after sync");
     }
     // Create new spindles based on taskframe instrinsics.  We need only work
     // about taskframe.create and taskframe.resume.
