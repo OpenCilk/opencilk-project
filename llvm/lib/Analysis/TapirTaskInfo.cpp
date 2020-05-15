@@ -841,7 +841,7 @@ void TaskInfo::findTaskFrameTreeHelper(
         ParentWorkList.push_back(SuccEdge.first);
         continue;
       }
-      // ADd the exception-handling continuation to the appropriate worklist.
+      // Add the exception-handling continuation to the appropriate worklist.
       if (SuccEdge.first == EHContinuation) {
         // If TFSpindle corresponds to a taskframe.create, push the successor
         // onto our worklist.  Otherwise push it onto the parent's worklist.
@@ -860,19 +860,19 @@ void TaskInfo::findTaskFrameTreeHelper(
           ParentWorkList.push_back(SuccEdge.first);
         continue;
       }
-      // // Add landingpad successor of detached.rethrow to the appropriate worklist.
-      // if (isDetachedRethrow(ExitTerm)) {
-      //   if (SuccEdge.first->getEntry() ==
-      //       cast<InvokeInst>(ExitTerm)->getUnwindDest()) {
-      //     // If TFSpindle corresponds to a taskframe.create, push the successor
-      //     // onto our worklist.  Otherwise push it onto the parent's worklist.
-      //     if (TFCreate)
-      //       WorkList.push_back(SuccEdge.first);
-      //     else
-      //       ParentWorkList.push_back(SuccEdge.first);
-      //   }
-      //   continue;
-      // }
+      // Add landingpad successor of detached.rethrow to the appropriate worklist.
+      if (isDetachedRethrow(ExitTerm)) {
+        if (SuccEdge.first->getEntry() ==
+            cast<InvokeInst>(ExitTerm)->getUnwindDest()) {
+          // If TFSpindle corresponds to a taskframe.create, push the successor
+          // onto our worklist.  Otherwise push it onto the parent's worklist.
+          if (TFCreate)
+            WorkList.push_back(SuccEdge.first);
+          else
+            ParentWorkList.push_back(SuccEdge.first);
+        }
+        continue;
+      }
 
       WorkList.push_back(SuccEdge.first);
     }
