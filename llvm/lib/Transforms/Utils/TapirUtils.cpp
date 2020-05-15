@@ -1298,6 +1298,7 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
 
   // Scan the function for taskframe.create instructions to split.
   SmallVector<Instruction *, 32> TFCreateToSplit;
+  SmallVector<DetachInst *, 8> DetachesWithTaskFrames;
   SmallVector<BasicBlock *, 8> WorkList;
   SmallPtrSet<BasicBlock *, 32> Visited;
   WorkList.push_back(&F.getEntryBlock());
@@ -1318,6 +1319,7 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
                   cast<Instruction>(Call->getArgOperand(0)));
               LLVM_DEBUG(dbgs() << "Pushing TFCreate "
                          << *Call->getArgOperand(0) << "\n");
+              DetachesWithTaskFrames.push_back(DI);
               break;
             }
       }
@@ -1337,6 +1339,21 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
       SplitBlock(I->getParent(), I, DT);
       Changed = true;
     }
+
+  // Also split critical continue edges, if we need to.  For example, we need to
+  // split critical continue edges if we're planning to fixup external uses of
+  // variables defined in a taskframe.
+  //
+  // TODO: Predicate this canonicalization on something more intuitive than the
+  // existence of DT.
+  for (DetachInst *DI : DetachesWithTaskFrames) {
+    if (DT && isCriticalContinueEdge(DI, 1)) {
+      SplitCriticalEdge(
+          DI, 1,
+          CriticalEdgeSplittingOptions(DT, nullptr).setSplitDetachContinue());
+      Changed = true;
+    }
+  }
 
   // Recalculate TaskInfo if necessary.
   if (Changed && DT && TI)
