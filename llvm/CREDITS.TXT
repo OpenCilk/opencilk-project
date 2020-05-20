@@ -69,6 +69,10 @@ N: Brendon Cahoon
 E: bcahoon@codeaurora.org
 D: Loop unrolling with run-time trip counts.
 
+N: John Carr
+E: jfc@mit.edu
+D: OpenCilk frontend, Tapir lowering to OpenCilk
+
 N: Chandler Carruth
 E: chandlerc@gmail.com
 E: chandlerc@google.com
@@ -109,6 +113,10 @@ D: Original Autoconf support, documentation improvements, bug fixes
 N: Anshuman Dasgupta
 E: adasgupt@codeaurora.org
 D: Deterministic finite automaton based infrastructure for VLIW packetization
+
+N: Tyler Denniston
+E: denniston.t@gmail.com
+D: CSI instrumentation pass and runtime
 
 N: Stefanus Du Toit
 E: stefanus.du.toit@intel.com
@@ -302,6 +310,10 @@ W: https://apt.llvm.org/
 D: Debian and Ubuntu packaging
 D: Continuous integration with jenkins
 
+N: I-Ting Angelina Lee
+E: angelee@wustl.edu
+D: cilksan
+
 N: Andrew Lenharth
 E: alenhar2@cs.uiuc.edu
 W: http://www.lenharth.org/~andrewl/
@@ -348,6 +360,10 @@ D: Test suite fixes for FreeBSD
 N: Scott Michel
 E: scottm@aero.org
 D: Added STI Cell SPU backend.
+
+N: William S. Moses
+E: wmoses@mit.edu
+D: Tapir, Tapir lowering passes for Cilk and OpenMP
 
 N: Kai Nacke
 E: kai@redstar.de
@@ -460,6 +476,11 @@ N: Ruchira Sasanka
 E: sasanka@uiuc.edu
 D: Graph coloring register allocator for the Sparc64 backend
 
+N: Tao B. Schardl
+E: neboat@mit.edu
+D: Tapir, Cilk frontend, Tapir lowering passes for Cilk
+D: CSI, cilksan, cilkscale
+
 N: Arnold Schwaighofer
 E: arnold.schwaighofer@gmail.com
 D: Tail call optimization for the x86 backend
@@ -511,6 +532,10 @@ N: Lauro Ramos Venancio
 E: lauro.venancio@indt.org.br
 D: ARM backend improvements
 D: Thread Local Storage implementation
+
+N: Daniele Vettorel
+E: vettoreldaniele@gmail.com
+D: CSI modifications to support JIT compilation
 
 N: Bill Wendling
 I: wendling
