@@ -254,6 +254,10 @@ SYCL conformance
 | Alexey Bader
 | alexey.bader\@intel.com (email), bader (Phabricator), bader (GitHub)
 
+Cilk frontend
+~~~~~~~~~~~~~~~~
+| Tao B. Schardl
+| neboat\@mit.edu (email), neboat (GitHub)
 
 Former Code Owners
 ==================
