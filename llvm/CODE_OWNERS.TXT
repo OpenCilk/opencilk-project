@@ -209,6 +209,10 @@ N: Duncan Sands
 E: baldrick@free.fr
 D: DragonEgg
 
+N: Tao B. Schardl
+E: neboat@mit.edu
+D: Tapir, CSI and CilkSanitizer instrumentation passes
+
 N: Mark Schimmel
 E: marksl@synopsys.com
 D: ARC backend (lib/Target/ARC/*)

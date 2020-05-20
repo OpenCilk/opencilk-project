@@ -44,6 +44,10 @@ N: Kostya Serebryany
 E: kcc@google.com
 D: AddressSanitizer, sanitizer_common, LeakSanitizer, LibFuzzer
 
+N: Tao B. Schardl
+E: neboat@mit.edu
+D: cilksan, cilkscale, csi
+
 N: Richard Smith
 E: richard-llvm@metafoo.co.uk
 D: UndefinedBehaviorSanitizer
