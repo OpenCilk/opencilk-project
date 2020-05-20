@@ -196,6 +196,10 @@ N: Duncan Sands
 E: baldrick@free.fr
 D: DragonEgg
 
+N: Tao B. Schardl
+E: neboat@mit.edu
+D: Tapir, CSI and CilkSanitizer instrumentation passes
+
 N: Kostya Serebryany
 E: kcc@google.com
 D: AddressSanitizer, ThreadSanitizer (LLVM parts)
