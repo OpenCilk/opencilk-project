@@ -49,6 +49,10 @@ N: John McCall
 E: rjmccall@apple.com
 D: Clang LLVM IR generation
 
+N: Tao B. Schardl
+E: neboat@mit.edu
+D: Cilk frontend
+
 N: Brad Smith
 E: brad@comstyle.com
 D: OpenBSD driver
