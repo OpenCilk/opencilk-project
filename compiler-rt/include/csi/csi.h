@@ -276,7 +276,7 @@ typedef struct {
 
 typedef struct {
   int32_t full_ir_size;
-  int32_t non_empty_size;
+  int32_t ir_cost;
 } sizeinfo_t;
 
 // Front-end data (FED) table accessors.

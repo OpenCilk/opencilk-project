@@ -198,7 +198,7 @@ public:
 
   /// Add the given basic block  to this table.
   /// \returns The local ID of the basic block.
-  uint64_t add(const BasicBlock &BB);
+  uint64_t add(const BasicBlock &BB, TargetTransformInfo *TTI);
 
   /// Get the Type for a pointer to a table entry.
   ///
@@ -968,10 +968,11 @@ public:
           function_ref<TaskInfo &(Function &)> GetTaskInfo,
           const TargetLibraryInfo *TLI,
           function_ref<ScalarEvolution &(Function &)> GetSE,
+          function_ref<TargetTransformInfo &(Function &)> GetTTI,
           const CSIOptions &Options = CSIOptions())
       : M(M), DL(M.getDataLayout()), CG(CG), GetDomTree(GetDomTree),
         GetLoopInfo(GetLoopInfo), GetTaskInfo(GetTaskInfo), TLI(TLI),
-        GetScalarEvolution(GetSE), Options(Options) {
+        GetScalarEvolution(GetSE), GetTTI(GetTTI), Options(Options) {
     loadConfiguration();
   }
   CSIImpl(Module &M, CallGraph *CG,
@@ -1002,10 +1003,12 @@ public:
                              Type *SizeTy, Type *AddrTy,
                              const TargetLibraryInfo &TLI);
 
-  /// Helper functions to deal with calls to functions that can throw.
+  /// Helper functions to set up the CFG for CSI instrumentation.
   static void setupCalls(Function &F);
   static void setupBlocks(Function &F, const TargetLibraryInfo *TLI,
                           DominatorTree *DT = nullptr, LoopInfo *LI = nullptr);
+  static void splitBlocksAtCalls(Function &F, DominatorTree *DT = nullptr,
+                                 LoopInfo *LI = nullptr);
 
   /// Helper function that identifies calls or invokes of placeholder functions,
   /// such as debug-info intrinsics or lifetime intrinsics.
@@ -1378,6 +1381,7 @@ protected:
   function_ref<TaskInfo &(Function &)> GetTaskInfo;
   const TargetLibraryInfo *TLI;
   Optional<function_ref<ScalarEvolution &(Function &)>> GetScalarEvolution;
+  Optional<function_ref<TargetTransformInfo &(Function &)>> GetTTI;
   CSIOptions Options;
 
   FrontEndDataTable FunctionFED, FunctionExitFED, BasicBlockFED, LoopFED,
