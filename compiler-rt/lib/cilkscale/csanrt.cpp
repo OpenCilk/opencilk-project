@@ -1,6 +1,6 @@
-#include <stdlib.h>
 #include <assert.h>
 #include <csi/csi.h>
+#include <stdlib.h>
 
 #define CSIRT_API __attribute__((visibility("default")))
 
@@ -99,10 +99,12 @@ static void ensure_fed_table_capacity(fed_type_t fed_type,
   int64_t total_num_entries = table->num_entries + num_new_entries;
   if (num_new_entries > 0) {
     if (!table->entries)
-      table->entries = (source_loc_t *)malloc(sizeof(source_loc_t) * total_num_entries);
+      table->entries =
+          (source_loc_t *)malloc(sizeof(source_loc_t) * total_num_entries);
     else {
       source_loc_t *old_entries = table->entries;
-      table->entries = (source_loc_t *)malloc(sizeof(source_loc_t) * total_num_entries);
+      table->entries =
+          (source_loc_t *)malloc(sizeof(source_loc_t) * total_num_entries);
       for (int i = 0; i < table->num_entries; ++i)
         table->entries[i] = old_entries[i];
       free(old_entries);
@@ -152,7 +154,7 @@ static inline const source_loc_t *get_fed_entry(fed_type_t fed_type,
 // sizeinfo_type_t. This is called once, by the first unit to load.
 static void initialize_sizeinfo_tables() {
   sizeinfo_tables =
-    (sizeinfo_table_t *)malloc(sizeof(sizeinfo_table_t) * NUM_SIZEINFO_TYPES);
+      (sizeinfo_table_t *)malloc(sizeof(sizeinfo_table_t) * NUM_SIZEINFO_TYPES);
   assert(sizeinfo_tables != NULL);
   for (int i = 0; i < (int)NUM_SIZEINFO_TYPES; ++i) {
     sizeinfo_table_t table;
@@ -177,11 +179,11 @@ static void ensure_sizeinfo_table_capacity(sizeinfo_type_t sizeinfo_type,
   if (num_new_entries > 0) {
     if (!table->entries)
       table->entries =
-        (sizeinfo_t *)malloc(sizeof(sizeinfo_t) * total_num_entries);
+          (sizeinfo_t *)malloc(sizeof(sizeinfo_t) * total_num_entries);
     else {
       sizeinfo_t *old_entries = table->entries;
       table->entries =
-        (sizeinfo_t *)malloc(sizeof(sizeinfo_t) * total_num_entries);
+          (sizeinfo_t *)malloc(sizeof(sizeinfo_t) * total_num_entries);
       for (int i = 0; i < table->num_entries; ++i)
         table->entries[i] = old_entries[i];
       free(old_entries);
@@ -204,8 +206,8 @@ static inline void add_sizeinfo_table(sizeinfo_type_t sizeinfo_type,
 
 // Return the SizeInfo entry of the given type, corresponding to the given CSI
 // ID.
-static inline const sizeinfo_t *get_sizeinfo_entry(sizeinfo_type_t sizeinfo_type,
-                                                   const csi_id_t csi_id) {
+static inline const sizeinfo_t *
+get_sizeinfo_entry(sizeinfo_type_t sizeinfo_type, const csi_id_t csi_id) {
   // TODO(ddoucet): threadsafety
   sizeinfo_table_t *table = &sizeinfo_tables[sizeinfo_type];
   if (csi_id < table->num_entries) {
@@ -221,8 +223,8 @@ static inline const sizeinfo_t *get_sizeinfo_entry(sizeinfo_type_t sizeinfo_type
 
 EXTERN_C
 
-void __csi_unit_init(const char * const file_name,
-                      const instrumentation_counts_t counts);
+void __csi_unit_init(const char *const file_name,
+                     const instrumentation_counts_t counts);
 
 // Not used at the moment
 // __thread bool __csi_disable_instrumentation;
@@ -252,7 +254,7 @@ static inline void compute_inst_counts(instrumentation_counts_t *counts,
 // A call to this is inserted by the CSI compiler pass, and occurs
 // before main().
 CSIRT_API
-void __csirt_unit_init(const char * const name,
+void __csirt_unit_init(const char *const name,
                        unit_fed_table_t *unit_fed_tables,
                        unit_sizeinfo_table_t *unit_sizeinfo_tables,
                        __csi_init_callsite_to_functions callsite_to_func_init) {
@@ -298,8 +300,8 @@ const source_loc_t *__csi_get_func_source_loc(const csi_id_t func_id) {
 }
 
 CSIRT_API
-const source_loc_t *__csi_get_func_exit_source_loc(
-    const csi_id_t func_exit_id) {
+const source_loc_t *
+__csi_get_func_exit_source_loc(const csi_id_t func_exit_id) {
   return get_fed_entry(FED_TYPE_FUNCTION_EXIT, func_exit_id);
 }
 
@@ -334,14 +336,14 @@ const source_loc_t *__csi_get_task_source_loc(const csi_id_t task_id) {
 }
 
 CSIRT_API
-const source_loc_t *__csi_get_task_exit_source_loc(
-    const csi_id_t task_exit_id) {
+const source_loc_t *
+__csi_get_task_exit_source_loc(const csi_id_t task_exit_id) {
   return get_fed_entry(FED_TYPE_TASK_EXIT, task_exit_id);
 }
 
 CSIRT_API
-const source_loc_t *__csi_get_detach_continue_source_loc(
-    const csi_id_t detach_continue_id) {
+const source_loc_t *
+__csi_get_detach_continue_source_loc(const csi_id_t detach_continue_id) {
   return get_fed_entry(FED_TYPE_DETACH_CONTINUE, detach_continue_id);
 }
 
