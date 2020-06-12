@@ -904,6 +904,10 @@ static LangOptions::CilktoolKind parseCilktoolKind(StringRef FlagName,
     LangOptions::CilktoolKind ParsedCilktool =
       llvm::StringSwitch<LangOptions::CilktoolKind>(Val)
       .Case("cilkscale", LangOptions::Cilktool_Cilkscale)
+      .Case("cilkscale-instructions",
+            LangOptions::Cilktool_Cilkscale_InstructionCount)
+      .Case("cilkscale-benchmark",
+            LangOptions::Cilktool_Cilkscale_Benchmark)
       .Default(LangOptions::Cilktool_None);
     if (ParsedCilktool == LangOptions::Cilktool_None)
       Diags.Report(diag::err_drv_invalid_value) << FlagName << Val;

@@ -417,10 +417,10 @@ addComprehensiveStaticInstrumentationPass(const PassManagerBuilder &Builder,
   }
 }
 
-static CSIOptions getCSIOptionsForCilkscale() {
+static CSIOptions getCSIOptionsForCilkscale(bool InstrumentBasicBlocks) {
   CSIOptions Options;
   // Disable CSI hooks that Cilkscale doesn't need.
-  Options.InstrumentBasicBlocks = false;
+  Options.InstrumentBasicBlocks = InstrumentBasicBlocks;
   Options.InstrumentLoops = false;
   Options.InstrumentMemoryAccesses = false;
   Options.InstrumentCalls = false;
@@ -431,15 +431,88 @@ static CSIOptions getCSIOptionsForCilkscale() {
   return Options;
 }
 
+static CSIOptions getCSIOptionsForCilkscaleBenchmark() {
+  CSIOptions Options;
+  // Disable CSI hooks that Cilkscale doesn't need.
+  Options.InstrumentFuncEntryExit = false;
+  Options.InstrumentBasicBlocks = false;
+  Options.InstrumentLoops = false;
+  Options.InstrumentMemoryAccesses = false;
+  Options.InstrumentCalls = false;
+  Options.InstrumentAtomics = false;
+  Options.InstrumentMemIntrinsics = false;
+  Options.InstrumentTapir = false;
+  Options.InstrumentAllocas = false;
+  Options.InstrumentAllocFns = false;
+  Options.CallsMayThrow = false;
+  Options.CallsTerminateBlocks = false;
+  return Options;
+}
+
 static void
 addCilkscaleInstrumentation(const PassManagerBuilder &Builder,
                             legacy::PassManagerBase &PM) {
   PM.add(createComprehensiveStaticInstrumentationLegacyPass(
-             getCSIOptionsForCilkscale()));
+             getCSIOptionsForCilkscale(/*InstrumentBasicBlocks*/ false)));
 
   // CSI inserts complex instrumentation that mostly follows the logic of the
   // original code, but operates on "shadow" values.  It can benefit from
   // re-running some general purpose optimization passes.
+  if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
+    PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createReassociatePass());
+    PM.add(createLICMPass());
+    PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
+    PM.add(createInstructionCombiningPass());
+    PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
+  }
+}
+
+static void
+addCilkscaleInstructionCountInstrumentation(const PassManagerBuilder &Builder,
+                                            legacy::PassManagerBase &PM) {
+  PM.add(createComprehensiveStaticInstrumentationLegacyPass(
+             getCSIOptionsForCilkscale(/*InstrumentBasicBlocks*/ true)));
+
+  // CSI inserts complex instrumentation that mostly follows the logic of the
+  // original code, but operates on "shadow" values.  It can benefit from
+  // re-running some general purpose optimization passes.
+  if (Builder.OptLevel > 0) {
+    PM.add(createInstructionCombiningPass());
+    PM.add(createEarlyCSEPass());
+    PM.add(createJumpThreadingPass());
+    PM.add(createCorrelatedValuePropagationPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createReassociatePass());
+    PM.add(createLICMPass());
+    PM.add(createGVNPass());
+    PM.add(createSCCPPass());
+    PM.add(createBitTrackingDCEPass());
+    PM.add(createInstructionCombiningPass());
+    PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
+  }
+}
+
+static void
+addCilkscaleBenchmarkInstrumentation(const PassManagerBuilder &Builder,
+                                     legacy::PassManagerBase &PM) {
+  PM.add(createComprehensiveStaticInstrumentationLegacyPass(
+             getCSIOptionsForCilkscaleBenchmark()));
+
+  // CSI inserts complex instrumentation that mostly follows the logic of the
+  // original code, but operates on "shadow" values.  It can benefit from
+  // re-running some general purpose optimization passes.  Even though the
+  // cilkscale-benchmark tool disables most CSI instrumentation, we still
+  // perform these optimizations to maintain consistency with other cilkscale
+  // tools.
   if (Builder.OptLevel > 0) {
     PM.add(createInstructionCombiningPass());
     PM.add(createEarlyCSEPass());
@@ -890,8 +963,16 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
     switch (LangOpts.getCilktool()) {
     default: break;
     case LangOptions::CilktoolKind::Cilktool_Cilkscale:
-      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
+      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
                              addCilkscaleInstrumentation);
+      break;
+    case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
+      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
+                             addCilkscaleInstructionCountInstrumentation);
+      break;
+    case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
+      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
+                             addCilkscaleBenchmarkInstrumentation);
       break;
     }
   }
@@ -1504,14 +1585,36 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
       default:
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale:
-        PB.registerTapirLateEPCallback(
+        PB.registerTapirLoopEndEPCallback(
             [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
               // CilkSanitizer performs significant changes to the CFG before
               // attempting to analyze and insert instrumentation.  Hence we
               // invalidate all analysis passes before running CilkSanitizer.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
-                  getCSIOptionsForCilkscale()));
+                  getCSIOptionsForCilkscale(false)));
+            });
+        break;
+      case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
+        PB.registerTapirLoopEndEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CilkSanitizer performs significant changes to the CFG before
+              // attempting to analyze and insert instrumentation.  Hence we
+              // invalidate all analysis passes before running CilkSanitizer.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(ComprehensiveStaticInstrumentationPass(
+                  getCSIOptionsForCilkscale(true)));
+            });
+        break;
+      case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
+          PB.registerTapirLoopEndEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CSI performs significant changes to the CFG before attempting
+              // to analyze and insert instrumentation.  Hence we invalidate all
+              // analysis passes before running CSI.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(ComprehensiveStaticInstrumentationPass(
+                              getCSIOptionsForCilkscaleBenchmark()));
             });
         break;
       }
@@ -1580,7 +1683,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
       MPM.addPass(createModuleToFunctionPassAdaptor(MemProfilerPass()));
       MPM.addPass(ModuleMemProfilerPass());
     }
-  }
+      }
 
   // FIXME: We still use the legacy pass manager to do code generation. We
   // create that pass manager here and use it as needed below.
@@ -1664,7 +1767,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
     ThinLinkOS->keep();
   if (DwoOS)
     DwoOS->keep();
-}
+    }
 
 static void runThinLTOBackend(
     DiagnosticsEngine &Diags, ModuleSummaryIndex *CombinedIndex, Module *M,

@@ -272,7 +272,9 @@ public:
   enum CilktoolKind {
     // No Cilktool
     Cilktool_None = 0,
-    Cilktool_Cilkscale
+    Cilktool_Cilkscale,
+    Cilktool_Cilkscale_InstructionCount,
+    Cilktool_Cilkscale_Benchmark
   };
 
   enum CilkVersion {
