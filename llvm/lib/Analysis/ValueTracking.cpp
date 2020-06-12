@@ -519,6 +519,14 @@ static bool isEphemeralValueOf(const Instruction *I, const Value *E) {
 
 // Is this an intrinsic that cannot be speculated but also cannot trap?
 bool llvm::isAssumeLikeIntrinsic(const Instruction *I) {
+  // Check for invokes of detached.rethrow, taskframe.resume, or sync.unwind.
+  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
+    if (const Function *Called = II->getCalledFunction())
+      if (Intrinsic::detached_rethrow == Called->getIntrinsicID() ||
+          Intrinsic::taskframe_resume == Called->getIntrinsicID() ||
+          Intrinsic::sync_unwind == Called->getIntrinsicID())
+        return true;
+
   if (const CallInst *CI = dyn_cast<CallInst>(I))
     if (Function *F = CI->getCalledFunction())
       switch (F->getIntrinsicID()) {

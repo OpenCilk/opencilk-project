@@ -430,6 +430,14 @@ void AliasSetTracker::addUnknown(Instruction *Inst) {
   if (isa<DbgInfoIntrinsic>(Inst))
     return; // Ignore DbgInfo Intrinsics.
 
+  // Check for invokes of detached.rethrow, taskframe.resume, or sync.unwind.
+  if (const InvokeInst *I = dyn_cast<InvokeInst>(Inst))
+    if (const Function *Called = I->getCalledFunction())
+      if (Intrinsic::detached_rethrow == Called->getIntrinsicID() ||
+          Intrinsic::taskframe_resume == Called->getIntrinsicID() ||
+          Intrinsic::sync_unwind == Called->getIntrinsicID())
+        return;
+
   if (auto *II = dyn_cast<IntrinsicInst>(Inst)) {
     // These intrinsics will show up as affecting memory, but they are just
     // markers.
@@ -442,10 +450,8 @@ void AliasSetTracker::addUnknown(Instruction *Inst) {
     case Intrinsic::sideeffect:
     case Intrinsic::pseudoprobe:
     case Intrinsic::syncregion_start:
-    case Intrinsic::detached_rethrow:
     case Intrinsic::taskframe_create:
     case Intrinsic::taskframe_use:
-    case Intrinsic::taskframe_resume:
     case Intrinsic::taskframe_load_guard:
     case Intrinsic::sync_unwind:
       return;

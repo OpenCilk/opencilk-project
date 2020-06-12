@@ -285,6 +285,14 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
         && TI->mayHappenInParallel(MD->getBlock(), UseInst->getParent()))
       return {false, NoAlias};
 
+  // Check for invokes of detached.rethrow, taskframe.resume, or sync.unwind.
+  if (const InvokeInst *II = dyn_cast<InvokeInst>(DefInst))
+    if (const Function *Called = II->getCalledFunction())
+      if (Intrinsic::detached_rethrow == Called->getIntrinsicID() ||
+          Intrinsic::taskframe_resume == Called->getIntrinsicID() ||
+          Intrinsic::sync_unwind == Called->getIntrinsicID())
+        return {false, NoAlias};
+
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(DefInst)) {
     // These intrinsics will show up as affecting memory, but they are just
     // markers, mostly.
@@ -297,10 +305,8 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
     case Intrinsic::invariant_start:
     case Intrinsic::invariant_end:
     case Intrinsic::syncregion_start:
-    case Intrinsic::detached_rethrow:
     case Intrinsic::taskframe_create:
     case Intrinsic::taskframe_use:
-    case Intrinsic::taskframe_resume:
     case Intrinsic::taskframe_load_guard:
     case Intrinsic::sync_unwind:
     case Intrinsic::assume:
