@@ -1023,6 +1023,8 @@ bool tools::addCilktoolRuntime(const ToolChain &TC, const ArgList &Args,
   if (Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ)) {
     StringRef Val = A->getValue();
     CmdArgs.push_back(TC.getCompilerRTArgString(Args, Val));
+    // Link in the C++ standard library
+    TC.AddCXXStdlibLibArgs(Args, CmdArgs);
     return true;
   }
   return false;
