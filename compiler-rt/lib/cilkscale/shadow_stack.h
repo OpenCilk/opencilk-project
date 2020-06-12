@@ -4,7 +4,6 @@
 
 #include "cilkscale_timer.h"
 #include <cilk/reducer.h>
-#include <stdbool.h>
 
 #ifndef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE 64
