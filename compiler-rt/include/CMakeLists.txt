@@ -29,10 +29,16 @@ if (COMPILER_RT_BUILD_CSI)
     csi/csi.h)
 endif(COMPILER_RT_BUILD_CSI)
 
+if (COMPILER_RT_BUILD_CILKTOOLS)
+  set(CILKTOOL_HEADERS
+    cilk/cilkscale.h)
+endif(COMPILER_RT_BUILD_CILKTOOLS)
+
 set(COMPILER_RT_HEADERS
   ${SANITIZER_HEADERS}
   ${XRAY_HEADERS}
-  ${CSI_HEADERS})
+  ${CSI_HEADERS}
+  ${CILKTOOL_HEADERS})
 
 set(output_dir ${COMPILER_RT_OUTPUT_DIR}/include)
 
@@ -67,6 +73,11 @@ install(FILES ${CSI_HEADERS}
   COMPONENT compiler-rt-headers
   PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   DESTINATION ${COMPILER_RT_INSTALL_PATH}/include/csi)
+# Install headers for Cilk tools.
+install(FILES ${CILKTOOL_HEADERS}
+  COMPONENT compiler-rt-headers
+  PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  DESTINATION ${COMPILER_RT_INSTALL_PATH}/include/cilk)
 
 if (NOT CMAKE_CONFIGURATION_TYPES) # don't add this for IDEs.
   add_custom_target(install-compiler-rt-headers
