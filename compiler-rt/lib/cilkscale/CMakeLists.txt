@@ -4,6 +4,10 @@ set(CILKSCALE_SOURCES
   cilkscale.cpp
   csanrt.cpp)
 
+set(BENCHMARK_SOURCES
+  benchmark.cpp
+  csanrt.cpp)
+
 include_directories(${COMPILER_RT_SOURCE_DIR}/include)
 
 set(CILKSCALE_CFLAGS ${SANITIZER_COMMON_CFLAGS})
@@ -67,6 +71,24 @@ foreach (arch ${CILKSCALE_SUPPORTED_ARCH})
     LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
     LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
     DEFS ${CILKSCALE_INSTRUCTIONS_DYNAMIC_DEFINITIONS}
+    PARENT_TARGET cilkscale)
+
+  add_compiler_rt_runtime(clang_rt.cilkscale-benchmark
+    STATIC
+    ARCHS ${arch}
+    SOURCES ${BENCHMARK_SOURCES}
+    CFLAGS ${CILKSCALE_CFLAGS}
+    DEFS ${CILKSCALE_COMMON_DEFINITIONS}
+    PARENT_TARGET cilkscale)
+
+  add_compiler_rt_runtime(clang_rt.cilkscale-benchmark
+    SHARED
+    ARCHS ${arch}
+    SOURCES ${BENCHMARK_SOURCES}
+    CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
+    LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
+    LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
+    DEFS ${CILKSCALE_DYNAMIC_DEFINITIONS}
     PARENT_TARGET cilkscale)
 endforeach()
 
