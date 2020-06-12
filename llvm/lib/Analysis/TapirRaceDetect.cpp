@@ -389,6 +389,14 @@ static bool checkInstructionForRace(const Instruction *I,
     if (isa<DbgInfoIntrinsic>(I))
       return false;
 
+    // Check for detached.rethrow, taskframe.resume, or sync.unwind, which might
+    // be invoked.
+    if (const Function *Called = Call->getCalledFunction())
+      if (Intrinsic::detached_rethrow == Called->getIntrinsicID() ||
+          Intrinsic::taskframe_resume == Called->getIntrinsicID() ||
+          Intrinsic::sync_unwind == Called->getIntrinsicID())
+        return false;
+
     // Ignore other intrinsics.
     if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I))
       // TODO: Exclude all intrinsics for which
