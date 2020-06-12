@@ -192,6 +192,7 @@ struct CSIOptions {
 
   bool jitMode = false;
   bool CallsMayThrow = true;
+  bool CallsTerminateBlocks = true;
 
   CSIOptions() = default;
 };
