@@ -1307,6 +1307,26 @@ llvm::opt::DerivedArgList *ToolChain::TranslateXarchArgs(
   return nullptr;
 }
 
+static void addRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
+                              ArgStringList &CmdArgs) {
+  // Allow the -fno-rtlib-add-rpath flag to prevent adding this default
+  // directory to the runpath.
+  if (!Args.hasFlag(options::OPT_frtlib_add_rpath,
+                    options::OPT_fno_rtlib_add_rpath, true))
+    return;
+
+  if (auto CandidateRPath = TC.getRuntimePath()) {
+    if (TC.getVFS().exists(*CandidateRPath)) {
+      CmdArgs.push_back("-L");
+      CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
+      CmdArgs.push_back("-rpath");
+      CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
+      // TODO: Check the portability of the --enable-new-dtags flag.
+      CmdArgs.push_back("--enable-new-dtags");
+    }
+  }
+}
+
 void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                                        ArgStringList &CmdArgs) const {
   TapirTargetID TapirTarget = parseTapirTarget(Args);
@@ -1321,11 +1341,10 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     CmdArgs.push_back("-lpthread");
     break;
   case TapirTargetID::OpenCilk:
-    // Link the static Cheetah library because it's easier to do that than add
-    // all the linker arguments to find a shared library a both link time and
-    // runtime.
-    CmdArgs.push_back(
-        getCompilerRTArgString(Args, "opencilk", ToolChain::FT_Static));
+    CmdArgs.push_back("-lopencilk");
+    // Add to the executable's runpath the default directory containing OpenCilk
+    // runtime, when the runtime is compiled as an integrated component.
+    addRuntimeRunPath(*this, Args, CmdArgs);
     CmdArgs.push_back("-lpthread");
     break;
   case TapirTargetID::Cilk:
