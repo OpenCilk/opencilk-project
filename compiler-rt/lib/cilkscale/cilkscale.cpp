@@ -12,7 +12,6 @@
 #define __cilkscale__
 #endif
 
-// #include "cilkscale_internal.h"
 #include "shadow_stack.h"
 #include <csi/csi.h>
 #include <iostream>
@@ -40,13 +39,20 @@ extern int __cilkrts_get_worker_number(void);
 ///////////////////////////////////////////////////////////////////////////
 // Data structures for tracking work and span.
 
+// Top-level class to manage the state of the global Cilkscale tool.  This class
+// interface allows the tool to initialize data structures, such as a
+// std::ostream and a std::ofstream, only after the standard libraries they rely
+// on have been initialized, and to destroy those structures before those
+// libraries are deinitialized.
 class CilkscaleImpl_t {
 public:
+  // Shadow-stack data structure, for managing work-span variables.
   shadow_stack_t *shadow_stack = nullptr;
 #if !SERIAL_TOOL
   shadow_stack_reducer *shadow_stack_red = nullptr;
 #endif
 
+  // Output stream for printing results.
   std::ostream &outs = std::cout;
   std::ofstream outf;
 #if !SERIAL_TOOL
@@ -56,12 +62,17 @@ public:
   CilkscaleImpl_t();
   ~CilkscaleImpl_t();
 
+  // Callbacks run for initializing and deinitializing the tool state when the
+  // OpenCilk runtime starts up and shuts down.
   void cilkify(void);
   void uncilkify(void);
 };
 
-CilkscaleImpl_t tool;
+// Top-level Cilkscale tool.
+static CilkscaleImpl_t tool;
 
+// Macro to access the correct shadow-stack data structure, based on the
+// initialized state of the tool.
 #if SERIAL_TOOL
 #define STACK (*tool.shadow_stack)
 #else
@@ -69,6 +80,8 @@ CilkscaleImpl_t tool;
                (tool.shadow_stack_red->get_view()) : (*tool.shadow_stack))
 #endif
 
+// Macro to use the correct output stream, based on the initialized state of the
+// tool.
 #if SERIAL_TOOL
 #define OUTPUT ((tool.outf.is_open()) ? (tool.outf) : (tool.outs))
 #else
@@ -76,34 +89,39 @@ CilkscaleImpl_t tool;
                 ((tool.outf.is_open()) ? (tool.outf) : (tool.outs)))
 #endif
 
-bool TOOL_INITIALIZED = false;
+static bool TOOL_INITIALIZED = false;
 
 ///////////////////////////////////////////////////////////////////////////
 // Utilities for printing analysis results
 
+// Ensure that a proper header has been emitted to OS.
 template<class Out>
-void ensure_header(Out &OS) {
+static void ensure_header(Out &OS) {
   static bool PRINT_STARTED = false;
   if (PRINT_STARTED)
     return;
 
-  OS << "work (" << cilk_time_t::units << ")"
-     << ", span (" << cilk_time_t::units << ")"
-     << ", parallelism"
-     << ", burdened_span (" << cilk_time_t::units << ")"
-     << ", burdened_parallelism\n";
+  OS << "tag,work (" << cilk_time_t::units << ")"
+     << ",span (" << cilk_time_t::units << ")"
+     << ",parallelism"
+     << ",burdened_span (" << cilk_time_t::units << ")"
+     << ",burdened_parallelism\n";
 
   PRINT_STARTED = true;
 }
 
+// Emit the given results to OS.
 template<class Out>
-void print_results(Out &OS, cilk_time_t work, cilk_time_t span,
-                   cilk_time_t bspan) {
-  OS << work << ", " << span << ", " << work.get_val_d() / span.get_val_d()
-     << ", " << bspan << ", " << work.get_val_d() / bspan.get_val_d() << "\n";
+static void print_results(Out &OS, const char *tag, cilk_time_t work,
+                          cilk_time_t span, cilk_time_t bspan) {
+  OS << tag
+     << "," << work << "," << span << "," << work.get_val_d() / span.get_val_d()
+     << "," << bspan << "," << work.get_val_d() / bspan.get_val_d() << "\n";
 }
 
-void print_analysis(void) {
+// Emit the results from the overall program execution to the proper output
+// stream.
+static void print_analysis(void) {
   assert(TOOL_INITIALIZED);
   shadow_stack_frame_t &bottom = STACK.peek_bot();
 
@@ -114,7 +132,7 @@ void print_analysis(void) {
   cilk_time_t bspan = bottom.contin_bspan;
 
   ensure_header(OUTPUT);
-  print_results(OUTPUT, work, span, bspan);
+  print_results(OUTPUT, "", work, span, bspan);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -161,7 +179,7 @@ CilkscaleImpl_t::~CilkscaleImpl_t() {
   bottom.contin_bspan += strand_time;
 
   print_analysis();
-  
+
   if (outf.is_open())
     outf.close();
   delete shadow_stack;
@@ -169,6 +187,7 @@ CilkscaleImpl_t::~CilkscaleImpl_t() {
   TOOL_INITIALIZED = false;
 }
 
+// Initialize tool state that depends on the Cilk runtime system.
 void CilkscaleImpl_t::cilkify(void) {
 #if TRACE_CALLS
   fprintf(stderr, "cilkscale_cilkify\n");
@@ -192,6 +211,7 @@ void CilkscaleImpl_t::cilkify(void) {
 #endif
 }
 
+// Deinitialize tool state that depends on the Cilk runtime system.
 void CilkscaleImpl_t::uncilkify(void) {
 #if TRACE_CALLS
   fprintf(stderr, "cilkscale_uncilkify\n");
@@ -220,16 +240,16 @@ void CilkscaleImpl_t::uncilkify(void) {
 #endif
 }
 
-void cilkscale_cilkify(void) {
-  tool.cilkify();
-}
-
-void cilkscale_uncilkify(void) {
-  tool.uncilkify();
-}
-
 ///////////////////////////////////////////////////////////////////////////
-// CSI hooks for measuring work and span.
+// Hooks for operating the tool.
+
+// Callback to initialze Cilk-runtime-dependent tool state when the Cilk runtime
+// system starts.
+void cilkscale_cilkify(void) { tool.cilkify(); }
+
+// Callback to deinitialze Cilk-runtime-dependent tool state when the Cilk
+// runtime system stops.
+void cilkscale_uncilkify(void) { tool.uncilkify(); }
 
 CILKTOOL_API void __csi_init() {
 #if TRACE_CALLS
@@ -294,7 +314,7 @@ void __csi_func_entry(const csi_id_t func_id, const func_prop_t prop) {
   c_bottom.contin_work = p_bottom.contin_work;
   c_bottom.contin_span = p_bottom.contin_span;
   c_bottom.contin_bspan = p_bottom.contin_bspan;
-  
+
   // stack.start.gettime();
   // Because of the high overhead of calling gettime(), especially compared to
   // the running time of the operations in this hook, the work and span
@@ -476,7 +496,10 @@ void __csi_after_sync(const csi_id_t sync_id, const int32_t *has_spawned) {
   stack.start.gettime();
 }
 
-wsp_t getworkspan() CILKSCALE_NOTHROW {
+///////////////////////////////////////////////////////////////////////////
+// Probes and associated routines
+
+CILKSCALE_EXTERN_C wsp_t getworkspan() CILKSCALE_NOTHROW {
   shadow_stack_t &stack = STACK;
 
   stack.stop.gettime();
@@ -536,24 +559,21 @@ std::ostream &operator<<(std::ostream &OS, const wsp_t &pt) {
   return OS;
 }
 
-CILKSCALE_EXTERN_C
-wsp_t add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   lhs.work += rhs.work;
   lhs.span += rhs.span;
   lhs.bspan += rhs.bspan;
   return lhs;
 }
 
-CILKSCALE_EXTERN_C
-wsp_t sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   lhs.work -= rhs.work;
   lhs.span -= rhs.span;
   lhs.bspan -= rhs.bspan;
   return lhs;
 }
 
-CILKSCALE_EXTERN_C
-void dump(wsp_t wsp) {
+CILKSCALE_EXTERN_C void dump(wsp_t wsp, const char *tag) {
   shadow_stack_t &stack = STACK;
 
   stack.stop.gettime();
@@ -567,7 +587,7 @@ void dump(wsp_t wsp) {
   bottom.contin_bspan += strand_time;
 
   ensure_header(OUTPUT);
-  print_results(OUTPUT, cilk_time_t(wsp.work), cilk_time_t(wsp.span),
+  print_results(OUTPUT, tag, cilk_time_t(wsp.work), cilk_time_t(wsp.span),
                 cilk_time_t(wsp.bspan));
 
   stack.start.gettime();
