@@ -6,7 +6,6 @@
 #include <cstdlib>
 
 #include <cilk/cilk.h>
-// #include <cilk/cilk_api.h>
 #include <cilk/reducer.h>
 
 #include "shadow_stack.h"
