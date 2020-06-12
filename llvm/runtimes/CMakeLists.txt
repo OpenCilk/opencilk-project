@@ -7,7 +7,7 @@
 # build, see runtimes/CMakeLists.txt, except that we currently check whether
 # compiler-rt is being built to determine whether to first build builtins
 # or not so we need that information in this file as well.
-set(LLVM_ALL_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind;openmp")
+set(LLVM_ALL_RUNTIMES "cheetah;compiler-rt;libcxx;libcxxabi;libunwind;openmp")
 set(LLVM_ENABLE_RUNTIMES "" CACHE STRING
   "Semicolon-separated list of runtimes to build (${LLVM_ALL_RUNTIMES}), or \"all\".")
 if(LLVM_ENABLE_RUNTIMES STREQUAL "all" )
