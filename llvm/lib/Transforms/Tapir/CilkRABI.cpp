@@ -1231,17 +1231,15 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
 }
 
 void CilkRABI::MarkSpawner(Function &F) {
-  if (F.hasPersonalityFn()) {
-    // Use the Cilk personality function.
-    Function *GXXPersonality = M.getFunction("__gxx_personality_v0");
-    assert(GXXPersonality &&
-           "Personality function __gxx_personality_v0 not found");
-    FunctionType *FTy = GXXPersonality->getFunctionType();
-    Function *Personality = cast<Function>(M.getOrInsertFunction(
-                                               "__cilk_personality_v0",
-                                               FTy).getCallee());
-    F.setPersonalityFn(Personality);
-  }
+  // Use the Cilk personality function.
+  Function *GXXPersonality = M.getFunction("__gxx_personality_v0");
+  assert(GXXPersonality &&
+         "Personality function __gxx_personality_v0 not found");
+  FunctionType *FTy = GXXPersonality->getFunctionType();
+  Function *Personality = cast<Function>(M.getOrInsertFunction(
+                                             "__cilk_personality_v0",
+                                             FTy).getCallee());
+  F.setPersonalityFn(Personality);
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
