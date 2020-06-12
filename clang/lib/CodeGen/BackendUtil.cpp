@@ -285,7 +285,7 @@ static bool asanUseGlobalsGC(const Triple &T, const CodeGenOptions &CGOpts) {
 static CSIOptions getCSIOptionsForCilkscale() {
   CSIOptions Options;
   // Disable CSI hooks that Cilkscale doesn't need.
-  Options.InstrumentBasicBlocks = false;
+  Options.InstrumentBasicBlocks = InstrumentBasicBlocks;
   Options.InstrumentLoops = false;
   Options.InstrumentMemoryAccesses = false;
   Options.InstrumentCalls = false;
@@ -293,6 +293,24 @@ static CSIOptions getCSIOptionsForCilkscale() {
   Options.InstrumentMemIntrinsics = false;
   Options.InstrumentAllocas = false;
   Options.InstrumentAllocFns = false;
+  return Options;
+}
+
+static CSIOptions getCSIOptionsForCilkscaleBenchmark() {
+  CSIOptions Options;
+  // Disable CSI hooks that Cilkscale doesn't need.
+  Options.InstrumentFuncEntryExit = false;
+  Options.InstrumentBasicBlocks = false;
+  Options.InstrumentLoops = false;
+  Options.InstrumentMemoryAccesses = false;
+  Options.InstrumentCalls = false;
+  Options.InstrumentAtomics = false;
+  Options.InstrumentMemIntrinsics = false;
+  Options.InstrumentTapir = false;
+  Options.InstrumentAllocas = false;
+  Options.InstrumentAllocFns = false;
+  Options.CallsMayThrow = false;
+  Options.CallsTerminateBlocks = false;
   return Options;
 }
 
@@ -1043,14 +1061,36 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
       default:
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale:
-        PB.registerTapirLateEPCallback(
+        PB.registerTapirLoopEndEPCallback(
             [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
               // CilkSanitizer performs significant changes to the CFG before
               // attempting to analyze and insert instrumentation.  Hence we
               // invalidate all analysis passes before running CilkSanitizer.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
-                  getCSIOptionsForCilkscale()));
+                  getCSIOptionsForCilkscale(false)));
+            });
+        break;
+      case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
+        PB.registerTapirLoopEndEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CilkSanitizer performs significant changes to the CFG before
+              // attempting to analyze and insert instrumentation.  Hence we
+              // invalidate all analysis passes before running CilkSanitizer.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(ComprehensiveStaticInstrumentationPass(
+                  getCSIOptionsForCilkscale(true)));
+            });
+        break;
+      case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
+          PB.registerTapirLoopEndEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CSI performs significant changes to the CFG before attempting
+              // to analyze and insert instrumentation.  Hence we invalidate all
+              // analysis passes before running CSI.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(ComprehensiveStaticInstrumentationPass(
+                              getCSIOptionsForCilkscaleBenchmark()));
             });
         break;
       }
@@ -1265,7 +1305,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
     ThinLinkOS->keep();
   if (DwoOS)
     DwoOS->keep();
-}
+    }
 
 static void runThinLTOBackend(
     DiagnosticsEngine &Diags, ModuleSummaryIndex *CombinedIndex,
