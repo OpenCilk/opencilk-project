@@ -1111,6 +1111,21 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     break;
   }
 
+  // Add macro to indicate that the program is compiled with Cilksan enabled.
+  if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+    Builder.defineMacro("__cilksan__");
+
+  // Add macros to indicate that the program is compiled with different Cilk
+  // tools.
+  switch (LangOpts.getCilktool()) {
+  case LangOptions::CilktoolKind::Cilktool_Cilkscale:
+  case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
+  case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
+    Builder.defineMacro("__cilkscale__");
+    break;
+  default: break;
+  }
+
   // CUDA device path compilaton
   if (LangOpts.CUDAIsDevice && !LangOpts.HIP) {
     // The CUDA_ARCH value is set for the GPU target specified in the NVPTX
