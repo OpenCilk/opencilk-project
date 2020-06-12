@@ -2,7 +2,6 @@
 #ifndef INCLUDED_CILKSCALE_TIMER_H
 #define INCLUDED_CILKSCALE_TIMER_H
 
-// #include <cilk/cilk_time.h>
 #include <cilk/cilkscale.h>
 #include <csi/csi.h>
 #include <iostream>
