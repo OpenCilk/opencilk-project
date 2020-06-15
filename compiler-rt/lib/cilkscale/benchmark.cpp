@@ -247,6 +247,11 @@ std::ostream &operator<<(std::ostream &OS, const wsp_t &pt) {
   return OS;
 }
 
+std::ofstream &operator<<(std::ofstream &OS, const wsp_t &pt) {
+  OS << cilk_time_t(pt.work);
+  return OS;
+}
+
 CILKSCALE_EXTERN_C wsp_t wsp_add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   lhs.work += rhs.work;
   return lhs;
