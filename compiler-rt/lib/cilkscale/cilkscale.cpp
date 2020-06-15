@@ -499,7 +499,7 @@ void __csi_after_sync(const csi_id_t sync_id, const int32_t *has_spawned) {
 ///////////////////////////////////////////////////////////////////////////
 // Probes and associated routines
 
-CILKSCALE_EXTERN_C wsp_t getworkspan() CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t wsp_getworkspan() CILKSCALE_NOTHROW {
   shadow_stack_t &stack = STACK;
 
   stack.stop.gettime();
@@ -559,21 +559,21 @@ std::ostream &operator<<(std::ostream &OS, const wsp_t &pt) {
   return OS;
 }
 
-CILKSCALE_EXTERN_C wsp_t add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t wsp_add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   lhs.work += rhs.work;
   lhs.span += rhs.span;
   lhs.bspan += rhs.bspan;
   return lhs;
 }
 
-CILKSCALE_EXTERN_C wsp_t sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t wsp_sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   lhs.work -= rhs.work;
   lhs.span -= rhs.span;
   lhs.bspan -= rhs.bspan;
   return lhs;
 }
 
-CILKSCALE_EXTERN_C void dump(wsp_t wsp, const char *tag) {
+CILKSCALE_EXTERN_C void wsp_dump(wsp_t wsp, const char *tag) {
   shadow_stack_t &stack = STACK;
 
   stack.stop.gettime();
