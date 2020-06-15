@@ -787,6 +787,25 @@ AddDirectArgument(CodeGenFunction &CGF, CallArgList &Args,
   }
 }
 
+namespace {
+class DetachScopeRAII {
+  CodeGenFunction &CGF;
+  CodeGenFunction::DetachScope *StartingDetachScope;
+public:
+  DetachScopeRAII(CodeGenFunction &CGF)
+      : CGF(CGF), StartingDetachScope(CGF.CurDetachScope) {}
+  ~DetachScopeRAII() {
+    if (!CGF.CurDetachScope || CGF.CurDetachScope == StartingDetachScope)
+      // No detach scope was pushed, so there's nothing to do.
+      return;
+    CGF.PopDetachScope();
+    assert(CGF.CurDetachScope == StartingDetachScope &&
+           "Unexpected detach scope after processing AtomicExpr");
+    CGF.IsSpawned = false;
+  }
+};
+} // end anonymous namespace
+
 RValue CodeGenFunction::EmitAtomicExpr(AtomicExpr *E) {
   QualType AtomicTy = E->getPtr()->getType()->getPointeeType();
   QualType MemTy = AtomicTy;
@@ -805,6 +824,10 @@ RValue CodeGenFunction::EmitAtomicExpr(AtomicExpr *E) {
     EmitAtomicInit(E->getVal1(), lvalue);
     return RValue::get(nullptr);
   }
+
+  // RAII to finish detach scope after processing AtomicExpr E, if E uses a
+  // spawned value.
+  DetachScopeRAII DetScope(*this);
 
   auto TInfo = getContext().getTypeInfoInChars(AtomicTy);
   uint64_t Size = TInfo.Width.getQuantity();
