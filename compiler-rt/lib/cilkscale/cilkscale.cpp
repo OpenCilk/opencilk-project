@@ -553,7 +553,30 @@ std::ostream &operator<<(std::ostream &OS, const wsp_t &pt) {
   cilk_time_t span = cilk_time_t(pt.span);
   cilk_time_t bspan = cilk_time_t(pt.bspan);
   OS << work << ", " << span << ", " << work.get_val_d() / span.get_val_d()
-     << ", " << bspan << ", " << work.get_val_d() / bspan.get_val_d() << "\n";
+     << ", " << bspan << ", " << work.get_val_d() / bspan.get_val_d();
+
+  stack.start.gettime();
+  return OS;
+}
+
+std::ofstream &operator<<(std::ofstream &OS, const wsp_t &pt) {
+  shadow_stack_t &stack = STACK;
+
+  stack.stop.gettime();
+
+  shadow_stack_frame_t &bottom = stack.peek_bot();
+
+  duration_t strand_time = elapsed_time(&(stack.stop), &(stack.start));
+  // stack->running_work += strand_time;
+  bottom.contin_work += strand_time;
+  bottom.contin_span += strand_time;
+  bottom.contin_bspan += strand_time;
+
+  cilk_time_t work = cilk_time_t(pt.work);
+  cilk_time_t span = cilk_time_t(pt.span);
+  cilk_time_t bspan = cilk_time_t(pt.bspan);
+  OS << work << ", " << span << ", " << work.get_val_d() / span.get_val_d()
+     << ", " << bspan << ", " << work.get_val_d() / bspan.get_val_d();
 
   stack.start.gettime();
   return OS;
