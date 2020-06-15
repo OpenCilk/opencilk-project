@@ -226,7 +226,7 @@ CILKTOOL_API void __csi_unit_init(const char *const file_name,
 ///////////////////////////////////////////////////////////////////////////
 // Probes and associated routines
 
-CILKSCALE_EXTERN_C wsp_t getworkspan() CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t wsp_getworkspan() CILKSCALE_NOTHROW {
   TIMER.gettime();
   duration_t time_since_start = elapsed_time(&TIMER, &tool.start);
   wsp_t result = { cilk_time_t(time_since_start).get_raw_duration(), 0, 0 };
@@ -247,17 +247,17 @@ std::ostream &operator<<(std::ostream &OS, const wsp_t &pt) {
   return OS;
 }
 
-CILKSCALE_EXTERN_C wsp_t add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t wsp_add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   lhs.work += rhs.work;
   return lhs;
 }
 
-CILKSCALE_EXTERN_C wsp_t sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t wsp_sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   lhs.work -= rhs.work;
   return lhs;
 }
 
-CILKSCALE_EXTERN_C void dump(wsp_t wsp, const char *tag) {
+CILKSCALE_EXTERN_C void wsp_dump(wsp_t wsp, const char *tag) {
   ensure_header(OUTPUT);
   print_results(OUTPUT, tag, cilk_time_t(wsp.work));
 }

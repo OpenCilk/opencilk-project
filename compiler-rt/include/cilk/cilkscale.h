@@ -51,40 +51,47 @@ std::ostream &operator<<(std::ostream &os, const wsp_t &pt) {
 #endif // #ifdef __cplusplus
 
 CILKSCALE_EXTERN_C
-wsp_t add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW;
+wsp_t wsp_add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW;
 
 CILKSCALE_EXTERN_C
-wsp_t sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW;
+wsp_t wsp_sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW;
 
 CILKSCALE_EXTERN_C
-void dump(wsp_t wsp, const char *tag);
+void wsp_dump(wsp_t wsp, const char *tag);
+
+CILKSCALE_EXTERN_C
+inline wsp_t wsp_zero(void) CILKSCALE_NOTHROW {
+  wsp_t res = {0, 0, 0};
+  return res;
+}
 
 #ifndef __cilkscale__
 
 // Default implementations when the program is not compiled with Cilkscale.
-CILKSCALE_EXTERN_C wsp_t getworkspan() CILKSCALE_NOTHROW {
-  wsp_t res = {0, 0};
-  return res;
-}
-
-CILKSCALE_EXTERN_C
-wsp_t add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+CILKSCALE_EXTERN_C wsp_t wsp_getworkspan() CILKSCALE_NOTHROW {
   wsp_t res = {0, 0, 0};
   return res;
 }
 
 CILKSCALE_EXTERN_C
-wsp_t sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+wsp_t wsp_add(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
   wsp_t res = {0, 0, 0};
   return res;
 }
 
 CILKSCALE_EXTERN_C
-void dump(wsp_t wsp, const char *tag) {
+wsp_t wsp_sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW {
+  wsp_t res = {0, 0, 0};
+  return res;
+}
+
+CILKSCALE_EXTERN_C
+void wsp_dump(wsp_t wsp, const char *tag) {
   return;
 }
 #else
-CILKSCALE_EXTERN_C wsp_t getworkspan() CILKSCALE_NOTHROW;
+CILKSCALE_EXTERN_C wsp_t wsp_getworkspan() CILKSCALE_NOTHROW;
+
 #endif // #ifndef __cilkscale__
 
 #endif // INCLUDED_CILK_CILKSCALE_H
