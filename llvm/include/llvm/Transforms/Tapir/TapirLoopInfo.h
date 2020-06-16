@@ -84,13 +84,13 @@ public:
   /// Top-level call to prepare a Tapir loop for outlining.
   bool prepareForOutlining(
     DominatorTree &DT, LoopInfo &LI, TaskInfo &TI,
-    PredicatedScalarEvolution &PSE, AssumptionCache &AC,
+    PredicatedScalarEvolution &PSE, AssumptionCache &AC, const char *PassName,
     OptimizationRemarkEmitter &ORE, const TargetTransformInfo &TTI);
 
   /// Gather all induction variables in this loop that need special handling
   /// during outlining.
-  bool collectIVs(PredicatedScalarEvolution &PSE,
-                  OptimizationRemarkEmitter &ORE);
+  bool collectIVs(PredicatedScalarEvolution &PSE, const char *PassName,
+                  OptimizationRemarkEmitter *ORE);
 
   /// Replace all induction variables in this loop that are not primary with
   /// stronger forms.
@@ -98,7 +98,7 @@ public:
 
   /// Identify the loop condition instruction, and determine if the loop uses an
   /// inclusive or exclusive range.
-  void getLoopCondition();
+  bool getLoopCondition(const char *PassName, OptimizationRemarkEmitter *ORE);
 
   /// Fix up external users of the induction variable.
   void fixupIVUsers(PHINode *OrigPhi, const InductionDescriptor &II,
@@ -108,7 +108,9 @@ public:
   const SCEV *getBackedgeTakenCount(PredicatedScalarEvolution &PSE) const;
   const SCEV *getExitCount(const SCEV *BackedgeTakenCount,
                            PredicatedScalarEvolution &PSE) const;
-  Value *getOrCreateTripCount(PredicatedScalarEvolution &PSE);
+  Value *getOrCreateTripCount(PredicatedScalarEvolution &PSE,
+                              const char *PassName,
+                              OptimizationRemarkEmitter *ORE);
 
   /// Record task T as a descendant task under this loop and not under a
   /// descendant Tapir loop.
@@ -172,6 +174,18 @@ public:
 
   /// Get the debug location for this loop.
   DebugLoc getDebugLoc() const { return TheTask->getDetach()->getDebugLoc(); }
+
+  /// Create an analysis remark that explains why the transformation failed
+  ///
+  /// \p RemarkName is the identifier for the remark.  If \p I is passed it is
+  /// an instruction that prevents the transformation.  Otherwise \p TheLoop is
+  /// used for the location of the remark.  \return the remark object that can
+  /// be streamed to.
+  ///
+  /// Based on createMissedAnalysis in the LoopVectorize pass.
+  static OptimizationRemarkAnalysis
+  createMissedAnalysis(const char *PassName, StringRef RemarkName,
+                       const Loop *TheLoop, Instruction *I = nullptr);
 
 private:
   /// The loop that we evaluate.
