@@ -201,31 +201,6 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
   }
 }
 
-/// Create an analysis remark that explains why vectorization failed
-///
-/// \p RemarkName is the identifier for the remark.  If \p I is passed it is an
-/// instruction that prevents vectorization.  Otherwise \p TheLoop is used for
-/// the location of the remark.  \return the remark object that can be streamed
-/// to.
-static OptimizationRemarkAnalysis
-createMissedAnalysis(StringRef RemarkName, const Loop *TheLoop,
-                     Instruction *I = nullptr) {
-  const Value *CodeRegion = TheLoop->getHeader();
-  DebugLoc DL = TheLoop->getStartLoc();
-
-  if (I) {
-    CodeRegion = I->getParent();
-    // If there is no debug location attached to the instruction, revert back to
-    // using the loop's.
-    if (I->getDebugLoc())
-      DL = I->getDebugLoc();
-  }
-
-  OptimizationRemarkAnalysis R(LS_NAME, RemarkName, DL, CodeRegion);
-  R << "Tapir loop not transformed: ";
-  return R;
-}
-
 namespace {
 static void emitMissedWarning(const Loop *L, const TapirLoopHints &LH,
                               OptimizationRemarkEmitter *ORE) {
@@ -235,7 +210,9 @@ static void emitMissedWarning(const Loop *L, const TapirLoopHints &LH,
                   DEBUG_TYPE, "FailedRequestedSpawning",
                   L->getStartLoc(), L->getHeader())
               << "Tapir loop not transformed: "
-              << "failed to use divide-and-conquer loop spawning");
+              << "failed to use divide-and-conquer loop spawning."
+              << "  Compile with -Rpass-analysis=" << LS_NAME
+              << " for more details.");
     break;
   case TapirLoopHints::ST_SEQ:
     ORE->emit(DiagnosticInfoOptimizationFailure(
@@ -674,7 +651,7 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
   if (!Preheader) {
     LLVM_DEBUG(dbgs() << "Loop lacks a preheader.\n");
     if (hintsDemandOutlining(Hints)) {
-      ORE.emit(createMissedAnalysis("NoPreheader", L)
+      ORE.emit(TapirLoopInfo::createMissedAnalysis(LS_NAME, "NoPreheader", L)
                << "loop lacks a preheader");
       emitMissedWarning(L, Hints, &ORE);
     }
@@ -682,7 +659,8 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
   } else if (!isa<BranchInst>(Preheader->getTerminator())) {
     LLVM_DEBUG(dbgs() << "Loop preheader is not terminated by a branch.\n");
     if (hintsDemandOutlining(Hints)) {
-      ORE.emit(createMissedAnalysis("ComplexPreheader", L)
+      ORE.emit(TapirLoopInfo::createMissedAnalysis(LS_NAME, "ComplexPreheader",
+                                                   L)
                << "loop preheader not terminated by a branch");
       emitMissedWarning(L, Hints, &ORE);
     }
@@ -694,7 +672,8 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
   if (!T) {
     LLVM_DEBUG(dbgs() << "Loop does not match structure of Tapir loop.\n");
     if (hintsDemandOutlining(Hints)) {
-      ORE.emit(createMissedAnalysis("NonCanonicalLoop", L)
+      ORE.emit(TapirLoopInfo::createMissedAnalysis(LS_NAME, "NonCanonicalLoop",
+                                                   L)
                << "loop does not have the canonical structure of a Tapir loop");
       emitMissedWarning(L, Hints, &ORE);
     }
@@ -1193,12 +1172,11 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
   for (Task *T : post_order(TI.getRootTask())) {
     if (TapirLoopInfo *TL = getTapirLoop(T)) {
       PredicatedScalarEvolution PSE(SE, *TL->getLoop());
-      bool canOutline = TL->prepareForOutlining(DT, LI, TI, PSE, AC, ORE, TTI);
+      bool canOutline = TL->prepareForOutlining(DT, LI, TI, PSE, AC, LS_NAME,
+                                                ORE, TTI);
       if (!canOutline) {
         const Loop *L = TL->getLoop();
         TapirLoopHints Hints(L);
-        ORE.emit(createMissedAnalysis("PrepareFailed", L)
-                 << "Could not process Tapir loop.");
         emitMissedWarning(L, Hints, &ORE);
         forgetTapirLoop(TL);
         continue;
