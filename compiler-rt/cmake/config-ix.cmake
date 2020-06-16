@@ -164,7 +164,6 @@ if (ANDROID AND COMPILER_RT_HAS_LIBDL)
 endif()
 check_library_exists(c++ __cxa_throw "" COMPILER_RT_HAS_LIBCXX)
 check_library_exists(stdc++ __cxa_throw "" COMPILER_RT_HAS_LIBSTDCXX)
-check_library_exists(snappy snappy_compress "" COMPILER_RT_HAS_SNAPPY)
 
 # Linker flags.
 check_linker_flag("-Wl,-z,text" COMPILER_RT_HAS_Z_TEXT)
