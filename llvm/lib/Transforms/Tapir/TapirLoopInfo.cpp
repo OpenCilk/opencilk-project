@@ -25,6 +25,33 @@ using namespace llvm;
 
 #define DEBUG_TYPE "tapir"
 
+/// Create an analysis remark that explains why the transformation failed
+///
+/// \p RemarkName is the identifier for the remark.  If \p I is passed it is an
+/// instruction that prevents the transformation.  Otherwise \p TheLoop is used
+/// for the location of the remark.  \return the remark object that can be
+/// streamed to.
+///
+/// Based on createMissedAnalysis in the LoopVectorize pass.
+OptimizationRemarkAnalysis
+TapirLoopInfo::createMissedAnalysis(const char *PassName, StringRef RemarkName,
+                                    const Loop *TheLoop, Instruction *I) {
+  const Value *CodeRegion = TheLoop->getHeader();
+  DebugLoc DL = TheLoop->getStartLoc();
+
+  if (I) {
+    CodeRegion = I->getParent();
+    // If there is no debug location attached to the instruction, revert back to
+    // using the loop's.
+    if (I->getDebugLoc())
+      DL = I->getDebugLoc();
+  }
+
+  OptimizationRemarkAnalysis R(PassName, RemarkName, DL, CodeRegion);
+  R << "Tapir loop not transformed: ";
+  return R;
+}
+
 /// Update information on this Tapir loop based on its metadata.
 void TapirLoopInfo::readTapirLoopMetadata(OptimizationRemarkEmitter &ORE) {
   TapirLoopHints Hints(getLoop());
@@ -99,35 +126,11 @@ void TapirLoopInfo::addInductionPhi(PHINode *Phi,
   LLVM_DEBUG(dbgs() << "TapirLoop: Found an induction variable.\n");
 }
 
-/// Create an analysis remark that explains why vectorization failed
-///
-/// \p RemarkName is the identifier for the remark.  If \p I is passed it is an
-/// instruction that prevents vectorization.  Otherwise \p TheLoop is used for
-/// the location of the remark.  \return the remark object that can be streamed
-/// to.
-static OptimizationRemarkAnalysis
-createMissedAnalysis(StringRef RemarkName, const Loop *TheLoop,
-                     Instruction *I = nullptr) {
-  const Value *CodeRegion = TheLoop->getHeader();
-  DebugLoc DL = TheLoop->getStartLoc();
-
-  if (I) {
-    CodeRegion = I->getParent();
-    // If there is no debug location attached to the instruction, revert back to
-    // using the loop's.
-    if (I->getDebugLoc())
-      DL = I->getDebugLoc();
-  }
-
-  OptimizationRemarkAnalysis R(DEBUG_TYPE, RemarkName, DL, CodeRegion);
-  R << "Tapir loop not transformed: ";
-  return R;
-}
-
 /// Gather all induction variables in this loop that need special handling
 /// during outlining.
 bool TapirLoopInfo::collectIVs(PredicatedScalarEvolution &PSE,
-                               OptimizationRemarkEmitter &ORE) {
+                               const char *PassName,
+                               OptimizationRemarkEmitter *ORE) {
   Loop *L = getLoop();
   for (Instruction &I : *L->getHeader()) {
     if (auto *Phi = dyn_cast<PHINode>(&I)) {
@@ -135,16 +138,18 @@ bool TapirLoopInfo::collectIVs(PredicatedScalarEvolution &PSE,
       // Check that this PHI type is allowed.
       if (!PhiTy->isIntegerTy() && !PhiTy->isFloatingPointTy() &&
           !PhiTy->isPointerTy()) {
-        ORE.emit(createMissedAnalysis("CFGNotUnderstood", L, Phi)
-                 << "loop control flow is not understood by loop spawning");
+        if (ORE)
+          ORE->emit(createMissedAnalysis(PassName, "CFGNotUnderstood", L, Phi)
+                    << "loop control flow is not understood by loop spawning");
         LLVM_DEBUG(dbgs() << "TapirLoop: Found an non-int non-pointer PHI.\n");
         return false;
       }
 
       // We only allow if-converted PHIs with exactly two incoming values.
       if (Phi->getNumIncomingValues() != 2) {
-        ORE.emit(createMissedAnalysis("CFGNotUnderstood", L, Phi)
-                 << "loop control flow is not understood by loop spawning");
+        if (ORE)
+          ORE->emit(createMissedAnalysis(PassName, "CFGNotUnderstood", L, Phi)
+                    << "loop control flow is not understood by loop spawning");
         LLVM_DEBUG(dbgs() << "TapirLoop: Found an invalid PHI.\n");
         return false;
       }
@@ -172,10 +177,11 @@ bool TapirLoopInfo::collectIVs(PredicatedScalarEvolution &PSE,
 
   if (!PrimaryInduction) {
     LLVM_DEBUG(dbgs()
-               << "TapirLoop: Did not find one integer induction var.\n");
+               << "TapirLoop: Did not find a primary integer induction var.\n");
     if (Inductions.empty()) {
-      ORE.emit(createMissedAnalysis("NoInductionVariable", L)
-               << "loop induction variable could not be identified");
+      if (ORE)
+        ORE->emit(createMissedAnalysis(PassName, "NoInductionVariable", L)
+                  << "loop induction variable could not be identified");
       return false;
     }
   }
@@ -224,21 +230,57 @@ void TapirLoopInfo::replaceNonPrimaryIVs(PredicatedScalarEvolution &PSE) {
   }
 }
 
-void TapirLoopInfo::getLoopCondition() {
-  // Get the loop condition.
+bool TapirLoopInfo::getLoopCondition(const char *PassName,
+                                     OptimizationRemarkEmitter *ORE) {
+  Loop *L = getLoop();
+
+  // Check that the latch is terminated by a branch instruction.  The
+  // LoopRotate pass can be helpful to ensure this property.
   BranchInst *BI =
-    dyn_cast<BranchInst>(getLoop()->getLoopLatch()->getTerminator());
-  assert(BI && "Loop latch not terminated by a branch.");
+    dyn_cast<BranchInst>(L->getLoopLatch()->getTerminator());
+  if (!BI || BI->isUnconditional()) {
+    LLVM_DEBUG(dbgs()
+               << "Loop-latch terminator is not a conditional branch.\n");
+    if (ORE)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(PassName, "NoLatchBranch",
+                                                    L)
+                << "loop latch is not terminated by a conditional branch");
+    return false;
+  }
+  // Check that the condition is an integer-equality comparison.  The
+  // IndVarSimplify pass should transform Tapir loops to use integer-equality
+  // comparisons when the loop can be analyzed.
+  {
+    const ICmpInst *Cond = dyn_cast<ICmpInst>(BI->getCondition());
+    if (!Cond) {
+      LLVM_DEBUG(dbgs() <<
+                 "Loop-latch condition is not an integer comparison.\n");
+      if (ORE)
+        ORE->emit(TapirLoopInfo::createMissedAnalysis(PassName, "NotIntCmp", L)
+                  << "loop-latch condition is not an integer comparison");
+      return false;
+    }
+    if (!Cond->isEquality()) {
+      LLVM_DEBUG(dbgs() <<
+                 "Loop-latch condition is not an equality comparison.\n");
+      // TODO: Find a reasonable analysis message to give to users.
+      // if (ORE)
+      //   ORE->emit(TapirLoopInfo::createMissedAnalysis(PassName,
+      //                                                 "NonCanonicalCmp", L)
+      //             << "non-canonical loop-latch condition");
+      return false;
+    }
+  }
   Condition = dyn_cast<ICmpInst>(BI->getCondition());
   LLVM_DEBUG(dbgs() << "\tLoop condition " << *Condition << "\n");
-  assert(Condition && "Condition is not an integer comparison.");
-  assert(Condition->isEquality() && "Condition is not an equality comparison.");
 
   if (Condition->getOperand(0) == PrimaryInduction ||
       Condition->getOperand(1) == PrimaryInduction)
     // The condition examines the primary induction before the increment.
     // Hence, the end iteration is included in the loop bounds.
     InclusiveRange = true;
+
+  return true;
 }
 
 static Value *getEscapeValue(Instruction *UI, const InductionDescriptor &II,
@@ -354,14 +396,17 @@ const SCEV *TapirLoopInfo::getExitCount(const SCEV *BackedgeTakenCount,
 }
 
 /// Returns (and creates if needed) the original loop trip count.
-Value *TapirLoopInfo::getOrCreateTripCount(PredicatedScalarEvolution &PSE) {
+Value *TapirLoopInfo::getOrCreateTripCount(PredicatedScalarEvolution &PSE,
+                                           const char *PassName,
+                                           OptimizationRemarkEmitter *ORE) {
   if (TripCount)
     return TripCount;
   Loop *L = getLoop();
 
   // Get the existing SSA value being used for the end condition of the loop.
   if (!Condition)
-    getLoopCondition();
+    if (!getLoopCondition(PassName, ORE))
+      return nullptr;
 
   Value *ConditionEnd = Condition->getOperand(0);
   {
@@ -377,10 +422,10 @@ Value *TapirLoopInfo::getOrCreateTripCount(PredicatedScalarEvolution &PSE) {
   // Find the loop boundaries.
   const SCEV *BackedgeTakenCount = getBackedgeTakenCount(PSE);
 
-  if (BackedgeTakenCount == SE->getCouldNotCompute())
+  if (BackedgeTakenCount == SE->getCouldNotCompute()) {
+    LLVM_DEBUG(dbgs() << "Could not compute backedge-taken count.\n");
     return nullptr;
-  // assert(BackedgeTakenCount != SE->getCouldNotCompute() &&
-  //        "Invalid loop count");
+  }
 
   const SCEV *ExitCount = getExitCount(BackedgeTakenCount, PSE);
 
@@ -418,12 +463,12 @@ Value *TapirLoopInfo::getOrCreateTripCount(PredicatedScalarEvolution &PSE) {
 /// Top-level call to prepare a Tapir loop for outlining.
 bool TapirLoopInfo::prepareForOutlining(
     DominatorTree &DT, LoopInfo &LI, TaskInfo &TI,
-    PredicatedScalarEvolution &PSE, AssumptionCache &AC,
+    PredicatedScalarEvolution &PSE, AssumptionCache &AC, const char *PassName,
     OptimizationRemarkEmitter &ORE, const TargetTransformInfo &TTI) {
   LLVM_DEBUG(dbgs() << "Preparing loop for outlining " << *getLoop() << "\n");
 
   // Collect the IVs in this loop.
-  collectIVs(PSE, ORE);
+  collectIVs(PSE, PassName, &ORE);
 
   // If no primary induction was found, just bail.
   if (!PrimaryInduction)
@@ -443,9 +488,12 @@ bool TapirLoopInfo::prepareForOutlining(
   //
   // 2) In the helper itself, the strip-mined loop must iterate to the
   // end-iteration argument, not the total number of iterations.
-  Value *TripCount = getOrCreateTripCount(PSE);
-  if (!TripCount)
+  Value *TripCount = getOrCreateTripCount(PSE, PassName, &ORE);
+  if (!TripCount) {
+    ORE.emit(createMissedAnalysis(PassName, "NoTripCount", getLoop())
+             << "could not compute finite loop trip count.");
     return false;
+  }
 
   LLVM_DEBUG(dbgs() << "\tTrip count " << *TripCount << "\n");
 
