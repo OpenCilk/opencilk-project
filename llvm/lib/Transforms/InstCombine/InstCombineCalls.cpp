@@ -1552,11 +1552,12 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     break;
   }
   case Intrinsic::taskframe_create: {
-    // Remove a taskframe.create if there is no taskframe.use among its users.
+    // Remove a taskframe.create if it has no uses.
     int NumUsers = 0;
     for (User *U : II->users()) {
       if (Instruction *I = dyn_cast<Instruction>(U))
         if (isTapirIntrinsic(Intrinsic::taskframe_use, I) ||
+            isTapirIntrinsic(Intrinsic::taskframe_end, I) ||
             isTaskFrameResume(I))
           ++NumUsers;
     }

@@ -565,6 +565,7 @@ bool llvm::isAssumeLikeIntrinsic(const Instruction *I) {
       case Intrinsic::syncregion_start:
       case Intrinsic::taskframe_create:
       case Intrinsic::taskframe_use:
+      case Intrinsic::taskframe_end:
       case Intrinsic::taskframe_load_guard:
       case Intrinsic::sync_unwind:
         return true;

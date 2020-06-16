@@ -1277,6 +1277,9 @@ def int_taskframe_create : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly]>;
 // identify the taskframe used by the spawned task.
 def int_taskframe_use : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly]>;
 
+// Marker for the end of a taskframe.
+def int_taskframe_end : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly]>;
+
 // Marker for the end of a taskframe along exception-handling unwind
 // paths.
 def int_taskframe_resume : Intrinsic<[], [llvm_token_ty, llvm_any_ty],

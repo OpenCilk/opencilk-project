@@ -7087,6 +7087,9 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
   case Intrinsic::taskframe_use:
     // Discard any taskframe.uses.
     return;
+  case Intrinsic::taskframe_end:
+    // Discard any taskframe.ends.
+    return;
   case Intrinsic::sync_unwind:
     // Discard any sync.unwinds.
     return;

@@ -666,7 +666,7 @@ bool Instruction::isTaskFrameMarker() const {
     return false;
   Intrinsic::ID ID = II->getIntrinsicID();
   return ID == Intrinsic::taskframe_create || ID == Intrinsic::taskframe_use ||
-      ID == Intrinsic::taskframe_resume;
+      ID == Intrinsic::taskframe_end || ID == Intrinsic::taskframe_resume;
 }
 
 const Instruction *
