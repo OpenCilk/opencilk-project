@@ -281,6 +281,7 @@ bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
     case Intrinsic::syncregion_start:
     case Intrinsic::taskframe_create:
     case Intrinsic::taskframe_use:
+    case Intrinsic::taskframe_end:
     case Intrinsic::taskframe_load_guard:
       // These intrinsics don't actually represent code after lowering.
       return true;
