@@ -36,7 +36,7 @@ append_list_if(COMPILER_RT_HAS_LIBDL dl CILKSAN_DYNAMIC_LIBS)
 #append_list_if(COMPILER_RT_HAS_LIBSTDCXX stdc++ CILKSAN_DYNAMIC_LIBS)
 #append_list_if(COMPILER_RT_HAS_LIBLOG log CILKSAN_DYNAMIC_LIBS)
 
-# Compile CilkSan sources into an object library
+# Compile Cilksan sources into an object library
 
 add_compiler_rt_object_libraries(RTCilksan_dynamic
   OS ${SANITIZER_COMMON_SUPPORTED_OS}
