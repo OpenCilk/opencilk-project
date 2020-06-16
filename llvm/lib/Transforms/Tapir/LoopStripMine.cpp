@@ -60,31 +60,6 @@ namespace StripMineConstants {
 const unsigned DefaultCoarseningFactor = 2048;
 }
 
-/// Create an analysis remark that explains why stripmining failed.
-///
-/// \p RemarkName is the identifier for the remark.  If \p I is passed it is an
-/// instruction that prevents vectorization.  Otherwise \p TheLoop is used for
-/// the location of the remark.  \return the remark object that can be streamed
-/// to.
-static OptimizationRemarkAnalysis
-createMissedAnalysis(StringRef RemarkName, const Loop *TheLoop,
-                     Instruction *I = nullptr) {
-  const Value *CodeRegion = TheLoop->getHeader();
-  DebugLoc DL = TheLoop->getStartLoc();
-
-  if (I) {
-    CodeRegion = I->getParent();
-    // If there is no debug location attached to the instruction, revert back to
-    // using the loop's.
-    if (I->getDebugLoc())
-      DL = I->getDebugLoc();
-  }
-
-  OptimizationRemarkAnalysis R("loop-stripmine", RemarkName, DL, CodeRegion);
-  R << "Tapir loop not transformed: ";
-  return R;
-}
-
 /// The function chooses which type of stripmine (epilog or prolog) is more
 /// profitabale.
 /// Epilog stripmine is more profitable when there is PHI that starts from
@@ -249,9 +224,9 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
   BasicBlock *Preheader = L->getLoopPreheader();
   if (!Preheader) {
     LLVM_DEBUG(dbgs()
-               << "  Can't stripmine; loop preheader-insertion failed.\n");
+               << "  Can't stripmine: loop preheader-insertion failed.\n");
     if (ORE)
-      ORE->emit(createMissedAnalysis("NoPreheader", L)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoPreheader", L)
                 << "loop lacks a preheader");
     return nullptr;
   }
@@ -261,18 +236,19 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
   BasicBlock *LatchBlock = L->getLoopLatch();
   if (!LatchBlock) {
     LLVM_DEBUG(dbgs()
-               << "  Can't stripmine; loop exit-block-insertion failed.\n");
+               << "  Can't stripmine: loop exit-block-insertion failed.\n");
     if (ORE)
-      ORE->emit(createMissedAnalysis("NoLatch", L)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoLatch", L)
                 << "loop lacks a latch");
     return nullptr;
   }
 
   // Loops with indirectbr cannot be cloned.
   if (!L->isSafeToClone()) {
-    LLVM_DEBUG(dbgs() << "  Can't stripmine; Loop body cannot be cloned.\n");
+    LLVM_DEBUG(dbgs() << "  Can't stripmine: loop body cannot be cloned.\n");
     if (ORE)
-      ORE->emit(createMissedAnalysis("UnsafeToClone", L)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "UnsafeToClone",
+                                                    L)
                 << "loop is not safe to clone");
     return nullptr;
   }
@@ -287,9 +263,10 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
     // The loop-rotate pass can be helpful to avoid this in many cases.
     LLVM_DEBUG(
         dbgs()
-        << "  Can't stripmine; loop not terminated by a conditional branch.\n");
+        << "  Can't stripmine: loop not terminated by a conditional branch.\n");
     if (ORE)
-      ORE->emit(createMissedAnalysis("NoLatchBranch", L)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoLatchBranch",
+                                                    L)
                 << "loop latch is not terminated by a conditional branch");
     return nullptr;
   }
@@ -300,10 +277,11 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
   };
 
   if (!CheckSuccessors(0, 1) && !CheckSuccessors(1, 0)) {
-    LLVM_DEBUG(dbgs() << "Can't stripmine; only loops with one conditional"
-                         "  latch exiting the loop can be stripmined.\n");
+    LLVM_DEBUG(dbgs() << "  Can't stripmine: only loops with one conditional"
+                         " latch exiting the loop can be stripmined.\n");
     if (ORE)
-      ORE->emit(createMissedAnalysis("ComplexLatchBranch", L)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME,
+                                                    "ComplexLatchBranch", L)
                 << "loop has multiple exiting conditional latches");
     return nullptr;
   }
@@ -311,9 +289,11 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
   if (Header->hasAddressTaken()) {
     // The loop-rotate pass can be helpful to avoid this in many cases.
     LLVM_DEBUG(
-        dbgs() << "  Won't stripmine loop: address of header block is taken.\n");
+        dbgs() << "  Won't stripmine loop: address of header block is "
+        "taken.\n");
     if (ORE)
-      ORE->emit(createMissedAnalysis("HeaderAddressTaken", L)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME,
+                                                    "HeaderAddressTaken", L)
                 << "loop header block has address taken");
     return nullptr;
   }
@@ -324,9 +304,11 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
       if (auto CS = CallSite(&I))
         if (CS.isConvergent()) {
           LLVM_DEBUG(
-              dbgs() << "  Won't stripmine loop: contains convergent attribute.\n");
+              dbgs() << "  Won't stripmine loop: contains convergent "
+              "attribute.\n");
           if (ORE)
-            ORE->emit(createMissedAnalysis("ConvergentLoop", L)
+            ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME,
+                                                          "ConvergentLoop", L)
                       << "loop contains convergent attribute");
           return nullptr;
         }
@@ -681,7 +663,7 @@ Loop *llvm::StripMineLoop(
     return nullptr;
   PredicatedScalarEvolution PSE(*SE, *L);
 
-  TL.collectIVs(PSE, *ORE);
+  TL.collectIVs(PSE, LSM_NAME, ORE);
 
   // If no primary induction was found, just bail.
   if (!TL.hasPrimaryInduction()) {
@@ -691,7 +673,16 @@ Loop *llvm::StripMineLoop(
   PHINode *PrimaryInduction = TL.getPrimaryInduction().first;
   LLVM_DEBUG(dbgs() << "\tPrimary induction " << *PrimaryInduction << "\n");
 
-  Value *TripCount = TL.getOrCreateTripCount(PSE);
+  Value *TripCount = TL.getOrCreateTripCount(PSE, LSM_NAME, ORE);
+  if (!TripCount) {
+    LLVM_DEBUG(dbgs() << "Could not compute trip count.\n");
+    if (ORE)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoTripCount", L)
+                << "could not compute finite loop trip count.");
+    return nullptr;
+  }
+
+  LLVM_DEBUG(dbgs() << "\tTrip count " << *TripCount << "\n");
 
   // Fixup all external uses of the IVs.
   for (auto &InductionEntry : *TL.getInductionVars())
