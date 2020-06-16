@@ -81,6 +81,45 @@ static Instruction *getTaskFrameCreate(BasicBlock *BB) {
       getTaskFrameCreate(const_cast<const BasicBlock *>(BB)));
 }
 
+static bool isCanonicalTaskFrameEnd(const Instruction *TFEnd) {
+  // Check that the last instruction in the basic block containing TFEnd is
+  // TFEnd.
+  const Instruction *Term = &TFEnd->getParent()->back();
+  if (!Term || isa<SyncInst>(Term) || isa<ReattachInst>(Term))
+    return false;
+
+  const Instruction *Prev = Term->getPrevNode();
+  if (!Prev || Prev != TFEnd)
+    return false;
+
+  return true;
+}
+
+// Check if the given instruction is an intrinsic with the specified ID.  If a
+// value \p V is specified, then additionally checks that the first argument of
+// the intrinsic matches \p V.  This function matches the behavior of
+// isTapirIntrinsic in Transforms/Utils/TapirUtils.
+static bool isTapirIntrinsic(Intrinsic::ID ID, const Instruction *I,
+                             const Value *V = nullptr) {
+  if (const CallBase *CB = dyn_cast<CallBase>(I))
+    if (const Function *Called = CB->getCalledFunction())
+      if (ID == Called->getIntrinsicID())
+        if (!V || (V == CB->getArgOperand(0)))
+          return true;
+  return false;
+}
+
+// Check if the basic block terminates a taskframe via a taskframe.end.
+static bool endsUnassociatedTaskFrame(const BasicBlock *B) {
+  const Instruction *Prev = B->getTerminator()->getPrevNode();
+  if (!Prev)
+    return false;
+  if (isTapirIntrinsic(Intrinsic::taskframe_end, Prev) &&
+      isCanonicalTaskFrameEnd(Prev))
+    return true;
+  return false;
+}
+
 /// Checks if the given taskframe.create instruction is in canonical form.  This
 /// function mirrors the behavior of needToSplitTaskFrameCreate in
 /// Transforms/Utils/TapirUtils.
@@ -103,6 +142,20 @@ static bool isCanonicalTaskFrameCreate(const Instruction *TFCreate) {
   if (isa<SyncInst>(Pred->getTerminator()))
     return false;
 
+  // If the taskframe.create has no users, ignore it.
+  if (TFCreate->user_empty())
+    return false;
+
+  // Check that the uses of the taskframe.create are canonical as well.
+  for (const User *U : TFCreate->users()) {
+    if (const Instruction *I = dyn_cast<Instruction>(U)) {
+      if (isTapirIntrinsic(Intrinsic::taskframe_use, I) ||
+          isTapirIntrinsic(Intrinsic::taskframe_resume, I))
+        return true;
+      if (isTapirIntrinsic(Intrinsic::taskframe_end, I))
+        return isCanonicalTaskFrameEnd(I);
+    }
+  }
   return true;
 }
 
@@ -187,6 +240,24 @@ Value *Spindle::getTaskFrameCreate() const {
 Task *Spindle::getTaskFromTaskFrame() const {
   if (TaskFrameUser) return TaskFrameUser;
   if (getParentTask()->getEntrySpindle() == this) return getParentTask();
+  return nullptr;
+}
+
+BasicBlock *Spindle::getTaskFrameContinuation() const {
+  // If this taskframe is used by a task, return that task's continuation.
+  if (TaskFrameUser)
+    return TaskFrameUser->getContinuationSpindle()->getEntry();
+
+  Value *TFCreate = getTaskFrameCreate();
+  if (!TFCreate)
+    return nullptr;
+  // Scan the uses of the taskframe.create for a canonical taskframe.end.
+  for (User *U : TFCreate->users())
+    if (Instruction *I = dyn_cast<Instruction>(U)) {
+      if (isTapirIntrinsic(Intrinsic::taskframe_end, I) &&
+          isCanonicalTaskFrameEnd(I))
+        return I->getParent()->getSingleSuccessor();
+    }
   return nullptr;
 }
 
@@ -572,6 +643,16 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
         createSpindleWithEntry(&B, Spindle::SPType::Phi);
         SpindleCount++;
       }
+    } else if (endsUnassociatedTaskFrame(&B)) {
+      BasicBlock *SPEntry = B.getSingleSuccessor();
+      // This block ends with a taskframe.end.  Mark its successor as a spindle
+      // entry.
+      DefiningBlocks.insert(SPEntry);
+      if (!getSpindleFor(SPEntry)) {
+        // Create a new spindle.
+        createSpindleWithEntry(SPEntry, Spindle::SPType::Phi);
+        SpindleCount++;
+      }
     } else if (isTaskFrameResume(B.getTerminator())) {
       // This block ends with a taskframe.resume invocation.  Mark the unwind
       // destination as a spindle entry.
@@ -771,9 +852,28 @@ void TaskInfo::findTaskFrameTreeHelper(
     Spindle *TFSpindle, SmallVectorImpl<Spindle *> &ParentWorkList,
     SmallPtrSetImpl<Spindle *> &SubTFVisited) {
   const Value *TFCreate = TFSpindle->getTaskFrameCreate();
-  const Task *User = TFSpindle->getTaskFromTaskFrame();
-  const Spindle *Continuation = User->getContinuationSpindle();
-  const Spindle *EHContinuation = User->getEHContinuationSpindle();
+  const Task *UserT = TFSpindle->getTaskFromTaskFrame();
+  const Spindle *Continuation = nullptr;
+  const Spindle *EHContinuation = nullptr;
+  if (UserT) {
+    Continuation = UserT->getContinuationSpindle();
+    EHContinuation = UserT->getEHContinuationSpindle();
+  } else {
+    // This taskframe is not associated with a task.  Examine the uses of the
+    // taskframe to determine its continuation and exceptional-continuation
+    // spindles.
+    for (const User *U : TFCreate->users()) {
+      if (const Instruction *I = dyn_cast<Instruction>(U)) {
+        if (isTapirIntrinsic(Intrinsic::taskframe_end, I) &&
+            isCanonicalTaskFrameEnd(I))
+          Continuation = getSpindleFor(I->getParent()->getSingleSuccessor());
+        else if (isTaskFrameResume(I)) {
+          const InvokeInst *II = dyn_cast<InvokeInst>(I);
+          EHContinuation = getSpindleFor(II->getUnwindDest());
+        }
+      }
+    }
+  }
 
   SmallVector<Spindle *, 8> WorkList;
   SmallPtrSet<Spindle *, 8> Visited;
@@ -811,7 +911,7 @@ void TaskInfo::findTaskFrameTreeHelper(
       if (!TFSpindle->succInSameTask(SuccEdge.first))
         if (isa<DetachInst>(SuccEdge.second->getTerminator())) {
           Task *SubT = getTaskFor(SuccEdge.first);
-          if (SubT != User) {
+          if (SubT != UserT) {
             // Add SubT as a subtask of the taskframe spindle.
             TFSpindle->TaskFrameSubtasks.insert(SubT);
 
@@ -843,9 +943,12 @@ void TaskInfo::findTaskFrameTreeHelper(
       }
       // Add the exception-handling continuation to the appropriate worklist.
       if (SuccEdge.first == EHContinuation) {
-        // If TFSpindle corresponds to a taskframe.create, push the successor
-        // onto our worklist.  Otherwise push it onto the parent's worklist.
-        if (TFCreate)
+        // If TFSpindle corresponds to a taskframe.create associated with a
+        // task, push the successor onto our worklist.  Otherwise push it onto
+        // the parent's worklist.
+        //
+        // TODO: Why do we ever push the EHContinuation onto our own worklist?
+        if (TFCreate && UserT)
           WorkList.push_back(SuccEdge.first);
         else
           ParentWorkList.push_back(SuccEdge.first);
