@@ -93,6 +93,15 @@ public:
   Value *getTaskFrameCreate() const;
   Task *getTaskFrameUser() const { return TaskFrameUser; }
   Spindle *getTaskFrameParent() const { return TaskFrameParent; }
+  BasicBlock *getTaskFrameContinuation() const;
+  /// Return the nesting level of this taskframe.
+  unsigned getTaskFrameDepth() const {
+    unsigned D = 0;
+    for (const Spindle *CurTF = TaskFrameParent; CurTF;
+         CurTF = CurTF->TaskFrameParent)
+      ++D;
+    return D;
+  }
 
   Task *getTaskFromTaskFrame() const;
 
