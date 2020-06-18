@@ -70,6 +70,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <algorithm>
 #include <cassert>
@@ -579,6 +580,11 @@ static unsigned getJumpThreadDuplicationCost(const TargetTransformInfo *TTI,
     if (const CallInst *CI = dyn_cast<CallInst>(I))
       if (CI->cannotDuplicate() || CI->isConvergent())
         return ~0U;
+
+    // Bail if we discover a taskframe.end intrinsic.
+    // TODO: Handle taskframe.end like a guard.
+    if (isTapirIntrinsic(Intrinsic::taskframe_end, &*I))
+      return ~0U;
 
     if (TTI->getInstructionCost(&*I, TargetTransformInfo::TCK_SizeAndLatency) ==
         TargetTransformInfo::TCC_Free)
