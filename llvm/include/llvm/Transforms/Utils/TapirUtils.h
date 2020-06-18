@@ -129,6 +129,11 @@ BranchInst *SerializeDetachedCFG(DetachInst *DI, DominatorTree *DT = nullptr);
 const BasicBlock *GetDetachedCtx(const BasicBlock *BB);
 BasicBlock *GetDetachedCtx(BasicBlock *BB);
 
+// Returns true if the function may not be synced at the point of the given
+// basic block, false otherwise.  This function does a simple depth-first
+// traversal of the CFG, and as such, produces a conservative result.
+bool mayBeUnsynced(const BasicBlock *BB);
+
 /// isCriticalContinueEdge - Return true if the specified edge is a critical
 /// detach-continue edge.  Critical detach-continue edges are critical edges -
 /// from a block with multiple successors to a block with multiple predecessors
