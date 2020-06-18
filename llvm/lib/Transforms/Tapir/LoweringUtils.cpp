@@ -213,10 +213,10 @@ static bool definedOutsideTaskFrame(const Value *V, const Spindle *TF,
 
 /// Get the set of inputs for the given task T, accounting for the taskframe of
 /// T, if it exists.
-void llvm::getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
-                                     TaskValueSetMap &TFOutputs,
+void llvm::getTaskFrameInputsOutputs(TFValueSetMap &TFInputs,
+                                     TFValueSetMap &TFOutputs,
                                      const Spindle &TF,
-                                     const ValueSet &TaskInputs,
+                                     const ValueSet *TaskInputs,
                                      const TaskInfo &TI,
                                      const DominatorTree &DT) {
   NamedRegionTimer NRT("getTaskFrameInputsOutputs",
@@ -225,31 +225,30 @@ void llvm::getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
                        TimePassesIsEnabled);
 
   const Task *T = TF.getTaskFromTaskFrame();
-  if (!T) {
-    dbgs() << "getTaskFrameInputsOutputs returning: "
-           << "taskframe spindle@" << TF.getEntry()->getName()
-           << " does not correspond to a task.\n";
-  }
-
-  LLVM_DEBUG(dbgs() << "getTaskFrameInputsOutputs: task@"
-             << T->getEntry()->getName() << "\n");
+  if (T)
+    LLVM_DEBUG(dbgs() << "getTaskFrameInputsOutputs: task@"
+               << T->getEntry()->getName() << "\n");
+  else
+    LLVM_DEBUG(dbgs() << "getTaskFrameInputsOutputs: taskframe spindle@"
+               << TF.getEntry()->getName() << "\n");
 
   // Check the taskframe spindles for definitions of inputs to T.
-  for (Value *V : TaskInputs)
-    if (definedOutsideTaskFrame(V, &TF, TI))
-      TFInputs[T].insert(V);
+  if (TaskInputs)
+    for (Value *V : *TaskInputs)
+      if (definedOutsideTaskFrame(V, &TF, TI))
+        TFInputs[&TF].insert(V);
 
   // Get inputs from child taskframes.
   for (Spindle *SubTF : TF.subtaskframes())
-    if (Task *SubT = SubTF->getTaskFromTaskFrame())
-      for (Value *V : TFInputs[SubT])
+      for (Value *V : TFInputs[SubTF])
         if (definedOutsideTaskFrame(V, &TF, TI))
-          TFInputs[T].insert(V);
+          TFInputs[&TF].insert(V);
 
+  Value *TFCreate = T ? T->getTaskFrameUsed() : TF.getTaskFrameCreate();
   // Get inputs and outputs of the taskframe.
   for (Spindle *S : TF.taskframe_spindles()) {
     // Skip taskframe spindles within the task itself.
-    if (T->contains(S))
+    if (T && T->contains(S))
       continue;
 
     for (BasicBlock *BB : S->blocks()) {
@@ -261,8 +260,8 @@ void llvm::getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
         // Ignore certain instructions from consideration: the taskframe.create
         // intrinsic for this taskframe, the detach instruction that spawns T,
         // and the landingpad value in T's EH continuation.
-        if ((T->getTaskFrameUsed() == &I) || isa<DetachInst>(&I) ||
-            (T->getLPadValueInEHContinuationSpindle() == &I))
+        if ((TFCreate == &I) || isa<DetachInst>(&I) ||
+            (T && T->getLPadValueInEHContinuationSpindle() == &I))
           continue;
 
         // Examine all operands of this instruction
@@ -282,21 +281,21 @@ void llvm::getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
           // PHI-node inputs will be rewritten anyway, so skip them.
           if (isa<PHINode>(I))
             if (Instruction *OP = dyn_cast<Instruction>(*OI))
-              if (isa<LandingPadInst>(*OP) && T->encloses(OP->getParent()))
+              if (isa<LandingPadInst>(*OP) && T && T->encloses(OP->getParent()))
                 if (isSuccessorOfDetachedRethrow(OP->getParent()))
                   continue;
 
           // TODO: Add a test to exclude landingpads from detached-rethrows?
           LLVM_DEBUG({
               if (Instruction *OP = dyn_cast<Instruction>(*OI)) {
-                assert(!T->encloses(OP->getParent()) &&
+                assert(!(T && T->encloses(OP->getParent())) &&
                        "TaskFrame uses value defined in task.");
               }
             });
           // If this operand is not defined outside of the taskframe, then it's
           // an input.
           if (definedOutsideTaskFrame(*OI, &TF, TI))
-            TFInputs[T].insert(*OI);
+            TFInputs[&TF].insert(*OI);
       }
       // Examine all users of this instruction.
       for (User *U : I.users()) {
@@ -304,7 +303,7 @@ void llvm::getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
         if (Instruction *UI = dyn_cast<Instruction>(U)) {
           if (definedOutsideTaskFrame(UI, &TF, TI) &&
               DT.isReachableFromEntry(UI->getParent()))
-            TFOutputs[T].insert(&I);
+            TFOutputs[&TF].insert(&I);
         }
       }
     }
@@ -318,7 +317,7 @@ void llvm::getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
 /// Aggregating all of this work into a single routine allows us to avoid
 /// redundant traversals of basic blocks in nested tasks.
 void llvm::findAllTaskFrameInputs(
-    TaskValueSetMap &TFInputs, TaskValueSetMap &TFOutputs,
+    TFValueSetMap &TFInputs, TFValueSetMap &TFOutputs,
     const SmallVectorImpl<Spindle *> &AllTaskFrames, Function &F,
     const DominatorTree &DT, TaskInfo &TI) {
   // Determine the inputs for all tasks.
@@ -326,18 +325,17 @@ void llvm::findAllTaskFrameInputs(
 
   for (Spindle *TF : AllTaskFrames) {
     Task *T = TF->getTaskFromTaskFrame();
-    if (!T)
-      continue;
 
     // Update the inputs to account for the taskframe.
-    getTaskFrameInputsOutputs(TFInputs, TFOutputs, *TF, TaskInputs[T], TI, DT);
+    getTaskFrameInputsOutputs(TFInputs, TFOutputs, *TF,
+                              T ? &TaskInputs[T] : nullptr, TI, DT);
 
     LLVM_DEBUG({
         dbgs() << "TFInputs:\n";
-        for (Value *V : TFInputs[T])
+        for (Value *V : TFInputs[TF])
           dbgs() << "\t" << *V << "\n";
         dbgs() << "TFOutputs:\n";
-        for (Value *V : TFOutputs[T])
+        for (Value *V : TFOutputs[TF])
           dbgs() << "\t" << *V << "\n";
       });
   }
@@ -696,8 +694,9 @@ Function *llvm::createHelperForTask(
     // the stack appropriately.
   }
 
+  // Convert the cloned detach into an unconditional branch.  We do this
+  // conversion here in part to prevent the cloned task from being reprocessed.
   if (VMap[DI]) {
-    // Convert the cloned detach into an unconditional branch.
     NamedRegionTimer NRT("serializeClone", "Serialize cloned Tapir task",
                          TimerGroupName, TimerGroupDescription,
                          TimePassesIsEnabled);
@@ -749,18 +748,195 @@ static void unlinkTaskEHFromParent(Task *T) {
     I->eraseFromParent();
 }
 
+static BasicBlock *getTaskFrameContinue(Spindle *TF) {
+  Value *TFCreate = TF->getTaskFrameCreate();
+  for (User *U : TFCreate->users()) {
+    if (IntrinsicInst *UI = dyn_cast<IntrinsicInst>(U)) {
+      if (Intrinsic::taskframe_end == UI->getIntrinsicID())
+        return UI->getParent()->getSingleSuccessor();
+    }
+  }
+  return nullptr;
+}
+
+/// Outlines the content of taskframe \p TF in function \p F into a new helper
+/// function.  The parameter \p Inputs specified the inputs to the helper
+/// function.  The map \p VMap is updated with the mapping of instructions in \p
+/// TF to instructions in the new helper function.
+Function *llvm::createHelperForTaskFrame(
+    Function &F, Spindle *TF, ValueSet &Args, Module *DestM,
+    ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
+    DominatorTree *DT) {
+  // Collect all basic blocks in this task.
+  std::vector<BasicBlock *> TaskBlocks;
+  // Reattach instructions and detached rethrows in this task might need special
+  // handling.
+  SmallPtrSet<BasicBlock *, 4> TFEndBlocks;
+  SmallPtrSet<BasicBlock *, 4> TFResumeBlocks;
+  // Entry blocks of shared-EH spindles may contain PHI nodes that need to be
+  // rewritten in the cloned helper.
+  SmallPtrSet<BasicBlock *, 4> SharedEHEntries;
+  {
+  NamedRegionTimer NRT("getTaskFrameBlocks", "Get taskframe blocks",
+                       TimerGroupName, TimerGroupDescription,
+                       TimePassesIsEnabled);
+  // Get taskframe blocks
+  for (Spindle *S : TF->taskframe_spindles()) {
+    // Skip spindles that are placeholders.
+    if (isPlaceholderSuccessor(S->getEntry()))
+      continue;
+
+    LLVM_DEBUG(dbgs() << "Adding blocks in taskframe spindle " << *S << "\n");
+
+    // Some canonicalization methods, e.g., loop canonicalization, will
+    // introduce a basic block after a detached-rethrow that branches to the
+    // successor of the EHContinuation entry.
+    for (BasicBlock *Pred : predecessors(S->getEntry())) {
+      assert(!endsTaskFrame(Pred, TF->getTaskFrameCreate()) &&
+             "Taskframe spindle after taskframe.end");
+      if (isSuccessorOfDetachedRethrow(Pred))
+        SharedEHEntries.insert(S->getEntry());
+    }
+
+    for (BasicBlock *B : S->blocks()) {
+      LLVM_DEBUG(dbgs() << "Adding taskframe block " << B->getName() << "\n");
+      TaskBlocks.push_back(B);
+
+      // Record any blocks that end the taskframe.
+      if (endsTaskFrame(B)) {
+        LLVM_DEBUG(dbgs() << "Recording taskframe.end block " << B->getName()
+                   << "\n");
+        TFEndBlocks.insert(B);
+      }
+      if (isTaskFrameResume(B->getTerminator())) {
+        LLVM_DEBUG(dbgs() << "Recording taskframe.resume block " << B->getName()
+                   << "\n");
+        TFResumeBlocks.insert(B);
+      }
+    }
+  }
+  } // end timed region
+
+  SmallVector<ReturnInst *, 4> Returns;  // Ignore returns cloned.
+  ValueSet Outputs;
+  Value *TFCreate = TF->getTaskFrameCreate();
+
+  BasicBlock *Header = TF->getEntry();
+  BasicBlock *Entry = Header->getSinglePredecessor();
+  BasicBlock *Continue = getTaskFrameContinue(TF);
+  assert(Continue && "Task frame lacks a continuation for outlining.");
+
+  Twine NameSuffix = ".otf" + Twine(TF->getTaskFrameDepth());
+  Function *Helper;
+  {
+  NamedRegionTimer NRT("CreateHelper", "Create helper function",
+                       TimerGroupName, TimerGroupDescription,
+                       TimePassesIsEnabled);
+  Helper =
+    CreateHelper(Args, Outputs, TaskBlocks, Header, Entry, Continue,
+                 VMap, DestM, F.getSubprogram() != nullptr, Returns,
+                 NameSuffix.str(), &TFEndBlocks, &TFResumeBlocks,
+                 &SharedEHEntries, nullptr, nullptr, nullptr, ReturnType,
+                 nullptr, nullptr, nullptr);
+  } // end timed region
+  assert(Returns.empty() && "Returns cloned when cloning detached CFG.");
+
+  // Add alignment assumptions to arguments of helper, based on alignment of
+  // values in old function.
+  AddAlignmentAssumptions(&F, Args, VMap, &Header->front(), AC, DT);
+
+  // Move allocas in the newly cloned detached CFG to the entry block of the
+  // helper.
+  {
+    NamedRegionTimer NRT("MoveAllocas", "Move allocas in cloned helper",
+                         TimerGroupName, TimerGroupDescription,
+                         TimePassesIsEnabled);
+    // Collect the end instructions of the task.
+    SmallVector<Instruction *, 4> TaskEnds;
+    for (BasicBlock *EndBlock : TFEndBlocks)
+      TaskEnds.push_back(cast<BasicBlock>(VMap[EndBlock])->getTerminator());
+    for (BasicBlock *EndBlock : TFResumeBlocks)
+      TaskEnds.push_back(cast<BasicBlock>(VMap[EndBlock])->getTerminator());
+
+    // Move allocas in cloned taskframe entry block to entry of helper function.
+    BasicBlock *ClonedTFEntry = cast<BasicBlock>(VMap[Header]);
+    MoveStaticAllocasInBlock(&Helper->getEntryBlock(), ClonedTFEntry,
+                             TaskEnds);
+
+    // We do not need to add new llvm.stacksave/llvm.stackrestore intrinsics,
+    // because calling and returning from the helper will automatically manage
+    // the stack appropriately.
+  } // end timed region
+
+  // Remove the cloned taskframe.end intrinsics, to prevent the cloned taskframe
+  // from being reprocessed.
+  if (VMap[TFCreate]) {
+    NamedRegionTimer NRT("serializeClone", "Serialize cloned Tapir task",
+                         TimerGroupName, TimerGroupDescription,
+                         TimePassesIsEnabled);
+    SmallVector<Instruction *, 1> TFEndsToRemove;
+    for (BasicBlock *EndBlock : TFEndBlocks) {
+      BasicBlock *ClonedEndBlock = cast<BasicBlock>(VMap[EndBlock]);
+      if (Instruction *Prev = ClonedEndBlock->getTerminator()->getPrevNode())
+        if (isTapirIntrinsic(Intrinsic::taskframe_end, Prev))
+          TFEndsToRemove.push_back(Prev);
+    }
+    for (Instruction *ClonedTFEnd : TFEndsToRemove)
+      ClonedTFEnd->eraseFromParent();
+  }
+  return Helper;
+}
+
+/// Outlines a taskframe \p TF into a helper function that accepts the inputs \p
+/// Inputs.  The map \p VMap is updated with the mapping of instructions in \p
+/// TF to instructions in the new helper function.  Information about the helper
+/// function is returned as a TaskOutlineInfo structure.
+TaskOutlineInfo llvm::outlineTaskFrame(
+    Spindle *TF, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
+    Module *DestM, ValueToValueMapTy &VMap,
+    TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
+    ValueToValueMapTy &InputMap, AssumptionCache *AC, DominatorTree *DT) {
+  if (Task *T = TF->getTaskFromTaskFrame())
+    return outlineTask(T, Inputs, HelperInputs, DestM, VMap, useArgStruct,
+                       ReturnType, InputMap, AC, DT);
+
+  Function &F = *TF->getEntry()->getParent();
+  BasicBlock *Entry = TF->getEntry();
+
+  Instruction *StorePt = Entry->getSinglePredecessor()->getTerminator();
+  // Find the corresponding taskframe.resume, if one exists.
+  BasicBlock *Unwind = getTaskFrameResumeDest(TF->getTaskFrameCreate());
+  BasicBlock *Continue = getTaskFrameContinue(TF);
+
+  // Convert the inputs of the task to inputs to the helper.
+  ValueSet HelperArgs;
+  // TODO: Consider supporting arg structs for arbitrary outlined taskframes.
+  fixupInputSet(F, Inputs, HelperArgs);
+  Instruction *ArgsStart = StorePt;
+
+  for (Value *V : HelperArgs)
+    HelperInputs.push_back(V);
+
+  // Clone the blocks into a helper function.
+  Function *Helper = createHelperForTaskFrame(F, TF, HelperArgs, DestM, VMap,
+                                              ReturnType, AC, DT);
+  Instruction *ClonedTF = cast<Instruction>(VMap[TF->getTaskFrameCreate()]);
+  return TaskOutlineInfo(Helper, nullptr, ClonedTF, Inputs,
+                         ArgsStart, StorePt, Continue, Unwind);
+}
+
 /// Replaces the spawned task \p T, with associated TaskOutlineInfo \p Out, with
 /// a call or invoke to the outlined helper function created for \p T.
-Instruction *llvm::replaceTaskWithCallToOutline(
-    Task *T, TaskOutlineInfo &Out, SmallVectorImpl<Value *> &OutlineInputs) {
-  // Remove any dependencies from T's exception-handling code to T's parent.
-  unlinkTaskEHFromParent(T);
+Instruction *llvm::replaceTaskFrameWithCallToOutline(
+    Spindle *TF, TaskOutlineInfo &Out, SmallVectorImpl<Value *> &OutlineInputs) {
+  if (Task *T = TF->getTaskFromTaskFrame())
+    // Remove any dependencies from T's exception-handling code to T's parent.
+    unlinkTaskEHFromParent(T);
 
   Instruction *ToReplace = Out.ReplCall;
   BasicBlock *TFResumeBB = nullptr;
-  if (Spindle *TFSpindle = T->getTaskFrameCreateSpindle())
-    if (Instruction *TFResume =
-        getTaskFrameResume(TFSpindle->getTaskFrameCreate()))
+  if (Value *TFCreate = TF->getTaskFrameCreate())
+    if (Instruction *TFResume = getTaskFrameResume(TFCreate))
       TFResumeBB = TFResume->getParent();
 
   // Add call to new helper function in original function.
