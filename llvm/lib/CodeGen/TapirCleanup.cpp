@@ -25,6 +25,7 @@ using namespace llvm;
 #define DEBUG_TYPE "tapircleanup"
 
 STATISTIC(NumTasksSerialized, "Number of Tapir tasks serialized");
+STATISTIC(NumTaskFramesErased, "Number of taskframes erased");
 
 namespace {
 class TapirCleanup : public FunctionPass {
@@ -61,9 +62,9 @@ void TapirCleanup::getAnalysisUsage(AnalysisUsage &AU) const {
 
 bool TapirCleanup::runOnFunction(Function &F) {
   TaskInfo &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
-  if (TI.isSerial())
-    return false;
   auto &ORE = getAnalysis<OptimizationRemarkEmitterWrapperPass>().getORE();
+
+  bool Changed = false;
 
   // If we haven't lowered the Tapir task to a particular parallel runtime by
   // this point, simply serialize the task.
@@ -79,7 +80,21 @@ bool TapirCleanup::runOnFunction(Function &F) {
 
     SerializeDetach(T->getDetach(), T);
     NumTasksSerialized++;
+    Changed = true;
   }
 
-  return true;
+  // Get the set of taskframes to erase.
+  SmallVector<Instruction *, 8> TaskFramesToErase;
+  for (BasicBlock &BB : F)
+    for (Instruction &I : BB)
+      if (isTapirIntrinsic(Intrinsic::taskframe_create, &I))
+        TaskFramesToErase.push_back(&I);
+
+  for (Instruction *TFCreate : TaskFramesToErase) {
+    eraseTaskFrame(TFCreate);
+    ++NumTaskFramesErased;
+    Changed = true;
+  }
+
+  return Changed;
 }
