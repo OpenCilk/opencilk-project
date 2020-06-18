@@ -62,6 +62,15 @@ bool isSyncUnwind(const Instruction *I, const Value *SyncRegion = nullptr);
 /// instructions.
 bool isPlaceholderSuccessor(const BasicBlock *B);
 
+/// Returns true if the given basic block ends a taskframe, false otherwise.  If
+/// \p TaskFrame is specified, then additionally checks that the
+/// taskframe.end uses \p TaskFrame.
+bool endsTaskFrame(const BasicBlock *B, const Value *TaskFrame = nullptr);
+
+/// Returns the spindle containing the taskframe.create used by task \p T, or
+/// the entry spindle of \p T if \p T has no such taskframe.create spindle.
+Spindle *getTaskFrameForTask(Task *T);
+
 // Removes the given sync.unwind instruction, if it is dead.  Returns true if
 // the sync.unwind was removed, false otherwise.
 bool removeDeadSyncUnwind(CallBase *SyncUnwind, DomTreeUpdater *DTU);
