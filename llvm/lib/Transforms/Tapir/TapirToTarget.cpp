@@ -61,16 +61,19 @@ public:
 private:
   bool unifyReturns(Function &F);
   void processFunction(Function &F, SmallVectorImpl<Function *> &NewHelpers);
-  TaskOutlineMapTy outlineAllTasks(Function &F,
-                                   SmallVectorImpl<Spindle *> &AllTaskFrames,
-                                   DominatorTree &DT, AssumptionCache &AC,
-                                   TaskInfo &TI);
+  TFOutlineMapTy outlineAllTasks(Function &F,
+                                 SmallVectorImpl<Spindle *> &AllTaskFrames,
+                                 DominatorTree &DT, AssumptionCache &AC,
+                                 TaskInfo &TI);
   bool processSimpleABI(Function &F);
-  bool processRootTask(Function &F, TaskOutlineMapTy &TaskToOutline,
+  bool processRootTask(Function &F, TFOutlineMapTy &TFToOutline,
                        DominatorTree &DT, AssumptionCache &AC, TaskInfo &TI);
-  bool processOutlinedTask(
-      Task *T, TaskOutlineMapTy &TaskToOutline, DominatorTree &DT,
-      AssumptionCache &AC, TaskInfo &TI);
+  bool processSpawnerTaskFrame(Spindle *TF, TFOutlineMapTy &TFToOutline,
+                               DominatorTree &DT, AssumptionCache &AC,
+                               TaskInfo &TI);
+  bool processOutlinedTask(Task *T, TFOutlineMapTy &TFToOutline,
+                           DominatorTree &DT, AssumptionCache &AC,
+                           TaskInfo &TI);
 
 private:
   TapirTarget *Target = nullptr;
@@ -124,39 +127,53 @@ bool TapirToTargetImpl::unifyReturns(Function &F) {
 }
 
 /// Outline all tasks in this function in post order.
-TaskOutlineMapTy
+TFOutlineMapTy
 TapirToTargetImpl::outlineAllTasks(Function &F,
                                    SmallVectorImpl<Spindle *> &AllTaskFrames,
                                    DominatorTree &DT, AssumptionCache &AC,
                                    TaskInfo &TI) {
   NamedRegionTimer NRT("outlineAllTasks", "Outline all tasks", TimerGroupName,
                        TimerGroupDescription, TimePassesIsEnabled);
-  TaskOutlineMapTy TaskToOutline;
+  TFOutlineMapTy TFToOutline;
 
   // Determine the inputs for all tasks.
-  TaskValueSetMap TFInputs, TFOutputs;
+  TFValueSetMap TFInputs, TFOutputs;
   findAllTaskFrameInputs(TFInputs, TFOutputs, AllTaskFrames, F, DT, TI);
 
-  DenseMap<Task *, SmallVector<Value *, 8>> HelperInputs;
+  DenseMap<Spindle *, SmallVector<Value *, 8>> HelperInputs;
 
   for (Spindle *TF : AllTaskFrames) {
     // At this point, all subtaskframess of TF must have been processed.
     // Replace the tasks with calls to their outlined helper functions.
     for (Spindle *SubTF : TF->subtaskframes())
-      if (Task *SubT = SubTF->getTaskFromTaskFrame())
-        TaskToOutline[SubT].replaceReplCall(
-            replaceTaskWithCallToOutline(SubT, TaskToOutline[SubT],
-                                         HelperInputs[SubT]));
+      TFToOutline[SubTF].replaceReplCall(
+          replaceTaskFrameWithCallToOutline(SubTF, TFToOutline[SubTF],
+                                            HelperInputs[SubTF]));
 
     // TODO: Add support for outlining taskframes with no associated task.  Such
     // a facility would allow the frontend to create nested sync regions that
     // are properly outlined.
 
     Task *T = TF->getTaskFromTaskFrame();
-    // Nothing to do if there is no task associated with this taskframe.
     if (!T) {
-      LLVM_DEBUG(dbgs() << "Skipping taskframe spindle@"
-                 << TF->getEntry()->getName() << ": no associated task.\n");
+      ValueToValueMapTy VMap;
+      ValueToValueMapTy InputMap;
+      TFToOutline[TF] = outlineTaskFrame(TF, TFInputs[TF], HelperInputs[TF],
+                                         &Target->getDestinationModule(), VMap,
+                                         Target->getArgStructMode(),
+                                         Target->getReturnType(), InputMap, &AC,
+                                         &DT);
+      // If the taskframe TF does not catch an exception from the taskframe,
+      // then the outlined function cannot throw.
+      if (F.doesNotThrow() && !getTaskFrameResume(TF->getTaskFrameCreate()))
+        TFToOutline[TF].Outline->setDoesNotThrow();
+      Target->addHelperAttributes(*TFToOutline[TF].Outline);
+
+      // Update subtaskframe outline info to reflect the fact that their parent
+      // taskframe was outlined.
+      for (Spindle *SubTF : TF->subtaskframes())
+        TFToOutline[SubTF].remapOutlineInfo(VMap, InputMap);
+
       continue;
     }
 
@@ -178,30 +195,29 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
 
     ValueToValueMapTy VMap;
     ValueToValueMapTy InputMap;
-    TaskToOutline[T] = outlineTask(T, TFInputs[T], HelperInputs[T],
-                                   &Target->getDestinationModule(), VMap,
-                                   Target->getArgStructMode(),
-                                   Target->getReturnType(), InputMap, &AC, &DT);
+    TFToOutline[TF] = outlineTask(T, TFInputs[TF], HelperInputs[TF],
+                                  &Target->getDestinationModule(), VMap,
+                                  Target->getArgStructMode(),
+                                  Target->getReturnType(), InputMap, &AC, &DT);
     // If the detach for task T does not catch an exception from the task, then
     // the outlined function cannot throw.
     if (F.doesNotThrow() && !T->getDetach()->hasUnwindDest())
-      TaskToOutline[T].Outline->setDoesNotThrow();
-    Target->addHelperAttributes(*TaskToOutline[T].Outline);
+      TFToOutline[TF].Outline->setDoesNotThrow();
+    Target->addHelperAttributes(*TFToOutline[TF].Outline);
 
     // Update subtask outline info to reflect the fact that their spawner was
     // outlined.
     for (Spindle *SubTF : TF->subtaskframes())
-      if (Task *SubT = SubTF->getTaskFromTaskFrame())
-        TaskToOutline[SubT].remapOutlineInfo(VMap, InputMap);
+      TFToOutline[SubTF].remapOutlineInfo(VMap, InputMap);
   }
 
   // Insert calls to outlined helpers for taskframe roots.
-  for (Spindle *TFRoot : TI.getRootTask()->taskframe_roots())
-    if (Task *T = TFRoot->getTaskFromTaskFrame())
-      TaskToOutline[T].replaceReplCall(
-          replaceTaskWithCallToOutline(T, TaskToOutline[T], HelperInputs[T]));
+  for (Spindle *TF : TI.getRootTask()->taskframe_roots())
+    TFToOutline[TF].replaceReplCall(
+        replaceTaskFrameWithCallToOutline(TF, TFToOutline[TF],
+                                          HelperInputs[TF]));
 
-  return TaskToOutline;
+  return TFToOutline;
 }
 
 /// Process the Tapir instructions in function \p F directly.
@@ -264,20 +280,29 @@ bool TapirToTargetImpl::processSimpleABI(Function &F) {
 }
 
 bool TapirToTargetImpl::processRootTask(
-    Function &F, TaskOutlineMapTy &TaskToOutline, DominatorTree &DT,
+    Function &F, TFOutlineMapTy &TFToOutline, DominatorTree &DT,
     AssumptionCache &AC, TaskInfo &TI) {
   NamedRegionTimer NRT("processRootTask", "Process root task",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
   bool Changed = false;
-  if (!TI.isSerial()) {
+  // Check if the root task performs a spawn
+  bool PerformsSpawn = false;
+  for (Spindle *TF : TI.getRootTask()->taskframe_roots()) {
+    if (TF->getTaskFromTaskFrame()) {
+      PerformsSpawn = true;
+      break;
+    }
+  }
+  if (PerformsSpawn) {
     Changed = true;
     // Process root-task function F as a spawner.
     Target->preProcessRootSpawner(F);
 
     // Process each call to a subtask.
-    for (Task *SubT : TI.getRootTask()->subtasks())
-      Target->processSubTaskCall(TaskToOutline[SubT], DT);
+    for (Spindle *TF : TI.getRootTask()->taskframe_roots())
+      if (Task *SubT = TF->getTaskFromTaskFrame())
+        Target->processSubTaskCall(TFToOutline[TF], DT);
 
     Target->postProcessRootSpawner(F);
   }
@@ -286,21 +311,47 @@ bool TapirToTargetImpl::processRootTask(
   return Changed;
 }
 
+bool TapirToTargetImpl::processSpawnerTaskFrame(
+    Spindle *TF, TFOutlineMapTy &TFToOutline, DominatorTree &DT,
+    AssumptionCache &AC, TaskInfo &TI) {
+  NamedRegionTimer NRT("processSpawnerTaskFrame", "Process spawner taskframe",
+                       TimerGroupName, TimerGroupDescription,
+                       TimePassesIsEnabled);
+  Function &F = *TFToOutline[TF].Outline;
+
+  // Process function F as a spawner.
+  Target->preProcessRootSpawner(F);
+
+  // Process each call to a subtask.
+  for (Spindle *SubTF : TF->subtaskframes())
+    if (Task *SubT = SubTF->getTaskFromTaskFrame())
+      Target->processSubTaskCall(TFToOutline[SubTF], DT);
+
+  Target->postProcessRootSpawner(F);
+
+  // Process the Tapir instructions in F directly.
+  processSimpleABI(F);
+  return true;
+}
+
 bool TapirToTargetImpl::processOutlinedTask(
-    Task *T, TaskOutlineMapTy &TaskToOutline, DominatorTree &DT,
+    Task *T, TFOutlineMapTy &TFToOutline, DominatorTree &DT,
     AssumptionCache &AC, TaskInfo &TI) {
   NamedRegionTimer NRT("processOutlinedTask", "Process outlined task",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
-  Function &F = *TaskToOutline[T].Outline;
-  Instruction *DetachPt = TaskToOutline[T].DetachPt;
-  Instruction *TaskFrameCreate = TaskToOutline[T].TaskFrameCreate;
+  Spindle *TF = getTaskFrameForTask(T);
+  Function &F = *TFToOutline[TF].Outline;
+
+  Instruction *DetachPt = TFToOutline[TF].DetachPt;
+  Instruction *TaskFrameCreate = TFToOutline[TF].TaskFrameCreate;
 
   Target->preProcessOutlinedTask(F, DetachPt, TaskFrameCreate,
                                  !T->isSerial());
   // Process each call to a subtask.
-  for (Task *SubT : T->subtasks())
-    Target->processSubTaskCall(TaskToOutline[SubT], DT);
+  for (Spindle *SubTF : TF->subtaskframes())
+    if (Task *SubT = SubTF->getTaskFromTaskFrame())
+      Target->processSubTaskCall(TFToOutline[SubTF], DT);
 
   Target->postProcessOutlinedTask(F, DetachPt, TaskFrameCreate,
                                   !T->isSerial());
@@ -308,6 +359,19 @@ bool TapirToTargetImpl::processOutlinedTask(
   // Process the Tapir instructions in F directly.
   processSimpleABI(F);
   return true;
+}
+
+// Helper method to check if the given taskframe spindle performs any spawns.
+static bool isSpawningTaskFrame(const Spindle *TF) {
+  for (const Spindle *SubTF : TF->subtaskframes())
+    if (SubTF->getTaskFromTaskFrame())
+      return true;
+  return false;
+}
+
+// Helper method to check if the given taskframe corresponds to a spawned task.
+static bool isSpawnedTaskFrame(const Spindle *TF) {
+  return TF->getTaskFromTaskFrame();
 }
 
 void TapirToTargetImpl::processFunction(
@@ -348,19 +412,22 @@ void TapirToTargetImpl::processFunction(
     fixupTaskFrameExternalUses(TF, TI, DT);
 
   // Outline all tasks in a target-oblivious manner.
-  TaskOutlineMapTy TaskToOutline = outlineAllTasks(F, AllTaskFrames, DT, AC,
-                                                   TI);
+  TFOutlineMapTy TFToOutline = outlineAllTasks(F, AllTaskFrames, DT, AC, TI);
 
   // Perform target-specific processing of this function and all newly created
   // helpers.
-  for (Task *T : post_order(TI.getRootTask())) {
-    if (T->isRootTask())
-      processRootTask(F, TaskToOutline, DT, AC, TI);
-    else {
-      processOutlinedTask(T, TaskToOutline, DT, AC, TI);
-      NewHelpers.push_back(TaskToOutline[T].Outline);
-    }
+  for (Spindle *TF : AllTaskFrames) {
+    if (isSpawningTaskFrame(TF) && !isSpawnedTaskFrame(TF))
+      processSpawnerTaskFrame(TF, TFToOutline, DT, AC, TI);
+    else if (isSpawnedTaskFrame(TF))
+      processOutlinedTask(TF->getTaskFromTaskFrame(), TFToOutline, DT, AC, TI);
+    else
+      processSimpleABI(*TFToOutline[TF].Outline);
+    NewHelpers.push_back(TFToOutline[TF].Outline);
   }
+  // Process the root task
+  processRootTask(F, TFToOutline, DT, AC, TI);
+
   {
   NamedRegionTimer NRT("TargetPostProcess", "Target postprocessing",
                        TimerGroupName, TimerGroupDescription,
