@@ -666,15 +666,26 @@ static void HandleInlinedTasksHelper(
         isDetachedRethrow(BB->getTerminator()))
       continue;
 
-    // If we find a taskframe.resume terminator, add its successor to the
-    // parent search.
-    if (isTaskFrameResume(BB->getTerminator())) {
+    // If we find a taskframe.end, add its successor to the parent search.
+    if (endsTaskFrame(BB, CurrentTaskFrame)) {
+      // We may not have a parent worklist, if inlining itself created
+      // the taskframe.
+      if (ParentWorklist)
+        ParentWorklist->push_back(BB->getSingleSuccessor());
+      continue;
+    }
+
+    // If we find a taskframe.resume terminator, add its successor to the parent
+    // search.
+    if (isTaskFrameResume(BB->getTerminator()) && ParentWorklist) {
       assert(isTaskFrameUnwind(UnwindEdge) &&
              "Unexpected taskframe.resume, doesn't correspond to unwind edge");
       InvokeInst *II = cast<InvokeInst>(BB->getTerminator());
-      assert(ParentWorklist &&
-             "Unexpected taskframe.resume: no parent worklist");
-      ParentWorklist->push_back(II->getUnwindDest());
+
+      // We may not have a parent worklist, however, if inlining itself created
+      // the taskframe.
+      if (ParentWorklist)
+        ParentWorklist->push_back(II->getUnwindDest());
       continue;
     }
 
@@ -734,7 +745,7 @@ static void HandleInlinedTasksHelper(
 
 static void HandleInlinedTasks(
     SmallPtrSetImpl<BasicBlock *> &BlocksToProcess, BasicBlock *FirstNewBlock,
-    BasicBlock *UnwindEdge, LandingPadInliningInfo &Invoke,
+    Value *TFCreate, BasicBlock *UnwindEdge, LandingPadInliningInfo &Invoke,
     SmallPtrSetImpl<LandingPadInst *> &InlinedLPads) {
   Function *Caller = UnwindEdge->getParent();
 
@@ -744,7 +755,7 @@ static void HandleInlinedTasks(
 
   // Recursively handle inlined tasks.
   HandleInlinedTasksHelper(BlocksToProcess, FirstNewBlock, UnwindEdge,
-                           UnreachableBlk, nullptr, nullptr, Invoke,
+                           UnreachableBlk, TFCreate, nullptr, Invoke,
                            InlinedLPads);
 
   // Either finish the unreachable block or remove it, depending on whether it
@@ -811,6 +822,7 @@ static void GetInlinedLPads(SmallPtrSetImpl<BasicBlock *> &BlocksToProcess,
 /// block of the inlined code (the last block is the end of the function),
 /// and InlineCodeInfo is information about the code that got inlined.
 static void HandleInlinedLandingPad(InvokeInst *II, BasicBlock *FirstNewBlock,
+                                    Value *TFCreate,
                                     ClonedCodeInfo &InlinedCodeInfo) {
   BasicBlock *InvokeDest = II->getUnwindDest();
 
@@ -846,7 +858,7 @@ static void HandleInlinedLandingPad(InvokeInst *II, BasicBlock *FirstNewBlock,
     }
 
     // Process inlined subtasks.
-    HandleInlinedTasks(BlocksToProcess, FirstNewBlock,
+    HandleInlinedTasks(BlocksToProcess, FirstNewBlock, TFCreate,
                        Invoke.getOuterResumeDest(), Invoke, InlinedLPads);
     // Now that everything is happy, we have one final detail.  The PHI nodes in
     // the exception destination block still have entries due to the original
@@ -2146,6 +2158,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
             DetachedCtxEntryBlock->getSinglePredecessor()) &&
            "Entry block of detached context has multiple predecessors.");
   }
+  bool MayBeUnsyncedAtCall = mayBeUnsynced(OrigBB);
 
   // Get an iterator to the last basic block in the function, which will have
   // the new function inlined after it.
@@ -2354,21 +2367,25 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
           InsertPoint, FirstNewBlock->getInstList(), AI->getIterator(), I);
     }
 
-    // Move any syncregion_start's into the entry basic block.
-    for (BasicBlock::iterator I = FirstNewBlock->begin(),
-         E = FirstNewBlock->end(); I != E; ) {
-      IntrinsicInst *II = dyn_cast<IntrinsicInst>(I++);
-      if (!II) continue;
-      if (Intrinsic::syncregion_start != II->getIntrinsicID())
-        continue;
+    // Move any syncregion_start's into the entry basic block.  Avoid moving
+    // syncregions if we'll need to insert a taskframe for this inlined call.
+    if (InlinedFunctionInfo.ContainsDetach &&
+        !InlinedFunctionInfo.ContainsDynamicAllocas && !MayBeUnsyncedAtCall) {
+      for (BasicBlock::iterator I = FirstNewBlock->begin(),
+                                    E = FirstNewBlock->end(); I != E; ) {
+        IntrinsicInst *II = dyn_cast<IntrinsicInst>(I++);
+        if (!II) continue;
+        if (Intrinsic::syncregion_start != II->getIntrinsicID())
+          continue;
 
-      while (isa<IntrinsicInst>(I) &&
-             Intrinsic::syncregion_start ==
-             cast<IntrinsicInst>(I)->getIntrinsicID())
-        ++I;
+        while (isa<IntrinsicInst>(I) &&
+               Intrinsic::syncregion_start ==
+               cast<IntrinsicInst>(I)->getIntrinsicID())
+          ++I;
 
-      DetachedCtxEntryBlock->getInstList().splice(
-          InsertPoint, FirstNewBlock->getInstList(), II->getIterator(), I);
+        DetachedCtxEntryBlock->getInstList().splice(
+            InsertPoint, FirstNewBlock->getInstList(), II->getIterator(), I);
+      }
     }
   }
 
@@ -2519,7 +2536,46 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
 
   // If the inlined code contained dynamic alloca instructions, wrap the inlined
   // code with llvm.stacksave/llvm.stackrestore intrinsics.
-  if (InlinedFunctionInfo.ContainsDynamicAllocas) {
+  CallInst *TFCreate = nullptr;
+  BasicBlock *TFEntryBlock = DetachedCtxEntryBlock;
+  if (InlinedFunctionInfo.ContainsDetach &&
+      (InlinedFunctionInfo.ContainsDynamicAllocas || MayBeUnsyncedAtCall)) {
+    Module *M = Caller->getParent();
+    // Get the two intrinsics we care about.
+    Function *TFCreateFn =
+        Intrinsic::getDeclaration(M, Intrinsic::taskframe_create);
+
+    // Insert the llvm.taskframe.create.
+    TFCreate = IRBuilder<>(&*FirstNewBlock, FirstNewBlock->begin())
+                   .CreateCall(TFCreateFn, {}, "tf.i");
+    TFCreate->setDebugLoc(TheCall->getDebugLoc());
+    TFEntryBlock = &*FirstNewBlock;
+
+    // If we're inlining an invoke, insert a taskframe.resume at the unwind
+    // destination of the invoke.
+    if (auto *II = dyn_cast<InvokeInst>(TheCall)) {
+      BasicBlock *UnwindEdge = II->getUnwindDest();
+      // Create the normal return for the detached rethrow.
+      BasicBlock *UnreachableBlk = BasicBlock::Create(
+          Caller->getContext(), UnwindEdge->getName()+".unreachable", Caller);
+      { // Add an unreachable instruction to the end of UnreachableBlk.
+        IRBuilder<> Builder(UnreachableBlk);
+        Builder.CreateUnreachable();
+      }
+
+      // Create an unwind edge for the taskframe.
+      BasicBlock *TaskFrameUnwindEdge = CreateSubTaskUnwindEdge(
+          Intrinsic::taskframe_resume, TFCreate, UnwindEdge,
+          UnreachableBlk);
+
+      for (PHINode &PN : UnwindEdge->phis())
+        PN.replaceIncomingBlockWith(II->getParent(), TaskFrameUnwindEdge);
+
+      // Replace the unwind destination of the invoke with the unwind edge for
+      // the taskframe.
+      II->setUnwindDest(TaskFrameUnwindEdge);
+    }
+  } else if (InlinedFunctionInfo.ContainsDynamicAllocas) {
     Module *M = Caller->getParent();
     // Get the two intrinsics we care about.
     Function *StackSave = Intrinsic::getDeclaration(M, Intrinsic::stacksave);
@@ -2550,12 +2606,12 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     BasicBlock *UnwindDest = II->getUnwindDest();
     Instruction *FirstNonPHI = UnwindDest->getFirstNonPHI();
     if (isa<LandingPadInst>(FirstNonPHI)) {
-      HandleInlinedLandingPad(II, &*FirstNewBlock, InlinedFunctionInfo);
+      HandleInlinedLandingPad(II, &*FirstNewBlock, TFCreate,
+                              InlinedFunctionInfo);
     } else {
       HandleInlinedEHPad(II, &*FirstNewBlock, InlinedFunctionInfo);
     }
-  } else if (!Resumes.empty() && (&Caller->getEntryBlock() !=
-                                  DetachedCtxEntryBlock)) {
+  } else if (!Resumes.empty() && (&Caller->getEntryBlock() != TFEntryBlock)) {
     // If we inlined into a detached task, and the inlined function contains
     // resumes, then we need to insert additional calls to EH intrinsics,
     // specifically, detached.rethrow and taskframe.resume.
@@ -2592,7 +2648,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     }
 
     // Handle resumes within the task.
-    HandleInlinedResumeInTask(DetachedCtxEntryBlock, Resume, UnreachableBlk);
+    HandleInlinedResumeInTask(TFEntryBlock, Resume, UnreachableBlk);
   }
 
   // Update the lexical scopes of the new funclets and callsites.
@@ -2829,6 +2885,14 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     // Copy original BB's block frequency to AfterCallBB
     IFI.CallerBFI->setBlockFreq(
         AfterCallBB, IFI.CallerBFI->getBlockFreq(OrigBB).getFrequency());
+  }
+
+  // If we inserted a taskframe.create, insert a taskframe.end at the start of
+  // AfterCallBB.
+  if (TFCreate) {
+    Function *TFEndFn = Intrinsic::getDeclaration(Caller->getParent(),
+                                                  Intrinsic::taskframe_end);
+    IRBuilder<>(&AfterCallBB->front()).CreateCall(TFEndFn, TFCreate);
   }
 
   // Change the branch that used to go to AfterCallBB to branch to the first
