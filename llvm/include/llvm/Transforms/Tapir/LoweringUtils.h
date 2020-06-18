@@ -39,6 +39,7 @@ class Value;
 using ValueSet = SetVector<Value *>;
 using SpindleSet = SetVector<Spindle *>;
 using TaskValueSetMap = DenseMap<const Task *, ValueSet>;
+using TFValueSetMap = DenseMap<const Spindle *, ValueSet>;
 
 /// Structure that captures relevant information about an outlined task,
 /// including the following:
@@ -128,7 +129,6 @@ struct TaskOutlineInfo {
 // Map from tasks to TaskOutlineInfo structures.
 using TaskOutlineMapTy = DenseMap<const Task *, TaskOutlineInfo>;
 using TFOutlineMapTy = DenseMap<const Spindle *, TaskOutlineInfo>;
-
 
 /// Abstract class for a parallel-runtime-system target for Tapir lowering.
 ///
@@ -409,13 +409,13 @@ TapirTarget *getTapirTargetFromID(Module &M, TapirTargetID TargetID);
 TaskValueSetMap findAllTaskInputs(Function &F, const DominatorTree &DT,
                                   const TaskInfo &TI);
 
-void getTaskFrameInputsOutputs(TaskValueSetMap &TFInputs,
-                               TaskValueSetMap &TFOutputs,
-                               const Spindle &TF, const ValueSet &TaskInputs,
+void getTaskFrameInputsOutputs(TFValueSetMap &TFInputs,
+                               TFValueSetMap &TFOutputs,
+                               const Spindle &TF, const ValueSet *TaskInputs,
                                const TaskInfo &TI, const DominatorTree &DT);
 
-void findAllTaskFrameInputs(TaskValueSetMap &TFInputs,
-                            TaskValueSetMap &TFOutputs,
+void findAllTaskFrameInputs(TFValueSetMap &TFInputs,
+                            TFValueSetMap &TFOutputs,
                             const SmallVectorImpl<Spindle *> &AllTaskFrames,
                             Function &F, const DominatorTree &DT, TaskInfo &TI);
 
@@ -470,10 +470,19 @@ Function *createHelperForTask(
     ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
     DominatorTree *DT);
 
-/// Replaces the spawned task \p T, with associated TaskOutlineInfo \p Out, with
-/// a call or invoke to the outlined helper function created for \p T.
-Instruction *replaceTaskWithCallToOutline(
-    Task *T, TaskOutlineInfo &Out, SmallVectorImpl<Value *> &OutlineInputs);
+/// Outlines the content of taskframe \p TF in function \p F into a new helper
+/// function.  The parameter \p Inputs specified the inputs to the helper
+/// function.  The map \p VMap is updated with the mapping of instructions in \p
+/// TF to instructions in the new helper function.
+Function *createHelperForTaskFrame(
+    Function &F, Spindle *TF, ValueSet &Args, Module *DestM,
+    ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
+    DominatorTree *DT);
+
+/// Replaces the taskframe \p TF, with associated TaskOutlineInfo \p Out, with a
+/// call or invoke to the outlined helper function created for \p TF.
+Instruction *replaceTaskFrameWithCallToOutline(
+    Spindle *TF, TaskOutlineInfo &Out, SmallVectorImpl<Value *> &OutlineInputs);
 
 /// Outlines a task \p T into a helper function that accepts the inputs \p
 /// Inputs.  The map \p VMap is updated with the mapping of instructions in \p T
@@ -481,6 +490,16 @@ Instruction *replaceTaskWithCallToOutline(
 /// function is returned as a TaskOutlineInfo structure.
 TaskOutlineInfo outlineTask(
     Task *T, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
+    Module *DestM, ValueToValueMapTy &VMap,
+    TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
+    ValueToValueMapTy &InputMap, AssumptionCache *AC, DominatorTree *DT);
+
+/// Outlines a taskframe \p TF into a helper function that accepts the inputs \p
+/// Inputs.  The map \p VMap is updated with the mapping of instructions in \p
+/// TF to instructions in the new helper function.  Information about the helper
+/// function is returned as a TaskOutlineInfo structure.
+TaskOutlineInfo outlineTaskFrame(
+    Spindle *TF, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
     Module *DestM, ValueToValueMapTy &VMap,
     TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
     ValueToValueMapTy &InputMap, AssumptionCache *AC, DominatorTree *DT);
