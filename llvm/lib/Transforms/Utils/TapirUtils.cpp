@@ -1118,6 +1118,68 @@ const BasicBlock *llvm::GetDetachedCtx(const BasicBlock *BB) {
   return &(BB->getParent()->getEntryBlock());
 }
 
+// Returns true if the function may not be synced at the point of the given
+// basic block, false otherwise.  This function does a simple depth-first
+// traversal of the CFG, and as such, produces a conservative result.
+bool llvm::mayBeUnsynced(const BasicBlock *BB) {
+  SmallPtrSet<const BasicBlock *, 32> Visited;
+  SmallVector<const BasicBlock *, 32> WorkList;
+  SmallPtrSet<const Value *, 2> TaskFramesToIgnore;
+  WorkList.push_back(BB);
+  while (!WorkList.empty()) {
+    const BasicBlock *CurrBB = WorkList.pop_back_val();
+    if (!Visited.insert(CurrBB).second)
+      continue;
+
+    // If we find a canonical taskframe.create that we're not ignoring, then
+    // we've found the context.
+    if (const Value *TaskFrame = getCanonicalTaskFrameCreate(CurrBB))
+      if (!TaskFramesToIgnore.count(TaskFrame))
+        continue;
+
+    for (const BasicBlock *PredBB : predecessors(CurrBB)) {
+      // If we find a predecessor via reattach instructions, then
+      // wconservatively return that we may not be synced.
+      if (isa<ReattachInst>(PredBB->getTerminator()))
+          return true;
+
+      // If we find a predecessor via a detached.rethrow, then conservatively
+      // return that we may not be synced.
+      if (isDetachedRethrow(PredBB->getTerminator()))
+        return true;
+
+      // If we find a taskframe.resume, add its taskframe to the set of
+      // taskframes to ignore.
+      if (isTaskFrameResume(PredBB->getTerminator())) {
+        const InvokeInst *II = cast<InvokeInst>(PredBB->getTerminator());
+        TaskFramesToIgnore.insert(II->getArgOperand(0));
+      } else if (endsUnassociatedTaskFrame(PredBB)) {
+        const CallBase *TFEnd = cast<CallBase>(
+            PredBB->getTerminator()->getPrevNode());
+        TaskFramesToIgnore.insert(TFEnd->getArgOperand(0));
+      }
+
+      // If the predecessor is terminated by a detach, check to see if
+      // that detach spawned the current basic block.
+      if (isa<DetachInst>(PredBB->getTerminator())) {
+        const DetachInst *DI = cast<DetachInst>(PredBB->getTerminator());
+        if (DI->getDetached() == CurrBB)
+          // Return the current block, which is the entry of this detached
+          // sub-CFG.
+          continue;
+        else
+          // We encountered a continue or unwind destination of a detach.
+          // Conservatively return that we may not be synced.
+          return true;
+      }
+
+      // Otherwise, add the predecessor block to the work list to search.
+      WorkList.push_back(PredBB);
+    }
+  }
+  return false;
+}
+
 /// isCriticalContinueEdge - Return true if the specified edge is a critical
 /// detach-continue edge.  Critical detach-continue edges are critical edges -
 /// from a block with multiple successors to a block with multiple predecessors
