@@ -70,6 +70,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <algorithm>
 #include <cassert>
@@ -568,6 +569,11 @@ static unsigned getJumpThreadDuplicationCost(BasicBlock *BB,
     // Bail out if this instruction gives back a token type, it is not possible
     // to duplicate it if it is used outside this BB.
     if (I->getType()->isTokenTy() && I->isUsedOutsideOfBlock(BB))
+      return ~0U;
+
+    // Bail if we discover a taskframe.end intrinsic.
+    // TODO: Handle taskframe.end like a guard.
+    if (isTapirIntrinsic(Intrinsic::taskframe_end, &*I))
       return ~0U;
 
     // All other instructions count for at least one unit.
