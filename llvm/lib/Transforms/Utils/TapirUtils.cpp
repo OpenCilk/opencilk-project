@@ -2025,6 +2025,22 @@ void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
   }
 }
 
+void llvm::eraseTaskFrame(Value *TaskFrame, DominatorTree *DT) {
+  InlineTaskFrameResumes(TaskFrame, DT);
+  SmallVector<Instruction *, 2> ToErase;
+  for (User *U : TaskFrame->users()) {
+    if (Instruction *UI = dyn_cast<Instruction>(U))
+      if (isTapirIntrinsic(Intrinsic::taskframe_use, UI) ||
+          isTapirIntrinsic(Intrinsic::taskframe_end, UI))
+        ToErase.push_back(UI);
+  }
+
+  for (Instruction *I : ToErase)
+    I->eraseFromParent();
+
+  cast<Instruction>(TaskFrame)->eraseFromParent();
+}
+
 /// Find hints specified in the loop metadata and update local values.
 void llvm::TapirLoopHints::getHintsFromMetadata() {
   MDNode *LoopID = TheLoop->getLoopID();

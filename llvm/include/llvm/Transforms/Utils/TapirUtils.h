@@ -201,6 +201,12 @@ BasicBlock *CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
 /// insert appropriate detached.rethrow and taskframe.resume terminators.
 void promoteCallsInTasksToInvokes(Function &F, const Twine Name = "cleanup");
 
+/// eraseTaskFrame - Remove the specified taskframe and all uses of it.  The
+/// given \p TaskFrame should correspond to a taskframe.create call.  The
+/// DominatorTree \p DT is updated to reflect changes to the CFG, if \p DT is
+/// not null.
+void eraseTaskFrame(Value *TaskFrame, DominatorTree *DT = nullptr);
+
 /// Utility class for getting and setting Tapir-related loop hints in the form
 /// of loop metadata.
 ///
