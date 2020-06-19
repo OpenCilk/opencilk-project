@@ -1,8 +1,10 @@
 ; Test that basic -O1 optimizations effectively remove Tapir
 ; instructions and intrinsics.
 ;
-; RUN: opt < %s -O1 -S -o - | FileCheck %s
-; RUN: opt < %s -passes='default<O1>' -S -o - | FileCheck %s
+; RUN: opt < %s -O1 -simplify-taskframes=false -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-NOTFSIMPLIFY
+; RUN: opt < %s -passes='default<O1>' -simplify-taskframes=false -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-NOTFSIMPLIFY
+; RUN: opt < %s -O1 -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TFSIMPLIFY
+; RUN: opt < %s -passes='default<O1>' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TFSIMPLIFY
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -34,8 +36,10 @@ define dso_local void @_Z6parentl(i64 %x) #1 personality i8* bitcast (i32 (...)*
 ; CHECK: %[[SYNCREG:.+]] = {{.*}}call token @llvm.syncregion.start()
 ; CHECK-NOT: call token @llvm.syncregion.start()
 ; CHECK: call token @llvm.taskframe.create()
-; CHECK detach within %[[SYNCREG]]
 ; CHECK: call token @llvm.taskframe.create()
+; CHECK detach within %[[SYNCREG]]
+; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
+; CHECK-TFSIMPLIFY-NOT: call token @llvm.taskframe.create()
 ; CHECK detach within %[[SYNCREG]]
 entry:
   %this.addr.i122.i133.i32 = alloca %class.object.1*, align 8
@@ -3029,9 +3033,10 @@ define dso_local void @_Z14parent_nospawnl(i64 %x) #1 personality i8* bitcast (i
 ; CHECK: %[[SYNCREG:.+]] = {{.*}}call token @llvm.syncregion.start()
 ; CHECK-NOT: call token @llvm.syncregion.start()
 ; CHECK: call token @llvm.taskframe.create()
-; CHECK detach within %[[SYNCREG]]
-; CHECK: call token @llvm.taskframe.create()
-; CHECK detach within %[[SYNCREG]]
+; CHECK: detach within %[[SYNCREG]]
+; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
+; CHECK-TFSIMPLIFY-NOT: call token @llvm.taskframe.create()
+; CHECK: detach within %[[SYNCREG]]
 entry:
   %this.addr.i122.i133.i305.i27 = alloca %class.object.1*, align 8
   %exn.slot12.i124.i134.i306.i28 = alloca i8*
