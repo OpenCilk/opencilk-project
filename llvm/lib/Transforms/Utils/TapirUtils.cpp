@@ -1562,7 +1562,9 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
   for (Instruction *I : TFCreateToSplit)
     if (needToSplitTaskFrameCreate(I)) {
       LLVM_DEBUG(dbgs() << "Splitting at " << *I << "\n");
+      StringRef OldName = I->getParent()->getName();
       SplitBlock(I->getParent(), I, DT);
+      I->getParent()->setName(OldName+".tf");
       Changed = true;
     }
 
@@ -1573,6 +1575,7 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
       LLVM_DEBUG(dbgs() << "Splitting block after " << *TFEnd << "\n");
       BasicBlock::iterator Iter = ++TFEnd->getIterator();
       SplitBlock(TFEnd->getParent(), &*Iter, DT);
+      Iter->getParent()->setName(TFEnd->getParent()->getName()+".tfend");
       Changed = true;
     }
 
