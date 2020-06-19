@@ -261,7 +261,7 @@ det.achd:                                         ; preds = %entry
   %call1 = tail call i32 @_Z3barP3Foo(%class.Foo* nonnull %1)
   reattach within %syncreg, label %det.cont
 ; CHECK: [[CALLHELPER]]:
-; CHECK-NEXT: call fastcc void @_Z16spawn_tf_nocatchi.outline_entry.split.otd1()
+; CHECK-NEXT: call fastcc void @_Z16spawn_tf_nocatchi.outline_entry.tf.otd1()
 ; CHECK-NEXT: br label %[[CONTINUE]]
 
 det.cont:                                         ; preds = %det.achd, %entry
@@ -298,7 +298,7 @@ det.achd:                                         ; preds = %entry
   %call = invoke i32 @_Z3bazRK3Foo(%class.Foo* nonnull dereferenceable(1) %ref.tmp)
           to label %invoke.cont unwind label %lpad
 ; CHECK: [[CALLHELPER]]:
-; CHECK-NEXT: call fastcc void @_Z21spawn_stmt_destructori.outline_entry.split.otd1()
+; CHECK-NEXT: call fastcc void @_Z21spawn_stmt_destructori.outline_entry.tf.otd1()
 ; CHECK-NEXT: br label %[[CONTINUE]]
 
 invoke.cont:                                      ; preds = %det.achd
@@ -352,7 +352,7 @@ det.achd:                                         ; preds = %entry
   %call = invoke i32 @_Z3bazRK3Foo(%class.Foo* nonnull dereferenceable(1) %ref.tmp)
           to label %invoke.cont unwind label %lpad
 ; CHECK: [[CALLHELPER]]:
-; CHECK-NEXT: call fastcc void @_Z21spawn_decl_destructori.outline_entry.split.otd1()
+; CHECK-NEXT: call fastcc void @_Z21spawn_decl_destructori.outline_entry.tf.otd1()
 ; CHECK-NEXT: br label %[[CONTINUE]]
 
 invoke.cont:                                      ; preds = %det.achd
@@ -398,7 +398,7 @@ det.achd:                                         ; preds = %entry
   %call = invoke i32 @_Z3bazRK3Foo(%class.Foo* nonnull dereferenceable(1) %f)
           to label %invoke.cont unwind label %lpad
 ; CHECK: [[CALLHELPER]]:
-; CHECK-NEXT: invoke fastcc void @_Z22spawn_block_destructori.outline_entry.split.otd1(%class.Foo*
+; CHECK-NEXT: invoke fastcc void @_Z22spawn_block_destructori.outline_entry.tf.otd1(%class.Foo*
 ; CHECK-NEXT: to label %[[CONTINUE]] unwind label %lpad9
 
 invoke.cont:                                      ; preds = %det.achd
@@ -466,7 +466,7 @@ det.achd:                                         ; preds = %entry
   %call.i = invoke i32 @_Z3barP3Foo(%class.Foo* nonnull %1)
           to label %_Z3fooP3Foo.exit unwind label %lpad.i
 ; CHECK: [[CALLHELPER]]:
-; CHECK-NEXT: call fastcc void @_Z18spawn_throw_inlinei.outline_entry.split.otd1()
+; CHECK-NEXT: call fastcc void @_Z18spawn_throw_inlinei.outline_entry.tf.otd1()
 ; CHECK-NEXT: br label %[[CONTINUE]]
 
 lpad.i:                                           ; preds = %det.achd
@@ -523,7 +523,7 @@ det.achd:                                         ; preds = %entry
   %call = tail call i32 @_Z4quuzi(i32 %n) #10
   reattach within %syncreg, label %det.cont
 ; CHECK: [[CALLHELPER1]]:
-; CHECK-NEXT: call fastcc void @_Z14spawn_tryblocki.outline_entry.split.otd1(i32 %n)
+; CHECK-NEXT: call fastcc void @_Z14spawn_tryblocki.outline_entry.tf.otd1(i32 %n)
 ; CHECK-NEXT: br label %[[CONTINUE1]]
 
 det.cont:                                         ; preds = %det.achd, %entry
@@ -544,7 +544,7 @@ det.achd4:                                        ; preds = %invoke.cont
   %call9 = invoke i32 @_Z3barP3Foo(%class.Foo* nonnull %2)
           to label %invoke.cont8 unwind label %lpad5
 ; CHECK: [[CALLHELPER2]]:
-; CHECK-NEXT: invoke fastcc void @_Z14spawn_tryblocki.outline_det.cont.split.otd1()
+; CHECK-NEXT: invoke fastcc void @_Z14spawn_tryblocki.outline_det.cont.tf.otd1()
 ; CHECK-NEXT: to label %[[CONTINUE2]] unwind label %lpad16
 
 invoke.cont8:                                     ; preds = %det.achd4
@@ -562,7 +562,7 @@ det.achd19:                                       ; preds = %det.cont11
   %call20 = tail call i32 @_Z4quuzi(i32 %n) #10
   reattach within %syncreg, label %det.cont21
 ; CHECK: [[CALLHELPER3]]:
-; CHECK-NEXT: call fastcc void @_Z14spawn_tryblocki.outline_det.cont11.split.otd1(i32 %n)
+; CHECK-NEXT: call fastcc void @_Z14spawn_tryblocki.outline_det.cont11.tf.otd1(i32 %n)
 ; CHECK-NEXT: br label %[[CONTINUE3]]
 
 det.cont21:                                       ; preds = %det.achd19, %det.cont11
@@ -671,7 +671,7 @@ unreachable:                                      ; preds = %lpad, %lpad5
 ; Function Attrs: nounwind
 declare void @llvm.assume(i1) #10
 
-; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_entry.split.otd1(i32
+; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_entry.tf.otd1(i32
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
@@ -684,7 +684,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: br label %{{.+}}
 
 
-; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont.split.otd1()
+; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
@@ -721,7 +721,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: resume { i8*, i32 } %[[LPADVAL]]
 
 
-; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont11.split.otd1(i32
+; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont11.tf.otd1(i32
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
@@ -734,7 +734,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: br label %{{.+}}
 
 
-; CHECK-LABEL: define private fastcc void @_Z18spawn_throw_inlinei.outline_entry.split.otd1()
+; CHECK-LABEL: define private fastcc void @_Z18spawn_throw_inlinei.outline_entry.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
@@ -762,7 +762,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: unreachable
 
 
-; CHECK-LABEL: define private fastcc void @_Z22spawn_block_destructori.outline_entry.split.otd1(
+; CHECK-LABEL: define private fastcc void @_Z22spawn_block_destructori.outline_entry.tf.otd1(
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
@@ -788,7 +788,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: resume { i8*, i32 } %[[LPADVAL]]
 
 
-; CHECK-LABEL: define private fastcc void @_Z21spawn_decl_destructori.outline_entry.split.otd1()
+; CHECK-LABEL: define private fastcc void @_Z21spawn_decl_destructori.outline_entry.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
 
@@ -811,7 +811,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: unreachable
 
 
-; CHECK-LABEL: define private fastcc void @_Z21spawn_stmt_destructori.outline_entry.split.otd1()
+; CHECK-LABEL: define private fastcc void @_Z21spawn_stmt_destructori.outline_entry.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
 
@@ -834,7 +834,7 @@ declare void @llvm.assume(i1) #10
 ; CHECK-NEXT: unreachable
 
 
-; CHECK-LABEL: define private fastcc void @_Z16spawn_tf_nocatchi.outline_entry.split.otd1()
+; CHECK-LABEL: define private fastcc void @_Z16spawn_tf_nocatchi.outline_entry.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
 ; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
