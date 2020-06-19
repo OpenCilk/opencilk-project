@@ -30,6 +30,11 @@ using namespace llvm;
 // Statistics
 STATISTIC(NumUniqueSyncRegs, "Number of unique sync regions found.");
 STATISTIC(NumDiscriminatingSyncs, "Number of discriminating syncs found.");
+STATISTIC(NumTaskFramesErased, "Number of taskframes erased");
+
+static cl::opt<bool> SimplifyTaskFrames(
+    "simplify-taskframes", cl::init(true), cl::Hidden,
+    cl::desc("Enable simplification of taskframes."));
 
 static bool syncMatchesReachingTask(const Value *SyncSR,
                                     SmallPtrSetImpl<const Task *> &MPTasks) {
@@ -238,6 +243,151 @@ bool llvm::simplifyTask(Task *T) {
   return Changed;
 }
 
+static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks) {
+  if (!TF->getTaskFrameCreate())
+    // Ignore implicit taskframes created from the start of a task that does not
+    // explicitly use another taskframe.
+    return false;
+
+  // We can remove a taskframe if it does not allocate any stack storage of its
+  // own and it does not contain any distinguishing syncs.
+
+  // We only need to check the spindles in the taskframe itself for these
+  // properties.  We do not need to check the task that uses this taskframe.
+  const Task *UserT = TF->getTaskFromTaskFrame();
+
+  // Create filter for MPTasks of tasks from parent of task UserT, if UserT
+  // exists.
+  SmallPtrSet<const Task *, 4> EntryTaskList;
+  if (UserT)
+    for (const Task *MPTask : MPTasks.TaskList[UserT->getEntrySpindle()])
+      EntryTaskList.insert(MPTask);
+
+  for (const Spindle *S : TF->taskframe_spindles()) {
+    // Skip spindles in the user task.
+    if (UserT && UserT->contains(S))
+      continue;
+
+    // Filter the task list of S to exclude tasks in parallel with the entry.
+    SmallPtrSet<const Task *, 4> LocalTaskList;
+    for (const Task *MPTask : MPTasks.TaskList[S])
+      if (!EntryTaskList.count(MPTask))
+        LocalTaskList.insert(MPTask);
+
+    for (const BasicBlock *BB : S->blocks()) {
+      // Skip spindles that are placeholders.
+      if (isPlaceholderSuccessor(S->getEntry()))
+        continue;
+
+      // We cannot remove taskframes that perform allocas.  Doing so would cause
+      // these allocas to affect the stack of the parent taskframe.
+      for (const Instruction &I : *BB)
+        if (isa<AllocaInst>(I))
+          return false;
+
+      // We cannot remove taskframes that contain discriminating syncs.  Doing
+      // so would cause these syncs to sync tasks spawned in the parent
+      // taskframe.
+      if (const SyncInst *SI = dyn_cast<SyncInst>(BB->getTerminator()))
+        if (syncIsDiscriminating(SI->getSyncRegion(), LocalTaskList))
+          return false;
+    }
+  }
+
+  return true;
+}
+
+static bool skipForHoisting(const Instruction *I,
+                            SmallPtrSetImpl<const Instruction *> &NotHoisted) {
+  if (I->isTerminator() || isTapirIntrinsic(Intrinsic::taskframe_create, I) ||
+      isTapirIntrinsic(Intrinsic::syncregion_start, I) ||
+      isa<AllocaInst>(I))
+    return true;
+
+  if (const CallInst *CI = dyn_cast<CallInst>(I))
+    if (!(CI->doesNotAccessMemory() || CI->onlyAccessesArgMemory()))
+      return true;
+
+  for (const Value *V : I->operand_values())
+    if (const Instruction *I = dyn_cast<Instruction>(V))
+      if (NotHoisted.count(I))
+        return true;
+
+  return false;
+}
+
+static bool hoistOutOfTaskFrame(Instruction *TFCreate) {
+  bool Changed = false;
+
+  BasicBlock *Entry = TFCreate->getParent();
+  // We'll move instructions immediately before the taskframe.create
+  // instruction.
+  BasicBlock::iterator InsertPoint = Entry->begin();
+
+  // Scan the instructions in the entry block and find instructions to hoist
+  // before the taskframe.create.
+  SmallPtrSet<const Instruction *, 8> NotHoisted;
+  for (BasicBlock::iterator I = Entry->begin(), E = Entry->end(); I != E; ) {
+    Instruction *Start = &*I++;
+    if (skipForHoisting(Start, NotHoisted)) {
+      NotHoisted.insert(Start);
+      continue;
+    }
+
+    while (!skipForHoisting(&*I, NotHoisted))
+      ++I;
+
+    // Move the instructions
+    Entry->getInstList().splice(InsertPoint, Entry->getInstList(),
+                                Start->getIterator(), I);
+
+    Changed = true;
+  }
+
+  return Changed;
+}
+
+bool llvm::simplifyTaskFrames(TaskInfo &TI, DominatorTree &DT) {
+  // We compute maybe-parallel tasks here, to ensure the analysis is properly
+  // discarded if the CFG changes.
+  MaybeParallelTasks MPTasks;
+  TI.evaluateParallelState<MaybeParallelTasks>(MPTasks);
+
+  bool Changed = false;
+
+  // Get the set of taskframes we can erase.
+  SmallVector<Instruction *, 8> TaskFramesToErase;
+  SmallVector<Instruction *, 8> TaskFramesToOptimize;
+  for (Spindle *TFRoot : TI.getRootTask()->taskframe_roots()) {
+    for (Spindle *TF : post_order<TaskFrames<Spindle *>>(TFRoot)) {
+      if (canRemoveTaskFrame(TF, MPTasks))
+        TaskFramesToErase.push_back(
+            cast<Instruction>(TF->getTaskFrameCreate()));
+      else if (Value *TFCreate = TF->getTaskFrameCreate())
+        TaskFramesToOptimize.push_back(cast<Instruction>(TFCreate));
+    }
+  }
+
+  // First handle hoisting instructions out of a taskframe entry block, since
+  // this transformation does not change the CFG.
+  for (Instruction *TFCreate : TaskFramesToOptimize) {
+    LLVM_DEBUG(dbgs() <<
+               "Hoisting instructions out of taskframe " << *TFCreate << "\n");
+    Changed |= hoistOutOfTaskFrame(TFCreate);
+  }
+
+  // Now delete any taskframes we don't need.
+  for (Instruction *TFCreate : TaskFramesToErase) {
+    LLVM_DEBUG(dbgs() <<
+               "Removing taskframe " << *TFCreate << "\n");
+    eraseTaskFrame(TFCreate, &DT);
+    ++NumTaskFramesErased;
+    Changed = true;
+  }
+
+  return Changed;
+}
+
 static void simplifyCFG(Function &F) {
   llvm::legacy::FunctionPassManager FPM(F.getParent());
   FPM.add(createCFGSimplificationPass());
@@ -257,6 +407,7 @@ struct TaskSimplify : public FunctionPass {
   bool runOnFunction(Function &F) override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequired<DominatorTreeWrapperPass>();
     AU.addRequired<TaskInfoWrapperPass>();
     AU.addPreserved<GlobalsAAWrapperPass>();
   }
@@ -266,6 +417,7 @@ struct TaskSimplify : public FunctionPass {
 char TaskSimplify::ID = 0;
 INITIALIZE_PASS_BEGIN(TaskSimplify, "task-simplify",
                 "Simplify Tapir tasks", false, false)
+INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_END(TaskSimplify, "task-simplify",
                 "Simplify Tapir tasks", false, false)
@@ -281,13 +433,26 @@ bool TaskSimplify::runOnFunction(Function &F) {
   if (skipFunction(F))
     return false;
 
+  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   TaskInfo &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
-  if (TI.isSerial())
+  splitTaskFrameCreateBlocks(F, &DT, &TI);
+  TI.findTaskFrameTree();
+  if (TI.isSerial() && !TI.foundChildTaskFrames())
     return false;
 
   bool Changed = false;
   LLVM_DEBUG(dbgs() << "TaskSimplify running on function " << F.getName()
              << "\n");
+
+  if (SimplifyTaskFrames) {
+    // Simplify taskframes.  If anything changed, update the analysis.
+    Changed |= simplifyTaskFrames(TI, DT);
+    if (Changed) {
+      TI.recalculate(F, DT);
+      if (TI.isSerial())
+        return Changed;
+    }
+  }
 
   // Evaluate the tasks that might be in parallel with each spindle, and
   // determine number of discriminating syncs: syncs that sync a subset of the
@@ -314,13 +479,29 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
   if (F.empty())
     return PreservedAnalyses::all();
 
+  DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);
   TaskInfo &TI = AM.getResult<TaskAnalysis>(F);
-  if (TI.isSerial())
+  splitTaskFrameCreateBlocks(F, &DT, &TI);
+  TI.findTaskFrameTree();
+  if (TI.isSerial() && !TI.foundChildTaskFrames())
     return PreservedAnalyses::all();
 
   bool Changed = false;
   LLVM_DEBUG(dbgs() << "TaskSimplify running on function " << F.getName()
              << "\n");
+
+  if (SimplifyTaskFrames) {
+    // Simplify taskframes.  If anything changed, update the analysis.
+    Changed |= simplifyTaskFrames(TI, DT);
+    if (Changed) {
+      TI.recalculate(F, DT);
+      if (TI.isSerial()) {
+        PreservedAnalyses PA;
+        PA.preserve<GlobalsAA>();
+        return PA;
+      }
+    }
+  }
 
   // Evaluate the tasks that might be in parallel with each spindle, and
   // determine number of discriminating syncs: syncs that sync a subset of the
