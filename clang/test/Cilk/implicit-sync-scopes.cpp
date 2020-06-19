@@ -1155,7 +1155,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1: [[TRYSYNCCONT]]:
 // CHECK-O1: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B2]])
 // CHECK-O1-NEXT: call void @llvm.lifetime.end.p0i8(i64 [[B2SIZE]], i8* nonnull %[[B2ADDR]])
-// CHECK-O1-NEXT: br label %[[TRYCONT]]
+// CHECK-O1-NEXT: br label %[[TRYCONT:.+]]
 
 // CHECK-O0: [[LPAD]]:
 // CHECK-O0-NEXT: landingpad
@@ -1209,7 +1209,7 @@ int mix_parfor_trycatch_destructors(int a) {
 
 // CHECK: [[CATCH]]:
 // CHECK: call void @_Z9catchfn_iii(i32 1,
-// CHECK: br label %[[TRYCONT:.+]]
+// CHECK: br label %[[TRYCONT]]
 
 // CHECK: [[TRYCONT]]:
 // CHECK-O1: call void @llvm.lifetime.start.p0i8(i64 [[B3SIZE:.+]], i8* nonnull %[[B3ADDR:.+]])
