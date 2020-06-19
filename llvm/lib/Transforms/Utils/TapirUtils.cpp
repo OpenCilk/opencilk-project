@@ -463,6 +463,17 @@ BasicBlock *LandingPadInliningInfo::getInnerResumeDest() {
   return InnerResumeDest;
 }
 
+// Helper method to remove Pred from the PHI nodes of BB, if Pred is present in
+// those PHI nodes.  Unlike BasicBlock::removePredecessor, this method does not
+// error if Pred is not found in a PHI node of BB.
+static void maybeRemovePredecessor(BasicBlock *BB, BasicBlock *Pred) {
+  for (PHINode &PN : BB->phis()) {
+    int BBIdx = PN.getBasicBlockIndex(Pred);
+    if (-1 != BBIdx)
+      PN.removeIncomingValue(BBIdx);
+  }
+}
+
 /// Forward a task resume - a terminator, such as a detached.rethrow or
 /// taskframe.resume, marking the exit from a task for exception handling - to
 /// the spawner's landing pad block.  When the landing pad block has only one
@@ -502,17 +513,24 @@ void LandingPadInliningInfo::forwardTaskResume(InvokeInst *TR) {
 
   // Remove the TR
   if (!NormalDest)
-    for (PHINode &PN : TR->getNormalDest()->phis())
-      PN.removeIncomingValue(Src);
+    TR->getNormalDest()->removePredecessor(Src);
   if (!UnwindDest)
-    for (PHINode &PN : TR->getUnwindDest()->phis())
-      PN.removeIncomingValue(Src);
+    TR->getUnwindDest()->removePredecessor(Src);
 
   TR->eraseFromParent();
-  if (NormalDest)
+
+  if (NormalDest) {
+    for (BasicBlock *Succ : successors(NormalDest)) {
+      maybeRemovePredecessor(Succ, NormalDest);
+    }
     NormalDest->eraseFromParent();
-  if (UnwindDest)
+  }
+  if (UnwindDest) {
+    for (BasicBlock *Succ : successors(UnwindDest)) {
+      maybeRemovePredecessor(Succ, UnwindDest);
+    }
     UnwindDest->eraseFromParent();
+  }
 }
 
 static void handleDetachedLandingPads(
@@ -694,7 +712,7 @@ static void handleTaskFrameResume(Value *TaskFrame,
   getTaskFrameLandingPads(TaskFrame, TaskFrameResume, InlinedLPads);
 
   InvokeInst *TFR = cast<InvokeInst>(TaskFrameResume);
-  LandingPadInliningInfo TFResumeDest(TFR);
+  LandingPadInliningInfo TFResumeDest(TFR, DT);
 
   // Append the clauses from the outer landing pad instruction into the inlined
   // landing pad instructions.
