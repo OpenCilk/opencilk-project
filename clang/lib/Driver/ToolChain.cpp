@@ -1340,13 +1340,20 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     CmdArgs.push_back("-lcheetah");
     CmdArgs.push_back("-lpthread");
     break;
-  case TapirTargetID::OpenCilk:
+  case TapirTargetID::OpenCilk: {
+    bool OnlyStaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk) &&
+                                  !Args.hasArg(options::OPT_static);
+    if (OnlyStaticOpenCilk)
+      CmdArgs.push_back("-Bstatic");
     CmdArgs.push_back("-lopencilk");
     // Add to the executable's runpath the default directory containing OpenCilk
     // runtime, when the runtime is compiled as an integrated component.
     addRuntimeRunPath(*this, Args, CmdArgs);
+    if (OnlyStaticOpenCilk)
+      CmdArgs.push_back("-Bdynamic");
     CmdArgs.push_back("-lpthread");
     break;
+  }
   case TapirTargetID::Cilk:
     CmdArgs.push_back("-lcilkrts");
     break;
