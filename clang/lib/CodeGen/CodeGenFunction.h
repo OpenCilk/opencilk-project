@@ -1484,6 +1484,25 @@ public:
     delete CurDetachScope;
   }
 
+  // RAII for automatically popping detach scopes at the end of code-generating
+  // an expression.
+  class DetachScopeRAII {
+    CodeGenFunction &CGF;
+    CodeGenFunction::DetachScope *StartingDetachScope;
+  public:
+    DetachScopeRAII(CodeGenFunction &CGF)
+        : CGF(CGF), StartingDetachScope(CGF.CurDetachScope) {}
+    ~DetachScopeRAII() {
+      if (!CGF.CurDetachScope || CGF.CurDetachScope == StartingDetachScope)
+        // No detach scope was pushed, so there's nothing to do.
+        return;
+      CGF.PopDetachScope();
+      assert(CGF.CurDetachScope == StartingDetachScope &&
+             "Unexpected detach scope after processing AtomicExpr");
+      CGF.IsSpawned = false;
+    }
+  };
+
   /// Takes the old cleanup stack size and emits the cleanup blocks
   /// that have been added.
   void

@@ -5145,6 +5145,9 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
   }
 
   IsSpawnedScope SpawnedScp(this);
+  // RAII to finish detach scope after processing CallExpr E, if E uses a
+  // spawned value.
+  DetachScopeRAII DetScope(*this);
 
   const Decl *TargetDecl =
       OrigCallee.getAbstractInfo().getCalleeDecl().getDecl();
