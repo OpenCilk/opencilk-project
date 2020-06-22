@@ -9993,7 +9993,7 @@ def err_cannot_spawn_function: Error<
 def err_cannot_init_static_variable: Error<
   "cannot spawn initialize a 'static' variable">;
 def err_multiple_spawns: Error<
-  "multiple spawn calls within a full expression">;
+  "multiple spawns among call arguments">;
 def note_multiple_spawns: Note<
   "another spawn here">;
 def note_protected_by_spawn: Note<

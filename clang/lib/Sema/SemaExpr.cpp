@@ -6114,6 +6114,24 @@ static bool checkArgsForPlaceholders(Sema &S, MultiExprArg args) {
   return hasInvalid;
 }
 
+/// checkNumSpawnedExprs - Check that an appropriate number of spawned
+/// expressions appear in args.
+static bool checkNumSpawnedExprs(Sema &S, MultiExprArg args) {
+  unsigned count = 0;
+  for (size_t i = 0, e = args.size(); i != e; i++) {
+    if (isa<CilkSpawnExpr>(args[i])) {
+      ++count;
+      if (count > 1) {
+        if (count == 2)
+          S.Diag(args[i]->getBeginLoc(), diag::err_multiple_spawns);
+        else
+          S.Diag(args[i]->getBeginLoc(), diag::note_multiple_spawns);
+      }
+    }
+  }
+  return (count > 1);
+}
+
 /// If a builtin function has a pointer argument with no explicit address
 /// space, then it should be able to accept a pointer to any address
 /// space as input.  In order to do this, we need to replace the
@@ -6349,6 +6367,10 @@ ExprResult Sema::BuildCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
   Fn = Result.get();
 
   if (checkArgsForPlaceholders(*this, ArgExprs))
+    return ExprError();
+
+  // Check that we have at most one spawned argument.
+  if (checkNumSpawnedExprs(*this, ArgExprs))
     return ExprError();
 
   if (getLangOpts().CPlusPlus) {
