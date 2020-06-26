@@ -1350,22 +1350,56 @@ void CSIImpl::instrumentSync(SyncInst *SI,
 
   // Insert instrumentation before the sync.
   insertHookCall(SI, CsiBeforeSync, {SyncID, TrackVar});
-  CallInst *call = insertHookCallInSuccessorBB(
-      SI->getSuccessor(0), SI->getParent(), CsiAfterSync, {SyncID, TrackVar},
+  BasicBlock *SyncBB = SI->getParent();
+  BasicBlock *SyncCont = SI->getSuccessor(0);
+  BasicBlock *SyncUnwind = nullptr;
+  if (InvokeInst *II =
+      dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
+    if (const Function *Called = II->getCalledFunction()) {
+      if (Intrinsic::sync_unwind == Called->getIntrinsicID()) {
+        SyncBB = SyncCont;
+        SyncUnwind = II->getUnwindDest();
+        SyncCont = II->getNormalDest();
+      }
+    }
+  }
+
+  CallInst *Call = insertHookCallInSuccessorBB(
+      SyncCont, SyncBB, CsiAfterSync, {SyncID, TrackVar},
       {DefaultID,
        ConstantPointerNull::get(
            IntegerType::getInt32Ty(SI->getContext())->getPointerTo())});
-
   // Reset the tracking variable to 0.
-  if (call != nullptr) {
-    callsAfterSync.insert({SI->getSuccessor(0), call});
-    IRB.SetInsertPoint(call->getNextNode());
+  if (Call != nullptr) {
+    callsAfterSync.insert({SyncCont, Call});
+    IRB.SetInsertPoint(Call->getNextNode());
     IRB.CreateStore(
         Constant::getIntegerValue(IntegerType::getInt32Ty(SI->getContext()),
                                   APInt(32, 0)),
         TrackVar);
   } else {
-    assert(callsAfterSync.find(SI->getSuccessor(0)) != callsAfterSync.end());
+    assert(callsAfterSync.find(SyncCont) != callsAfterSync.end());
+  }
+
+  // If we have no unwind for the sync, then we're done.
+  if (!SyncUnwind)
+    return;
+
+  Call = insertHookCallInSuccessorBB(
+      SyncUnwind, SyncBB, CsiAfterSync, {SyncID, TrackVar},
+      {DefaultID,
+       ConstantPointerNull::get(
+           IntegerType::getInt32Ty(SI->getContext())->getPointerTo())});
+  // Reset the tracking variable to 0.
+  if (Call != nullptr) {
+    callsAfterSync.insert({SyncUnwind, Call});
+    IRB.SetInsertPoint(Call->getNextNode());
+    IRB.CreateStore(
+        Constant::getIntegerValue(IntegerType::getInt32Ty(SI->getContext()),
+                                  APInt(32, 0)),
+        TrackVar);
+  } else {
+    assert(callsAfterSync.find(SyncUnwind) != callsAfterSync.end());
   }
 }
 
@@ -2294,6 +2328,8 @@ void CSIImpl::instrumentFunction(Function &F) {
     for (Loop *L : LI)
       simplifyLoop(L, DT, &LI, nullptr, nullptr, nullptr,
                    /* PreserveLCSSA */false);
+
+  LLVM_DEBUG(dbgs() << "Canonicalized function:\n" << F);
 
   SmallVector<std::pair<Instruction *, CsiLoadStoreProperty>, 8>
       LoadAndStoreProperties;
