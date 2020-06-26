@@ -1345,12 +1345,17 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                                   !Args.hasArg(options::OPT_static);
     if (OnlyStaticOpenCilk)
       CmdArgs.push_back("-Bstatic");
-    CmdArgs.push_back("-lopencilk");
+
     // Link the correct Cilk personality fn
     if (getDriver().CCCIsCXX())
       CmdArgs.push_back("-lopencilk-personality-cpp");
     else
       CmdArgs.push_back("-lopencilk-personality-c");
+
+    // Link the opencilk runtime.  We do this after linking the personality
+    // function, to ensure that symbols are resolved correctly when using static
+    // linking.
+    CmdArgs.push_back("-lopencilk");
 
     // Add to the executable's runpath the default directory containing OpenCilk
     // runtime, when the runtime is compiled as an integrated component.
