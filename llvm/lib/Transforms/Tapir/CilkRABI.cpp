@@ -1229,15 +1229,18 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
 }
 
 void CilkRABI::MarkSpawner(Function &F) {
-  // Use the Cilk personality function.
-  Function *GXXPersonality = M.getFunction("__gxx_personality_v0");
-  assert(GXXPersonality &&
-         "Personality function __gxx_personality_v0 not found");
-  FunctionType *FTy = GXXPersonality->getFunctionType();
-  Function *Personality = cast<Function>(M.getOrInsertFunction(
-                                             "__cilk_personality_v0",
-                                             FTy).getCallee());
-  F.setPersonalityFn(Personality);
+  // If the spawner F might throw, then we mark F with the Cilk personality
+  // function, which ensures that the Cilk stack frame of F is properly unwound.
+  if (!F.doesNotThrow()) {
+    LLVMContext &C = M.getContext();
+    // Get the type of the Cilk personality function the same way that clang and
+    // EscapeEnumerator get the type of a personality function.
+    Function *Personality = cast<Function>(
+        M.getOrInsertFunction("__cilk_personality_v0",
+                              FunctionType::get(Type::getInt32Ty(C), true))
+        .getCallee());
+    F.setPersonalityFn(Personality);
+  }
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
