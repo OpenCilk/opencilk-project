@@ -1246,6 +1246,7 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
   // Find the detached block, continuation, and associated reattaches.
   BasicBlock *DetachedBlock = DI->getDetached();
   BasicBlock *ContinueBlock = DI->getContinue();
+  Task *T = TI.getTaskFor(DetachedBlock);
   SmallVector<BasicBlock *, 8> TaskExits, TaskResumes;
   SmallVector<Spindle *, 2> SharedEHExits;
   getTaskExits(DI, TaskExits, TaskResumes, SharedEHExits, TI);
@@ -1283,7 +1284,6 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
                      {ExitID, TaskID, DetachID, ExitProp.getValue(IRB)});
     }
 
-    Task *T = TI.getTaskFor(DetachedBlock);
     Value *DefaultID = getDefaultID(IDBuilder);
     for (Spindle *SharedEH : SharedEHExits) {
       CsiTaskExitProperty ExitProp;
@@ -1316,6 +1316,15 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
   if (DI->hasUnwindDest()) {
     BasicBlock *UnwindBlock = DI->getUnwindDest();
     BasicBlock *PredBlock = DI->getParent();
+    if (Value *TF = T->getTaskFrameUsed()) {
+      // If the detached task uses a taskframe, then we want to insert the
+      // detach_continue instrumentation for the unwind destination after the
+      // taskframe.resume.
+      UnwindBlock = getTaskFrameResumeDest(TF);
+      assert(UnwindBlock &&
+             "Detach with unwind uses a taskframe with no resume");
+      PredBlock = getTaskFrameResume(TF)->getParent();
+    }
     Value *DefaultID = getDefaultID(IDBuilder);
     uint64_t LocalID = DetachContinueFED.add(*UnwindBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
