@@ -446,7 +446,28 @@ void __csi_detach_continue(const csi_id_t detach_continue_id,
 #endif
 
   shadow_stack_frame_t &bottom = stack.peek_bot();
-  bottom.contin_bspan += cilkscale_timer_t::burden;
+
+  if (prop.is_unwind) {
+    // In opencilk, upon reaching the unwind destination of a detach, all
+    // spawned child computations have been synced.  Hence we replicate the
+    // logic from after_sync here to compute work and span.
+
+    // Add achild_work to contin_work, and reset contin_work.
+    bottom.contin_work += bottom.achild_work;
+    bottom.achild_work = cilk_time_t::zero();
+
+    // Select the largest of lchild_span and contin_span, and then reset
+    // lchild_span.
+    if (bottom.lchild_span > bottom.contin_span)
+      bottom.contin_span = bottom.lchild_span;
+    bottom.lchild_span = cilk_time_t::zero();
+
+    if (bottom.lchild_bspan > bottom.contin_bspan)
+      bottom.contin_bspan = bottom.lchild_bspan;
+    bottom.lchild_bspan = cilk_time_t::zero();
+  } else {
+    bottom.contin_bspan += cilkscale_timer_t::burden;
+  }
 
   stack.start.gettime();
 }
