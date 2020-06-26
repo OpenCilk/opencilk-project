@@ -252,8 +252,6 @@ FunctionCallee CilkRABI::Get__cilkrts_cleanup_fiber() {
   AttributeList AL;
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
                        Attribute::NoUnwind);
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoReturn);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Type *Int32Ty = Type::getInt32Ty(C);
@@ -1376,10 +1374,9 @@ void CilkRABI::preProcessRootSpawner(Function &F) {
 
       Value *Cond = Builder.CreateICmpEQ(
           SetjmpCall, ConstantInt::get(SetjmpCall->getType(), 0));
-      Instruction *ThenTerm = SplitBlockAndInsertIfThen(Cond, InsertPt, true);
+      Instruction *ThenTerm = SplitBlockAndInsertIfThen(Cond, InsertPt, false);
       Builder.SetInsertPoint(ThenTerm);
-      CallInst *CleanupCall =
-          Builder.CreateCall(CILKRTS_FUNC(cleanup_fiber), {SF, Sel});
+      Builder.CreateCall(CILKRTS_FUNC(cleanup_fiber), {SF, Sel});
     }
   }
 }
