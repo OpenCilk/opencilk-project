@@ -435,12 +435,14 @@ void __csi_task_exit(const csi_id_t task_exit_id, const csi_id_t task_id,
 
 CILKTOOL_API
 void __csi_detach_continue(const csi_id_t detach_continue_id,
-                           const csi_id_t detach_id) {
+                           const csi_id_t detach_id,
+                           const detach_continue_prop_t prop) {
   // In the continuation
   shadow_stack_t &stack = STACK;
 
 #if TRACE_CALLS
-  fprintf(stderr, "detach_continue(%ld, %ld)\n", detach_continue_id, detach_id);
+  fprintf(stderr, "detach_continue(%ld, %ld, %ld)\n", detach_continue_id,
+          detach_id, prop);
 #endif
 
   shadow_stack_frame_t &bottom = stack.peek_bot();
