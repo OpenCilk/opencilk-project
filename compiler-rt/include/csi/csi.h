@@ -105,6 +105,12 @@ typedef struct {
 } task_exit_prop_t;
 
 typedef struct {
+  // The detach continue identifies the unwind destination of a detach.
+  unsigned is_unwind : 1;
+  uint64_t _padding : 63;
+} detach_continue_prop_t;
+
+typedef struct {
   // The call is indirect.
   unsigned is_indirect : 1;
   // Pad struct to 64 total bits.
@@ -237,7 +243,8 @@ WEAK void __csi_task_exit(const csi_id_t task_exit_id, const csi_id_t task_id,
                           const task_exit_prop_t prop);
 
 WEAK void __csi_detach_continue(const csi_id_t detach_continue_id,
-                                const csi_id_t detach_id);
+                                const csi_id_t detach_id,
+                                const detach_continue_prop_t prop);
 
 WEAK void __csi_before_sync(const csi_id_t sync_id, const int32_t *has_spawned);
 WEAK void __csi_after_sync(const csi_id_t sync_id, const int32_t *has_spawned);
