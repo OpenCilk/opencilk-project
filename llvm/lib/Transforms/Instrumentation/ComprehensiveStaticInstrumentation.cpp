@@ -705,6 +705,7 @@ void CSIImpl::initializeTapirHooks() {
   Type *RetType = IRB.getVoidTy();
   Type *TaskPropertyTy = CsiTaskProperty::getType(C);
   Type *TaskExitPropertyTy = CsiTaskExitProperty::getType(C);
+  Type *DetContPropertyTy = CsiDetachContinueProperty::getType(C);
 
   CsiDetach = M.getOrInsertFunction("__csi_detach", RetType,
                                     /* detach_id */ IDType,
@@ -720,7 +721,8 @@ void CSIImpl::initializeTapirHooks() {
                                       TaskExitPropertyTy);
   CsiDetachContinue = M.getOrInsertFunction("__csi_detach_continue", RetType,
                                             /* detach_continue_id */ IDType,
-                                            /* detach_id */ IDType);
+                                            /* detach_id */ IDType,
+                                            DetContPropertyTy);
   CsiBeforeSync = M.getOrInsertFunction(
       "__csi_before_sync", RetType, IDType,
       IntegerType::getInt32Ty(C)->getPointerTo());
@@ -1304,18 +1306,26 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     IRBuilder<> IRB(&*ContinueBlock->getFirstInsertionPt());
     uint64_t LocalID = DetachContinueFED.add(*ContinueBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
+    CsiDetachContinueProperty ContProp;
     Instruction *Call =
-        IRB.CreateCall(CsiDetachContinue, {ContinueID, DetachID});
+        IRB.CreateCall(CsiDetachContinue, {ContinueID, DetachID,
+                                           ContProp.getValue(IRB)});
     setInstrumentationDebugLoc(*ContinueBlock, Call);
   }
   // Instrument the unwind of the detach, if it exists.
   if (DI->hasUnwindDest()) {
     BasicBlock *UnwindBlock = DI->getUnwindDest();
+    BasicBlock *PredBlock = DI->getParent();
     Value *DefaultID = getDefaultID(IDBuilder);
     uint64_t LocalID = DetachContinueFED.add(*UnwindBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
-    insertHookCallInSuccessorBB(UnwindBlock, DI->getParent(), CsiDetachContinue,
-                                {ContinueID, DetachID}, {DefaultID, DefaultID});
+    CsiDetachContinueProperty ContProp;
+    LLVMContext &C = M.getContext();
+    Value *DefaultPropVal = ContProp.getValueImpl(C);
+    ContProp.setIsUnwind();
+    insertHookCallInSuccessorBB(UnwindBlock, PredBlock, CsiDetachContinue,
+                                {ContinueID, DetachID, ContProp.getValue(C)},
+                                {DefaultID, DefaultID, DefaultPropVal});
   }
 }
 
