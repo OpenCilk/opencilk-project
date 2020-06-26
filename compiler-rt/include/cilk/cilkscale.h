@@ -65,11 +65,16 @@ wsp_t wsp_sub(wsp_t lhs, wsp_t rhs) CILKSCALE_NOTHROW;
 CILKSCALE_EXTERN_C
 void wsp_dump(wsp_t wsp, const char *tag);
 
-CILKSCALE_EXTERN_C
-inline wsp_t wsp_zero(void) CILKSCALE_NOTHROW {
+#ifdef __cplusplus
+extern "C" {
+#endif // #ifdef __cplusplus
+static inline wsp_t wsp_zero(void) CILKSCALE_NOTHROW {
   wsp_t res = {0, 0, 0};
   return res;
 }
+#ifdef __cplusplus
+}
+#endif // #ifdef __cplusplus
 
 #ifndef __cilkscale__
 
