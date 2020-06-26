@@ -1423,6 +1423,9 @@ void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   SetJmpRes = B.CreateICmpEQ(SetJmpRes,
                              ConstantInt::get(SetJmpRes->getType(), 0));
   B.CreateCondBr(SetJmpRes, CallBlock, CallCont);
+  for (PHINode &PN : CallCont->phis())
+    PN.addIncoming(PN.getIncomingValueForBlock(CallBlock), DetBlock);
+
   SetJmpPt->eraseFromParent();
 }
 
