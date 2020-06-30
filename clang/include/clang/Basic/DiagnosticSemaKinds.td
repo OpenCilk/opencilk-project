@@ -9984,8 +9984,8 @@ def err_spawn_invalid_decl : Error<
   "_Cilk_spawn not supported in a '%0Decl'">;
 def err_spawn_spawn : Error<
   "consecutive _Cilk_spawn tokens not allowed">;
-def err_spawn_not_whole_expr : Error<
-  "_Cilk_spawn is not at statement level">;
+def err_invalid_spawn_expr : Error<
+  "invalid _Cilk_spawn in expression">;
 def err_cannot_spawn_builtin: Error<
   "builtin function cannot be spawned">;
 def err_cannot_spawn_function: Error<
