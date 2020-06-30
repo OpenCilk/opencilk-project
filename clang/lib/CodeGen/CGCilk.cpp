@@ -192,7 +192,7 @@ void CodeGenFunction::DetachScope::StartDetach() {
 }
 
 void CodeGenFunction::DetachScope::CleanupDetach() {
-  if (DetachCleanedUp)
+  if (!DetachStarted || DetachCleanedUp)
     return;
 
   // Pop the sync region for the detached task.
@@ -380,13 +380,6 @@ static const Stmt *IgnoreImplicitAndCleanups(const Stmt *S) {
   return Current;
 }
 
-static void FailedSpawnWarning(CodeGenFunction &CGF, SourceLocation SLoc) {
-  DiagnosticsEngine &Diags = CGF.CGM.getDiags();
-  unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Warning,
-                                          "Failed to produce spawn");
-  Diags.Report(SLoc, DiagID);
-}
-
 void CodeGenFunction::EmitCilkSpawnStmt(const CilkSpawnStmt &S) {
   // Handle spawning of calls in a special manner, to evaluate
   // arguments before spawn.
@@ -403,7 +396,7 @@ void CodeGenFunction::EmitCilkSpawnStmt(const CilkSpawnStmt &S) {
     // Finish the detach.
     if (IsSpawned) {
       if (!CurDetachScope->IsDetachStarted())
-        FailedSpawnWarning(*this, S.getBeginLoc());
+        FailedSpawnWarning(S.getBeginLoc());
       IsSpawned = false;
       PopDetachScope();
     }
@@ -441,7 +434,7 @@ LValue CodeGenFunction::EmitCilkSpawnExprLValue(const CilkSpawnExpr *E) {
   // Finish the detach.
   if (IsSpawned) {
     if (!CurDetachScope->IsDetachStarted())
-      FailedSpawnWarning(*this, E->getExprLoc());
+      FailedSpawnWarning(E->getExprLoc());
     IsSpawned = false;
     PopDetachScope();
   }
