@@ -13918,6 +13918,12 @@ static inline UnaryOperatorKind ConvertTokenKindToUnaryOpcode(
   return Opc;
 }
 
+/// Check if Expr is an illegal spawn expression.
+static void CheckForIllegalSpawn(Sema &S, Expr *Expr) {
+  if (isa<CilkSpawnExpr>(Expr->IgnoreImplicit()))
+    S.Diag(Expr->getExprLoc(), diag::err_invalid_spawn_expr);
+}
+
 /// DiagnoseSelfAssignment - Emits a warning if a value is assigned to itself.
 /// This warning suppressed in the event of macro expansions.
 static void DiagnoseSelfAssignment(Sema &S, Expr *LHSExpr, Expr *RHSExpr,
@@ -14153,6 +14159,11 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
       return ExprError();
     }
   }
+
+  // Check for illegal spawns
+  if (!BinaryOperator::isAssignmentOp(Opc))
+    CheckForIllegalSpawn(*this, RHS.get());
+  CheckForIllegalSpawn(*this, LHS.get());
 
   switch (Opc) {
   case BO_Assign:
@@ -14617,6 +14628,11 @@ static ExprResult BuildOverloadedBinOp(Sema &S, Scope *Sc, SourceLocation OpLoc,
   default:
     break;
   }
+
+  // Check for illegal spawns
+  if (!BinaryOperator::isAssignmentOp(Opc))
+    CheckForIllegalSpawn(S, RHS);
+  CheckForIllegalSpawn(S, LHS);
 
   // Find all of the overloaded operators visible from this point.
   UnresolvedSet<16> Functions;
