@@ -921,8 +921,8 @@ void AggExprEmitter::VisitCilkSpawnExpr(CilkSpawnExpr *E) {
   Visit(E->getSpawnedExpr());
 
   // Pop the detach scope
-  assert(CGF.IsSpawned && CGF.CurDetachScope->IsDetachStarted() &&
-         "Processing _Cilk_spawn of expression did not produce a detach.");
+  if (!(CGF.IsSpawned && CGF.CurDetachScope->IsDetachStarted()))
+    CGF.FailedSpawnWarning(E->getExprLoc());
   CGF.IsSpawned = false;
   CGF.PopDetachScope();
 }
@@ -1215,8 +1215,8 @@ void AggExprEmitter::VisitBinAssign(const BinaryOperator *E) {
     Visit(E->getRHS());
     CGF.EmitAtomicStore(Dest.asRValue(), LHS, /*isInit*/ false);
     if (CGF.IsSpawned) {
-      assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
-             "Processing _Cilk_spawn of expression did not produce a detach.");
+      if (!(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted()))
+        CGF.FailedSpawnWarning(E->getRHS()->getExprLoc());
       CGF.IsSpawned = false;
       CGF.PopDetachScope();
     }
@@ -1243,8 +1243,8 @@ void AggExprEmitter::VisitBinAssign(const BinaryOperator *E) {
                     E->getType());
 
   if (CGF.IsSpawned) {
-    assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
-           "Processing _Cilk_spawn of expression did not produce a detach.");
+    if (!(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted()))
+      CGF.FailedSpawnWarning(E->getRHS()->getExprLoc());
     CGF.IsSpawned = false;
     CGF.PopDetachScope();
   }

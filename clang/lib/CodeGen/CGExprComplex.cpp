@@ -138,8 +138,8 @@ public:
     CGF.PushDetachScope();
     ComplexPairTy C = Visit(CSE->getSpawnedExpr());
     if (DoSpawnedInit) {
-      assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
-             "Processing _Cilk_spawn of expression did not produce detach.");
+      if (!(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted()))
+        CGF.FailedSpawnWarning(CSE->getExprLoc());
       LValue LV = LValueToSpawnInit;
       EmitStoreOfComplex(C, LV, /*init*/ true);
 
@@ -1039,8 +1039,8 @@ LValue ComplexExprEmitter::EmitBinAssignLValue(const BinaryOperator *E,
     EmitStoreOfComplex(Val, LHS, /*isInit*/ false);
 
     // Finish the detach.
-    assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
-           "Processing _Cilk_spawn of expression did not produce detach.");
+    if (!(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted()))
+      CGF.FailedSpawnWarning(E->getRHS()->getExprLoc());
     CGF.IsSpawned = false;
     CGF.PopDetachScope();
 

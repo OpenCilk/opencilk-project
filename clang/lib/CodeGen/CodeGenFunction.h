@@ -1484,6 +1484,14 @@ public:
     delete CurDetachScope;
   }
 
+  /// Produce a warning that we failed to emit a spawn.
+  void FailedSpawnWarning(SourceLocation SLoc) {
+    DiagnosticsEngine &Diags = CGM.getDiags();
+    unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Warning,
+                                            "Failed to emit spawn");
+    Diags.Report(SLoc, DiagID);
+  }
+
   // RAII for automatically popping detach scopes at the end of code-generating
   // an expression.
   class DetachScopeRAII {
@@ -1498,7 +1506,7 @@ public:
         return;
       CGF.PopDetachScope();
       assert(CGF.CurDetachScope == StartingDetachScope &&
-             "Unexpected detach scope after processing AtomicExpr");
+             "Unexpected detach scope");
       CGF.IsSpawned = false;
     }
   };

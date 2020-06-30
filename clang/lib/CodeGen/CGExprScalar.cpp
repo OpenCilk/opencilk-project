@@ -455,9 +455,9 @@ public:
     CGF.IsSpawned = true;
     CGF.PushDetachScope();
     Value *V = Visit(CSE->getSpawnedExpr());
+    if (!(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted()))
+      CGF.FailedSpawnWarning(CSE->getExprLoc());
     if (DoSpawnedInit) {
-      assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
-             "Processing _Cilk_spawn of expression did not produce detach.");
       LValue LV = LValueToSpawnInit;
       CGF.EmitNullabilityCheck(LV, V, CSE->getExprLoc());
       CGF.EmitStoreThroughLValue(RValue::get(V), LV, true);
@@ -4205,8 +4205,8 @@ Value *ScalarExprEmitter::VisitBinAssign(const BinaryOperator *E) {
         CGF.EmitStoreThroughLValue(RValue::get(RHS), LHS);
 
       // Finish the detach.
-      assert(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted() &&
-             "Processing _Cilk_spawn of expression did not produce detach.");
+      if (!(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted()))
+        CGF.FailedSpawnWarning(E->getRHS()->getExprLoc());
       CGF.IsSpawned = false;
       CGF.PopDetachScope();
 

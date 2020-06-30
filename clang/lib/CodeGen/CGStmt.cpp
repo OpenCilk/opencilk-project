@@ -1264,9 +1264,9 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     CurDetachScope->CleanupDetach();
   cleanupScope.ForceCleanup();
   if (IsSpawned) {
+    if (!(CurDetachScope && CurDetachScope->IsDetachStarted()))
+      FailedSpawnWarning(RV->getExprLoc());
     // Pop the detach scope
-    assert(IsSpawned && CurDetachScope->IsDetachStarted() &&
-           "Processing _Cilk_spawn of expression did not produce a detach.");
     IsSpawned = false;
     PopDetachScope();
   }
