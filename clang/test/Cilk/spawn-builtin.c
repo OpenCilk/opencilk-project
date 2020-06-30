@@ -64,7 +64,7 @@ void spawn_trap() {
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
 void spawn_assume() {
-  _Cilk_spawn __builtin_assume(0); // expected-warning{{Failed to produce spawn}}
+  _Cilk_spawn __builtin_assume(0); // expected-warning{{Failed to emit spawn}}
 }
 
 // It doesn't make sense to spawn an assume, so we expect not to find any
