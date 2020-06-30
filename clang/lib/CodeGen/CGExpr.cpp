@@ -4749,8 +4749,8 @@ LValue CodeGenFunction::EmitBinaryOperatorLValue(const BinaryOperator *E) {
       EmitStoreThroughLValue(RV, LV);
 
       // Finish the detach.
-      assert(CurDetachScope && CurDetachScope->IsDetachStarted() &&
-             "Processing _Cilk_spawn of expression did not produce a detach.");
+      if (!(CurDetachScope && CurDetachScope->IsDetachStarted()))
+        FailedSpawnWarning(E->getRHS()->getExprLoc());
       PopDetachScope();
       IsSpawned = false;
 
