@@ -36,61 +36,123 @@ set(CILKSCALE_INSTRUCTIONS_DYNAMIC_DEFINITIONS
 # Build Cilkscale runtimes shipped with Clang.
 add_compiler_rt_component(cilkscale)
 
-foreach (arch ${CILKSCALE_SUPPORTED_ARCH})
-  add_compiler_rt_runtime(clang_rt.cilkscale
-    STATIC
-    ARCHS ${arch}
-    SOURCES ${CILKSCALE_SOURCES}
-    CFLAGS ${CILKSCALE_CFLAGS}
-    DEFS ${CILKSCALE_COMMON_DEFINITIONS}
-    PARENT_TARGET cilkscale)
+if (APPLE)
+    add_compiler_rt_runtime(clang_rt.cilkscale
+      STATIC
+      OS ${CILKTOOL_SUPPORTED_OS}
+      ARCHS ${CILKSCALE_SUPPORTED_ARCH}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_CFLAGS}
+      DEFS ${CILKSCALE_COMMON_DEFINITIONS}
+      PARENT_TARGET cilkscale)
 
-  add_compiler_rt_runtime(clang_rt.cilkscale
-    SHARED
-    ARCHS ${arch}
-    SOURCES ${CILKSCALE_SOURCES}
-    CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
-    LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
-    LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
-    DEFS ${CILKSCALE_DYNAMIC_DEFINITIONS}
-    PARENT_TARGET cilkscale)
+    add_compiler_rt_runtime(clang_rt.cilkscale-instructions
+      STATIC
+      OS ${CILKTOOL_SUPPORTED_OS}
+      ARCHS ${CILKSCALE_SUPPORTED_ARCH}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_CFLAGS}
+      DEFS ${CILKSCALE_INSTRUCTIONS_COMMON_DEFINITIONS}
+      PARENT_TARGET cilkscale)
 
-  add_compiler_rt_runtime(clang_rt.cilkscale-instructions
-    STATIC
-    ARCHS ${arch}
-    SOURCES ${CILKSCALE_SOURCES}
-    CFLAGS ${CILKSCALE_CFLAGS}
-    DEFS ${CILKSCALE_INSTRUCTIONS_COMMON_DEFINITIONS}
-    PARENT_TARGET cilkscale)
+    add_compiler_rt_runtime(clang_rt.cilkscale-benchmark
+      STATIC
+      OS ${CILKTOOL_SUPPORTED_OS}
+      ARCHS ${CILKSCALE_SUPPORTED_ARCH}
+      SOURCES ${BENCHMARK_SOURCES}
+      CFLAGS ${CILKSCALE_CFLAGS}
+      DEFS ${CILKSCALE_COMMON_DEFINITIONS}
+      PARENT_TARGET cilkscale)
 
-  add_compiler_rt_runtime(clang_rt.cilkscale-instructions
-    SHARED
-    ARCHS ${arch}
-    SOURCES ${CILKSCALE_SOURCES}
-    CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
-    LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
-    LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
-    DEFS ${CILKSCALE_INSTRUCTIONS_DYNAMIC_DEFINITIONS}
-    PARENT_TARGET cilkscale)
+    add_compiler_rt_runtime(clang_rt.cilkscale
+      SHARED
+      OS ${CILKTOOL_SUPPORTED_OS}
+      ARCHS ${CILKSCALE_SUPPORTED_ARCH}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
+      LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
+      LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
+      DEFS ${CILKSCALE_DYNAMIC_DEFINITIONS}
+      PARENT_TARGET cilkscale)
+
+    add_compiler_rt_runtime(clang_rt.cilkscale-instructions
+      SHARED
+      OS ${CILKTOOL_SUPPORTED_OS}
+      ARCHS ${CILKSCALE_SUPPORTED_ARCH}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
+      LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
+      LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
+      DEFS ${CILKSCALE_INSTRUCTIONS_DYNAMIC_DEFINITIONS}
+      PARENT_TARGET cilkscale)
 
   add_compiler_rt_runtime(clang_rt.cilkscale-benchmark
-    STATIC
-    ARCHS ${arch}
-    SOURCES ${BENCHMARK_SOURCES}
-    CFLAGS ${CILKSCALE_CFLAGS}
-    DEFS ${CILKSCALE_COMMON_DEFINITIONS}
-    PARENT_TARGET cilkscale)
+      SHARED
+      OS ${CILKTOOL_SUPPORTED_OS}
+      ARCHS ${CILKSCALE_SUPPORTED_ARCH}
+      SOURCES ${BENCHMARK_SOURCES}
+      CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
+      LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
+      LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
+      DEFS ${CILKSCALE_DYNAMIC_DEFINITIONS}
+      PARENT_TARGET cilkscale)
+else()
+  foreach (arch ${CILKSCALE_SUPPORTED_ARCH})
+    add_compiler_rt_runtime(clang_rt.cilkscale
+      STATIC
+      ARCHS ${arch}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_CFLAGS}
+      DEFS ${CILKSCALE_COMMON_DEFINITIONS}
+      PARENT_TARGET cilkscale)
 
-  add_compiler_rt_runtime(clang_rt.cilkscale-benchmark
-    SHARED
-    ARCHS ${arch}
-    SOURCES ${BENCHMARK_SOURCES}
-    CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
-    LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
-    LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
-    DEFS ${CILKSCALE_DYNAMIC_DEFINITIONS}
-    PARENT_TARGET cilkscale)
-endforeach()
+    add_compiler_rt_runtime(clang_rt.cilkscale
+      SHARED
+      ARCHS ${arch}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
+      LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
+      LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
+      DEFS ${CILKSCALE_DYNAMIC_DEFINITIONS}
+      PARENT_TARGET cilkscale)
+
+    add_compiler_rt_runtime(clang_rt.cilkscale-instructions
+      STATIC
+      ARCHS ${arch}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_CFLAGS}
+      DEFS ${CILKSCALE_INSTRUCTIONS_COMMON_DEFINITIONS}
+      PARENT_TARGET cilkscale)
+
+    add_compiler_rt_runtime(clang_rt.cilkscale-instructions
+      SHARED
+      ARCHS ${arch}
+      SOURCES ${CILKSCALE_SOURCES}
+      CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
+      LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
+      LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
+      DEFS ${CILKSCALE_INSTRUCTIONS_DYNAMIC_DEFINITIONS}
+      PARENT_TARGET cilkscale)
+
+    add_compiler_rt_runtime(clang_rt.cilkscale-benchmark
+      STATIC
+      ARCHS ${arch}
+      SOURCES ${BENCHMARK_SOURCES}
+      CFLAGS ${CILKSCALE_CFLAGS}
+      DEFS ${CILKSCALE_COMMON_DEFINITIONS}
+      PARENT_TARGET cilkscale)
+
+    add_compiler_rt_runtime(clang_rt.cilkscale-benchmark
+      SHARED
+      ARCHS ${arch}
+      SOURCES ${BENCHMARK_SOURCES}
+      CFLAGS ${CILKSCALE_DYNAMIC_CFLAGS}
+      LINK_FLAGS ${CILKSCALE_DYNAMIC_LINK_FLAGS}
+      LINK_LIBS ${CILKSCALE_DYNAMIC_LIBS}
+      DEFS ${CILKSCALE_DYNAMIC_DEFINITIONS}
+      PARENT_TARGET cilkscale)
+  endforeach()
+endif()
 
 if (COMPILER_RT_INCLUDE_TESTS)
   # TODO(bruening): add tests via add_subdirectory(tests)

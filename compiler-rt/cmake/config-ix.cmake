@@ -408,6 +408,7 @@ if(APPLE)
       ${DARWIN_tvossim_MIN_VER_FLAG}=${DARWIN_tvos_MIN_VER})
   endif()
 
+  set(CILKTOOL_SUPPORTED_OS osx)
   set(SANITIZER_COMMON_SUPPORTED_OS osx)
   set(PROFILE_SUPPORTED_OS osx)
   set(TSAN_SUPPORTED_OS osx)
