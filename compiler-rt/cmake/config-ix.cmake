@@ -327,6 +327,7 @@ if(APPLE)
 
   # Note: In order to target x86_64h on OS X the minimum deployment target must
   # be 10.8 or higher.
+  set(CILKTOOL_SUPPORTED_OS osx)
   set(SANITIZER_COMMON_SUPPORTED_OS osx)
   set(PROFILE_SUPPORTED_OS osx)
   set(TSAN_SUPPORTED_OS osx)
