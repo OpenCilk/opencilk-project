@@ -1430,6 +1430,17 @@ void DarwinClang::AddLinkSanitizerLibArgs(const ArgList &Args,
   AddLinkRuntimeLib(Args, CmdArgs, Sanitizer, RLO, Shared);
 }
 
+void DarwinClang::AddCilktoolRTLibs(const ArgList &Args,
+				    ArgStringList &CmdArgs) const {
+  if (Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ)) {
+    StringRef Val = A->getValue();
+    auto RLO = RuntimeLinkOptions(RLO_AlwaysLink);
+    AddLinkRuntimeLib(Args, CmdArgs, Val, RLO);
+    // Link in the C++ standard library
+    AddCXXStdlibLibArgs(Args, CmdArgs);
+  }
+}
+
 ToolChain::RuntimeLibType DarwinClang::GetRuntimeLibType(
     const ArgList &Args) const {
   if (Arg* A = Args.getLastArg(options::OPT_rtlib_EQ)) {
@@ -1507,7 +1518,7 @@ void DarwinClang::AddLinkRuntimeLibArgs(const ArgList &Args,
     if (Sanitize.needsCilksanRt()) {
       assert(Sanitize.needsSharedRt() &&
              "Static sanitizer runtimes not supported");
-      AddLinkSanitizerLibArgs(Args, CmdArgs, "cilk");
+      AddLinkSanitizerLibArgs(Args, CmdArgs, "cilksan");
     }
     if (Sanitize.needsFuzzer() && !Args.hasArg(options::OPT_dynamiclib)) {
       AddLinkSanitizerLibArgs(Args, CmdArgs, "fuzzer", /*shared=*/false);
@@ -1520,6 +1531,8 @@ void DarwinClang::AddLinkRuntimeLibArgs(const ArgList &Args,
       AddLinkSanitizerLibArgs(Args, CmdArgs, "stats");
     }
   }
+
+  AddCilktoolRTLibs(Args, CmdArgs);
 
   const XRayArgs &XRay = getXRayArgs();
   if (XRay.needsXRayRt()) {
