@@ -3,7 +3,14 @@
 #define INCLUDED_SHADOW_STACK_H
 
 #include "cilkscale_timer.h"
+
+#ifndef SERIAL_TOOL
+#define SERIAL_TOOL 1
+#endif
+
+#if !SERIAL_TOOL
 #include <cilk/reducer.h>
+#endif
 
 #ifndef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE 64
@@ -94,12 +101,14 @@ public:
         bot(std::move(move.bot))
   {}
 
+#if !SERIAL_TOOL
   // Move-in constructor
   shadow_stack_t(cilk::move_in_wrapper<shadow_stack_t> w) {
     capacity = w.value().capacity;
     frames = w.value().frames;
     bot = w.value().bot;
   }
+#endif
 
   ~shadow_stack_t() {
     if (frames)
