@@ -357,6 +357,7 @@ if(APPLE)
       ${DARWIN_tvos_MIN_VER_FLAG}=9.0)
   endif()
 
+  set(CILKTOOL_SUPPORTED_OS osx)
   set(SANITIZER_COMMON_SUPPORTED_OS osx)
   set(PROFILE_SUPPORTED_OS osx)
   set(TSAN_SUPPORTED_OS osx)

@@ -36,29 +36,29 @@ append_list_if(COMPILER_RT_HAS_LIBDL dl CILKSAN_DYNAMIC_LIBS)
 #append_list_if(COMPILER_RT_HAS_LIBSTDCXX stdc++ CILKSAN_DYNAMIC_LIBS)
 #append_list_if(COMPILER_RT_HAS_LIBLOG log CILKSAN_DYNAMIC_LIBS)
 
-# Compile Cilksan sources into an object library
-
-add_compiler_rt_object_libraries(RTCilksan_dynamic
-  OS ${SANITIZER_COMMON_SUPPORTED_OS}
-  ARCHS ${CILKSAN_SUPPORTED_ARCH}
-  SOURCES ${CILKSAN_SOURCES}
-  CFLAGS ${CILKSAN_DYNAMIC_CFLAGS}
-  DEFS ${CILKSAN_DYNAMIC_DEFINITIONS})
-
-add_compiler_rt_object_libraries(RTCilksan
-  OS ${SANITIZER_COMMON_SUPPORTED_OS}
-  ARCHS ${CILKSAN_SUPPORTED_ARCH}
-  SOURCES ${CILKSAN_SOURCES}
-  CFLAGS ${CILKSAN_CFLAGS}
-  DEFS ${CILKSAN_COMMON_DEFINITIONS})
-
 # Build Cilksan runtimes shipped with Clang.
 add_compiler_rt_component(cilksan)
 
-foreach (arch ${CILKSAN_SUPPORTED_ARCH})
+if (APPLE)
+  # Compile Cilksan sources into an object library
+  add_compiler_rt_object_libraries(RTCilksan_dynamic
+    OS ${CILKTOOL_SUPPORTED_OS}
+    ARCHS ${CILKSAN_SUPPORTED_ARCH}
+    SOURCES ${CILKSAN_SOURCES}
+    CFLAGS ${CILKSAN_DYNAMIC_CFLAGS}
+    DEFS ${CILKSAN_DYNAMIC_DEFINITIONS})
+
+  add_compiler_rt_object_libraries(RTCilksan
+    OS ${CILKTOOL_SUPPORTED_OS}
+    ARCHS ${CILKSAN_SUPPORTED_ARCH}
+    SOURCES ${CILKSAN_SOURCES}
+    CFLAGS ${CILKSAN_CFLAGS}
+    DEFS ${CILKSAN_COMMON_DEFINITIONS})
+
   add_compiler_rt_runtime(clang_rt.cilksan
     STATIC
-    ARCHS ${arch}
+    OS ${CILKTOOL_SUPPORTED_OS}
+    ARCHS ${CILKSAN_SUPPORTED_ARCH}
     OBJECT_LIBS RTCilksan
     CFLAGS ${CILKSAN_CFLAGS}
     DEFS ${CILKSAN_COMMON_DEFINITIONS}
@@ -66,14 +66,49 @@ foreach (arch ${CILKSAN_SUPPORTED_ARCH})
 
   add_compiler_rt_runtime(clang_rt.cilksan
     SHARED
-    ARCHS ${arch}
+    OS ${CILKTOOL_SUPPORTED_OS}
+    ARCHS ${CILKSAN_SUPPORTED_ARCH}
     OBJECT_LIBS RTCilksan_dynamic
     CFLAGS ${CILKSAN_DYNAMIC_CFLAGS}
     LINK_FLAGS ${CILKSAN_DYNAMIC_LINK_FLAGS}
     LINK_LIBS ${CILKSAN_DYNAMIC_LIBS}
     DEFS ${CILKSAN_DYNAMIC_DEFINITIONS}
     PARENT_TARGET cilksan)
-endforeach()
+
+else() # Not APPLE
+  # Compile Cilksan sources into an object library
+  add_compiler_rt_object_libraries(RTCilksan_dynamic
+    ARCHS ${CILKSAN_SUPPORTED_ARCH}
+    SOURCES ${CILKSAN_SOURCES}
+    CFLAGS ${CILKSAN_DYNAMIC_CFLAGS}
+    DEFS ${CILKSAN_DYNAMIC_DEFINITIONS})
+
+  add_compiler_rt_object_libraries(RTCilksan
+    ARCHS ${CILKSAN_SUPPORTED_ARCH}
+    SOURCES ${CILKSAN_SOURCES}
+    CFLAGS ${CILKSAN_CFLAGS}
+    DEFS ${CILKSAN_COMMON_DEFINITIONS})
+
+  foreach (arch ${CILKSAN_SUPPORTED_ARCH})
+    add_compiler_rt_runtime(clang_rt.cilksan
+      STATIC
+      ARCHS ${arch}
+      OBJECT_LIBS RTCilksan
+      CFLAGS ${CILKSAN_CFLAGS}
+      DEFS ${CILKSAN_COMMON_DEFINITIONS}
+      PARENT_TARGET cilksan)
+
+    add_compiler_rt_runtime(clang_rt.cilksan
+      SHARED
+      ARCHS ${arch}
+      OBJECT_LIBS RTCilksan_dynamic
+      CFLAGS ${CILKSAN_DYNAMIC_CFLAGS}
+      LINK_FLAGS ${CILKSAN_DYNAMIC_LINK_FLAGS}
+      LINK_LIBS ${CILKSAN_DYNAMIC_LIBS}
+      DEFS ${CILKSAN_DYNAMIC_DEFINITIONS}
+      PARENT_TARGET cilksan)
+  endforeach()
+endif()
 
 if (COMPILER_RT_INCLUDE_TESTS)
   # TODO(bruening): add tests via add_subdirectory(tests)
