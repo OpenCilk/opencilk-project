@@ -568,6 +568,9 @@ private:
                                StringRef Sanitizer,
                                bool shared = true) const;
 
+  void AddCilktoolRTLibs(const llvm::opt::ArgList &Args,
+			 llvm::opt::ArgStringList &CmdArgs) const;
+
   bool AddGnuCPlusPlusIncludePaths(const llvm::opt::ArgList &DriverArgs,
                                    llvm::opt::ArgStringList &CC1Args,
                                    llvm::SmallString<128> Base,
