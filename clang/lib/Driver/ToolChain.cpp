@@ -1093,7 +1093,8 @@ llvm::opt::DerivedArgList *ToolChain::TranslateOpenMPTargetArgs(
 }
 
 static void addRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
-                              ArgStringList &CmdArgs) {
+                              ArgStringList &CmdArgs,
+                              const llvm::Triple &Triple) {
   // Allow the -fno-rtlib-add-rpath flag to prevent adding this default
   // directory to the runpath.
   if (!Args.hasFlag(options::OPT_frtlib_add_rpath,
@@ -1107,7 +1108,8 @@ static void addRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
       CmdArgs.push_back("-rpath");
       CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
       // TODO: Check the portability of the --enable-new-dtags flag.
-      CmdArgs.push_back("--enable-new-dtags");
+      if (!Triple.isOSDarwin())
+        CmdArgs.push_back("--enable-new-dtags");
     }
   }
 }
@@ -1144,7 +1146,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
 
     // Add to the executable's runpath the default directory containing OpenCilk
     // runtime, when the runtime is compiled as an integrated component.
-    addRuntimeRunPath(*this, Args, CmdArgs);
+    addRuntimeRunPath(*this, Args, CmdArgs, Triple);
     if (OnlyStaticOpenCilk)
       CmdArgs.push_back("-Bdynamic");
     CmdArgs.push_back("-lpthread");
