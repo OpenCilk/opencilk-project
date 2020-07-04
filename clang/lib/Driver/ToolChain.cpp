@@ -1323,7 +1323,7 @@ static void addRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
       CmdArgs.push_back("-rpath");
       CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
       // TODO: Check the portability of the --enable-new-dtags flag.
-      if (!Triple.isOSDarwin())
+      if (Triple.isOSBinFormatELF())
         CmdArgs.push_back("--enable-new-dtags");
     }
   }
