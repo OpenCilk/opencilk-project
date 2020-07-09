@@ -18,6 +18,7 @@
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/Options.h"
 #include "clang/Driver/SanitizerArgs.h"
+#include "clang/Driver/Tapir.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/ProfileData/InstrProf.h"
@@ -603,8 +604,6 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddAllArgs(CmdArgs, options::OPT_L);
 
-  getToolChain().AddTapirRuntimeLibArgs(Args, CmdArgs);
-
   AddLinkerInputs(getToolChain(), Inputs, Args, CmdArgs, JA);
   // Build the input file for -filelist (list of linker input files) in case we
   // need it later
@@ -658,6 +657,8 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   if (getToolChain().ShouldLinkCXXStdlib(Args))
     getToolChain().AddCXXStdlibLibArgs(Args, CmdArgs);
+
+  getMachOToolChain().AddLinkTapirRuntime(Args, CmdArgs);
 
   bool NoStdOrDefaultLibs =
       Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs);
@@ -1258,7 +1259,7 @@ void DarwinClang::AddLinkSanitizerLibArgs(const ArgList &Args,
 }
 
 void DarwinClang::AddCilktoolRTLibs(const ArgList &Args,
-				    ArgStringList &CmdArgs) const {
+                                    ArgStringList &CmdArgs) const {
   if (Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ)) {
     StringRef Val = A->getValue();
     auto RLO = RuntimeLinkOptions(RLO_AlwaysLink);
@@ -2807,4 +2808,103 @@ SanitizerMask Darwin::getSupportedSanitizers() const {
 void Darwin::printVerboseInfo(raw_ostream &OS) const {
   CudaInstallation.print(OS);
   RocmInstallation.print(OS);
+}
+
+void DarwinClang::AddLinkTapirRuntimeLib(const ArgList &Args,
+                                         ArgStringList &CmdArgs,
+                                         StringRef LibName,
+                                         RuntimeLinkOptions Opts,
+                                         bool IsShared) const {
+  SmallString<64> DarwinLibName = StringRef("lib");
+  DarwinLibName += LibName;
+  DarwinLibName += IsShared ? ".dylib" : ".a";
+  SmallString<128> Dir(getDriver().ResourceDir);
+  llvm::sys::path::append(
+      Dir, "lib", (Opts & RLO_IsEmbedded) ? "macho_embedded" : "darwin");
+
+  SmallString<128> P(Dir);
+  llvm::sys::path::append(P, DarwinLibName);
+
+  // For now, allow missing resource libraries to support developers who may
+  // not have compiler-rt checked out or integrated into their build (unless
+  // we explicitly force linking with this library).
+  if ((Opts & RLO_AlwaysLink) || getVFS().exists(P)) {
+    const char *LibArg = Args.MakeArgString(P);
+    if (Opts & RLO_FirstLink)
+      CmdArgs.insert(CmdArgs.begin(), LibArg);
+    else
+      CmdArgs.push_back(LibArg);
+  }
+
+  // Adding the rpaths might negatively interact when other rpaths are involved,
+  // so we should make sure we add the rpaths last, after all user-specified
+  // rpaths. This is currently true from this place, but we need to be
+  // careful if this function is ever called before user's rpaths are emitted.
+  if (Opts & RLO_AddRPath) {
+    assert(DarwinLibName.endswith(".dylib") && "must be a dynamic library");
+
+    // Add @executable_path to rpath to support having the dylib copied with
+    // the executable.
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back("@executable_path");
+
+    // Add the path to the resource dir to rpath to support using the dylib
+    // from the default location without copying.
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(Dir));
+  }
+}
+
+void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
+                                      ArgStringList &CmdArgs) const {
+  TapirTargetID TapirTarget = parseTapirTarget(Args);
+  if (TapirTarget == TapirTargetID::Last_TapirTargetID)
+    if (const Arg *A = Args.getLastArg(options::OPT_ftapir_EQ))
+      getDriver().Diag(diag::err_drv_invalid_value) << A->getAsString(Args)
+                                                    << A->getValue();
+
+  switch (TapirTarget) {
+  case TapirTargetID::Cheetah:
+    CmdArgs.push_back("-lcheetah");
+    CmdArgs.push_back("-lpthread");
+    break;
+  case TapirTargetID::OpenCilk: {
+    bool StaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk);
+
+    auto RLO = RLO_AlwaysLink;
+    if (!StaticOpenCilk)
+      RLO = RuntimeLinkOptions(RLO | RLO_AddRPath);
+
+    // Link the correct Cilk personality fn
+    if (getDriver().CCCIsCXX())
+      AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk-personality-cpp", RLO,
+                             !StaticOpenCilk);
+    else
+      AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk-personality-c", RLO,
+                             !StaticOpenCilk);
+
+    // Link the opencilk runtime.  We do this after linking the personality
+    // function, to ensure that symbols are resolved correctly when using static
+    // linking.
+    AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk", RLO, !StaticOpenCilk);
+
+    CmdArgs.push_back("-lpthread");
+    break;
+  }
+  case TapirTargetID::Cilk:
+    CmdArgs.push_back("-lcilkrts");
+    break;
+  case TapirTargetID::CilkR:
+    CmdArgs.push_back("-lcilkr");
+    CmdArgs.push_back("-lpthread");
+    break;
+  case TapirTargetID::OpenMP:
+    CmdArgs.push_back("-lomp");
+    break;
+  case TapirTargetID::Qthreads:
+    CmdArgs.push_back("-lqthread");
+    break;
+  default:
+    break;
+  }
 }
