@@ -637,7 +637,7 @@ public:
   /// Return true if the analysis found child taskframes of this task.  This
   /// method assumes that taskframes are in canonical form and that
   /// findTaskFrameTree() has run.
-  bool foundChildTaskFrames() const { return TaskFrameRoots.empty(); }
+  bool foundChildTaskFrames() const { return !TaskFrameRoots.empty(); }
 
   /// Return the detach instruction that created this task, or nullptr if this
   /// task is a root task.
