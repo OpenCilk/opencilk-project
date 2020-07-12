@@ -1481,7 +1481,7 @@ static bool needToSplitTaskFrameEnd(const Instruction *TFEnd) {
 /// the representation of Tapir taskframes in F.
 bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
                                       TaskInfo *TI) {
-  if (F.empty() || (TI && TI->isSerial()))
+  if (F.empty())
     return false;
 
   // Scan the function for taskframe.create instructions to split.
