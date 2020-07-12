@@ -4049,6 +4049,14 @@ static bool isCleanupBlockEmpty(Instruction *Inst, Instruction *RI) {
   return true;
 }
 
+static bool isTaskFrameUnassociated(const Value *TFCreate) {
+  for (const User *U : TFCreate->users())
+    if (const Instruction *I = dyn_cast<Instruction>(U))
+      if (isTapirIntrinsic(Intrinsic::taskframe_use, I))
+        return false;
+  return true;
+}
+
 // Simplify resume that is only used by a single (non-phi) landing pad.
 bool SimplifyCFGOpt::simplifySingleResume(ResumeInst *RI) {
   BasicBlock *BB = RI->getParent();
@@ -4059,6 +4067,14 @@ bool SimplifyCFGOpt::simplifySingleResume(ResumeInst *RI) {
   // Check that there are no other instructions except for debug intrinsics.
   if (!isCleanupBlockEmpty(LPInst, RI))
     return false;
+
+  // Check that no predecessor is a taskframe.resume for an unassociated
+  // taskframe.
+  for (const BasicBlock *Pred : predecessors(BB))
+    if (isTaskFrameResume(Pred->getTerminator()))
+      if (isTaskFrameUnassociated(
+              cast<InvokeInst>(Pred->getTerminator())->getArgOperand(0)))
+        return false;
 
   // Turn all invokes that unwind here into calls and delete the basic block.
   for (pred_iterator PI = pred_begin(BB), PE = pred_end(BB); PI != PE;) {
