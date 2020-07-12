@@ -244,7 +244,8 @@ bool llvm::simplifyTask(Task *T) {
 }
 
 static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks) {
-  if (!TF->getTaskFrameCreate())
+  Value *TFCreate = TF->getTaskFrameCreate();
+  if (!TFCreate)
     // Ignore implicit taskframes created from the start of a task that does not
     // explicitly use another taskframe.
     return false;
@@ -255,6 +256,12 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks) {
   // We only need to check the spindles in the taskframe itself for these
   // properties.  We do not need to check the task that uses this taskframe.
   const Task *UserT = TF->getTaskFromTaskFrame();
+
+  if (!UserT && !MPTasks.TaskList[TF].empty() && getTaskFrameResume(TFCreate))
+    // Landingpads perform an implicit sync, so if there are logically parallel
+    // tasks with this unassociated taskframe and it has a resume destination,
+    // then it has a distinguishing sync.
+    return false;
 
   // Create filter for MPTasks of tasks from parent of task UserT, if UserT
   // exists.
