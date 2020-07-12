@@ -336,6 +336,87 @@ Address CodeGenFunction::DetachScope::CreateDetachedMemTemp(
   return RefTmp;
 }
 
+CodeGenFunction::TaskFrameScope::TaskFrameScope(CodeGenFunction &CGF)
+    : CGF(CGF) {
+  if (LangOptions::Cilk_none == CGF.getLangOpts().getCilk())
+    return;
+  if (!CGF.CurSyncRegion)
+    return;
+
+  llvm::Function *TaskFrameCreate =
+      CGF.CGM.getIntrinsic(llvm::Intrinsic::taskframe_create);
+  TaskFrame = CGF.Builder.CreateCall(TaskFrameCreate);
+
+  // Create a new alloca insertion point within the task frame.
+  OldAllocaInsertPt = CGF.AllocaInsertPt;
+  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
+  CGF.AllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "",
+                                             CGF.Builder.GetInsertBlock());
+
+  // Save the old EH state.
+  OldEHResumeBlock = CGF.EHResumeBlock;
+  CGF.EHResumeBlock = nullptr;
+  OldExceptionSlot = CGF.ExceptionSlot;
+  CGF.ExceptionSlot = nullptr;
+  OldEHSelectorSlot = CGF.EHSelectorSlot;
+  CGF.EHSelectorSlot = nullptr;
+  OldNormalCleanupDest = CGF.NormalCleanupDest;
+  CGF.NormalCleanupDest = Address::invalid();
+
+  CGF.pushFullExprCleanup<EndUnassocTaskFrame>(
+      static_cast<CleanupKind>(NormalAndEHCleanup | LifetimeMarker | TaskExit),
+      this);
+}
+
+CodeGenFunction::TaskFrameScope::~TaskFrameScope() {
+  if (LangOptions::Cilk_none == CGF.getLangOpts().getCilk())
+    return;
+  if (!CGF.CurSyncRegion)
+    return;
+
+  // Pop the taskframe.
+  CGF.PopCleanupBlock();
+
+  // Restore the alloca insertion point.
+  {
+    llvm::Instruction *Ptr = CGF.AllocaInsertPt;
+    CGF.AllocaInsertPt = OldAllocaInsertPt;
+    Ptr->eraseFromParent();
+  }
+
+  // Restore the original EH state.
+  llvm::BasicBlock *NestedEHResumeBlock = CGF.EHResumeBlock;
+  CGF.EHResumeBlock = OldEHResumeBlock;
+  CGF.ExceptionSlot = OldExceptionSlot;
+  CGF.EHSelectorSlot = OldEHSelectorSlot;
+  CGF.NormalCleanupDest = OldNormalCleanupDest;
+
+  if (TempInvokeDest) {
+    if (llvm::BasicBlock *InvokeDest = CGF.getInvokeDest()) {
+      TempInvokeDest->replaceAllUsesWith(InvokeDest);
+    } else
+      EmitTrivialLandingPad(CGF, TempInvokeDest);
+
+    if (TempInvokeDest->use_empty())
+      delete TempInvokeDest;
+  }
+
+  // If invocations in the parallel task led to the creation of EHResumeBlock,
+  // we need to create for outside the task.  In particular, the new
+  // EHResumeBlock must use an ExceptionSlot and EHSelectorSlot allocated
+  // outside of the task.
+  if (NestedEHResumeBlock) {
+    if (!NestedEHResumeBlock->use_empty()) {
+      // Translate the nested EHResumeBlock into an appropriate EHResumeBlock in
+      // the outer scope.
+      NestedEHResumeBlock->replaceAllUsesWith(
+          CGF.getEHResumeBlock(
+              isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
+    }
+    delete NestedEHResumeBlock;
+  }
+}
+
 llvm::Instruction *CodeGenFunction::EmitSyncRegionStart() {
   // Start the sync region.  To ensure the syncregion.start call dominates all
   // uses of the generated token, we insert this call at the alloca insertion
