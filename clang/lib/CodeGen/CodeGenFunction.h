@@ -1511,6 +1511,81 @@ public:
     }
   };
 
+  // Simple RAII object for creating an unassociated taskframe.
+  class TaskFrameScope {
+    CodeGenFunction &CGF;
+
+    // Old alloca insertion points from the CGF to restore when we're done
+    // emitting the spawned task and associated taskframe.
+    llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = nullptr;
+
+    // A temporary invoke destination, maintained to handle the emission of
+    // detached.rethrow and taskframe.resume intrinsics on exception-handling
+    // paths out of a spawned task or its taskframe.
+    llvm::BasicBlock *TempInvokeDest = nullptr;
+
+    // Old EH state from the CGF to restore when we're done emitting the spawned
+    // task and associated taskframe.
+    llvm::BasicBlock *OldEHResumeBlock = nullptr;
+    llvm::Value *OldExceptionSlot = nullptr;
+    llvm::AllocaInst *OldEHSelectorSlot = nullptr;
+    Address OldNormalCleanupDest = Address::invalid();
+
+    // Taskframe created separately from detach.
+    llvm::Value *TaskFrame = nullptr;
+  public:
+    TaskFrameScope(CodeGenFunction &CGF);
+    ~TaskFrameScope();
+
+    llvm::Value *getTaskFrame() const { return TaskFrame; }
+
+    // Get a temporary destination for an invoke, creating a new one if
+    // necessary.
+    llvm::BasicBlock *getTempInvokeDest() {
+      if (!TempInvokeDest)
+        TempInvokeDest = CGF.createBasicBlock("temp.invoke.dest");
+      return TempInvokeDest;
+    }
+  };
+
+  /// Cleanup to ensure a taskframe is ended with a taskframe.resume on an
+  /// exception-handling path.
+  struct EndUnassocTaskFrame final : public EHScopeStack::Cleanup {
+    TaskFrameScope *TFScope;
+  public:
+    EndUnassocTaskFrame(TaskFrameScope *TFScope) : TFScope(TFScope) {}
+    void Emit(CodeGenFunction &CGF, Flags F) override {
+      if (F.isForNormalCleanup()) {
+        // For normal cleanups, just insert a call to taskframe.end.
+        llvm::Function *TaskFrameEnd =
+            CGF.CGM.getIntrinsic(llvm::Intrinsic::taskframe_end);
+        assert(TFScope->getTaskFrame() && "No taskframe in TFScope");
+        CGF.Builder.CreateCall(TaskFrameEnd, { TFScope->getTaskFrame() });
+        return;
+      }
+
+      // Recreate the landingpad's return value for the rethrow invoke.  Tapir
+      // lowering will replace this rethrow with a resume.
+      llvm::Value *Exn = CGF.Builder.CreateLoad(
+          Address(CGF.ExceptionSlot, CGF.getPointerAlign()), "exn");
+      llvm::Value *Sel = CGF.Builder.CreateLoad(
+          Address(CGF.EHSelectorSlot, CharUnits::fromQuantity(4)), "sel");
+      llvm::Type *LPadType = llvm::StructType::get(Exn->getType(),
+                                                   Sel->getType());
+      llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
+      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
+      LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");
+
+      llvm::Function *TaskFrameResume =
+          CGF.CGM.getIntrinsic(llvm::Intrinsic::taskframe_resume,
+                               { LPadVal->getType() });
+      CGF.Builder.CreateInvoke(TaskFrameResume, CGF.getUnreachableBlock(),
+                               TFScope->getTempInvokeDest(),
+                               { TFScope->getTaskFrame(), LPadVal });
+      CGF.Builder.SetInsertPoint(TFScope->getTempInvokeDest());
+    }
+  };
+
   /// Takes the old cleanup stack size and emits the cleanup blocks
   /// that have been added.
   void
