@@ -123,7 +123,8 @@ void TapirLoopInfo::addInductionPhi(PHINode *Phi,
   //   AllowedExit.insert(Phi->getIncomingValueForBlock(TheLoop->getLoopLatch()));
   // }
 
-  LLVM_DEBUG(dbgs() << "TapirLoop: Found an induction variable.\n");
+  LLVM_DEBUG(dbgs() << "TapirLoop: Found an induction variable: " << *Phi
+             << "\n");
 }
 
 /// Gather all induction variables in this loop that need special handling
@@ -178,12 +179,11 @@ bool TapirLoopInfo::collectIVs(PredicatedScalarEvolution &PSE,
   if (!PrimaryInduction) {
     LLVM_DEBUG(dbgs()
                << "TapirLoop: Did not find a primary integer induction var.\n");
-    if (Inductions.empty()) {
-      if (ORE)
-        ORE->emit(createMissedAnalysis(PassName, "NoInductionVariable", L)
-                  << "loop induction variable could not be identified");
+    if (ORE)
+      ORE->emit(createMissedAnalysis(PassName, "NoInductionVariable", L)
+                << "canonical loop induction variable could not be identified");
+    if (Inductions.empty())
       return false;
-    }
   }
 
   // Now we know the widest induction type, check if our found induction is the
