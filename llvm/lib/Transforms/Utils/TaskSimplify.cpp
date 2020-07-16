@@ -13,8 +13,11 @@
 #include "llvm/Transforms/Utils/TaskSimplify.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/PassManager.h"
@@ -31,10 +34,15 @@ using namespace llvm;
 STATISTIC(NumUniqueSyncRegs, "Number of unique sync regions found.");
 STATISTIC(NumDiscriminatingSyncs, "Number of discriminating syncs found.");
 STATISTIC(NumTaskFramesErased, "Number of taskframes erased");
+STATISTIC(NumSimpl, "Number of blocks simplified");
 
 static cl::opt<bool> SimplifyTaskFrames(
     "simplify-taskframes", cl::init(true), cl::Hidden,
     cl::desc("Enable simplification of taskframes."));
+
+static cl::opt<bool> PostCleanupCFG(
+    "post-cleanup-cfg", cl::init(true), cl::Hidden,
+    cl::desc("Cleanup the CFG after task simplification."));
 
 static bool syncMatchesReachingTask(const Value *SyncSR,
                                     SmallPtrSetImpl<const Task *> &MPTasks) {
@@ -395,13 +403,57 @@ bool llvm::simplifyTaskFrames(TaskInfo &TI, DominatorTree &DT) {
   return Changed;
 }
 
-static void simplifyCFG(Function &F) {
-  llvm::legacy::FunctionPassManager FPM(F.getParent());
-  FPM.add(createCFGSimplificationPass());
 
-  FPM.doInitialization();
-  FPM.run(F);
-  FPM.doFinalization();
+/// Call SimplifyCFG on all the blocks in the function,
+/// iterating until no more changes are made.
+static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
+                                   const SimplifyCFGOptions &Options) {
+  bool Changed = false;
+  bool LocalChange = true;
+
+  SmallVector<std::pair<const BasicBlock *, const BasicBlock *>, 32> Edges;
+  FindFunctionBackedges(F, Edges);
+  SmallPtrSet<BasicBlock *, 16> LoopHeaders;
+  for (unsigned i = 0, e = Edges.size(); i != e; ++i)
+    LoopHeaders.insert(const_cast<BasicBlock *>(Edges[i].second));
+
+  while (LocalChange) {
+    LocalChange = false;
+
+    // Loop over all of the basic blocks and remove them if they are unneeded.
+    for (Function::iterator BBIt = F.begin(); BBIt != F.end(); ) {
+      if (simplifyCFG(&*BBIt++, TTI, Options, &LoopHeaders)) {
+        LocalChange = true;
+        ++NumSimpl;
+      }
+    }
+    Changed |= LocalChange;
+  }
+  return Changed;
+}
+
+static bool simplifyFunctionCFG(Function &F, const TargetTransformInfo &TTI,
+                                const SimplifyCFGOptions &Options) {
+  bool EverChanged = removeUnreachableBlocks(F);
+  EverChanged |= iterativelySimplifyCFG(F, TTI, Options);
+
+  // If neither pass changed anything, we're done.
+  if (!EverChanged) return false;
+
+  // iterativelySimplifyCFG can (rarely) make some loops dead.  If this happens,
+  // removeUnreachableBlocks is needed to nuke them, which means we should
+  // iterate between the two optimizations.  We structure the code like this to
+  // avoid rerunning iterativelySimplifyCFG if the second pass of
+  // removeUnreachableBlocks doesn't do anything.
+  if (!removeUnreachableBlocks(F))
+    return true;
+
+  do {
+    EverChanged = iterativelySimplifyCFG(F, TTI, Options);
+    EverChanged |= removeUnreachableBlocks(F);
+  } while (EverChanged);
+
+  return true;
 }
 
 namespace {
@@ -414,7 +466,9 @@ struct TaskSimplify : public FunctionPass {
   bool runOnFunction(Function &F) override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequired<AssumptionCacheTracker>();
     AU.addRequired<DominatorTreeWrapperPass>();
+    AU.addRequired<TargetTransformInfoWrapperPass>();
     AU.addRequired<TaskInfoWrapperPass>();
     AU.addPreserved<GlobalsAAWrapperPass>();
   }
@@ -424,7 +478,9 @@ struct TaskSimplify : public FunctionPass {
 char TaskSimplify::ID = 0;
 INITIALIZE_PASS_BEGIN(TaskSimplify, "task-simplify",
                 "Simplify Tapir tasks", false, false)
+INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_END(TaskSimplify, "task-simplify",
                 "Simplify Tapir tasks", false, false)
@@ -442,10 +498,14 @@ bool TaskSimplify::runOnFunction(Function &F) {
 
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   TaskInfo &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
-  splitTaskFrameCreateBlocks(F, &DT, &TI);
+  bool SplitBlocks = splitTaskFrameCreateBlocks(F, &DT, &TI);
   TI.findTaskFrameTree();
   if (TI.isSerial() && !TI.foundChildTaskFrames())
     return false;
+
+  SimplifyCFGOptions Options;
+  auto &TTI = getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
+  Options.AC = &getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
 
   bool Changed = false;
   LLVM_DEBUG(dbgs() << "TaskSimplify running on function " << F.getName()
@@ -456,8 +516,11 @@ bool TaskSimplify::runOnFunction(Function &F) {
     Changed |= simplifyTaskFrames(TI, DT);
     if (Changed) {
       TI.recalculate(F, DT);
-      if (TI.isSerial())
+      if (TI.isSerial()) {
+        if (PostCleanupCFG && SplitBlocks)
+          simplifyFunctionCFG(F, TTI, Options);
         return Changed;
+      }
     }
   }
 
@@ -475,8 +538,8 @@ bool TaskSimplify::runOnFunction(Function &F) {
   for (Task *T : post_order(TI.getRootTask()))
     Changed |= simplifyTask(T);
 
-  if (Changed)
-    simplifyCFG(F);
+  if (PostCleanupCFG && (Changed | SplitBlocks))
+    Changed |= simplifyFunctionCFG(F, TTI, Options);
 
   return Changed;
 }
@@ -488,10 +551,14 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
 
   DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);
   TaskInfo &TI = AM.getResult<TaskAnalysis>(F);
-  splitTaskFrameCreateBlocks(F, &DT, &TI);
+  bool SplitBlocks = splitTaskFrameCreateBlocks(F, &DT, &TI);
   TI.findTaskFrameTree();
   if (TI.isSerial() && !TI.foundChildTaskFrames())
     return PreservedAnalyses::all();
+
+  SimplifyCFGOptions Options;
+  auto &TTI = AM.getResult<TargetIRAnalysis>(F);
+  Options.AC = &AM.getResult<AssumptionAnalysis>(F);
 
   bool Changed = false;
   LLVM_DEBUG(dbgs() << "TaskSimplify running on function " << F.getName()
@@ -503,6 +570,8 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
     if (Changed) {
       TI.recalculate(F, DT);
       if (TI.isSerial()) {
+        if (PostCleanupCFG && SplitBlocks)
+          simplifyFunctionCFG(F, TTI, Options);
         PreservedAnalyses PA;
         PA.preserve<GlobalsAA>();
         return PA;
@@ -523,6 +592,9 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
   // Simplify each task in the function.
   for (Task *T : post_order(TI.getRootTask()))
     Changed |= simplifyTask(T);
+
+  if (PostCleanupCFG && (Changed | SplitBlocks))
+    Changed |= simplifyFunctionCFG(F, TTI, Options);
 
   if (!Changed)
     return PreservedAnalyses::all();
