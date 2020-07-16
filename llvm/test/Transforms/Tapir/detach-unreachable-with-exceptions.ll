@@ -1,5 +1,5 @@
 ; RUN: opt < %s -passes=simplify-cfg -S | FileCheck %s --check-prefix=SC
-; RUN: opt < %s -passes=simplify-cfg,task-simplify -S | FileCheck %s --check-prefix=TS
+; RUN: opt < %s -passes=simplify-cfg,task-simplify -post-cleanup-cfg=false -S | FileCheck %s --check-prefix=TS
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
