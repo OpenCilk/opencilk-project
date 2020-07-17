@@ -5466,16 +5466,34 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     if (!Triple.isOSLinux() && !Triple.isOSFreeBSD() && !Triple.isMacOSX())
       D.Diag(diag::err_drv_cilk_unsupported);
 
+    /* JFC: Is it possible to confuse with with -fno-opencilk? */
+    bool OpenCilk = Args.hasArgNoClaim(options::OPT_fopencilk);
+    bool Cheetah = false;
+
     if (Arg *TapirRuntime = Args.getLastArgNoClaim(options::OPT_ftapir_EQ)) {
-      // Cheetah runtime is x86 only.
-      if (TapirRuntime->getValue() == StringRef("cheetah")) {
-	if (Triple.getArch() != llvm::Triple::x86_64)
-	  D.Diag(diag::err_drv_cilk_unsupported);
-      }
-      // OpenCilk will additionally support 64 bit ARM.
+      Cheetah = TapirRuntime->getValue() == StringRef("cheetah");
       if (TapirRuntime->getValue() == StringRef("opencilk")) {
-	if (Triple.getArch() != llvm::Triple::x86_64 && !Triple.isAArch64())
-	  D.Diag(diag::err_drv_cilk_unsupported);
+        OpenCilk = true;
+      }
+    }
+
+    if (Cheetah && Triple.getArch() != llvm::Triple::x86_64) {
+      D.Diag(diag::err_drv_cilk_unsupported);
+    }
+    if (OpenCilk) {
+      switch (Triple.getArch()) {
+      case llvm::Triple::x86:
+      case llvm::Triple::x86_64:
+      case llvm::Triple::arm:
+      case llvm::Triple::armeb:
+	break;
+      case llvm::Triple::aarch64:
+      case llvm::Triple::aarch64_be:
+      case llvm::Triple::aarch64_32:
+	/* ARMv8 is waiting on builtin setjmp/longjmp. */
+      default:
+	D.Diag(diag::err_drv_cilk_unsupported);
+	break;
       }
     }
   }
