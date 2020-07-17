@@ -18,8 +18,8 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Tapir/CilkABI.h"
-#include "llvm/Transforms/Tapir/CilkRABI.h"
 #include "llvm/Transforms/Tapir/CudaABI.h"
+#include "llvm/Transforms/Tapir/OpenCilkABI.h"
 #include "llvm/Transforms/Tapir/OpenMPABI.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Tapir/QthreadsABI.h"
@@ -44,13 +44,11 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return new SerialABI(M);
   case TapirTargetID::Cilk:
     return new CilkABI(M);
-  case TapirTargetID::CilkR:
-  case TapirTargetID::Cheetah:
-    return new CilkRABI(M, false);
   case TapirTargetID::Cuda:
     return new CudaABI(M);
+  case TapirTargetID::Cheetah:
   case TapirTargetID::OpenCilk:
-    return new CilkRABI(M, true);
+    return new OpenCilkABI(M);
   case TapirTargetID::OpenMP:
     return new OpenMPABI(M);
   case TapirTargetID::Qthreads:
