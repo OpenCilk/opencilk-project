@@ -1,4 +1,4 @@
-//===- CilkRABI.h - Interface to the CilkR runtime system ------*- C++ -*--===//
+//===- OpenilkABI.h - Interface to the OpenCilk runtime system ---*- C++ -*--=//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the CilkR ABI to converts Tapir instructions to calls
-// into the CilkR runtime system.
+// This file implements the OpenCilk ABI to converts Tapir instructions to calls
+// into the OpenCilk runtime system.
 //
 //===----------------------------------------------------------------------===//
-#ifndef CILK_RABI_H_
-#define CILK_RABI_H_
+#ifndef OPEN_CILK_ABI_H_
+#define OPEN_CILK_ABI_H_
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
@@ -21,21 +21,23 @@ namespace llvm {
 class Value;
 class TapirLoopInfo;
 
-class CilkRABI : public TapirTarget {
+class OpenCilkABI : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
   SmallPtrSet<CallBase *, 8> CallsToInline;
 
   // Cilk RTS data types
   StructType *StackFrameTy = nullptr;
   StructType *WorkerTy = nullptr;
-  short StackFrameFieldFlags = -1;
-  short StackFrameFieldParent = -1;
-  short StackFrameFieldWorker = -1;
-  short StackFrameFieldContext = -1;
-  short StackFrameFieldMXCSR = -1;
-  short StackFrameFieldFPCSR = -1;
-  short WorkerFieldTail = 0;
-  short WorkerFieldFrame = 7;
+  signed char StackFrameFieldFlags = -1;
+  signed char StackFrameFieldParent = -1;
+  signed char StackFrameFieldWorker = -1;
+  signed char StackFrameFieldContext = -1;
+  signed char StackFrameFieldMXCSR = -1;
+  signed char StackFrameFieldMagic = -1;
+  signed char WorkerFieldTail = 0;
+  signed char WorkerFieldFrame = 7;
+
+  uint32_t FrameMagic = 0;
 
   // Opaque Cilk RTS functions
   FunctionCallee CilkRTSLeaveFrame = nullptr;
@@ -47,9 +49,6 @@ class CilkRABI : public TapirTarget {
   FunctionCallee CilkRTSCheckExceptionResume = nullptr;
   FunctionCallee CilkRTSCheckExceptionRaise = nullptr;
   FunctionCallee CilkRTSCleanupFiber = nullptr;
-
-  const int FrameVersion;
-  int FrameVersionFlag() const { return FrameVersion << 24; }
 
   // Accessors for opaque Cilk RTS functions
   FunctionCallee Get__cilkrts_leave_frame();
@@ -91,8 +90,8 @@ class CilkRABI : public TapirTarget {
   void MarkSpawner(Function &F);
 
 public:
-  CilkRABI(Module &M, bool OpenCilk);
-  ~CilkRABI() { DetachCtxToStackFrame.clear(); }
+  OpenCilkABI(Module &M);
+  ~OpenCilkABI() { DetachCtxToStackFrame.clear(); }
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
 
