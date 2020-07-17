@@ -1,6 +1,5 @@
 add_llvm_library(LLVMTapirOpts
   CilkABI.cpp
-  CilkRABI.cpp
   CilkRTSCilkFor.cpp
   CudaABI.cpp
   DRFScopedNoAliasAA.cpp
@@ -8,6 +7,7 @@ add_llvm_library(LLVMTapirOpts
   LoopStripMine.cpp
   LoopStripMinePass.cpp
   LoweringUtils.cpp
+  OpenCilkABI.cpp
   OpenMPABI.cpp
   Outline.cpp
   QthreadsABI.cpp
