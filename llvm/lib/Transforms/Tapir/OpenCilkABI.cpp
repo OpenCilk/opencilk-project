@@ -1,4 +1,4 @@
-//===- CilkRABI.cpp - Interface to the CilkR runtime system ---------------===//
+//===- OpenCilkABI.cpp - Interface to the OpenCilk runtime system------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the CilkR ABI to converts Tapir instructions to calls
-// into the CilkR runtime system.
+// This file implements the OpenCilk ABI to converts Tapir instructions to calls
+// into the OpenCilk runtime system.
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Transforms/Tapir/CilkRABI.h"
+#include "llvm/Transforms/Tapir/OpenCilkABI.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
@@ -30,14 +30,13 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "cilkrabi"
+#define DEBUG_TYPE "opencilk"
 
 extern cl::opt<bool> DebugABICalls;
 extern cl::opt<bool> UseExternalABIFunctions;
 
 enum {
-  __CILKRTS_ABI_VERSION_CILKR = 1, /* includes Cheetah */
-  __CILKRTS_ABI_VERSION_OPENCILK = 2
+  __CILKRTS_ABI_VERSION_OPENCILK = 3
 };
 
 enum {
@@ -54,7 +53,6 @@ enum {
 
 #define CILK_FRAME_VERSION_MASK  0xFF000000
 #define CILK_FRAME_FLAGS_MASK    0x00FFFFFF
-#define CILK_FRAME_VERSION_VALUE(_flags) (((_flags) & CILK_FRAME_VERSION_MASK) >> 24)
 #define CILK_FRAME_MBZ  (~ (CILK_FRAME_STOLEN            |       \
                             CILK_FRAME_UNSYNCHED         |       \
                             CILK_FRAME_DETACHED          |       \
@@ -68,25 +66,15 @@ enum {
 
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
 
-CilkRABI::CilkRABI(Module &M, bool OpenCilk)
-  : TapirTarget(M),
-    FrameVersion(OpenCilk ?
-                 __CILKRTS_ABI_VERSION_OPENCILK :
-                 __CILKRTS_ABI_VERSION_CILKR)
+OpenCilkABI::OpenCilkABI(Module &M)
+  : TapirTarget(M)
 {
   LLVMContext &C = M.getContext();
   Type *VoidPtrTy = Type::getInt8PtrTy(C);
   Type *Int32Ty = Type::getInt32Ty(C);
-  Type *Int16Ty = Type::getInt16Ty(C);
 
   // Get or create local definitions of Cilk RTS structure types.
-  const char *StackFrameName;
-  if (OpenCilk) {
-    StackFrameName = "struct.__opencilk_stack_frame";
-  }
-  else {
-    StackFrameName = "struct.__cilkrts_stack_frame";
-  }
+  const char *StackFrameName = "struct.__cilkrts_stack_frame";
   StackFrameTy = StructType::lookupOrCreate(C, StackFrameName);
   WorkerTy = StructType::lookupOrCreate(C, "struct.__cilkrts_worker");
 
@@ -94,59 +82,88 @@ CilkRABI::CilkRABI(Module &M, bool OpenCilk)
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
   ArrayType *ContextTy = ArrayType::get(VoidPtrTy, 5);
 
-  if (OpenCilk) {
-    Triple T(M.getTargetTriple());
-    if (T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64) {
-      if (StackFrameTy->isOpaque())
-        StackFrameTy->setBody(Int32Ty, // flags
-                              Int32Ty, // magic
-                              StackFramePtrTy, // call_parent
-                              WorkerPtrTy, // worker
-                              // VoidPtrTy, // except_data
-                              ContextTy, // ctx
-                              Int32Ty // mxcsr only
-                              );
-      StackFrameFieldFlags = 0;
-      StackFrameFieldParent = 2;
-      StackFrameFieldWorker = 3;
-      StackFrameFieldContext = 4;
-      StackFrameFieldMXCSR = 5;
-      StackFrameFieldFPCSR = -1;
-    }
-    else {
-      if (StackFrameTy->isOpaque())
-        StackFrameTy->setBody(Int32Ty, // flags
-                              Int32Ty, // magic
-                              StackFramePtrTy, // call_parent
-                              WorkerPtrTy, // worker
-                              // VoidPtrTy, // except_data
-                              ContextTy // ctx
-                              );
-      StackFrameFieldFlags = 0;
-      StackFrameFieldParent = 2;
-      StackFrameFieldWorker = 3;
-      StackFrameFieldContext = 4;
-      StackFrameFieldMXCSR = -1;
-      StackFrameFieldFPCSR = -1;
-    }
-  } else {
+  Triple T(M.getTargetTriple());
+  bool HasSSE = T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64;
+  if (HasSSE) {
     if (StackFrameTy->isOpaque())
       StackFrameTy->setBody(Int32Ty, // flags
+                            Int32Ty, // magic
                             StackFramePtrTy, // call_parent
                             WorkerPtrTy, // worker
                             // VoidPtrTy, // except_data
                             ContextTy, // ctx
-                            Int32Ty, // mxcsr
-                            Int16Ty, // fpcsr
-                            Int16Ty, // reserved
-                            Int32Ty // magic
+                            Int32Ty // mxcsr
                             );
-    StackFrameFieldFlags = 0;
-    StackFrameFieldParent = 1;
-    StackFrameFieldWorker = 2;
-    StackFrameFieldContext = 3;
-    StackFrameFieldMXCSR = 4;
-    StackFrameFieldFPCSR = 5;
+  }
+  else {
+    if (StackFrameTy->isOpaque())
+      StackFrameTy->setBody(Int32Ty, // flags
+                            Int32Ty, // magic
+                            StackFramePtrTy, // call_parent
+                            WorkerPtrTy, // worker
+                            // VoidPtrTy, // except_data
+                            ContextTy // ctx
+                            );
+  }
+
+  unsigned StackFields = StackFrameTy->getNumElements();
+  if (StackFields > 127)
+    StackFields = 127;
+  for (unsigned i = 0; i < StackFields; ++i) {
+    Type *E = StackFrameTy->getElementType(i);
+    if (E == Int32Ty) {
+      if (StackFrameFieldFlags < 0)
+	StackFrameFieldFlags = i;
+      else if (StackFrameFieldMagic < 0)
+	StackFrameFieldMagic = i;
+      else if (HasSSE && StackFrameFieldMXCSR < 0)
+	StackFrameFieldMXCSR = i;
+      continue;
+    }
+    if (E == StackFramePtrTy) {
+      if (StackFrameFieldParent < 0)
+	StackFrameFieldParent = i;
+      continue;
+    }
+    if (E == WorkerPtrTy) {
+      if (StackFrameFieldWorker < 0) {
+	StackFrameFieldWorker = i;
+      }
+      continue;
+    }
+    if (E == ContextTy) {
+      if (StackFrameFieldContext < 0)
+	StackFrameFieldContext = i;
+      continue;
+    }
+  }
+
+  /* These four fields are mandatory. TODO: Proper error message. */
+  assert(StackFrameFieldContext >= 0 && "__cilkrts_stack_frame lacks context");
+  assert(StackFrameFieldFlags >= 0 && "__cilkrts_stack_frame lacks flags");
+  assert(StackFrameFieldParent >= 0 && "__cilkrts_stack_frame lacks parent");
+  assert(StackFrameFieldWorker >= 0 && "__cilkrts_stack_frame lacks worker");
+
+  if (StackFrameFieldMagic >= 0) {
+    const StructLayout *StackLayout =
+      M.getDataLayout().getStructLayout(StackFrameTy);
+    /* This must match the runtime. */
+    uint32_t StackFieldHash = __CILKRTS_ABI_VERSION_OPENCILK;
+    StackFieldHash *= 13;
+    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldWorker);
+    StackFieldHash *= 13;
+    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldContext);
+    StackFieldHash *= 13;
+    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldMagic);
+    StackFieldHash *= 13;
+    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldFlags);
+    StackFieldHash *= 13;
+    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldParent);
+    if (StackFrameFieldMXCSR >= 0) {
+      StackFieldHash *= 13;
+      StackFieldHash += StackLayout->getElementOffset(StackFrameFieldMXCSR);
+    }
+    FrameMagic = StackFieldHash;
   }
 
   PointerType *StackFramePtrPtrTy = PointerType::getUnqual(StackFramePtrTy);
@@ -158,14 +175,17 @@ CilkRABI::CilkRABI(Module &M, bool OpenCilk)
                       Int32Ty, // self
                       VoidPtrTy, // g
                       VoidPtrTy, // l
-                      StackFramePtrTy // current_stack_frame
-                      // VoidPtrTy // reducer_map
+                      StackFramePtrTy, // current_stack_frame
+                      VoidPtrTy // reducer_map
                       );
+
+  /* TODO: If worker comes from program, verify that fields
+     have correct types. */
 }
 
 // Accessors for opaque Cilk RTS functions
 
-FunctionCallee CilkRABI::Get__cilkrts_get_nworkers() {
+FunctionCallee OpenCilkABI::Get__cilkrts_get_nworkers() {
   if (CilkRTSGetNworkers)
     return CilkRTSGetNworkers;
 
@@ -180,14 +200,11 @@ FunctionCallee CilkRABI::Get__cilkrts_get_nworkers() {
   return CilkRTSGetNworkers;
 }
 
-FunctionCallee CilkRABI::Get__cilkrts_leave_frame() {
+FunctionCallee OpenCilkABI::Get__cilkrts_leave_frame() {
   if (CilkRTSLeaveFrame)
     return CilkRTSLeaveFrame;
 
   const char *name = "__cilkrts_leave_frame";
-  if (FrameVersion == __CILKRTS_ABI_VERSION_OPENCILK) {
-    name = "__opencilk_leave_frame";
-  }
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
@@ -200,7 +217,7 @@ FunctionCallee CilkRABI::Get__cilkrts_leave_frame() {
   return CilkRTSLeaveFrame;
 }
 
-FunctionCallee CilkRABI::Get__cilkrts_pause_frame() {
+FunctionCallee OpenCilkABI::Get__cilkrts_pause_frame() {
   if (CilkRTSPauseFrame)
     return CilkRTSPauseFrame;
 
@@ -217,7 +234,7 @@ FunctionCallee CilkRABI::Get__cilkrts_pause_frame() {
   return CilkRTSPauseFrame;
 }
 
-FunctionCallee CilkRABI::Get__cilkrts_check_exception_resume() {
+FunctionCallee OpenCilkABI::Get__cilkrts_check_exception_resume() {
   if (CilkRTSCheckExceptionResume)
     return CilkRTSCheckExceptionResume;
 
@@ -230,7 +247,7 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_resume() {
 
   return CilkRTSCheckExceptionResume;
 }
-FunctionCallee CilkRABI::Get__cilkrts_check_exception_raise() {
+FunctionCallee OpenCilkABI::Get__cilkrts_check_exception_raise() {
   if (CilkRTSCheckExceptionRaise)
     return CilkRTSCheckExceptionRaise;
 
@@ -244,7 +261,7 @@ FunctionCallee CilkRABI::Get__cilkrts_check_exception_raise() {
   return CilkRTSCheckExceptionRaise;
 }
 
-FunctionCallee CilkRABI::Get__cilkrts_cleanup_fiber() {
+FunctionCallee OpenCilkABI::Get__cilkrts_cleanup_fiber() {
   if (CilkRTSCleanupFiber)
     return CilkRTSCleanupFiber;
 
@@ -262,7 +279,7 @@ FunctionCallee CilkRABI::Get__cilkrts_cleanup_fiber() {
   return CilkRTSCleanupFiber;
 }
 
-FunctionCallee CilkRABI::Get__cilkrts_sync() {
+FunctionCallee OpenCilkABI::Get__cilkrts_sync() {
   if (CilkRTSSync)
     return CilkRTSSync;
 
@@ -278,7 +295,7 @@ FunctionCallee CilkRABI::Get__cilkrts_sync() {
   return CilkRTSSync;
 }
 
-FunctionCallee CilkRABI::Get__cilkrts_get_tls_worker() {
+FunctionCallee OpenCilkABI::Get__cilkrts_get_tls_worker() {
   if (CilkRTSGetTLSWorker)
     return CilkRTSGetTLSWorker;
 
@@ -293,7 +310,7 @@ FunctionCallee CilkRABI::Get__cilkrts_get_tls_worker() {
   return CilkRTSGetTLSWorker;
 }
 
-void CilkRABI::addHelperAttributes(Function &Helper) {
+void OpenCilkABI::addHelperAttributes(Function &Helper) {
   // Use a fast calling convention for the helper.
   Helper.setCallingConv(CallingConv::Fast);
   // Inlining the helper function is not legal.
@@ -343,7 +360,7 @@ static Value *LoadSTyField(
 }
 
 /// Emit inline assembly code to save the floating point state, for x86 Only.
-void CilkRABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
+void OpenCilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
   LLVMContext &C = B.getContext();
   if (StackFrameFieldMXCSR >= 0) {
     FunctionType *FTy =
@@ -353,17 +370,6 @@ void CilkRABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
     Value *Asm = InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
     Value *Args[1] = {
       GEP(B, SF, StackFrameFieldMXCSR),
-    };
-    B.CreateCall(Asm, Args);
-  }
-  if (StackFrameFieldFPCSR >= 0) {
-    FunctionType *FTy =
-      FunctionType::get(Type::getVoidTy(C),
-			{PointerType::getUnqual(Type::getInt16Ty(C))},
-			false);
-    Value *Asm = InlineAsm::get(FTy, "fnstcw $0", "*m", /*sideeffects*/ true);
-    Value *Args[1] = {
-      GEP(B, SF, StackFrameFieldFPCSR)
     };
     B.CreateCall(Asm, Args);
   }
@@ -387,7 +393,7 @@ static bool GetOrCreateFunction(Module &M, const StringRef FnName,
 }
 
 /// Emit a call to the CILK_SETJMP function.
-CallInst *CilkRABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
+CallInst *OpenCilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   LLVMContext &Ctx = M.getContext();
 
   // We always want to save the floating point state too
@@ -435,7 +441,7 @@ CallInst *CilkRABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
 ///   sf->worker->current_stack_frame = sf->call_parent;
 ///   sf->call_parent = nullptr;
 /// }
-Function *CilkRABI::Get__cilkrts_pop_frame() {
+Function *OpenCilkABI::Get__cilkrts_pop_frame() {
   // Get or create the __cilkrts_pop_frame function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -506,7 +512,7 @@ Function *CilkRABI::Get__cilkrts_pop_frame() {
 ///
 ///   sf->flags |= CILK_FRAME_DETACHED;
 /// }
-Function *CilkRABI::Get__cilkrts_detach() {
+Function *OpenCilkABI::Get__cilkrts_detach() {
   // Get or create the __cilkrts_detach function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -594,7 +600,7 @@ Function *CilkRABI::Get__cilkrts_detach() {
 ///
 /// With exceptions disabled in the compiler, the function
 /// does not call __cilkrts_rethrow()
-Function *CilkRABI::GetCilkSyncFn() {
+Function *OpenCilkABI::GetCilkSyncFn() {
   // Get or create the __cilk_sync function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -713,7 +719,7 @@ Function *CilkRABI::GetCilkSyncFn() {
 ///
 /// With exceptions disabled in the compiler, the function
 /// does not call __cilkrts_rethrow()
-Function *CilkRABI::GetCilkSyncNoThrowFn() {
+Function *OpenCilkABI::GetCilkSyncNoThrowFn() {
   // Get or create the __cilk_sync_nothrow function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -802,7 +808,7 @@ Function *CilkRABI::GetCilkSyncNoThrowFn() {
 ///
 /// With exceptions disabled in the compiler, the function
 /// does not call __cilkrts_rethrow()
-Function *CilkRABI::GetCilkPauseFrameFn() {
+Function *OpenCilkABI::GetCilkPauseFrameFn() {
   // Get or create the __cilk_sync function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -876,7 +882,7 @@ Function *CilkRABI::GetCilkPauseFrameFn() {
 ///     /* sf->except_data is only valid when CILK_FRAME_EXCEPTING is set */
 ///     w->current_stack_frame = sf;
 /// }
-Function *CilkRABI::Get__cilkrts_enter_frame() {
+Function *OpenCilkABI::Get__cilkrts_enter_frame() {
   // Get or create the __cilkrts_enter_frame function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -930,12 +936,19 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
   // Block  (FastPath)
   {
     IRBuilder<> B(FastPath);
-    // sf->flags = CILK_FRAME_VERSION;
+    // sf->flags = 0
+    // sf->magic = (magic)
     Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
     StoreSTyField(B, DL, StackFrameTy,
-                  ConstantInt::get(Ty, FrameVersionFlag()),
+                  ConstantInt::get(Ty, 0),
                   SF, StackFrameFieldFlags, /*isVolatile=*/false,
                   AtomicOrdering::Unordered);
+    if (StackFrameFieldMagic >= 0) {
+      StoreSTyField(B, DL, StackFrameTy,
+		    ConstantInt::get(Ty, FrameMagic),
+		    SF, StackFrameFieldMagic, /*isVolatile=*/false,
+		    AtomicOrdering::Unordered);
+    }
     B.CreateBr(Cont);
   }
   // Block  (Cont)
@@ -986,7 +999,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame() {
 ///     /* sf->except_data is only valid when CILK_FRAME_EXCEPTING is set */
 ///     w->current_stack_frame = sf;
 /// }
-Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
+Function *OpenCilkABI::Get__cilkrts_enter_frame_fast() {
   // Get or create the __cilkrts_enter_frame_fast function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -1017,10 +1030,15 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
   StructType *SFTy = StackFrameTy;
   Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
 
-  // sf->flags = CILK_FRAME_VERSION;
+  // sf->flags = 0
   StoreSTyField(B, DL, StackFrameTy,
-                ConstantInt::get(Ty, FrameVersionFlag()),
+                ConstantInt::get(Ty, 0),
                 SF, StackFrameFieldFlags, /*isVolatile=*/false,
+                AtomicOrdering::Unordered);
+  // sf->magic = (magic)
+    StoreSTyField(B, DL, StackFrameTy,
+                ConstantInt::get(Ty, FrameMagic),
+                SF, StackFrameFieldMagic, /*isVolatile=*/false,
                 AtomicOrdering::Unordered);
   // sf->call_parent = w->current_stack_frame;
   StoreSTyField(B, DL, StackFrameTy,
@@ -1055,7 +1073,7 @@ Function *CilkRABI::Get__cilkrts_enter_frame_fast() {
 ///   if (sf->flags != CILK_FRAME_VERSION)
 ///     __cilkrts_leave_frame(sf);
 /// }
-Function *CilkRABI::GetCilkParentEpilogueFn() {
+Function *OpenCilkABI::GetCilkParentEpilogueFn() {
   // Get or create the __cilk_parent_epilogue function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -1090,8 +1108,7 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
     Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
                                 StackFrameFieldFlags, /*isVolatile=*/false,
                                 AtomicOrdering::Unordered);
-    Value *Cond = B.CreateICmpNE(
-        Flags, ConstantInt::get(Flags->getType(), FrameVersionFlag()));
+    Value *Cond = B.CreateICmpNE(Flags, ConstantInt::get(Flags->getType(), 0));
     B.CreateCondBr(Cond, B1, Exit);
   }
 
@@ -1125,7 +1142,7 @@ Function *CilkRABI::GetCilkParentEpilogueFn() {
 static const StringRef stack_frame_name = "__cilkrts_sf";
 
 /// Create the __cilkrts_stack_frame for the spawning function.
-AllocaInst *CilkRABI::CreateStackFrame(Function &F) {
+AllocaInst *OpenCilkABI::CreateStackFrame(Function &F) {
   const DataLayout &DL = F.getParent()->getDataLayout();
   Type *SFTy = StackFrameTy;
 
@@ -1138,7 +1155,7 @@ AllocaInst *CilkRABI::CreateStackFrame(Function &F) {
   return SF;
 }
 
-Value* CilkRABI::GetOrCreateCilkStackFrame(Function &F) {
+Value* OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
   if (DetachCtxToStackFrame.count(&F))
     return DetachCtxToStackFrame[&F];
 
@@ -1148,7 +1165,7 @@ Value* CilkRABI::GetOrCreateCilkStackFrame(Function &F) {
   return SF;
 }
 
-void CilkRABI::InsertDetach(Function &F, Instruction *DetachPt) {
+void OpenCilkABI::InsertDetach(Function &F, Instruction *DetachPt) {
   /*
     __cilkrts_stack_frame sf;
     ...
@@ -1172,7 +1189,7 @@ void CilkRABI::InsertDetach(Function &F, Instruction *DetachPt) {
   IRB.CreateCall(CILKRTS_FUNC(detach), Args);
 }
 
-CallInst *CilkRABI::InsertStackFramePush(Function &F,
+CallInst *OpenCilkABI::InsertStackFramePush(Function &F,
                                          Instruction *TaskFrameCreate,
                                          bool Helper) {
   AllocaInst *SF = cast<AllocaInst>(GetOrCreateCilkStackFrame(F));
@@ -1189,7 +1206,7 @@ CallInst *CilkRABI::InsertStackFramePush(Function &F,
     return IRB.CreateCall(CILKRTS_FUNC(enter_frame), Args);
 }
 
-void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
+void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
                                    bool InsertPauseFrame, bool Helper) {
   Value *SF = GetOrCreateCilkStackFrame(F);
   SmallPtrSet<ReturnInst*, 8> Returns;
@@ -1228,7 +1245,7 @@ void CilkRABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   }
 }
 
-void CilkRABI::MarkSpawner(Function &F) {
+void OpenCilkABI::MarkSpawner(Function &F) {
   // If the spawner F might throw, then we mark F with the Cilk personality
   // function, which ensures that the Cilk stack frame of F is properly unwound.
   if (!F.doesNotThrow()) {
@@ -1253,7 +1270,7 @@ void CilkRABI::MarkSpawner(Function &F) {
 ///     Grainsize = min(2048, ceil(Limit / (8 * workers)))
 ///
 /// This computation is inserted into the preheader of the loop.
-Value *CilkRABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
+Value *OpenCilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Limit = GrainsizeCall->getArgOperand(0);
   IRBuilder<> Builder(GrainsizeCall);
 
@@ -1278,7 +1295,7 @@ Value *CilkRABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   return Grainsize;
 }
 
-void CilkRABI::lowerSync(SyncInst &SI) {
+void OpenCilkABI::lowerSync(SyncInst &SI) {
   Function &Fn = *SI.getFunction();
   if (!DetachCtxToStackFrame[&Fn])
     // If we have not created a stackframe for this function, then we don't need
@@ -1332,7 +1349,7 @@ void CilkRABI::lowerSync(SyncInst &SI) {
   Fn.addFnAttr(Attribute::Stealable);
 }
 
-void CilkRABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+void OpenCilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                       Instruction *TaskFrameCreate,
                                       bool IsSpawner) {
   // If the outlined task F itself performs spawns, set up F to support stealing
@@ -1345,7 +1362,7 @@ void CilkRABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
   InsertDetach(F, (DetachPt ? DetachPt : &*(++EnterFrame->getIterator())));
 }
 
-void CilkRABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+void OpenCilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                        Instruction *TaskFrameCreate,
                                        bool IsSpawner) {
   // Because F is a spawned task, we want to insert landingpads for all calls
@@ -1362,7 +1379,7 @@ void CilkRABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
   // pop in the personality function.
 }
 
-void CilkRABI::preProcessRootSpawner(Function &F) {
+void OpenCilkABI::preProcessRootSpawner(Function &F) {
   MarkSpawner(F);
   InsertStackFramePush(F);
   Value *SF = DetachCtxToStackFrame[&F];
@@ -1384,7 +1401,7 @@ void CilkRABI::preProcessRootSpawner(Function &F) {
   }
 }
 
-void CilkRABI::postProcessRootSpawner(Function &F) {
+void OpenCilkABI::postProcessRootSpawner(Function &F) {
   // F is a root spawner, not itself a spawned task.  We don't need to promote
   // calls to invokes, since the Cilk personality function will take care of
   // popping the frame if no landingpad exists for a given call.
@@ -1392,7 +1409,7 @@ void CilkRABI::postProcessRootSpawner(Function &F) {
                       /*InsertPauseFrame*/false, /*Helper*/false);
 }
 
-void CilkRABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
+void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Instruction *ReplStart = TOI.ReplStart;
   Instruction *ReplCall = TOI.ReplCall;
 
@@ -1441,7 +1458,7 @@ static inline void inlineCilkFunctions(
   CallsToInline.clear();
 }
 
-void CilkRABI::preProcessFunction(Function &F, TaskInfo &TI,
+void OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
                                   bool OutliningTapirLoops) {
   if (OutliningTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
@@ -1451,7 +1468,7 @@ void CilkRABI::preProcessFunction(Function &F, TaskInfo &TI,
     F.setName("cilk_main");
 }
 
-void CilkRABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
+void OpenCilkABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
   if (OutliningTapirLoops)
     // Don't do any postprocessing when outlining Tapir loops.
     return;
@@ -1460,9 +1477,9 @@ void CilkRABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
     inlineCilkFunctions(F, CallsToInline);
 }
 
-void CilkRABI::postProcessHelper(Function &F) {}
+void OpenCilkABI::postProcessHelper(Function &F) {}
 
-LoopOutlineProcessor *CilkRABI::getLoopOutlineProcessor(
+LoopOutlineProcessor *OpenCilkABI::getLoopOutlineProcessor(
     const TapirLoopInfo *TL) const {
   if (UseRuntimeCilkFor)
     return new RuntimeCilkFor(M);
