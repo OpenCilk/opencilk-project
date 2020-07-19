@@ -47,7 +47,8 @@ endif(COMPILER_RT_BUILD_CSI)
 
 if (COMPILER_RT_BUILD_CILKTOOLS)
   set(CILKTOOL_HEADERS
-    cilk/cilkscale.h)
+    cilk/cilkscale.h
+    cilk/cilksan.h)
 endif(COMPILER_RT_BUILD_CILKTOOLS)
 
 set(COMPILER_RT_HEADERS
