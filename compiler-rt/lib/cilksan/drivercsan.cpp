@@ -99,21 +99,21 @@ struct CheckingRAII {
 
 // outside world (including runtime).
 // Non-inlined version for user code to use
-CILKSAN_API void __cilksan_enable_checking() {
+CILKSAN_API void __cilksan_enable_checking(void) {
   checking_disabled--;
   cilksan_assert(checking_disabled >= 0);
   DBG_TRACE(DEBUG_BASIC, "External enable checking (%d).\n", checking_disabled);
 }
 
 // Non-inlined version for user code to use
-CILKSAN_API void __cilksan_disable_checking() {
+CILKSAN_API void __cilksan_disable_checking(void) {
   cilksan_assert(checking_disabled >= 0);
   checking_disabled++;
   DBG_TRACE(DEBUG_BASIC, "External disable checking (%d).\n", checking_disabled);
 }
 
 // Non-inlined callback for user code to check if checking is enabled.
-CILKSAN_API bool __cilksan_is_checking_enabled() {
+CILKSAN_API bool __cilksan_is_checking_enabled(void) {
   return (checking_disabled == 0);
 }
 
