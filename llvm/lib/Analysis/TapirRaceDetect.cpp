@@ -62,7 +62,7 @@ static cl::opt<unsigned>
         cl::desc("Maximum number of uses to explore for a capture query."));
 
 static cl::list<std::string> ClABIListFiles(
-    "strat-blacklist",
+    "strat-ignorelist",
     cl::desc("File listing native ABI functions and how the pass treats them"),
     cl::Hidden);
 
@@ -153,7 +153,7 @@ bool RaceInfo::invalidate(Function &F, const PreservedAnalyses &PA,
 static StringRef GetGlobalTypeString(const GlobalValue &G) {
   // Types of GlobalVariables are always pointer types.
   Type *GType = G.getValueType();
-  // For now we support blacklisting struct types only.
+  // For now we support ignoring struct types only.
   if (StructType *SGType = dyn_cast<StructType>(GType)) {
     if (!SGType->isLiteral())
       return SGType->getName();
@@ -371,7 +371,7 @@ private:
   // /// at runtime. Using std::unique_ptr to make using move ctor simpler.
   // DenseMap<const Loop *, RuntimePointerChecking *> AllPtrRtChecking;
 
-  // ABI list for blacklisting.
+  // ABI list to ignore.
   StratABIList ABIList;
 };
 
@@ -389,13 +389,20 @@ static bool checkInstructionForRace(const Instruction *I,
     if (isa<DbgInfoIntrinsic>(I))
       return false;
 
-    // Check for detached.rethrow, taskframe.resume, or sync.unwind, which might
-    // be invoked.
-    if (const Function *Called = Call->getCalledFunction())
+    if (const Function *Called = Call->getCalledFunction()) {
+      // Check for detached.rethrow, taskframe.resume, or sync.unwind, which
+      // might be invoked.
       if (Intrinsic::detached_rethrow == Called->getIntrinsicID() ||
           Intrinsic::taskframe_resume == Called->getIntrinsicID() ||
           Intrinsic::sync_unwind == Called->getIntrinsicID())
         return false;
+
+      // Ignore CSI and Cilksan functions
+      if (Called->hasName() && (Called->getName().startswith("__csi") ||
+                                Called->getName().startswith("__csan") ||
+                                Called->getName().startswith("__cilksan")))
+        return false;
+    }
 
     // Ignore other intrinsics.
     if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I))
@@ -580,7 +587,7 @@ void AccessPtrAnalysis::addAccess(Instruction *I) {
   // AnyMemTransferInst, and function calls.
   if (checkInstructionForRace(I, TLI)) {
 
-    // Exclude calls to functions in the blacklist.
+    // Exclude calls to functions in ABIList.
     if (const CallBase *Call = dyn_cast<CallBase>(I)) {
       if (const Function *CF = Call->getCalledFunction())
         if (ABIList.isIn(*CF))
