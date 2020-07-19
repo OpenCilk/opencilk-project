@@ -293,6 +293,7 @@ struct CilkSanitizerImpl : public CSIImpl {
                                           StructType *UnitObjTableType,
                                           ObjectTable &ObjTable);
   static bool simpleCallCannotRace(const Instruction &I);
+  static bool shouldIgnoreCall(const Instruction &I);
   static void getAllocFnArgs(
       const Instruction *I, SmallVectorImpl<Value*> &AllocFnArgs,
       Type *SizeTy, Type *AddrTy, const TargetLibraryInfo &TLI);
@@ -1355,10 +1356,24 @@ void CilkSanitizerImpl::chooseInstructionsToInstrument(
   Local.clear();
 }
 
-// Helper function do determine if the call or invoke instruction Inst should be
-// skipped when examining calls that affect race detection.
+// Helper function to determine if the call-base instruction \p I should be
+// skipped when examining calls that affect race detection.  Returns true if and
+// only if \p I is a simple call that cannot race.
 bool CilkSanitizerImpl::simpleCallCannotRace(const Instruction &I) {
   return callsPlaceholderFunction(I);
+}
+
+// Helper function to determine if the call-base instruction \p I should be
+// skipped when examining calls that affect race detection.  Returns true if and
+// only if \p I is identified as a special function that should be ignored.
+bool CilkSanitizerImpl::shouldIgnoreCall(const Instruction &I) {
+  if (const CallBase *Call = dyn_cast<CallBase>(&I))
+    if (const Function *Called = Call->getCalledFunction())
+      if (Called->hasName() && (Called->getName().startswith("__csi") ||
+                                Called->getName().startswith("__csan") ||
+                                Called->getName().startswith("__cilksan")))
+        return true;
+  return false;
 }
 
 // Helper function to get the ID of a function being called.  These IDs are
@@ -2556,7 +2571,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           FreeCalls.insert(&Inst);
         else if (isa<AnyMemIntrinsic>(Inst))
           MemIntrinCalls.push_back(&Inst);
-        else if (!simpleCallCannotRace(Inst))
+        else if (!simpleCallCannotRace(Inst) && !shouldIgnoreCall(Inst))
           Callsites.push_back(&Inst);
 
         // Add the current set of local loads and stores to be considered for
