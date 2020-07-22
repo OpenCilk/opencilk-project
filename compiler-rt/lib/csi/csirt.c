@@ -380,6 +380,12 @@ typedef struct {
 // pass) that updates the callsite to function ID mappings.
 typedef void (*__csi_init_callsite_to_functions)();
 
+// Default implementations of user-level CSI initialization routines, declared
+// as weak symbols so that tool-provided implementations can override them.
+WEAK void __csi_init() {}
+WEAK void __csi_unit_init(const char *const file_name,
+                          const instrumentation_counts_t counts) {}
+
 static inline instrumentation_counts_t compute_inst_counts(unit_fed_table_t *unit_fed_tables) {
     instrumentation_counts_t counts;
     int64_t *base = (int64_t *)&counts;
