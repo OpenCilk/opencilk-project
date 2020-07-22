@@ -405,7 +405,6 @@ StructType *SizeTable::getSizeStructType(LLVMContext &C) {
 }
 
 void SizeTable::add(uint64_t ID, int32_t FullIRSize, int32_t NonEmptyIRSize) {
-  assert(NonEmptyIRSize <= FullIRSize && "Broken basic block IR sizes");
   assert(LocalIdToSizeMap.find(ID) == LocalIdToSizeMap.end() &&
          "ID already exists in FED table.");
   LocalIdToSizeMap[ID] = {FullIRSize, NonEmptyIRSize};
