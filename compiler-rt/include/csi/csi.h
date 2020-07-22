@@ -170,10 +170,10 @@ typedef struct {
   uint64_t _padding : 56;
 } free_prop_t;
 
-WEAK void __csi_init();
+void __csi_init();
 
-WEAK void __csi_unit_init(const char *const file_name,
-                          const instrumentation_counts_t counts);
+void __csi_unit_init(const char *const file_name,
+                     const instrumentation_counts_t counts);
 
 ///-----------------------------------------------------------------------------
 /// Function entry/exit
