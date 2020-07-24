@@ -1223,7 +1223,7 @@ bool llvm::canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
       // A readonly argmemonly function only reads from memory pointed to by
       // it's arguments with arbitrary offsets.  If we can prove there are no
       // writes to this memory in the loop, we can hoist or sink.
-      if (Behavior.onlyAccessesArgPointees()) {
+      if (Behavior.onlyAccessesArgPointees() || CI->isStrandPure()) {
         // TODO: expand to writeable arguments
         for (Value *Op : CI->args())
           if (Op->getType()->isPointerTy() &&
@@ -1759,6 +1759,14 @@ static bool isSafeToExecuteUnconditionally(
   if (AllowSpeculation &&
       isSafeToSpeculativelyExecute(&Inst, CtxI, AC, DT, TLI))
     return true;
+
+  if (CtxI)
+    if (const CallBase *CB = dyn_cast<CallBase>(&Inst)) {
+      const Function *Callee = CB->getCalledFunction();
+      if (Callee && Callee->isStrandPure())
+        return (TI->getSpindleFor(Inst.getParent()) ==
+                TI->getSpindleFor(CtxI->getParent()));
+    }
 
   bool GuaranteedToExecute =
       SafetyInfo->isGuaranteedToExecute(Inst, DT, TI, CurLoop);
