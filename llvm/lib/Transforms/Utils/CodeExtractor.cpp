@@ -932,6 +932,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::NoCfCheck:
       case Attribute::SanitizeCilk:
       case Attribute::Stealable:
+      case Attribute::StrandPure:
         break;
       }
 
