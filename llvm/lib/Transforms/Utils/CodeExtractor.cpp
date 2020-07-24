@@ -962,6 +962,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::SkipProfile:
       case Attribute::SanitizeCilk:
       case Attribute::Stealable:
+      case Attribute::StrandPure:
         break;
       // These attributes cannot be applied to functions.
       case Attribute::Alignment:
