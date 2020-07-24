@@ -1463,7 +1463,8 @@ static Task *GetTopLevelTaskFor(BasicBlock *BB, Loop *L, TaskInfo *TaskI) {
 static void GetTaskExits(BasicBlock *Exit, Task *SubT, Loop *L,
                          SmallVectorImpl<BasicBlock *> &TaskExits,
                          std::vector<BasicBlock *> *Blocks,
-                         SmallPtrSetImpl<BasicBlock *> &Visited) {
+                         SmallPtrSetImpl<BasicBlock *> &Visited,
+                         DominatorTree *DT) {
   // Get the sync region of this task.
   Value *SyncReg = SubT->getDetach()->getSyncRegion();
   // Traverse the CFG to find the exit blocks from SubT.
@@ -1482,11 +1483,48 @@ static void GetTaskExits(BasicBlock *Exit, Task *SubT, Loop *L,
 
     // We only need to worry about encountering detached-rethrow exits from BB.
     if (isDetachedRethrow(BB->getTerminator(), SyncReg)) {
+      BasicBlock *NewExit =
+          cast<InvokeInst>(BB->getTerminator())->getUnwindDest();
+
       // Add the unwind destionation of this detached rethrow as an exit.
-      TaskExits.push_back(
-          cast<InvokeInst>(BB->getTerminator())->getUnwindDest());
+      TaskExits.push_back(NewExit);
+
+      // If necessary, add PHI nodes in the detached-rethrow exit, in order to
+      // imitate LCSSA form for subsequent parts of the transformation.
+      if (NewExit->getSinglePredecessor()) {
+        // Get the PHI nodes in the Exit, and find uses that follow NewExit
+        for (PHINode &PN : Exit->phis()) {
+          SmallVector<Use *, 16> UsesToRewrite;
+          for (Use &U : PN.uses()) {
+            Instruction *User = cast<Instruction>(U.getUser());
+            BasicBlock *UserBB = User->getParent();
+            if (auto *PN = dyn_cast<PHINode>(User))
+              UserBB = PN->getIncomingBlock(U);
+
+            if (DT->dominates(NewExit, UserBB))
+              UsesToRewrite.push_back(&U);
+          }
+
+          // Create a PHI node in NewExit
+          PHINode *NewPN = PHINode::Create(PN.getType(), 1,
+                                           PN.getName() + ".us-lcssa",
+                                           &NewExit->front());
+          NewPN->setDebugLoc(PN.getDebugLoc());
+          NewPN->addIncoming(&PN, BB);
+
+          // Replace uses of PN with NewPN
+          for (Use *UseToRewrite : UsesToRewrite) {
+            Instruction *User = cast<Instruction>(UseToRewrite->getUser());
+            User->replaceUsesOfWith(&PN, NewPN);
+          }
+        }
+      }
+
       // Don't search the successors of BB.
       continue;
+    } else if (ReattachInst *RI = dyn_cast<ReattachInst>(BB->getTerminator())) {
+      if (RI->getSyncRegion() == SyncReg)
+        continue;
     }
 
     // Add successors of BB to the worklist.
@@ -1508,7 +1546,7 @@ void LoopUnswitch::GetLoopExitBlocks(Loop *L,
     if (Task *SubT = GetTopLevelTaskFor(Exit, L, TaskI)) {
       // The exit blocks lives in a subtask.  Traverse that subtask to find the
       // correct exit blocks.
-      GetTaskExits(Exit, SubT, L, FixedExits, nullptr, Visited);
+      GetTaskExits(Exit, SubT, L, FixedExits, nullptr, Visited, DT);
       continue;
     }
     FixedExits.push_back(Exit);
@@ -1527,7 +1565,7 @@ void LoopUnswitch::GetLoopExitBlocks(Loop *L,
     if (Task *SubT = GetTopLevelTaskFor(Exit, L, TaskI)) {
       // The exit blocks lives in a subtask.  Traverse that subtask to find the
       // correct exit blocks.  Add any non-exit blocks found to LoopBlocks.
-      GetTaskExits(Exit, SubT, L, ExitBlocks, &LoopBlocks, Visited);
+      GetTaskExits(Exit, SubT, L, ExitBlocks, &LoopBlocks, Visited, DT);
       continue;
     }
     ExitBlocks.push_back(Exit);
