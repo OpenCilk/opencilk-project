@@ -907,6 +907,14 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
       getContext().getTargetInfo().getTriple().isX86())
     Fn->addFnAttr("patchable-function", "prologue-short-redirect");
 
+  // Add Cilk attributes
+  if (D && (getLangOpts().getCilk() != LangOptions::Cilk_none)) {
+    if (D->getAttr<StrandPureAttr>())
+      Fn->setStrandPure();
+    if (D->getAttr<StealableAttr>())
+      Fn->addFnAttr(llvm::Attribute::Stealable);
+  }
+
   // Add no-jump-tables value.
   if (CGM.getCodeGenOpts().NoUseJumpTables)
     Fn->addFnAttr("no-jump-tables", "true");
