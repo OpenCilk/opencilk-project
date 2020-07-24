@@ -311,6 +311,7 @@ def BlocksSupported : LangOpt<"Blocks">;
 def ObjCAutoRefCount : LangOpt<"ObjCAutoRefCount">;
 def ObjCNonFragileRuntime : LangOpt<"ObjCNonFragileRuntime",
                                     "LangOpts.ObjCRuntime.allowsClassStubs()">;
+def Cilk : LangOpt<"Cilk", "LangOpts.getCilk() != LangOptions::Cilk_none">;
 
 // Language option for CMSE extensions
 def Cmse : LangOpt<"Cmse">;
@@ -3521,4 +3522,20 @@ def ReleaseHandle : InheritableParamAttr {
   let Args = [StringArgument<"HandleType">];
   let Subjects = SubjectList<[ParmVar]>;
   let Documentation = [ReleaseHandleDocs];
+}
+
+// Cilk attributes
+
+// TODO: Add docs to these attributes
+
+def Stealable : InheritableAttr {
+  let Spellings = [Clang<"stealable">];
+  let Subjects = SubjectList<[FunctionLike]>;
+  let Documentation = [StealableDocs];
+}
+
+def StrandPure : InheritableAttr {
+  let Spellings = [Clang<"strand_pure">];
+  let Subjects = SubjectList<[FunctionLike]>;
+  let Documentation = [StrandPureDocs];
 }
