@@ -441,6 +441,8 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
     return "shadowcallstack";
   if (hasAttribute(Attribute::Stealable))
     return "stealable";
+  if (hasAttribute(Attribute::StrandPure))
+    return "strand_pure";
   if (hasAttribute(Attribute::StrictFP))
     return "strictfp";
   if (hasAttribute(Attribute::SanitizeCilk))

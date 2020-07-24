@@ -616,6 +616,14 @@ public:
     addFnAttr(Attribute::Speculatable);
   }
 
+  /// Determine if the call is pure within a strand.
+  bool isStrandPure() const {
+    return hasFnAttribute(Attribute::StrandPure);
+  }
+  void setStrandPure() {
+    addFnAttr(Attribute::StrandPure);
+  }
+
   /// Determine if the call might deallocate memory.
   bool doesNotFreeMemory() const {
     return onlyReadsMemory() || hasFnAttribute(Attribute::NoFree);

@@ -1405,6 +1405,9 @@ bool LLParser::parseFnAttributeValuePairs(AttrBuilder &B,
       B.addAttribute(Attribute::SpeculativeLoadHardening);
       break;
     case lltok::kw_stealable: B.addAttribute(Attribute::Stealable); break;
+    case lltok::kw_strand_pure:
+      B.addAttribute(Attribute::StrandPure);
+      break;
     case lltok::kw_strictfp: B.addAttribute(Attribute::StrictFP); break;
     case lltok::kw_uwtable: B.addAttribute(Attribute::UWTable); break;
     case lltok::kw_willreturn: B.addAttribute(Attribute::WillReturn); break;
@@ -1804,6 +1807,7 @@ bool LLParser::parseOptionalParamAttrs(AttrBuilder &B) {
     case lltok::kw_safestack:
     case lltok::kw_shadowcallstack:
     case lltok::kw_stealable:
+    case lltok::kw_strand_pure:
     case lltok::kw_strictfp:
     case lltok::kw_uwtable:
       HaveError |=
@@ -1915,6 +1919,7 @@ bool LLParser::parseOptionalReturnAttrs(AttrBuilder &B) {
     case lltok::kw_safestack:
     case lltok::kw_shadowcallstack:
     case lltok::kw_stealable:
+    case lltok::kw_strand_pure:
     case lltok::kw_strictfp:
     case lltok::kw_uwtable:
       HaveError |=

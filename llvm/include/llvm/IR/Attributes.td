@@ -209,6 +209,9 @@ def StackProtectReq : EnumAttr<"sspreq">;
 /// Strong Stack protection.
 def StackProtectStrong : EnumAttr<"sspstrong">;
 
+/// Multiple calls to this function in a strand return the same result.
+def StrandPure : EnumAttr<"strand_pure">;
+
 /// Function was called in a scope requiring strict floating point semantics.
 def StrictFP : EnumAttr<"strictfp">;
 

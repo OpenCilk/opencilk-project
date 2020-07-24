@@ -662,6 +662,7 @@ enum AttributeKindCodes {
   ATTR_KIND_NO_PROFILE = 73,
   ATTR_KIND_SANITIZE_CILK = 74,
   ATTR_KIND_STEALABLE = 75,
+  ATTR_KIND_STRAND_PURE = 76,
 };
 
 enum ComdatSelectionKindCodes {
