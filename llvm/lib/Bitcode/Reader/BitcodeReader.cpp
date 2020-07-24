@@ -1305,6 +1305,9 @@ static uint64_t getRawAttributeMask(Attribute::AttrKind Val) {
   case Attribute::Stealable:
     llvm_unreachable("stealable attribute not supported in raw format");
     break;
+  case Attribute::StrandPure:
+    llvm_unreachable("strand_pure attribute not supported in raw format");
+    break;
   }
   llvm_unreachable("Unsupported attribute type");
 }
@@ -1321,7 +1324,8 @@ static void addRawAttributeValue(AttrBuilder &B, uint64_t Val) {
         I == Attribute::AllocSize ||
         I == Attribute::NoSync ||
         I == Attribute::SanitizeCilk ||
-        I == Attribute::Stealable)
+        I == Attribute::Stealable ||
+        I == Attribute::StrandPure)
       continue;
     if (uint64_t A = (Val & getRawAttributeMask(I))) {
       if (I == Attribute::Alignment)
@@ -1520,6 +1524,8 @@ static Attribute::AttrKind getAttrFromCode(uint64_t Code) {
     return Attribute::ShadowCallStack;
   case bitc::ATTR_KIND_STEALABLE:
     return Attribute::Stealable;
+  case bitc::ATTR_KIND_STRAND_PURE:
+    return Attribute::StrandPure;
   case bitc::ATTR_KIND_STRICT_FP:
     return Attribute::StrictFP;
   case bitc::ATTR_KIND_STRUCT_RET:
