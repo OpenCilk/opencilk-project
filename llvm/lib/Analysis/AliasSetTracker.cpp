@@ -484,7 +484,7 @@ void AliasSetTracker::add(Instruction *I) {
 
   // Handle all calls with known mod/ref sets genericall
   if (auto *Call = dyn_cast<CallBase>(I))
-    if (Call->onlyAccessesArgMemory()) {
+    if (Call->onlyAccessesArgMemory() || Call->isStrandPure()) {
       auto getAccessFromModRef = [](ModRefInfo MRI) {
         if (isRefSet(MRI) && isModSet(MRI))
           return AliasSet::ModRefAccess;
