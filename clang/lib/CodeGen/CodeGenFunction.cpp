@@ -852,6 +852,14 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
     }
   }
 
+  // Add Cilk attributes
+  if (D && (getLangOpts().getCilk() != LangOptions::Cilk_none)) {
+    if (D->getAttr<StrandPureAttr>())
+      Fn->setStrandPure();
+    if (D->getAttr<StealableAttr>())
+      Fn->addFnAttr(llvm::Attribute::Stealable);
+  }
+
   // Add no-jump-tables value.
   Fn->addFnAttr("no-jump-tables",
                 llvm::toStringRef(CGM.getCodeGenOpts().NoUseJumpTables));

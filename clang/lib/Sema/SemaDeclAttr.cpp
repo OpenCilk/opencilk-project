@@ -7460,6 +7460,14 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
   case ParsedAttr::AT_UseHandle:
     handleHandleAttr<UseHandleAttr>(S, D, AL);
     break;
+
+  // Cilk attributes
+  case ParsedAttr::AT_StrandPure:
+    handleSimpleAttribute<StrandPureAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_Stealable:
+    handleSimpleAttribute<StealableAttr>(S, D, AL);
+    break;
   }
 }
 
