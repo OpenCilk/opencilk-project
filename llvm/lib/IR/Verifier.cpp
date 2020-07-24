@@ -1546,6 +1546,7 @@ static bool isFuncOnlyAttr(Attribute::AttrKind Kind) {
   case Attribute::SpeculativeLoadHardening:
   case Attribute::Speculatable:
   case Attribute::Stealable:
+  case Attribute::StrandPure:
   case Attribute::StrictFP:
     return true;
   default:
