@@ -1298,6 +1298,8 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
 
   if (IsFullLTO) {
     FPM.addPass(SCCPPass());
+    // Rerun EarlyCSE for further cleanup after the sinking transformation.
+    FPM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
     FPM.addPass(InstCombinePass());
     FPM.addPass(BDCEPass());
   }
