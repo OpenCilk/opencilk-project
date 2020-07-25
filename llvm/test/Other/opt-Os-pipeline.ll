@@ -270,6 +270,10 @@
 ; CHECK-NEXT:       Simplify Tapir tasks
 ; CHECK-NEXT:       Simplify the CFG
 ; CHECK-NEXT:       Dominator Tree Construction
+; CHECK-NEXT:       Basic Alias Analysis (stateless AA impl)
+; CHECK-NEXT:       Function Alias Analysis Results
+; CHECK-NEXT:       Memory SSA
+; CHECK-NEXT:       Early CSE w/ MemorySSA
 ; CHECK-NEXT:       Natural Loop Information
 ; CHECK-NEXT:       Scalar Evolution Analysis
 ; CHECK-NEXT:       Basic Alias Analysis (stateless AA impl)
