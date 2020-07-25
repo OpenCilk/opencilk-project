@@ -824,6 +824,8 @@ void PassManagerBuilder::populateModulePassManager(
   // before SLP vectorization.
   MPM.add(createTaskSimplifyPass());
   MPM.add(createCFGSimplificationPass(1, true, true, false, true));
+  // Rerun EarlyCSE for further cleanup after the sinking transformation.
+  MPM.add(createEarlyCSEPass(true /* Enable mem-ssa. */));
 
   if (SLPVectorize) {
     MPM.add(createSLPVectorizerPass()); // Vectorize parallel scalar chains.
