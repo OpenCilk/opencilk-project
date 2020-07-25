@@ -1337,6 +1337,8 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
                                          .needCanonicalLoops(false)
                                          .hoistCommonInsts(true)
                                          .sinkCommonInsts(true)));
+  // Rerun EarlyCSE for further cleanup after the sinking transformation.
+  OptimizePM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
 
   // Optimize parallel scalar instruction chains into SIMD instructions.
   if (PTO.SLPVectorization) {

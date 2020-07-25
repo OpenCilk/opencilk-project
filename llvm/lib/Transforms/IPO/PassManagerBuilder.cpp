@@ -897,6 +897,8 @@ void PassManagerBuilder::populateModulePassManager(
                                           .needCanonicalLoops(false)
                                           .hoistCommonInsts(true)
                                           .sinkCommonInsts(true)));
+  // Rerun EarlyCSE for further cleanup after the sinking transformation.
+  MPM.add(createEarlyCSEPass(true /* Enable mem-ssa. */));
 
   if (SLPVectorize) {
     MPM.add(createSLPVectorizerPass()); // Vectorize parallel scalar chains.
