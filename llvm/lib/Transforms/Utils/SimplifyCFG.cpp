@@ -6630,8 +6630,10 @@ static bool serializeTrivialDetachedBlock(BasicBlock *BB, DomTreeUpdater *DTU) {
       if (!isa<DetachInst>(PredBB->getTerminator()))
 	return false;
     }
-    // All predecessors detach BB, so we can serialize
-    for (BasicBlock *PredBB : predecessors(BB)) {
+    // All predecessors detach BB, so we can serialize.  Copy the predecessors
+    // into a separate vector, so we can safely remove the predecessors.
+    SmallVector<BasicBlock *, 16> Preds(pred_begin(BB), pred_end(BB));
+    for (BasicBlock *PredBB : Preds) {
       DetachInst *DI = dyn_cast<DetachInst>(PredBB->getTerminator());
       BasicBlock *Detached = DI->getDetached();
       BasicBlock *Continue = DI->getContinue();
