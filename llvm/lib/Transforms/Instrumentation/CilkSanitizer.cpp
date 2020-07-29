@@ -33,6 +33,7 @@
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -219,6 +220,8 @@ struct CilkSanitizerImpl : public CSIImpl {
         DenseMap<Value *, unsigned> &SyncRegNums,
         DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL,
         const TargetLibraryInfo *TLI);
+    bool InstrumentLoops(SmallPtrSetImpl<Instruction *> &LoopInstInAncestRace,
+        ScalarEvolution *);
     bool PerformDelayedInstrumentation();
 
   private:
@@ -278,9 +281,12 @@ struct CilkSanitizerImpl : public CSIImpl {
                     function_ref<LoopInfo &(Function &)> GetLoopInfo,
                     function_ref<DependenceInfo &(Function &)> GetDepInfo,
                     function_ref<RaceInfo &(Function &)> GetRaceInfo,
-                    const TargetLibraryInfo *TLI, bool JitMode = false,
+                    const TargetLibraryInfo *TLI,
+                    function_ref<ScalarEvolution &(Function &)> GetSE,
+                    //function_ref<TargetTransformInfo &(Function &)> GetTTI,
+                    bool JitMode = false,
                     bool CallsMayThrow = !AssumeNoExceptions)
-      : CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, TLI),
+      : CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, TLI, GetSE, nullptr),
         GetDepInfo(GetDepInfo), GetRaceInfo(GetRaceInfo) {
     // Even though we're doing our own instrumentation, we want the CSI setup
     // for the instrumentation of function entry/exit, memory accesses (i.e.,
@@ -357,7 +363,7 @@ struct CilkSanitizerImpl : public CSIImpl {
                         unsigned NumSyncRegs, DominatorTree *DT, TaskInfo &TI,
                         LoopInfo &LI);
   bool instrumentSync(SyncInst *SI, unsigned SyncRegNum);
-  void instrumentLoop(Loop &L, TaskInfo &TI,
+  void instrumentTapirLoop(Loop &L, TaskInfo &TI,
                       DenseMap<Value *, unsigned> &SyncRegNums,
                       ScalarEvolution *SE = nullptr);
   bool instrumentAlloca(Instruction *I);
@@ -371,6 +377,10 @@ struct CilkSanitizerImpl : public CSIImpl {
     IRBuilder<> IRB(I);
     return instrumentAnyMemIntrinAcc(I, OperandNum, IRB);
   }
+
+  bool instrumentLoadOrStoreHoisted(Instruction *I,
+                                    LoopInfo &LI,
+                                    ScalarEvolution *SE);
 
 private:
   // Analysis results
@@ -502,6 +512,7 @@ INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TapirRaceDetectWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
 INITIALIZE_PASS_END(
     CilkSanitizerLegacyPass, "csan",
     "CilkSanitizer: detects determinacy races in Cilk programs.",
@@ -517,6 +528,7 @@ void CilkSanitizerLegacyPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<TargetLibraryInfoWrapperPass>();
   AU.addRequired<AAResultsWrapperPass>();
   AU.addPreserved<BasicAAWrapperPass>();
+  AU.addRequired<ScalarEvolutionWrapperPass>();
 }
 
 ModulePass *llvm::createCilkSanitizerLegacyPass(bool JitMode) {
@@ -646,6 +658,7 @@ using SCCNodeSet = SmallSetVector<Function *, 8>;
 } // end anonymous namespace
 
 bool CilkSanitizerImpl::run() {
+  dbgs() << "STARTING CSAN\n";
   // Initialize components of the CSI and Cilksan system.
   initializeCsi();
   initializeFEDTables();
@@ -660,6 +673,7 @@ bool CilkSanitizerImpl::run() {
   for (scc_iterator<CallGraph *> I = scc_begin(CG); !I.isAtEnd(); ++I) {
     const std::vector<CallGraphNode *> &SCC = *I;
     for (CallGraphNode *N : SCC) {
+      dbgs() << "Checking CallGraphNode\n";
       if (Function *F = N->getFunction())
         if (instrumentFunctionUsingRI(*F))
           InstrumentedFunctions.push_back(F);
@@ -1417,6 +1431,7 @@ Value *CilkSanitizerImpl::GetCalleeFuncID(const Function *Callee,
 
 bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentSimpleInstructions(
     SmallVectorImpl<Instruction *> &Instructions) {
+  dbgs() << "SIMPLE INSTRUMENTOR InstrumentSimpleInstructions";
   bool Result = false;
   for (Instruction *I : Instructions) {
     bool LocalResult = false;
@@ -1495,13 +1510,13 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAncillaryInstructions(
   // Instrument allocas and allocation-function calls that may be involved in a
   // race.
   for (Instruction *I : Allocas) {
-    // The simple instrumentor just instruments everyting
+    // The simple instrumentor just instruments everything
     CilkSanImpl.instrumentAlloca(I);
     getDetachesForInstruction(I);
     Result = true;
   }
   for (Instruction *I : AllocationFnCalls) {
-    // The simple instrumentor just instruments everyting
+    // The simple instrumentor just instruments everything
     CilkSanImpl.instrumentAllocationFn(I, DT);
     getDetachesForInstruction(I);
     Result = true;
@@ -1519,7 +1534,7 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAncillaryInstructions(
         continue;
       }
     }
-    // The simple instrumentor just instruments everyting
+    // The simple instrumentor just instruments everything
     CilkSanImpl.instrumentFree(I);
     getDetachesForInstruction(I);
     Result = true;
@@ -1547,9 +1562,9 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAncillaryInstructions(
     CilkSanImpl.instrumentSync(SI, SyncRegNums[SI->getSyncRegion()]);
 
   if (CilkSanImpl.Options.InstrumentLoops) {
-    // Recursively instrument all loops
+    // Recursively instrument all Tapir loops
     for (Loop *L : Loops)
-      CilkSanImpl.instrumentLoop(*L, TI, SyncRegNums);
+      CilkSanImpl.instrumentTapirLoop(*L, TI, SyncRegNums);
   }
 
   return Result;
@@ -1669,6 +1684,7 @@ void CilkSanitizerImpl::Instrumentor::InsertArgMAAPs(Function &F,
 
 bool CilkSanitizerImpl::Instrumentor::InstrumentSimpleInstructions(
     SmallVectorImpl<Instruction *> &Instructions) {
+  dbgs() << "INSTRUMENTOR InstrumentSimpleInstructions";
   bool Result = false;
   for (Instruction *I : Instructions) {
     bool LocalResult = false;
@@ -2471,10 +2487,141 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
   if (CilkSanImpl.Options.InstrumentLoops) {
     // Recursively instrument all loops
     for (Loop *L : Loops)
-      CilkSanImpl.instrumentLoop(*L, TI, SyncRegNums);
+      CilkSanImpl.instrumentTapirLoop(*L, TI, SyncRegNums);
   }
 
   return Result;
+}
+
+// Helper function to get a value for the runtime trip count of the given loop.
+static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE) {
+  BasicBlock *Latch = L.getLoopLatch();
+
+  const SCEV *BECountSC = SE->getExitCount(&L, Latch);
+  if (isa<SCEVCouldNotCompute>(BECountSC) ||
+      !BECountSC->getType()->isIntegerTy()) {
+    LLVM_DEBUG(dbgs() << "Could not compute exit block SCEV\n");
+    return SE->getCouldNotCompute();
+  }
+
+  // Add 1 since the backedge count doesn't include the first loop iteration.
+  const SCEV *TripCountSC =
+      SE->getAddExpr(BECountSC, SE->getConstant(BECountSC->getType(), 1));
+  if (isa<SCEVCouldNotCompute>(TripCountSC)) {
+    LLVM_DEBUG(dbgs() << "Could not compute trip count SCEV.\n");
+    return SE->getCouldNotCompute();
+  }
+
+  return TripCountSC;
+}
+
+
+// TODO: Maybe to avoid confusion with CilkSanImpl.Options.InstrumentLoops
+// (which is unrelated to this), rename this to involve the word "hoist" or something.
+bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
+    SmallPtrSetImpl<Instruction *> &LoopInstInAncestRace, ScalarEvolution *SE) {
+  bool Result = false;
+
+  // TODO: for now, only LoadInst and StoreInst (next, atomics)
+  // TODO: what does the stride look like if iterating backwards?
+  for (Instruction *I : LoopInstInAncestRace) {
+    // TODO: Shouldn't be a reason to return false for now
+    //       (already verified size, stride, and tripcount)
+    Result = true;
+
+    CilkSanImpl.instrumentLoadOrStoreHoisted(I, LI, SE);
+  }
+
+  return Result;
+}
+
+bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
+                                                     LoopInfo &LI,
+                                                     ScalarEvolution* SE) {
+  // get loop
+  Loop *L = LI.getLoopFor(I->getParent());
+
+  // TODO: what if there isn't a unique preheader?
+  IRBuilder<> IRB(L->getLoopPreheader()->getTerminator());
+
+  // get size and stride
+  Value *ptr = getLoadStorePointerOperand(I);
+  Value *Addr;
+  // TODO: what if not a GEP? what could it be?
+  if (isa<GetElementPtrInst>(ptr)) {
+    /*
+    // want to evaluate this ptr at index 0
+    SmallVector<const SCEV *, 4> IndexExprs;
+    IndexExprs.push_back(SE->getZero());
+    Addr = SE->getGEPExpr(cast<GEPOperator>(ptr), IndexExprs);
+    */
+    Addr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
+  }
+  const SCEV *Size = SE->getElementSize(I);
+  const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
+  const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
+  const SCEV *Stride = SrcAR->getStepRecurrence(*SE);
+
+  // get trip count
+  const SCEV* TripCount = getRuntimeTripCount(*L, SE);
+
+  // get address range
+  const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
+  assert(isa<SCEVConstant>(RangeExpr) && "RangeExpr is not a constant");
+  ConstantInt *Range = cast<SCEVConstant>(RangeExpr)->getValue();
+
+  dbgs() << "Addr   = " << *Addr << "\n";
+  dbgs() << "Size   = " << *Size << "\n";
+  dbgs() << "Stride = " << *Stride << "\n";
+  dbgs() << "Trip   = " << *TripCount << "\n";
+  dbgs() << "Range  = " << *Range << "\n";
+
+  CsiLoadStoreProperty Prop;
+
+  if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
+    //Value *Addr = M->getSource();
+    Prop.setAlignment(LI->getAlignment());
+    // Instrument the load
+    uint64_t LoadId = LoadFED.add(*LI);
+
+    // TODO: Don't recalculate underlying objects
+    uint64_t LoadObjId = LoadObj.add(*LI, lookupUnderlyingObject(Addr));
+    assert(LoadId == LoadObjId &&
+           "Load received different ID's in FED and object tables.");
+
+    Value *CsiId = LoadFED.localToGlobalId(LoadId, IRB);
+    Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+                     IRB.CreateIntCast(Range, IntptrTy, false),
+                     Prop.getValue(IRB)};
+    Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
+    IRB.SetInstDebugLocation(Call);
+    // TODO: I picked the right thing to increment?
+    ++NumInstrumentedMemIntrinsicReads;
+    //NumInstrumentedReads++;
+  } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+    //Value *Addr = M->getDest();
+    Prop.setAlignment(SI->getAlignment());
+    // Instrument the store
+    uint64_t StoreId = StoreFED.add(*SI);
+
+    // TODO: Don't recalculate underlying objects
+    uint64_t StoreObjId = StoreObj.add(*SI, lookupUnderlyingObject(Addr));
+    assert(StoreId == StoreObjId &&
+           "Store received different ID's in FED and object tables.");
+
+    Value *CsiId = StoreFED.localToGlobalId(StoreId, IRB);
+    Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+                     IRB.CreateIntCast(Range, IntptrTy, false),
+                     Prop.getValue(IRB)};
+    Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
+    IRB.SetInstDebugLocation(Call);
+    //NumInstrumentedWrites++;
+    ++NumInstrumentedMemIntrinsicWrites;
+  }
+
+  dbgs() << "PREHEADER = " << *L->getLoopPreheader() << "\n";
+
+  return true;
 }
 
 static bool CheckSanitizeCilkAttr(Function &F) {
@@ -2484,8 +2631,13 @@ static bool CheckSanitizeCilkAttr(Function &F) {
 }
 
 bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
+
   if (F.empty() || shouldNotInstrumentFunction(F) ||
       !CheckSanitizeCilkAttr(F)) {
+    dbgs() << "skipping " << F.getName() << "\n";
+    dbgs() << "f.empty() = " << F.empty() << "\n";
+    dbgs() << "shouldNotInstrumentFunction(F) = " << shouldNotInstrumentFunction(F) << "\n";
+    dbgs() << "CheckSanitizeCilkAttr(F) = " << CheckSanitizeCilkAttr(F) << "\n";
     LLVM_DEBUG({
         dbgs() << "Skipping " << F.getName() << "\n";
         if (F.empty())
@@ -2525,52 +2677,140 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   DenseMap<BasicBlock *, unsigned> SRCounters;
   DenseMap<Value *, unsigned> SyncRegNums;
 
+  // Find instructions in loops that can only race via ancestor
+  SmallPtrSet<Instruction *, 8> LoopInstInAncestRace;
+
   TaskInfo &TI = GetTaskInfo(F);
   RaceInfo &RI = GetRaceInfo(F);
   // Evaluate the tasks that might be in parallel with each spindle.
   MaybeParallelTasks MPTasks;
   TI.evaluateParallelState<MaybeParallelTasks>(MPTasks);
 
+  ScalarEvolution &SE = (*GetScalarEvolution)(F);
+
   for (BasicBlock &BB : F) {
     // Record the Tapir sync instructions found
     if (SyncInst *SI = dyn_cast<SyncInst>(BB.getTerminator()))
       Syncs.push_back(SI);
 
+    // get loop for BB
+    Loop *L = LI.getLoopFor(&BB);
+
     // Record the memory accesses in the basic block
     for (Instruction &Inst : BB) {
-      // TODO: Handle VAArgInst
-      if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst))
-        LocalLoadsAndStores.push_back(&Inst);
-      else if (isa<AtomicRMWInst>(Inst) || isa<AtomicCmpXchgInst>(Inst))
-        AtomicAccesses.push_back(&Inst);
-      else if (isa<CallInst>(Inst) || isa<InvokeInst>(Inst)) {
-        // if (CallInst *CI = dyn_cast<CallInst>(&Inst))
-        //   maybeMarkSanitizerLibraryCallNoBuiltin(CI, TLI);
 
-        // If we find a sync region, record it.
-        if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&Inst))
-          if (Intrinsic::syncregion_start == II->getIntrinsicID()) {
-            // Identify this sync region with a counter value, where all sync
-            // regions within a function or task are numbered from 0.
-            BasicBlock *TEntry = TI.getTaskFor(&BB)->getEntry();
-            // Create a new counter if need be.
-            if (!SRCounters.count(TEntry))
-              SRCounters[TEntry] = 0;
-            SyncRegNums[&Inst] = SRCounters[TEntry]++;
+      bool can_hoist = false;
+      // if the instruction is in a loop and can only race via ancestor,
+      // and size < stride, store it.
+      if (L) {
+        // TODO: for now, only look @ loads and stores b/c lazy later on
+        //       add atomics. Need to add any others?
+        if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
+          bool raceViaAncestor = false;
+          bool otherRace = false;
+          for (const RaceInfo::RaceData &RD : RI.getRaceData(&Inst)) {
+            if (RaceInfo::isRaceViaAncestor(RD.Type)) {
+              raceViaAncestor = true;
+            } else if (RaceInfo::isLocalRace(RD.Type) ||
+                       RaceInfo::isLocalRace(RD.Type)) {
+              otherRace = true;
+              break;
+            }
           }
+          if (raceViaAncestor && !otherRace) {
+            /*
+            //ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+            dbgs() << "Is only race via ancestor : " << Inst << "\n";
 
-        // Record this function call as either an allocation function, a call to
-        // free (or delete), a memory intrinsic, or an ordinary real function
-        // call.
-        if (isAllocationFn(&Inst, TLI, /*LookThroughBitCast*/ false,
-                           /*IgnoreBuiltinAttr*/ true))
-          AllocationFnCalls.insert(&Inst);
-        else if (isFreeCall(&Inst, TLI))
-          FreeCalls.insert(&Inst);
-        else if (isa<AnyMemIntrinsic>(Inst))
-          MemIntrinCalls.push_back(&Inst);
-        else if (!simpleCallCannotRace(Inst) && !shouldIgnoreCall(Inst))
-          Callsites.push_back(&Inst);
+            dbgs() << "is a load inst : " << isa<LoadInst>(Inst) << "\n";
+
+            */
+            // is this always a scalar?
+            //dbgs() << "has computable loop evolution : " << SE.hasComputableLoopEvolution(SE.getSCEV(&Inst), L) << "\n";
+            //dbgs() << "Inst : " << Inst << "\n";
+            //dbgs() << "1\n";
+            Value *ptr = getLoadStorePointerOperand(&Inst);
+            //dbgs() << "2\n";
+            const SCEV *Size = SE.getElementSize(&Inst);
+            //dbgs() << "3\n";
+            //dbgs() << "Checking size : " << *SE.getElementSize(&Inst) << "\n";//->getType()->getScalarSizeInBits() << "\n";
+            //dbgs() << "ptr : " << *getLoadStorePointerOperand(&Inst) << "\n";
+            const SCEV *V = SE.getSCEV(getLoadStorePointerOperand(&Inst));
+            //dbgs() << "4\n";
+            //dbgs() << "ptr scev : " << *SE.getSCEV(getLoadStorePointerOperand(&Inst)) << "\n";
+
+            //dbgs() << "Checking stride : " << getStrideFromPointer(getLoadStorePointerOperand(&Inst), &SE, L) << "\n";
+
+            //dbgs() << "inst = " << Inst << "\n";
+            //dbgs() << "v = " << *V << "\n";
+            // if not an AddRecExpr, don't proceed
+            if (const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V)) {
+              //dbgs() << "5\n";
+              //dbgs() << "SrcAR = " << SrcAR << "\n";
+              //dbgs() << "getStepRecurrence : " << *(SrcAR->getStepRecurrence(SE)) << "\n";
+
+              const SCEV *Stride = SrcAR->getStepRecurrence(SE);
+              //dbgs() << "6\n";
+              //dbgs() << "stride : " << *Stride << "\n";
+              //dbgs() << "size : " << *Size << "\n";
+
+              const SCEV *Diff = SE.getMinusSCEV(Size, Stride);
+              //dbgs() << "7\n";
+
+              //dbgs() << "is known not negative : " << SE.isKnownNonNegative(Diff) << "\n";
+
+              //dbgs() << "values : " << SrcAR->getStepRecurrence(SE)->getValue() << " " << 
+
+              const SCEV* TripCount = getRuntimeTripCount(*L, &SE);
+              //dbgs() << "8\n";
+
+              // can only hoist if stride <= size and the tripcount is known
+              if (SE.isKnownNonNegative(Diff) &&
+                  isa<SCEVConstant>(TripCount) &&
+                  isa<SCEVConstant>(Stride)) {
+                dbgs() << "Can hoist " << Inst << "\n";
+                LoopInstInAncestRace.insert(&Inst);
+                can_hoist = true;
+              }
+            }
+          }
+        }
+      }
+      if (!can_hoist) {
+        // TODO: Handle VAArgInst
+        if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst))
+          LocalLoadsAndStores.push_back(&Inst);
+        else if (isa<AtomicRMWInst>(Inst) || isa<AtomicCmpXchgInst>(Inst))
+          AtomicAccesses.push_back(&Inst);
+        else if (isa<CallInst>(Inst) || isa<InvokeInst>(Inst)) {
+          // if (CallInst *CI = dyn_cast<CallInst>(&Inst))
+          //   maybeMarkSanitizerLibraryCallNoBuiltin(CI, TLI);
+
+          // If we find a sync region, record it.
+          if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&Inst))
+            if (Intrinsic::syncregion_start == II->getIntrinsicID()) {
+              // Identify this sync region with a counter value, where all sync
+              // regions within a function or task are numbered from 0.
+              BasicBlock *TEntry = TI.getTaskFor(&BB)->getEntry();
+              // Create a new counter if need be.
+              if (!SRCounters.count(TEntry))
+                SRCounters[TEntry] = 0;
+              SyncRegNums[&Inst] = SRCounters[TEntry]++;
+            }
+
+          // Record this function call as either an allocation function, a call to
+          // free (or delete), a memory intrinsic, or an ordinary real function
+          // call.
+          if (isAllocationFn(&Inst, TLI, /*LookThroughBitCast*/ false,
+                             /*IgnoreBuiltinAttr*/ true))
+            AllocationFnCalls.insert(&Inst);
+          else if (isFreeCall(&Inst, TLI))
+            FreeCalls.insert(&Inst);
+          else if (isa<AnyMemIntrinsic>(Inst))
+            MemIntrinCalls.push_back(&Inst);
+          else if (!simpleCallCannotRace(Inst) && !shouldIgnoreCall(Inst))
+            Callsites.push_back(&Inst);
+        }
 
         // Add the current set of local loads and stores to be considered for
         // instrumentation.
@@ -2602,6 +2842,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
   bool Result = false;
   if (!EnableStaticRaceDetection) {
+    dbgs() << "Simple instrumentor\n";
     SimpleInstrumentor FuncI(*this, TI, LI, DT);
     Result |= FuncI.InstrumentSimpleInstructions(AllLoadsAndStores);
     Result |= FuncI.InstrumentSimpleInstructions(AtomicAccesses);
@@ -2614,6 +2855,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                                                     FreeCalls, SyncRegNums,
                                                     SRCounters, DL, TLI);
   } else {
+    dbgs() << "Normal instrumentor\n";
     Instrumentor FuncI(*this, RI, TI, LI, DT);
     // Insert MAAP flags for each function argument.
     FuncI.InsertArgMAAPs(F, FuncId);
@@ -2622,6 +2864,10 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
     Result |= FuncI.InstrumentSimpleInstructions(AtomicAccesses);
     Result |= FuncI.InstrumentAnyMemIntrinsics(MemIntrinCalls);
     Result |= FuncI.InstrumentCalls(Callsites);
+
+    // Hoist instrumentation when possible (applies to all loops, not just
+    // Tapir loops)
+    Result |= FuncI.InstrumentLoops(LoopInstInAncestRace, &SE);
 
     // Instrument ancillary instructions including allocas, allocation-function
     // calls, free calls, detaches, and syncs.
@@ -3172,29 +3418,8 @@ bool CilkSanitizerImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
   return true;
 }
 
-// Helper function to get a value for the runtime trip count of the given loop.
-static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE) {
-  BasicBlock *Latch = L.getLoopLatch();
 
-  const SCEV *BECountSC = SE->getExitCount(&L, Latch);
-  if (isa<SCEVCouldNotCompute>(BECountSC) ||
-      !BECountSC->getType()->isIntegerTy()) {
-    LLVM_DEBUG(dbgs() << "Could not compute exit block SCEV\n");
-    return SE->getCouldNotCompute();
-  }
-
-  // Add 1 since the backedge count doesn't include the first loop iteration.
-  const SCEV *TripCountSC =
-      SE->getAddExpr(BECountSC, SE->getConstant(BECountSC->getType(), 1));
-  if (isa<SCEVCouldNotCompute>(TripCountSC)) {
-    LLVM_DEBUG(dbgs() << "Could not compute trip count SCEV.\n");
-    return SE->getCouldNotCompute();
-  }
-
-  return TripCountSC;
-}
-
-void CilkSanitizerImpl::instrumentLoop(Loop &L, TaskInfo &TI,
+void CilkSanitizerImpl::instrumentTapirLoop(Loop &L,TaskInfo &TI,
                                        DenseMap<Value *, unsigned> &SyncRegNums,
                                        ScalarEvolution *SE) {
   // Only insert instrumentation if requested
@@ -3582,9 +3807,12 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
   auto GetRaceInfo = [this](Function &F) -> RaceInfo & {
     return this->getAnalysis<TapirRaceDetectWrapperPass>(F).getRaceInfo();
   };
+  auto GetSE = [this](Function &F) -> ScalarEvolution & {
+    return this->getAnalysis<ScalarEvolutionWrapperPass>(F).getSE();
+  };
 
   return CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo,
-                           GetDepInfo, GetRaceInfo, TLI, JitMode,
+                           GetDepInfo, GetRaceInfo, TLI, GetSE, JitMode,
                            CallsMayThrow).run();
 }
 
@@ -3612,8 +3840,11 @@ PreservedAnalyses CilkSanitizerPass::run(Module &M, ModuleAnalysisManager &AM) {
       return FAM.getResult<TapirRaceDetect>(F);
     };
   auto *TLI = &AM.getResult<TargetLibraryAnalysis>(M);
+  auto GetSE = [&FAM](Function &F) -> ScalarEvolution & {
+    return FAM.getResult<ScalarEvolutionAnalysis>(F);
+  };
 
-  if (!CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetDI, GetRI, TLI)
+  if (!CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetDI, GetRI, TLI, GetSE)
       .run())
     return PreservedAnalyses::all();
 
