@@ -976,6 +976,11 @@ bool tools::addSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
   if (SanArgs.hasCrossDsoCfi() && !AddExportDynamic)
     CmdArgs.push_back("--export-dynamic-symbol=__cfi_check");
 
+  if (SanArgs.needsCilksanRt())
+    // Interpose the merge_two_rmaps function in the OpenCilk runtime, to
+    // properly suppress races involving reducer hyperobjects.
+    CmdArgs.push_back("--wrap=merge_two_rmaps");
+
   return !StaticRuntimes.empty() || !NonWholeStaticRuntimes.empty();
 }
 
