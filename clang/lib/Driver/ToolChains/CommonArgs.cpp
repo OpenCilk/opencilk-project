@@ -1228,6 +1228,11 @@ bool tools::addSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
       CmdArgs.push_back("--android-memtag-stack");
   }
 
+  if (SanArgs.needsCilksanRt())
+    // Interpose the merge_two_rmaps function in the OpenCilk runtime, to
+    // properly suppress races involving reducer hyperobjects.
+    CmdArgs.push_back("--wrap=merge_two_rmaps");
+
   return !StaticRuntimes.empty() || !NonWholeStaticRuntimes.empty();
 }
 
