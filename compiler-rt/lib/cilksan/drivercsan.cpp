@@ -1,18 +1,13 @@
-// #include <cilk/hyperobject_base.h>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <cstdarg>
-#include <execinfo.h>
-// #include <internal/abi.h>
-#include <unistd.h>
-#include <map>
-#include <unordered_map>
-#include <sys/mman.h>
-
-#if CILKSAN_DYNAMIC
 #include <dlfcn.h>
-#endif  // CILKSAN_DYNAMIC
+#include <execinfo.h>
+#include <map>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <unordered_map>
 
 #include "cilksan_internal.h"
 #include "debug_util.h"
@@ -235,11 +230,11 @@ static void init_internal() {
   // Force reductions.
   // XXX: Does not work with SP+ algorithm, but works with ordinary
   // SP bags.
-  e = getenv("CILK_FORCE_REDUCE");
+  e = getenv("CILKSAN_CHECK_REDUCER_RACE");
   if (!e || 0 != strcmp(e, "1")) {
     // fprintf(err_io, "Setting CILK_FORCE_REDUCE to be 1\n");
-    if (setenv("CILK_FORCE_REDUCE", "1", 1)) {
-      fprintf(err_io, "Error setting CILK_FORCE_REDUCE to be 1\n");
+    if (setenv("CILKSAN_CHECK_REDUCER_RACE", "1", 1)) {
+      fprintf(err_io, "Error setting CILKSAN_CHECK_REDUCER_REACE to be 1\n");
       exit(1);
     }
   }
@@ -1205,3 +1200,49 @@ void *mremap(void *start, size_t old_len, size_t len, int flags, ...) {
 }
 
 #endif  // CILKSAN_DYNAMIC
+
+/// Wrapping for merge_two_rmaps Cilk runtime method for performing reduce
+/// operations on reducer views.
+
+struct cilkred_map;
+struct __cilkrts_worker;
+
+// Wrapped merge_two_rmaps method for dynamic interpositioning.
+typedef cilkred_map *(*merge_two_rmaps_t)(__cilkrts_worker *const,
+                                          cilkred_map *, cilkred_map *);
+static merge_two_rmaps_t dl_merge_two_rmaps = NULL;
+
+__attribute__((weak)) CILKSAN_API
+cilkred_map *merge_two_rmaps(__cilkrts_worker *const ws,
+                             cilkred_map *left, cilkred_map *right) {
+  if (__builtin_expect(dl_merge_two_rmaps == NULL, 0)) {
+    dl_merge_two_rmaps = (merge_two_rmaps_t)dlsym(RTLD_NEXT, "merge_two_rmaps");
+    char *error = dlerror();
+    if (error != NULL) {
+      fputs(error, err_io);
+      fflush(err_io);
+      abort();
+    }
+  }
+  disable_checking();
+  cilkred_map *res = dl_merge_two_rmaps(ws, left, right);
+  enable_checking();
+
+  return res;
+}
+
+/// Wrapped merge_two_rmaps method for link-time interpositioning.
+__attribute__((weak)) CILKSAN_API
+cilkred_map *__real_merge_two_rmaps(__cilkrts_worker *const ws,
+                                    cilkred_map *left, cilkred_map *right) {
+  return merge_two_rmaps(ws, left, right);
+}
+
+CILKSAN_API
+cilkred_map *__wrap_merge_two_rmaps(__cilkrts_worker *const ws,
+                                    cilkred_map *left, cilkred_map *right) {
+  disable_checking();
+  cilkred_map *res = __real_merge_two_rmaps(ws, left, right);
+  enable_checking();
+  return res;
+}
