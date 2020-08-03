@@ -750,7 +750,12 @@ void CilkSanImpl_t::do_read(const csi_id_t load_id,
   DBG_TRACE(DEBUG_MEMORY, "record read %lu: %lu bytes at addr %p and rip %p.\n",
             load_id, mem_size, addr,
             (load_id != UNKNOWN_CSI_ID) ? load_pc[load_id] : 0);
-  ++num_reads_checked;
+  if (collect_stats) {
+    ++total_reads_checked;
+    if (!num_reads_checked.count(mem_size))
+      num_reads_checked.insert(std::make_pair(mem_size, 0));
+    ++num_reads_checked[mem_size];
+  }
 
   bool on_stack = is_on_stack(addr);
   if (on_stack)
@@ -764,7 +769,12 @@ void CilkSanImpl_t::do_write(const csi_id_t store_id,
   cilksan_assert(CILKSAN_INITIALIZED);
   DBG_TRACE(DEBUG_MEMORY, "record write %ld: %lu bytes at addr %p and rip %p.\n",
             store_id, mem_size, addr, store_pc[store_id]);
-  ++num_writes_checked;
+  if (collect_stats) {
+    ++total_writes_checked;
+    if (!num_writes_checked.count(mem_size))
+      num_writes_checked.insert(std::make_pair(mem_size, 0));
+    ++num_writes_checked[mem_size];
+  }
 
   bool on_stack = is_on_stack(addr);
   if (on_stack)
@@ -803,8 +813,16 @@ inline void CilkSanImpl_t::print_stats() {
   //           << std::endl;
   // std::cout << "max continuation depth seen: "
   //           << accounted_max_cont_depth << std::endl;
-  std::cout << "number of reads checked:  " << num_reads_checked << "\n";
-  std::cout << "number of writes checked: " << num_writes_checked << "\n";
+
+  std::cout << ",size (bytes),count\n";
+
+  for (std::pair<size_t, uint64_t> reads : num_reads_checked)
+    std::cout << "reads," << reads.first << "," << reads.second << "\n";
+  std::cout << "total reads,," << total_reads_checked << "\n";
+
+  for (std::pair<size_t, uint64_t> writes : num_writes_checked)
+    std::cout << "writes," << writes.first << "," << writes.second << "\n";
+  std::cout << "total writes,," << total_writes_checked << "\n";
 }
 
 void CilkSanImpl_t::deinit() {
@@ -815,8 +833,7 @@ void CilkSanImpl_t::deinit() {
 
   print_race_report();
   // Optionally print statistics.
-  char *e = getenv("CILKSAN_STATS");
-  if (e && 0 != strcmp(e, "0"))
+  if (collect_stats)
     print_stats();
 
   cilksan_assert(frame_stack.size() == 1);
@@ -861,6 +878,11 @@ void CilkSanImpl_t::deinit() {
 
 void CilkSanImpl_t::init() {
   DBG_TRACE(DEBUG_CALLBACK, "cilksan_init()\n");
+
+  char *e = getenv("CILKSAN_STATS");
+  if (e && 0 != strcmp(e, "0"))
+    collect_stats = true;
+
   std::cout << "Running Cilksan race detector\n";
   // std::cout << "cilksan_init() version 19\n";
 
