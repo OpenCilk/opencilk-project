@@ -744,6 +744,8 @@ void __csi_after_alloca(const csi_id_t alloca_id, const void *addr,
     alloca_pc[alloca_id] = CALLERPC;
 
   DBG_TRACE(DEBUG_CALLBACK, "__csi_after_alloca(%ld)\n", alloca_id);
+  DBG_TRACE(DEBUG_STACK, "__csi_after_alloca(%ld, %p, %ld)\n", alloca_id, addr,
+            size);
 
   // Record the alloca and clear the allocated portion of the shadow memory.
   CilkSanImpl.record_alloc((size_t) addr, size, 2 * alloca_id);
