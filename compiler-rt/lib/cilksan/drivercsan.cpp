@@ -230,11 +230,11 @@ static void init_internal() {
   // Force reductions.
   // XXX: Does not work with SP+ algorithm, but works with ordinary
   // SP bags.
-  e = getenv("CILKSAN_CHECK_REDUCER_RACE");
+  e = getenv("CILK_FORCE_REDUCE");
   if (!e || 0 != strcmp(e, "1")) {
     // fprintf(err_io, "Setting CILK_FORCE_REDUCE to be 1\n");
-    if (setenv("CILKSAN_CHECK_REDUCER_RACE", "1", 1)) {
-      fprintf(err_io, "Error setting CILKSAN_CHECK_REDUCER_REACE to be 1\n");
+    if (setenv("CILK_FORCE_REDUCE", "1", 1)) {
+      fprintf(err_io, "Error setting CILKS_FORCE_REDUCE to be 1\n");
       exit(1);
     }
   }
