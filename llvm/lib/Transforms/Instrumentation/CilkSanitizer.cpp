@@ -649,7 +649,6 @@ using SCCNodeSet = SmallSetVector<Function *, 8>;
 } // end anonymous namespace
 
 bool CilkSanitizerImpl::run() {
-  dbgs() << "STARTING CSAN\n";
   // Initialize components of the CSI and Cilksan system.
   initializeCsi();
   initializeFEDTables();
@@ -664,7 +663,6 @@ bool CilkSanitizerImpl::run() {
   for (scc_iterator<CallGraph *> I = scc_begin(CG); !I.isAtEnd(); ++I) {
     const std::vector<CallGraphNode *> &SCC = *I;
     for (CallGraphNode *N : SCC) {
-      dbgs() << "Checking CallGraphNode\n";
       if (Function *F = N->getFunction())
         if (instrumentFunctionUsingRI(*F))
           InstrumentedFunctions.push_back(F);
@@ -1422,7 +1420,6 @@ Value *CilkSanitizerImpl::GetCalleeFuncID(const Function *Callee,
 
 bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentSimpleInstructions(
     SmallVectorImpl<Instruction *> &Instructions) {
-  dbgs() << "SIMPLE INSTRUMENTOR InstrumentSimpleInstructions";
   bool Result = false;
   for (Instruction *I : Instructions) {
     bool LocalResult = false;
@@ -1680,7 +1677,6 @@ void CilkSanitizerImpl::Instrumentor::InsertArgSuppressionFlags(Function &F,
 
 bool CilkSanitizerImpl::Instrumentor::InstrumentSimpleInstructions(
     SmallVectorImpl<Instruction *> &Instructions) {
-  dbgs() << "INSTRUMENTOR InstrumentSimpleInstructions";
   bool Result = false;
   for (Instruction *I : Instructions) {
     bool LocalResult = false;
@@ -2524,13 +2520,13 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     SmallPtrSetImpl<Instruction *> &LoopInstInAncestRace, ScalarEvolution *SE) {
   bool Result = false;
 
-  // TODO: for now, only LoadInst and StoreInst (next, atomics)
-  // TODO: what does the stride look like if iterating backwards?
+  // TODO: for now, only LoadInst and StoreInst (add atomics later)
+  // TODO: hmm, what does the stride look like if iterating backwards?
   for (Instruction *I : LoopInstInAncestRace) {
-    // TODO: Shouldn't be a reason to return false for now
-    //       (already verified size, stride, and tripcount)
+    // For now, there shouldn't be a reason to return false since we already
+    // verified the size, stride, and tripcount.
+    // TODO: might fail because no unique preheader. Add this later.
     Result = true;
-
     CilkSanImpl.instrumentLoadOrStoreHoisted(I, LI, SE);
   }
 
@@ -2551,6 +2547,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
     // evaluate this ptr at index 0
     Addr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
   } else {
+    // fail the moment we see something other than a GEP
     assert(false && "Trying to hoist something other than a GEP\n");
   }
 
@@ -2564,15 +2561,6 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
 
   // get address range
   const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
-  //assert(isa<SCEVConstant>(RangeExpr) && "RangeExpr is not a constant");
-  //ConstantInt *Range = cast<SCEVConstant>(RangeExpr)->getValue();
-
-  dbgs() << "Addr      = " << *Addr << "\n";
-  dbgs() << "Size      = " << *Size << "\n";
-  dbgs() << "Stride    = " << *Stride << "\n";
-  dbgs() << "Trip      = " << *TripCount << "\n";
-  dbgs() << "RangeExpr = " << *RangeExpr << "\n";
-  //dbgs() << "Range  = " << *Range << "\n";
 
   // TODO: for now, assume unique preheader
   BasicBlock *PreheaderBB = L->getLoopPreheader();
@@ -2583,7 +2571,6 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
 
   CsiLoadStoreProperty Prop;
 
-  // TODO: what if there isn't a unique preheader?
   IRBuilder<> IRB(L->getLoopPreheader()->getTerminator());
 
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
@@ -2603,11 +2590,10 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
     IRB.SetInstDebugLocation(Call);
-    // TODO: I picked the right thing to increment?
+    // TODO: Which do we want to increment?
     ++NumInstrumentedMemIntrinsicReads;
     //NumInstrumentedReads++;
   } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-    //Value *Addr = M->getDest();
     Prop.setAlignment(SI->getAlignment());
     // Instrument the store
     uint64_t StoreId = StoreFED.add(*SI);
@@ -2623,11 +2609,10 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
     IRB.SetInstDebugLocation(Call);
+    // TODO: Which do we want to increment?
     //NumInstrumentedWrites++;
     ++NumInstrumentedMemIntrinsicWrites;
   }
-
-  dbgs() << "PREHEADER = " << *L->getLoopPreheader() << "\n";
 
   return true;
 }
@@ -2642,10 +2627,6 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
   if (F.empty() || shouldNotInstrumentFunction(F) ||
       !CheckSanitizeCilkAttr(F)) {
-    dbgs() << "skipping " << F.getName() << "\n";
-    dbgs() << "f.empty() = " << F.empty() << "\n";
-    dbgs() << "shouldNotInstrumentFunction(F) = " << shouldNotInstrumentFunction(F) << "\n";
-    dbgs() << "CheckSanitizeCilkAttr(F) = " << CheckSanitizeCilkAttr(F) << "\n";
     LLVM_DEBUG({
         dbgs() << "Skipping " << F.getName() << "\n";
         if (F.empty())
@@ -2711,14 +2692,12 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
       // if the instruction is in a loop and can only race via ancestor,
       // and size < stride, store it.
       if (L) {
-        // TODO: for now, only look @ loads and stores b/c lazy later on
-        //       add atomics. Need to add any others?
+        // TODO: for now, only look @ loads and stores. Add atomics later.
+        //       Need to add any others?
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
           bool raceViaAncestor = false;
           bool otherRace = false;
-          dbgs() << "CHECKING INST " << Inst << "\n";
           for (const RaceInfo::RaceData &RD : RI.getRaceData(&Inst)) {
-            dbgs() << "  RACE TYPE " << RD.Type << "\n";
             if (RaceInfo::isRaceViaAncestor(RD.Type)) {
               raceViaAncestor = true;
             } else if (RaceInfo::isLocalRace(RD.Type) ||
@@ -2727,59 +2706,20 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
               break;
             }
           }
+          // if this instruction can only race via an ancestor, see if it
+          // can be hoisted.
           if (raceViaAncestor && !otherRace) {
-            /*
-            //ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-            dbgs() << "Is only race via ancestor : " << Inst << "\n";
-
-            dbgs() << "is a load inst : " << isa<LoadInst>(Inst) << "\n";
-
-            */
-            // is this always a scalar?
-            //dbgs() << "has computable loop evolution : " << SE.hasComputableLoopEvolution(SE.getSCEV(&Inst), L) << "\n";
-            //dbgs() << "Inst : " << Inst << "\n";
-            //dbgs() << "1\n";
             Value *ptr = getLoadStorePointerOperand(&Inst);
-            //dbgs() << "2\n";
             const SCEV *Size = SE.getElementSize(&Inst);
-            //dbgs() << "3\n";
-            //dbgs() << "Checking size : " << *SE.getElementSize(&Inst) << "\n";//->getType()->getScalarSizeInBits() << "\n";
-            //dbgs() << "ptr : " << *getLoadStorePointerOperand(&Inst) << "\n";
             const SCEV *V = SE.getSCEV(getLoadStorePointerOperand(&Inst));
-            //dbgs() << "4\n";
-            //dbgs() << "ptr scev : " << *SE.getSCEV(getLoadStorePointerOperand(&Inst)) << "\n";
-
-            //dbgs() << "Checking stride : " << getStrideFromPointer(getLoadStorePointerOperand(&Inst), &SE, L) << "\n";
-
-            dbgs() << "inst = " << Inst << "\n";
-            dbgs() << "v = " << *V << "\n";
-            dbgs() << "tripcount = " << *getRuntimeTripCount(*L, &SE) << "\n";
-
             // if not an AddRecExpr, don't proceed
             if (const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V)) {
-              //dbgs() << "5\n";
-              //dbgs() << "SrcAR = " << SrcAR << "\n";
-              //dbgs() << "getStepRecurrence : " << *(SrcAR->getStepRecurrence(SE)) << "\n";
-
               const SCEV *Stride = SrcAR->getStepRecurrence(SE);
-              //dbgs() << "6\n";
-              //dbgs() << "stride : " << *Stride << "\n";
-              //dbgs() << "size : " << *Size << "\n";
-
               const SCEV *Diff = SE.getMinusSCEV(Size, Stride);
-              //dbgs() << "7\n";
-
-              //dbgs() << "is known not negative : " << SE.isKnownNonNegative(Diff) << "\n";
-
-              //dbgs() << "values : " << SrcAR->getStepRecurrence(SE)->getValue() << " " << 
-
               const SCEV* TripCount = getRuntimeTripCount(*L, &SE);
-              //dbgs() << "8\n";
-
               // can only hoist if stride <= size and the tripcount is known
               if (SE.isKnownNonNegative(Diff) &&
                   !isa<SCEVCouldNotCompute>(TripCount)) {
-                dbgs() << "Can hoist " << Inst << "\n";
                 LoopInstInAncestRace.insert(&Inst);
                 can_hoist = true;
               }
@@ -2853,7 +2793,6 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
   bool Result = false;
   if (!EnableStaticRaceDetection) {
-    dbgs() << "Simple instrumentor\n";
     SimpleInstrumentor FuncI(*this, TI, LI, DT);
     Result |= FuncI.InstrumentSimpleInstructions(AllLoadsAndStores);
     Result |= FuncI.InstrumentSimpleInstructions(AtomicAccesses);
@@ -2866,7 +2805,6 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                                                     FreeCalls, SyncRegNums,
                                                     SRCounters, DL, TLI);
   } else {
-    dbgs() << "Normal instrumentor\n";
     Instrumentor FuncI(*this, RI, TI, LI, DT);
     // Insert suppression flags for each function argument.
     FuncI.InsertArgSuppressionFlags(F, FuncId);
