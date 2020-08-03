@@ -216,6 +216,51 @@ static_assert((member_size(Slab8_t, UsedMap) * 8) - 64 <
               (member_size(Slab8_t, Lines)/sizeof(MemoryAccess_t[8])),
               "Bad size for Slab8_t.UsedMap");
 
+// Slab of MemoryAccess_t[16].
+using Slab16_t =
+  Slab_t<16, (SYS_PAGE_SIZE - sizeof(uintptr_t[2]) - sizeof(uint64_t[1]))/
+         sizeof(MemoryAccess_t[16])>;
+
+static_assert(sizeof(SlabHead_t<Slab16_t, 16>) == sizeof(uintptr_t),
+              "Unexpected SlabHead_t size.");
+static_assert(sizeof(Slab16_t) <= SYS_PAGE_SIZE, "Invalid Slab16_t");
+static_assert(member_size(Slab16_t, UsedMap) * 8 >=
+              (member_size(Slab16_t, Lines)/sizeof(MemoryAccess_t[16])),
+              "Bad size for Slab16_t.UsedMap");
+static_assert((member_size(Slab16_t, UsedMap) * 8) - 64 <
+              (member_size(Slab16_t, Lines)/sizeof(MemoryAccess_t[16])),
+              "Bad size for Slab8_t.UsedMap");
+
+// Slab of MemoryAccess_t[32].
+using Slab32_t =
+  Slab_t<32, (SYS_PAGE_SIZE - sizeof(uintptr_t[2]) - sizeof(uint64_t[1]))/
+         sizeof(MemoryAccess_t[32])>;
+
+static_assert(sizeof(SlabHead_t<Slab32_t, 32>) == sizeof(uintptr_t),
+              "Unexpected SlabHead_t size.");
+static_assert(sizeof(Slab32_t) <= SYS_PAGE_SIZE, "Invalid Slab32_t");
+static_assert(member_size(Slab32_t, UsedMap) * 8 >=
+              (member_size(Slab32_t, Lines)/sizeof(MemoryAccess_t[32])),
+              "Bad size for Slab32_t.UsedMap");
+static_assert((member_size(Slab32_t, UsedMap) * 8) - 64 <
+              (member_size(Slab32_t, Lines)/sizeof(MemoryAccess_t[32])),
+              "Bad size for Slab32_t.UsedMap");
+
+// Slab of MemoryAccess_t[64].
+using Slab64_t =
+  Slab_t<64, (SYS_PAGE_SIZE - sizeof(uintptr_t[2]) - sizeof(uint64_t[1]))/
+         sizeof(MemoryAccess_t[64])>;
+
+static_assert(sizeof(SlabHead_t<Slab64_t, 64>) == sizeof(uintptr_t),
+              "Unexpected SlabHead_t size.");
+static_assert(sizeof(Slab64_t) <= SYS_PAGE_SIZE, "Invalid Slab64_t");
+static_assert(member_size(Slab64_t, UsedMap) * 8 >=
+              (member_size(Slab64_t, Lines)/sizeof(MemoryAccess_t[64])),
+              "Bad size for Slab64_t.UsedMap");
+static_assert((member_size(Slab64_t, UsedMap) * 8) - 64 <
+              (member_size(Slab64_t, Lines)/sizeof(MemoryAccess_t[64])),
+              "Bad size for Slab64_t.UsedMap");
+
 // Top-level class for the allocating lines of memory accesses.
 class MALineAllocator {
   // The types of lines -- fixed-size arrays of MemoryAccess_t objects --
@@ -224,18 +269,27 @@ class MALineAllocator {
   using LineType2 = MemoryAccess_t[2];
   using LineType4 = MemoryAccess_t[4];
   using LineType8 = MemoryAccess_t[8];
+  using LineType16 = MemoryAccess_t[16];
+  using LineType32 = MemoryAccess_t[32];
+  // using LineType64 = MemoryAccess_t[64];
 
   // Linked lists of slabs with available lines.
   Slab1_t *MA1Lines = nullptr;
   Slab2_t *MA2Lines = nullptr;
   Slab4_t *MA4Lines = nullptr;
   Slab8_t *MA8Lines = nullptr;
+  Slab16_t *MA16Lines = nullptr;
+  Slab32_t *MA32Lines = nullptr;
+  // Slab64_t *MA64Lines = nullptr;
 
   // Doubly-linked lists of full slabs.
   Slab1_t *FullMA1 = nullptr;
   Slab2_t *FullMA2 = nullptr;
   Slab4_t *FullMA4 = nullptr;
   Slab8_t *FullMA8 = nullptr;
+  Slab16_t *FullMA16 = nullptr;
+  Slab32_t *FullMA32 = nullptr;
+  // Slab64_t *FullMA64 = nullptr;
 
 public:
   MALineAllocator() {
@@ -244,6 +298,9 @@ public:
     MA2Lines = new (my_aligned_alloc(SYS_PAGE_SIZE, sizeof(Slab2_t))) Slab2_t;
     MA4Lines = new (my_aligned_alloc(SYS_PAGE_SIZE, sizeof(Slab4_t))) Slab4_t;
     MA8Lines = new (my_aligned_alloc(SYS_PAGE_SIZE, sizeof(Slab8_t))) Slab8_t;
+    MA16Lines = new (my_aligned_alloc(SYS_PAGE_SIZE, sizeof(Slab16_t))) Slab16_t;
+    MA32Lines = new (my_aligned_alloc(SYS_PAGE_SIZE, sizeof(Slab32_t))) Slab32_t;
+    // MA64Lines = new (my_aligned_alloc(SYS_PAGE_SIZE, sizeof(Slab64_t))) Slab64_t;
   }
 
   // Free the slabs back to system memory.
@@ -265,10 +322,16 @@ public:
     cilksan_assert(!FullMA2 && "Full slabs remaining.");
     cilksan_assert(!FullMA4 && "Full slabs remaining.");
     cilksan_assert(!FullMA8 && "Full slabs remaining.");
+    cilksan_assert(!FullMA16 && "Full slabs remaining.");
+    cilksan_assert(!FullMA32 && "Full slabs remaining.");
+    // cilksan_assert(!FullMA64 && "Full slabs remaining.");
     freeSlabs<Slab1_t>(MA1Lines);
     freeSlabs<Slab2_t>(MA2Lines);
     freeSlabs<Slab4_t>(MA4Lines);
     freeSlabs<Slab8_t>(MA8Lines);
+    freeSlabs<Slab16_t>(MA16Lines);
+    freeSlabs<Slab32_t>(MA32Lines);
+    // freeSlabs<Slab64_t>(MA64Lines);
   }
 
   // Call the destructor on a line.
@@ -347,6 +410,18 @@ public:
       freeLine(reinterpret_cast<LineType8 *>(Ptr),
                reinterpret_cast<Slab8_t *>(PagePtr), MA8Lines, FullMA8, 8);
       break;
+    case 16:
+      freeLine(reinterpret_cast<LineType16 *>(Ptr),
+               reinterpret_cast<Slab16_t *>(PagePtr), MA16Lines, FullMA16, 16);
+      break;
+    case 32:
+      freeLine(reinterpret_cast<LineType32 *>(Ptr),
+               reinterpret_cast<Slab32_t *>(PagePtr), MA32Lines, FullMA32, 32);
+      break;
+    // case 64:
+    //   freeLine(reinterpret_cast<LineType64 *>(Ptr),
+    //            reinterpret_cast<Slab64_t *>(PagePtr), MA64Lines, FullMA64, 64);
+    //   break;
     }
     return true;
   }
@@ -391,6 +466,15 @@ public:
   LineType8 *getMA8Line() {
     return getLine<LineType8, Slab8_t>(MA8Lines, FullMA8);
   }
+  LineType16 *getMA16Line() {
+    return getLine<LineType16, Slab16_t>(MA16Lines, FullMA16);
+  }
+  LineType32 *getMA32Line() {
+    return getLine<LineType32, Slab32_t>(MA32Lines, FullMA32);
+  }
+  // LineType64 *getMA64Line() {
+  //   return getLine<LineType64, Slab64_t>(MA64Lines, FullMA64);
+  // }
 
   // Call the constructor on all entries of Line.
   template <typename LT>
@@ -409,6 +493,9 @@ public:
     case 2: return construct<LineType2>(getMA2Line(), 2);
     case 4: return construct<LineType4>(getMA4Line(), 4);
     case 8: return construct<LineType8>(getMA8Line(), 8);
+    case 16: return construct<LineType16>(getMA16Line(), 16);
+    case 32: return construct<LineType32>(getMA32Line(), 32);
+    // case 64: return construct<LineType64>(getMA64Line(), 64);
     }
   }    
 };
