@@ -393,6 +393,10 @@ public:
   void addSyncToOutlineReturns(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                                ValueToValueMapTy &VMap);
 
+  /// Move Cilksan instrumentation out of cloned loop.
+  void moveCilksanInstrumentation(TapirLoopInfo &TL, TaskOutlineInfo &Out,
+                                  ValueToValueMapTy &VMap);
+
   /// Remap any data members of the LoopOutlineProcessor.  This method is called
   /// whenever a loop L is outlined, in order to update data for subloops of L.
   virtual void remapData(ValueToValueMapTy &VMap) {};

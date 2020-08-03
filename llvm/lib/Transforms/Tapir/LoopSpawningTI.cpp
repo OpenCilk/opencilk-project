@@ -92,6 +92,9 @@ public:
     implementDACIterSpawnOnHelper(TL, Out, VMap);
     ++LoopsConvertedToDAC;
 
+    // Move Cilksan instrumentation.
+    moveCilksanInstrumentation(TL, Out, VMap);
+
     // Add syncs to all exits of the outline.
     addSyncToOutlineReturns(TL, Out, VMap);
   }
@@ -198,6 +201,169 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
     if (TL.getUnwindDest())
       changeToInvokeAndSplitBasicBlock(
           SyncUnwind, cast<BasicBlock>(VMap[TL.getUnwindDest()]));
+  }
+}
+
+static void getDependenciesInSameBlock(Instruction *I,
+                                       SmallPtrSetImpl<Instruction *> &Deps) {
+  const BasicBlock *Block = I->getParent();
+  for (Value *Op : I->operand_values())
+    if (Instruction *OpI = dyn_cast<Instruction>(Op))
+      if (OpI->getParent() == Block) {
+        if (!Deps.insert(OpI).second)
+          continue;
+        getDependenciesInSameBlock(OpI, Deps);
+      }
+}
+
+static void moveInstrumentation(StringRef Name, BasicBlock &From,
+                                BasicBlock &To,
+                                Instruction *InsertBefore = nullptr) {
+  assert((!InsertBefore || InsertBefore->getParent() == &To) &&
+         "Insert point not in To block.");
+  BasicBlock::iterator InsertPoint =
+      InsertBefore ? InsertBefore->getIterator() : To.getFirstInsertionPt();
+
+  // Search the From block for instrumentation to move.
+  SmallPtrSet<Instruction *, 8> ToHoist;
+  for (Instruction &I : From) {
+    if (CallBase *CB = dyn_cast<CallBase>(&I))
+      if (const Function *Called = CB->getCalledFunction())
+        if (Called->getName() == Name) {
+          ToHoist.insert(&I);
+          getDependenciesInSameBlock(&I, ToHoist);
+        }
+  }
+
+  // If we found no instrumentation to hoist, give up.
+  if (ToHoist.empty())
+    return;
+
+  // Hoist the instrumentation to InsertPoint in the To block.
+  for (BasicBlock::iterator II = From.begin(), IE = From.end(); II != IE;) {
+    Instruction *I = dyn_cast<Instruction>(II++);
+    if (!I || !ToHoist.count(I))
+      continue;
+
+    while (isa<Instruction>(II) && ToHoist.count(cast<Instruction>(II)))
+      ++II;
+
+    To.getInstList().splice(InsertPoint, From.getInstList(), I->getIterator(),
+                            II);
+  }
+}
+
+void LoopOutlineProcessor::moveCilksanInstrumentation(TapirLoopInfo &TL,
+                                                      TaskOutlineInfo &Out,
+                                                      ValueToValueMapTy &VMap) {
+  Task *T = TL.getTask();
+  Loop *L = TL.getLoop();
+
+  // Get the header of the cloned loop.
+  BasicBlock *Header = cast<BasicBlock>(VMap[L->getHeader()]);
+  assert(Header && "No cloned header block found");
+
+  // Get the task entry of the cloned loop.
+  BasicBlock *TaskEntry = cast<BasicBlock>(VMap[T->getEntry()]);
+  assert(TaskEntry && "No cloned task-entry block found");
+
+  // Get the latch of the cloned loop.
+  BasicBlock *Latch = cast<BasicBlock>(VMap[L->getLoopLatch()]);
+  assert(Latch && "No cloned loop latch found");
+
+  // Get the normal task exit of the cloned loop.
+  BasicBlock *TaskExit = Latch->getSinglePredecessor();
+
+  // Get the preheader of the cloned loop.
+  BasicBlock *Preheader = nullptr;
+  for (BasicBlock *Pred : predecessors(Header)) {
+    if (Latch == Pred)
+      continue;
+    Preheader = Pred;
+    break;
+  }
+  if (!Preheader) {
+    LLVM_DEBUG(dbgs() << "No preheader for hoisting Cilksan instrumentation\n");
+    return;
+  }
+
+  // Get the normal exit of the cloned loop.
+  BasicBlock *LatchExit = nullptr;
+  for (BasicBlock *Succ : successors(Latch)) {
+    if (Header == Succ)
+      continue;
+    LatchExit = Succ;
+    break;
+  }
+  if (!LatchExit) {
+    LLVM_DEBUG(
+        dbgs() << "No normal exit for hoisting Cilksan instrumentation\n");
+    return;
+  }
+
+  // Move __csan_detach and __csan_task to the Preheader.
+  moveInstrumentation("__csan_detach", *Header, *Preheader,
+                      Preheader->getTerminator());
+  moveInstrumentation("__csan_task", *TaskEntry, *Preheader,
+                      Preheader->getTerminator());
+
+  // Move __csan_detach_continue and __csan_task_exit on the normal exit path to
+  // LatchExit.
+  moveInstrumentation("__csan_detach_continue", *Latch, *LatchExit);
+  if (TaskExit)
+    // There's only one block with __csan_task_exit instrumentation to move, so
+    // move it from that block.
+    moveInstrumentation("__csan_task_exit", *TaskExit, *LatchExit);
+  else {
+    // We need to create PHI nodes for the arguments of a new instrumentation
+    // call in LatchExit.
+
+    // Scan all predecessors of Latch for __csan_task_exit instrumentation.
+    DenseMap<BasicBlock *, CallBase *> Instrumentation;
+    Function *InstrFunc = nullptr;
+    for (BasicBlock *Pred : predecessors(Latch))
+      for (Instruction &I : *Pred)
+        if (CallBase *CB = dyn_cast<CallBase>(&I))
+          if (Function *Called = CB->getCalledFunction())
+            if (Called->getName() == "__csan_task_exit") {
+              Instrumentation.insert(std::make_pair(Pred, CB));
+              InstrFunc = Called;
+            }
+
+    // Return early if we found no instrumentation.
+    if (!InstrFunc || Instrumentation.empty()) {
+      LLVM_DEBUG(dbgs() << "No task_exit instrumentation found");
+      return;
+    }
+
+    // Create PHI nodes at the start of Latch for the arguments of the moved
+    // instrumentation.
+    SmallVector<Value *, 4> InstrArgs;
+    for (BasicBlock *Pred : predecessors(Latch)) {
+      CallBase *Instr = Instrumentation[Pred];
+      if (InstrArgs.empty()) {
+        // Create PHI nodes at the start of Latch for the instrumentation
+        // arguments.
+        IRBuilder<> IRB(&Latch->front());
+        for (Value *Arg : Instr->args()) {
+          PHINode *ArgPHI =
+              IRB.CreatePHI(Arg->getType(), Instrumentation.size());
+          ArgPHI->addIncoming(Arg, Pred);
+          InstrArgs.push_back(ArgPHI);
+        }
+      } else {
+        // Update the PHI nodes at the start of Latch for the instrumentation.
+        unsigned ArgIdx = 0;
+        for (Value *Arg : Instr->args()) {
+          cast<PHINode>(InstrArgs[ArgIdx])->addIncoming(Arg, Pred);
+          ++ArgIdx;
+        }
+      }
+    }
+
+    // Insert new instrumentation call at the start of LatchExit.
+    CallInst::Create(InstrFunc->getFunctionType(), InstrFunc, InstrArgs, "",
+                     &*LatchExit->getFirstInsertionPt());
   }
 }
 
