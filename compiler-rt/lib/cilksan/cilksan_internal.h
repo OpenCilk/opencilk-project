@@ -227,8 +227,11 @@ private:
   const bool color_report;
 
   // Basic statistics
-  uint64_t num_reads_checked = 0;
-  uint64_t num_writes_checked = 0;
+  bool collect_stats = false;
+  uint64_t total_reads_checked = 0;
+  uint64_t total_writes_checked = 0;
+  std::unordered_map<size_t, uint64_t> num_reads_checked;
+  std::unordered_map<size_t, uint64_t> num_writes_checked;
 };
 
 #endif // __CILKSAN_INTERNAL_H__
