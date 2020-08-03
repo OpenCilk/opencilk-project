@@ -95,11 +95,6 @@ static cl::opt<bool>
         "cilksan-assume-no-exceptions", cl::init(false), cl::Hidden,
         cl::desc("Assume that ordinary calls cannot throw exceptions."));
 
-static cl::opt<bool>
-    AssumeLibCallsDontRecur(
-        "cilksan-assume-lib-calls-dont-recur", cl::init(true), cl::Hidden,
-        cl::desc("Assume that library calls do not recur."));
-
 static cl::opt<unsigned>
     MaxUsesToExploreCapture(
         "cilksan-max-uses-to-explore-capture", cl::init(unsigned(-1)),
