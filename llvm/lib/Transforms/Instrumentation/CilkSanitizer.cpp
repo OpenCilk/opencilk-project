@@ -107,6 +107,12 @@ static cl::opt<bool>
         cl::desc("Ignore the 'sanitize_cilk' attribute when choosing what to "
                  "instrument."));
 
+static cl::opt<unsigned> InstrumentationSet(
+    "cilksan-instrumentation-set", cl::init(3), cl::Hidden,
+    cl::desc("Specify the set of instrumentation hooks to insert."));
+static const unsigned SERIESPARALLEL = 0x1;
+static const unsigned SHADOWMEMORY = 0x2;
+
 static const char *const CsiUnitObjTableName = "__csi_unit_obj_table";
 static const char *const CsiUnitObjTableArrayName = "__csi_unit_obj_tables";
 
@@ -2709,6 +2715,10 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
     return false;
   }
 
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SHADOWMEMORY))
+    return true;
+
   const unsigned Alignment = IsWrite
       ? cast<StoreInst>(I)->getAlignment()
       : cast<LoadInst>(I)->getAlignment();
@@ -2764,6 +2774,10 @@ bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
     return false;
   }
 
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SHADOWMEMORY))
+    return true;
+
   uint64_t LocalId = StoreFED.add(*I);
   uint64_t StoreObjId = StoreObj.add(*I, lookupUnderlyingObject(Addr));
   assert(LocalId == StoreObjId &&
@@ -2789,6 +2803,10 @@ bool CilkSanitizerImpl::instrumentCallsite(
   if (!CB)
     return false;
   Function *Called = CB->getCalledFunction();
+
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SERIESPARALLEL))
+    return true;
 
   IRBuilder<> IRB(I);
   uint64_t LocalId = CallsiteFED.add(*I);
@@ -2933,6 +2951,10 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
     bool Instrumented = false;
 
     if (IsMemTransferDstOperand(OperandNum)) {
+      // Only insert instrumentation if requested
+      if (!(InstrumentationSet & SHADOWMEMORY))
+        return true;
+
       Value *Addr = M->getDest();
       Prop.setAlignment(M->getDestAlignment());
       // Instrument the store
@@ -2954,6 +2976,10 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
     }
 
     if (IsMemTransferSrcOperand(OperandNum)) {
+      // Only insert instrumentation if requested
+      if (!(InstrumentationSet & SHADOWMEMORY))
+        return true;
+
       Value *Addr = M->getSource();
       Prop.setAlignment(M->getSourceAlignment());
       // Instrument the load
@@ -2975,6 +3001,10 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
     }
     return Instrumented;
   } else if (AnyMemIntrinsic *M = dyn_cast<AnyMemIntrinsic>(I)) {
+    // Only insert instrumentation if requested
+    if (!(InstrumentationSet & SHADOWMEMORY))
+      return true;
+
     // assert(IsMemIntrinDstOperand(OperandNum) &&
     //        "Race on memset not on destination operand.");
     Value *Addr = M->getDest();
@@ -3041,6 +3071,10 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
                                          unsigned NumSyncRegs,
                                          DominatorTree *DT, TaskInfo &TI,
                                          LoopInfo &LI) {
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SERIESPARALLEL))
+    return true;
+
   BasicBlock *TaskEntryBlock = TI.getTaskFor(DI->getParent())->getEntry();
   IRBuilder<> IDBuilder(&*TaskEntryBlock->getFirstInsertionPt());
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
@@ -3154,6 +3188,10 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
 }
 
 bool CilkSanitizerImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SERIESPARALLEL))
+    return true;
+
   IRBuilder<> IRB(SI);
   // Get the ID of this sync.
   uint64_t LocalID = SyncFED.add(*SI);
@@ -3189,6 +3227,10 @@ static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE) {
 void CilkSanitizerImpl::instrumentLoop(Loop &L,TaskInfo &TI,
                                        DenseMap<Value *, unsigned> &SyncRegNums,
                                        ScalarEvolution *SE) {
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SERIESPARALLEL))
+    return;
+
   assert(L.isLoopSimplifyForm() && "CSI assumes loops are in simplified form.");
   BasicBlock *Preheader = L.getLoopPreheader();
   Task *T = getTaskIfTapirLoop(&L, &TI);
@@ -3263,6 +3305,10 @@ void CilkSanitizerImpl::instrumentLoop(Loop &L,TaskInfo &TI,
 }
 
 bool CilkSanitizerImpl::instrumentAlloca(Instruction *I) {
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SHADOWMEMORY))
+    return true;
+
   IRBuilder<> IRB(I);
   AllocaInst* AI = cast<AllocaInst>(I);
 
@@ -3417,6 +3463,10 @@ void CilkSanitizerImpl::getAllocFnArgs(
 
 bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
                                                DominatorTree *DT) {
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SHADOWMEMORY))
+    return true;
+
   bool IsInvoke = isa<InvokeInst>(I);
   Function *Called = nullptr;
   if (CallInst *CI = dyn_cast<CallInst>(I))
@@ -3504,6 +3554,10 @@ bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
 }
 
 bool CilkSanitizerImpl::instrumentFree(Instruction *I) {
+  // Only insert instrumentation if requested
+  if (!(InstrumentationSet & SHADOWMEMORY))
+    return true;
+
   // It appears that frees (and deletes) never throw.
   assert(isa<CallInst>(I) && "Free call is not a call instruction");
 
