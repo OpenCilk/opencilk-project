@@ -2541,22 +2541,17 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   // get loop
   Loop *L = LI.getLoopFor(I->getParent());
 
-  // TODO: what if there isn't a unique preheader?
-  IRBuilder<> IRB(L->getLoopPreheader()->getTerminator());
-
   // get size and stride
   Value *ptr = getLoadStorePointerOperand(I);
   Value *Addr;
   // TODO: what if not a GEP? what could it be?
   if (isa<GetElementPtrInst>(ptr)) {
-    /*
-    // want to evaluate this ptr at index 0
-    SmallVector<const SCEV *, 4> IndexExprs;
-    IndexExprs.push_back(SE->getZero());
-    Addr = SE->getGEPExpr(cast<GEPOperator>(ptr), IndexExprs);
-    */
+    // evaluate this ptr at index 0
     Addr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
+  } else {
+    assert(false && "Trying to hoist something other than a GEP\n");
   }
+
   const SCEV *Size = SE->getElementSize(I);
   const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
   const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
@@ -2567,16 +2562,27 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
 
   // get address range
   const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
-  assert(isa<SCEVConstant>(RangeExpr) && "RangeExpr is not a constant");
-  ConstantInt *Range = cast<SCEVConstant>(RangeExpr)->getValue();
+  //assert(isa<SCEVConstant>(RangeExpr) && "RangeExpr is not a constant");
+  //ConstantInt *Range = cast<SCEVConstant>(RangeExpr)->getValue();
 
-  dbgs() << "Addr   = " << *Addr << "\n";
-  dbgs() << "Size   = " << *Size << "\n";
-  dbgs() << "Stride = " << *Stride << "\n";
-  dbgs() << "Trip   = " << *TripCount << "\n";
-  dbgs() << "Range  = " << *Range << "\n";
+  dbgs() << "Addr      = " << *Addr << "\n";
+  dbgs() << "Size      = " << *Size << "\n";
+  dbgs() << "Stride    = " << *Stride << "\n";
+  dbgs() << "Trip      = " << *TripCount << "\n";
+  dbgs() << "RangeExpr = " << *RangeExpr << "\n";
+  //dbgs() << "Range  = " << *Range << "\n";
+
+  // TODO: for now, assume unique preheader
+  BasicBlock *PreheaderBB = L->getLoopPreheader();
+  const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
+  SCEVExpander Expander(*SE, DL, "csi");
+  Value *RangeVal = Expander.expandCodeFor(RangeExpr, RangeExpr->getType(),
+                                           PreheaderBB->getTerminator());
 
   CsiLoadStoreProperty Prop;
+
+  // TODO: what if there isn't a unique preheader?
+  IRBuilder<> IRB(L->getLoopPreheader()->getTerminator());
 
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
     //Value *Addr = M->getSource();
@@ -2591,7 +2597,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
 
     Value *CsiId = LoadFED.localToGlobalId(LoadId, IRB);
     Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(Range, IntptrTy, false),
+                     IRB.CreateIntCast(RangeVal, IntptrTy, false),
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
     IRB.SetInstDebugLocation(Call);
@@ -2611,7 +2617,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
 
     Value *CsiId = StoreFED.localToGlobalId(StoreId, IRB);
     Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(Range, IntptrTy, false),
+                     IRB.CreateIntCast(RangeVal, IntptrTy, false),
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
     IRB.SetInstDebugLocation(Call);
@@ -2708,7 +2714,9 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
           bool raceViaAncestor = false;
           bool otherRace = false;
+          dbgs() << "CHECKING INST " << Inst << "\n";
           for (const RaceInfo::RaceData &RD : RI.getRaceData(&Inst)) {
+            dbgs() << "  RACE TYPE " << RD.Type << "\n";
             if (RaceInfo::isRaceViaAncestor(RD.Type)) {
               raceViaAncestor = true;
             } else if (RaceInfo::isLocalRace(RD.Type) ||
@@ -2741,8 +2749,10 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
             //dbgs() << "Checking stride : " << getStrideFromPointer(getLoadStorePointerOperand(&Inst), &SE, L) << "\n";
 
-            //dbgs() << "inst = " << Inst << "\n";
-            //dbgs() << "v = " << *V << "\n";
+            dbgs() << "inst = " << Inst << "\n";
+            dbgs() << "v = " << *V << "\n";
+            dbgs() << "tripcount = " << *getRuntimeTripCount(*L, &SE) << "\n";
+
             // if not an AddRecExpr, don't proceed
             if (const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V)) {
               //dbgs() << "5\n";
@@ -2766,8 +2776,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
               // can only hoist if stride <= size and the tripcount is known
               if (SE.isKnownNonNegative(Diff) &&
-                  isa<SCEVConstant>(TripCount) &&
-                  isa<SCEVConstant>(Stride)) {
+                  !isa<SCEVCouldNotCompute>(TripCount)) {
                 dbgs() << "Can hoist " << Inst << "\n";
                 LoopInstInAncestRace.insert(&Inst);
                 can_hoist = true;
