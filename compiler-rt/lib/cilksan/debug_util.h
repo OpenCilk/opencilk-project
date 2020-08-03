@@ -25,7 +25,8 @@ enum debug_levels {
     DEBUG_MEMORY     = 16,
     DEBUG_DEQUE      = 32,
     DEBUG_REDUCER    = 64,
-    DEBUG_DISJOINTSET = 128
+    DEBUG_DISJOINTSET = 128,
+    DEBUG_STACK = 256
 };
 
 #if CILKSAN_DEBUG
