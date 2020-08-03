@@ -30,7 +30,8 @@ class SimpleDictionary {
 private:
   // Constant parameters for the table structure.
   // log_2 of bytes per line.
-  static constexpr unsigned LG_LINE_SIZE = 3;
+  // static constexpr unsigned LG_LINE_SIZE = 3;
+  static constexpr unsigned LG_LINE_SIZE = 5;
   // log_2 of lines per page.
   static constexpr unsigned LG_PAGE_SIZE = 24 - LG_LINE_SIZE;
   // log_2 of number of pages in the top-level table.
@@ -543,7 +544,6 @@ private:
     void clear(Chunk_t &Accessed) {
       // Get the grainsize of the access.
       unsigned AccessedLgGrainsize = Accessed.getLgGrainsize();
-
       if (LG_LINE_SIZE == AccessedLgGrainsize) {
         if (!isEmpty())
           // Reset the line.
@@ -1095,11 +1095,11 @@ public:
     //           << reinterpret_cast<void*>(addr) << ", " << mem_size
     //           << ", func node " << (void*)f->Sbag->get_node() << "\n";
     if (is_read)
-      Reads.set(addr, mem_size, MemoryAccess_t(f->getSbagForAccess(), acc_id,
-                                               MAType_t::RW));
+      Reads.set(addr, mem_size,
+                MemoryAccess_t(f->getSbagForAccess(), acc_id, MAType_t::RW));
     else
-      Writes.set(addr, mem_size, MemoryAccess_t(f->getSbagForAccess(), acc_id,
-                                                MAType_t::RW));
+      Writes.set(addr, mem_size,
+                 MemoryAccess_t(f->getSbagForAccess(), acc_id, MAType_t::RW));
   }
 
   template<typename QITy, bool prev_read, bool is_read>
