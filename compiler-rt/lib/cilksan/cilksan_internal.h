@@ -58,7 +58,7 @@ public:
 #define PREV_STACK_ALIGN(addr) (addr + STACK_ALIGN)
 
   inline void push_stack_frame(uintptr_t bp, uintptr_t sp) {
-    DBG_TRACE(DEBUG_BASIC, "push_stack_frame %p--%p\n", bp, sp);
+    DBG_TRACE(DEBUG_STACK, "push_stack_frame %p--%p\n", bp, sp);
     // Record high location of the stack for this frame.
     uintptr_t high_stack = bp;
     // uintptr_t high_stack = PREV_STACK_ALIGN(bp);
@@ -84,7 +84,7 @@ public:
   }
 
   inline void advance_stack_frame(uintptr_t addr) {
-    DBG_TRACE(DEBUG_BASIC, "advance_stack_frame %p to include %p\n",
+    DBG_TRACE(DEBUG_STACK, "advance_stack_frame %p to include %p\n",
               *sp_stack.head(), addr);
     if (addr < *sp_stack.head()) {
       *sp_stack.head() = addr;
@@ -99,7 +99,7 @@ public:
     sp_stack.pop();
     uintptr_t high_stack = *sp_stack.head();
     sp_stack.pop();
-    DBG_TRACE(DEBUG_BASIC, "pop_stack_frame %p--%p\n", high_stack, low_stack);
+    DBG_TRACE(DEBUG_STACK, "pop_stack_frame %p--%p\n", high_stack, low_stack);
     assert(low_stack <= high_stack);
     // Clear shadow memory of stack locations.  This seems to be necessary right
     // now, in order to handle functions that dynamically allocate stack memory.
