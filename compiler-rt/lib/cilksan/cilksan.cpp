@@ -605,6 +605,10 @@ template<bool is_read>
 inline void
 CilkSanImpl_t::record_mem_helper(const csi_id_t acc_id, uintptr_t addr,
                                  size_t mem_size, bool on_stack) {
+  // Do nothing for 0-byte accesses
+  if (!mem_size)
+    return;
+
   FrameData_t *f = frame_stack.head();
   bool write_in_shadow = shadow_memory.does_access_exists<false>(addr,
                                                                  mem_size);
