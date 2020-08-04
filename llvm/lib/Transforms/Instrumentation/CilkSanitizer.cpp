@@ -102,6 +102,9 @@ static cl::opt<unsigned>
         cl::Hidden,
         cl::desc("Maximum number of uses to explore for a capture query."));
 
+static cl::opt<bool> MAAPChecks("maap-checks", cl::init(true), cl::Hidden,
+                                cl::desc("Enable or disable MAAP checks."));
+
 static cl::opt<bool>
     IgnoreSanitizeCilkAttr(
         "ignore-sanitize-cilk-attr", cl::init(false), cl::Hidden,
@@ -1611,6 +1614,8 @@ static Value *getSuppressionIRValue(IRBuilder<> &IRB, unsigned SV) {
 // Insert per-argument suppressions for this function
 void CilkSanitizerImpl::Instrumentor::InsertArgSuppressionFlags(Function &F,
                                                                 Value *FuncId) {
+  if (!MAAPChecks)
+    return;
   LLVM_DEBUG(dbgs() << "InsertArgSuppressionFlags: " << F.getName() << "\n");
   IRBuilder<> IRB(&*(++(cast<Instruction>(FuncId)->getIterator())));
   unsigned ArgIdx = 0;
@@ -1829,6 +1834,9 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
     IRBuilder<> IRB(I);
     unsigned OpIdx = 0;
     for (const Value *Op : CB->args()) {
+      if (!MAAPChecks)
+        continue;
+
       if (!Op->getType()->isPtrOrPtrVectorTy()) {
         ++OpIdx;
         continue;
@@ -2381,11 +2389,13 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
            "Delayed instrumentation is not local race or race via ancestor");
     IRBuilder<> IRB(I);
 
-    Value *SupprChk = getSuppressionCheck(I, IRB);
-    Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-        IRB.CreateICmpEQ(SupprChk, IRB.getFalse()), I, false, nullptr, DT,
-        /*LI=*/nullptr);
-    IRB.SetInsertPoint(CheckTerm);
+    if (MAAPChecks) {
+      Value *SupprChk = getSuppressionCheck(I, IRB);
+      Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+          IRB.CreateICmpEQ(SupprChk, IRB.getFalse()), I, false, nullptr, DT,
+          /*LI=*/nullptr);
+      IRB.SetInsertPoint(CheckTerm);
+    }
     if (isa<LoadInst>(I) || isa<StoreInst>(I))
       Result |= CilkSanImpl.instrumentLoadOrStore(I, IRB);
     else if (isa<AtomicRMWInst>(I) || isa<AtomicCmpXchgInst>(I))
@@ -2402,11 +2412,13 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
     unsigned OperandNum = MemIntrinOp.second;
     IRBuilder<> IRB(I);
 
-    Value *SupprChk = getSuppressionCheck(I, IRB, OperandNum);
-    Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-        IRB.CreateICmpEQ(SupprChk, IRB.getFalse()), I, false, nullptr, DT,
-        /*LI=*/nullptr);
-    IRB.SetInsertPoint(CheckTerm);
+    if (MAAPChecks) {
+      Value *SupprChk = getSuppressionCheck(I, IRB, OperandNum);
+      Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+          IRB.CreateICmpEQ(SupprChk, IRB.getFalse()), I, false, nullptr, DT,
+          /*LI=*/nullptr);
+      IRB.SetInsertPoint(CheckTerm);
+    }
     Result |= CilkSanImpl.instrumentAnyMemIntrinAcc(I, OperandNum, IRB);
   }
   return Result;
