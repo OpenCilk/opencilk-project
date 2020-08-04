@@ -393,6 +393,8 @@ struct CilkSanitizerImpl : public CSIImpl {
   }
 
   bool instrumentLoadOrStoreHoisted(Instruction *I,
+                                    IRBuilder<> &IRB,
+                                    Instruction *InsertPt,
                                     LoopInfo &LI,
                                     ScalarEvolution *SE);
 
@@ -2557,14 +2559,26 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
   for (Instruction *I : LoopInstInAncestRace) {
     // For now, there shouldn't be a reason to return false since we already
     // verified the size, stride, and tripcount.
+    Loop *L = LI.getLoopFor(I->getParent());
+    Instruction *PreheaderTermInst = L->getLoopPreheader()->getTerminator();
+    IRBuilder<> IRB(PreheaderTermInst);
+
+    Value *MAAPChk = getMAAPCheck(I, IRB);
+    Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+        IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), PreheaderTermInst,
+                         false, nullptr, DT, /*LI*/ nullptr);
+    IRB.SetInsertPoint(CheckTerm);
+
     Result = true;
-    CilkSanImpl.instrumentLoadOrStoreHoisted(I, LI, SE);
+    CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE);
   }
 
   return Result;
 }
 
 bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
+                                                     IRBuilder<> &IRB,
+                                                     Instruction *InsertPt,
                                                      LoopInfo &LI,
                                                      ScalarEvolution* SE) {
   // get loop
@@ -2599,11 +2613,9 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
   SCEVExpander Expander(*SE, DL, "csi");
   Value *RangeVal = Expander.expandCodeFor(RangeExpr, RangeExpr->getType(),
-                                           PreheaderBB->getTerminator());
+                                           InsertPt);
 
   CsiLoadStoreProperty Prop;
-
-  IRBuilder<> IRB(L->getLoopPreheader()->getTerminator());
 
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
     Prop.setAlignment(LI->getAlignment());
@@ -2864,15 +2876,17 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
     Result |= FuncI.InstrumentAnyMemIntrinsics(MemIntrinCalls);
     Result |= FuncI.InstrumentCalls(Callsites);
 
-    // Hoist instrumentation when possible (applies to all loops, not just
-    // Tapir loops)
-    Result |= FuncI.InstrumentLoops(LoopInstInAncestRace, &SE);
-
     // Instrument ancillary instructions including allocas, allocation-function
     // calls, free calls, detaches, and syncs.
     Result |= FuncI.InstrumentAncillaryInstructions(Allocas, AllocationFnCalls,
                                                     FreeCalls, SyncRegNums,
                                                     SRCounters, DL, TLI);
+
+    // Hoist instrumentation when possible (applies to all loops, not just
+    // Tapir loops)
+    // Also inserts MAAP checks.
+    Result |= FuncI.InstrumentLoops(LoopInstInAncestRace, &SE);
+
 
     // Once we have handled ancillary instructions, we've done the necessary
     // analysis on this function.  We now perform delayed instrumentation, which
