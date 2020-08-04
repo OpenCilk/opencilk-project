@@ -223,8 +223,7 @@ bool llvm::MoveStaticAllocasInBlock(
   SmallVector<AllocaInst *, 4> StaticAllocas;
   bool ContainsDynamicAllocas = false;
   BasicBlock::iterator InsertPoint = Entry->begin();
-  for (BasicBlock::iterator I = Block->begin(),
-         E = Block->end(); I != E; ) {
+  for (BasicBlock::iterator I = Block->begin(), E = Block->end(); I != E;) {
     AllocaInst *AI = dyn_cast<AllocaInst>(I++);
     if (!AI) continue;
 
@@ -254,8 +253,7 @@ bool llvm::MoveStaticAllocasInBlock(
     replaceDbgDeclareForAlloca(AI, AI, DIB, DIExpression::ApplyOffset, 0);
 
   // Move any syncregion_start's into the entry basic block.
-  for (BasicBlock::iterator I = Block->begin(),
-         E = Block->end(); I != E; ) {
+  for (BasicBlock::iterator I = Block->begin(), E = Block->end(); I != E;) {
     IntrinsicInst *II = dyn_cast<IntrinsicInst>(I++);
     if (!II) continue;
     if (Intrinsic::syncregion_start != II->getIntrinsicID())
@@ -263,8 +261,8 @@ bool llvm::MoveStaticAllocasInBlock(
 
     while (isa<IntrinsicInst>(I) &&
            Intrinsic::syncregion_start ==
-           cast<IntrinsicInst>(I)->getIntrinsicID())
-        ++I;
+               cast<IntrinsicInst>(I)->getIntrinsicID())
+      ++I;
 
     Entry->getInstList().splice(
         InsertPoint, Block->getInstList(), II->getIterator(), I);
@@ -288,7 +286,7 @@ bool llvm::MoveStaticAllocasInBlock(
       // Try to determine the size of the allocation.
       ConstantInt *AllocaSize = nullptr;
       if (ConstantInt *AIArraySize =
-          dyn_cast<ConstantInt>(AI->getArraySize())) {
+              dyn_cast<ConstantInt>(AI->getArraySize())) {
         auto &DL = F->getParent()->getDataLayout();
         Type *AllocaType = AI->getAllocatedType();
         uint64_t AllocaTypeSize = DL.getTypeAllocSize(AllocaType);
