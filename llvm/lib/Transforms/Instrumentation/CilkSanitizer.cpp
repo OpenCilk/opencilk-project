@@ -75,6 +75,10 @@ STATISTIC(NumInstrumentedAllocas, "Number of instrumented allocas");
 STATISTIC(NumInstrumentedAllocFns,
           "Number of instrumented allocation functions");
 STATISTIC(NumInstrumentedFrees, "Number of instrumented free calls");
+STATISTIC(NumHoistedInstrumentedReads,
+          "Number of reads whose instrumentation has been hoisted");
+STATISTIC(NumHoistedInstrumentedWrites,
+          "Number of writes whose instrumentation has been hoisted");
 
 static cl::opt<bool>
     EnableStaticRaceDetection(
@@ -2617,9 +2621,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
     IRB.SetInstDebugLocation(Call);
-    // TODO: Which do we want to increment?
-    ++NumInstrumentedMemIntrinsicReads;
-    //NumInstrumentedReads++;
+    ++NumHoistedInstrumentedReads;
   } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
     Prop.setAlignment(SI->getAlignment());
     // Instrument the store
@@ -2636,9 +2638,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
     IRB.SetInstDebugLocation(Call);
-    // TODO: Which do we want to increment?
-    //NumInstrumentedWrites++;
-    ++NumInstrumentedMemIntrinsicWrites;
+    ++NumHoistedInstrumentedWrites;
   }
 
   return true;
