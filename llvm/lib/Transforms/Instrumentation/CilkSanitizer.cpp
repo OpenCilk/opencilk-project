@@ -3224,7 +3224,7 @@ static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE) {
   return TripCountSC;
 }
 
-void CilkSanitizerImpl::instrumentLoop(Loop &L,TaskInfo &TI,
+void CilkSanitizerImpl::instrumentLoop(Loop &L, TaskInfo &TI,
                                        DenseMap<Value *, unsigned> &SyncRegNums,
                                        ScalarEvolution *SE) {
   // Only insert instrumentation if requested
@@ -3296,11 +3296,14 @@ void CilkSanitizerImpl::instrumentLoop(Loop &L,TaskInfo &TI,
   //   insertHookCall(&*IRB.GetInsertPoint(), CsiLoopBodyExit,
   //                  {ExitCsiId, LoopCsiId, LoopExitPropVal});
   // }
+
   // Insert after-loop hooks.
   for (BasicBlock *BB : ExitBlocks) {
-    IRB.SetInsertPoint(&*BB->getFirstInsertionPt());
-    insertHookCall(&*IRB.GetInsertPoint(), CsanAfterLoop,
-                   {LoopCsiId, IRB.getInt8(SyncRegNum), LoopPropVal});
+    if (!T->simplyEncloses(BB)) {
+      IRB.SetInsertPoint(&*BB->getFirstInsertionPt());
+      insertHookCall(&*IRB.GetInsertPoint(), CsanAfterLoop,
+                     {LoopCsiId, IRB.getInt8(SyncRegNum), LoopPropVal});
+    }
   }
 }
 
