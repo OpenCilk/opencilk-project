@@ -3366,7 +3366,7 @@ bool CilkSanitizerImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
 }
 
 
-void CilkSanitizerImpl::instrumentTapirLoop(Loop &L,TaskInfo &TI,
+void CilkSanitizerImpl::instrumentTapirLoop(Loop &L, TaskInfo &TI,
                                        DenseMap<Value *, unsigned> &SyncRegNums,
                                        ScalarEvolution *SE) {
   // Only insert instrumentation if requested
