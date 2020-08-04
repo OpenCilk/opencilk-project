@@ -2553,7 +2553,6 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
   for (Instruction *I : LoopInstInAncestRace) {
     // For now, there shouldn't be a reason to return false since we already
     // verified the size, stride, and tripcount.
-    // TODO: might fail because no unique preheader. Add this later.
     Result = true;
     CilkSanImpl.instrumentLoadOrStoreHoisted(I, LI, SE);
   }
@@ -2571,6 +2570,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   Value *ptr = getLoadStorePointerOperand(I);
   Value *Addr;
   // TODO: what if not a GEP? what could it be?
+  // Phi nodes
   if (isa<GetElementPtrInst>(ptr)) {
     // evaluate this ptr at index 0
     Addr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
@@ -2590,7 +2590,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   // get address range
   const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
 
-  // TODO: for now, assume unique preheader
+  // get instructions for calculating address range
   BasicBlock *PreheaderBB = L->getLoopPreheader();
   const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
   SCEVExpander Expander(*SE, DL, "csi");
@@ -2602,7 +2602,6 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   IRBuilder<> IRB(L->getLoopPreheader()->getTerminator());
 
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-    //Value *Addr = M->getSource();
     Prop.setAlignment(LI->getAlignment());
     // Instrument the load
     uint64_t LoadId = LoadFED.add(*LI);
