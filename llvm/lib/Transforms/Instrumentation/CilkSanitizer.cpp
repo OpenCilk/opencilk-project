@@ -2759,7 +2759,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
             if (RaceInfo::isRaceViaAncestor(RD.Type)) {
               raceViaAncestor = true;
             } else if (RaceInfo::isLocalRace(RD.Type) ||
-                       RaceInfo::isLocalRace(RD.Type)) {
+                       RaceInfo::isOpaqueRace(RD.Type)) {
               otherRace = true;
               break;
             }
