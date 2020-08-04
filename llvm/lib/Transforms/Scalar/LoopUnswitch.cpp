@@ -1544,7 +1544,7 @@ void LoopUnswitch::GetLoopExitBlocks(Loop *L,
   SmallPtrSet<BasicBlock*, 8> Visited;
   for (BasicBlock *Exit : LoopExitBlocks) {
     if (Task *SubT = GetTopLevelTaskFor(Exit, L, TaskI)) {
-      // The exit blocks lives in a subtask.  Traverse that subtask to find the
+      // The exit block lives in a subtask.  Traverse that subtask to find the
       // correct exit blocks.
       GetTaskExits(Exit, SubT, L, FixedExits, nullptr, Visited, DT);
       continue;
