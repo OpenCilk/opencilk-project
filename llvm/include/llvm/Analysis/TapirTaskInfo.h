@@ -351,6 +351,11 @@ protected:
     Incoming.clear();
     Outgoing.clear();
     ParentTask = nullptr;
+    TaskFrameUser = nullptr;
+    TaskFrameParent = nullptr;
+    SubTaskFrames.clear();
+    TaskFrameSubtasks.clear();
+    TaskFrameSpindles.clear();
   }
 };
 
@@ -990,6 +995,12 @@ protected:
     DenseSpindleSet.clear();
     DenseEHSpindleSet.clear();
     ParentTask = nullptr;
+    Continuation = nullptr;
+    EHContinuation = nullptr;
+    LPadValueInEHContinuation = nullptr;
+    TaskFrameCreateSpindle = nullptr;
+    TaskFrameCreates.clear();
+    TaskFrameRoots.clear();
   }
 };
 
