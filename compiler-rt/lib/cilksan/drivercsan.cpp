@@ -119,7 +119,7 @@ static inline bool should_check() {
 Stack_t<uint8_t> parallel_execution;
 
 Stack_t<std::pair<csi_id_t, uint64_t>> suppressions;
-Stack_t<uint64_t> suppression_counts;
+Stack_t<unsigned> suppression_counts;
 
 CILKSAN_API void __csan_set_suppression_flag(uint64_t val, csi_id_t id) {
   DBG_TRACE(DEBUG_CALLBACK, "__csan_set_suppression_flag(%ld, %ld)\n",
@@ -460,7 +460,8 @@ CILKSAN_API void __csan_before_call(const csi_id_t call_id,
   // Push the suppression count onto the stack.
   suppression_counts.push();
   *suppression_counts.head() = suppression_count;
-  // fprintf(stderr, "suppression count %d\n", suppression_count);
+  cilksan_assert(suppression_count == *suppression_counts.head() &&
+                 "Mismatched suppression counts before call.");
 
   // Push the call onto the call stack.
   CilkSanImpl.record_call(call_id, CALL);
@@ -478,6 +479,8 @@ CILKSAN_API void __csan_after_call(const csi_id_t call_id,
             call_id, func_id);
 
   // Pop any suppressions.
+  cilksan_assert(suppression_count == *suppression_counts.head() &&
+                 "Mismatched suppression counts after call.");
   for (unsigned i = 0; i < suppression_count; ++i)
     suppressions.pop();
   suppression_counts.pop();
@@ -634,12 +637,13 @@ void __csan_load(csi_id_t load_id, const void *addr, int32_t size,
   // TODO: Use alignment information.
   cilksan_assert(TOOL_INITIALIZED);
   if (!should_check()) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read %p\n", __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read (%p, %ld)\n", __FUNCTION__, addr,
+              size);
     return;
   }
   if (!(*parallel_execution.head())) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read %p during serial execution\n",
-              __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read (%p, %ld) during serial execution\n",
+              __FUNCTION__, addr, size);
     return;
   }
 
@@ -648,7 +652,7 @@ void __csan_load(csi_id_t load_id, const void *addr, int32_t size,
   if (__builtin_expect(!load_pc[load_id], false))
     load_pc[load_id] = CALLERPC;
 
-  DBG_TRACE(DEBUG_MEMORY, "%s read %p\n", __FUNCTION__, addr);
+  DBG_TRACE(DEBUG_MEMORY, "%s read (%p, %ld)\n", __FUNCTION__, addr, size);
   // Record this read.
   CilkSanImpl.do_read(load_id, (uintptr_t)addr, size);
 }
@@ -659,12 +663,13 @@ void __csan_large_load(csi_id_t load_id, const void *addr, size_t size,
   // TODO: Use alignment information.
   cilksan_assert(TOOL_INITIALIZED);
   if (!should_check()) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read %p\n", __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read (%p, %ld)\n", __FUNCTION__, addr,
+              size);
     return;
   }
   if (!(*parallel_execution.head())) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read %p during serial execution\n",
-              __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s read (%p, %ld) during serial execution\n",
+              __FUNCTION__, addr, size);
     return;
   }
 
@@ -673,7 +678,7 @@ void __csan_large_load(csi_id_t load_id, const void *addr, size_t size,
   if (__builtin_expect(!load_pc[load_id], false))
     load_pc[load_id] = CALLERPC;
 
-  DBG_TRACE(DEBUG_MEMORY, "%s read %p\n", __FUNCTION__, addr);
+  DBG_TRACE(DEBUG_MEMORY, "%s read (%p, %ld)\n", __FUNCTION__, addr, size);
   // Record this read.
   CilkSanImpl.do_read(load_id, (uintptr_t)addr, size);
 }
@@ -684,12 +689,13 @@ void __csan_store(csi_id_t store_id, const void *addr, int32_t size,
   // TODO: Use alignment information.
   cilksan_assert(TOOL_INITIALIZED);
   if (!should_check()) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote %p\n", __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote (%p, %ld)\n", __FUNCTION__, addr,
+              size);
     return;
   }
   if (!(*parallel_execution.head())) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote %p during serial execution\n",
-              __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote (%p, %ld) during serial execution\n",
+              __FUNCTION__, addr, size);
     return;
   }
 
@@ -698,7 +704,7 @@ void __csan_store(csi_id_t store_id, const void *addr, int32_t size,
   if (__builtin_expect(!store_pc[store_id], false))
     store_pc[store_id] = CALLERPC;
 
-  DBG_TRACE(DEBUG_MEMORY, "%s wrote %p\n", __FUNCTION__, addr);
+  DBG_TRACE(DEBUG_MEMORY, "%s wrote (%p, %ld)\n", __FUNCTION__, addr, size);
   // Record this write.
   CilkSanImpl.do_write(store_id, (uintptr_t)addr, size);
 }
@@ -709,12 +715,13 @@ void __csan_large_store(csi_id_t store_id, const void *addr, size_t size,
   // TODO: Use alignment information.
   cilksan_assert(TOOL_INITIALIZED);
   if (!should_check()) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote %p\n", __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote (%p, %ld)\n", __FUNCTION__, addr,
+              size);
     return;
   }
   if (!(*parallel_execution.head())) {
-    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote %p during serial execution\n",
-              __FUNCTION__, addr);
+    DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote (%p, %ld) during serial execution\n",
+              __FUNCTION__, addr, size);
     return;
   }
 
@@ -723,7 +730,7 @@ void __csan_large_store(csi_id_t store_id, const void *addr, size_t size,
   if (__builtin_expect(!store_pc[store_id], false))
     store_pc[store_id] = CALLERPC;
 
-  DBG_TRACE(DEBUG_MEMORY, "%s wrote %p\n", __FUNCTION__, addr);
+  DBG_TRACE(DEBUG_MEMORY, "%s wrote (%p, %ld)\n", __FUNCTION__, addr, size);
   // Record this write.
   CilkSanImpl.do_write(store_id, (uintptr_t)addr, size);
 }
