@@ -1140,6 +1140,9 @@ class TaskInfo {
   // by calls to the mayHappenInParallel method.
   mutable std::unique_ptr<MaybeParallelTasks> MPTasks;
 
+  // Flag to indicate whether the taskframe tree has been computed.
+  mutable bool ComputedTaskFrameTree = false;
+
   BumpPtrAllocator TaskAllocator;
 
   void operator=(const TaskInfo &) = delete;
@@ -1184,6 +1187,7 @@ public:
       MPTasks->TaskList.clear();
       MPTasks.release();
     }
+    ComputedTaskFrameTree = false;
     TaskAllocator.Reset();
   }
 
