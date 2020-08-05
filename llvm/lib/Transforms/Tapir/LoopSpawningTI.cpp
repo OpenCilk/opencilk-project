@@ -364,6 +364,10 @@ void LoopOutlineProcessor::moveCilksanInstrumentation(TapirLoopInfo &TL,
     // Insert new instrumentation call at the start of LatchExit.
     CallInst::Create(InstrFunc->getFunctionType(), InstrFunc, InstrArgs, "",
                      &*LatchExit->getFirstInsertionPt());
+
+    // Remove old instrumentation calls from predecessors
+    for (BasicBlock *Pred : predecessors(Latch))
+      Instrumentation[Pred]->eraseFromParent();
   }
 }
 
