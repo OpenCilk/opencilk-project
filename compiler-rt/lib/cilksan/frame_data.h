@@ -54,6 +54,7 @@ typedef struct FrameData_t {
       set_pbag(i, nullptr);
     delete[] Pbags;
     Pbags = nullptr;
+    num_Pbags = 0;
   }
 
   void make_pbag_array(unsigned num_pbags) {
@@ -146,6 +147,7 @@ typedef struct FrameData_t {
   // remember to update this whenever new fields are added
   inline void init_new_function(DisjointSet_t<SPBagInterface *> *_sbag) {
     cilksan_assert(Pbags == NULL);
+    cilksan_assert(num_Pbags == 0);
     set_sbag(_sbag);
   }
 
