@@ -124,6 +124,7 @@ public:
   void do_detach_begin();
   void do_detach_end();
   void do_loop_begin() {
+    update_strand_stats();
     start_new_loop = true;
   }
   void do_loop_iteration_begin(uintptr_t stack_ptr, unsigned num_sync_reg);
@@ -228,10 +229,39 @@ private:
 
   // Basic statistics
   bool collect_stats = false;
+  uint64_t strand_count = 0;
   uint64_t total_reads_checked = 0;
   uint64_t total_writes_checked = 0;
   std::unordered_map<size_t, uint64_t> num_reads_checked;
   std::unordered_map<size_t, uint64_t> num_writes_checked;
+
+  std::unordered_map<size_t, uint64_t> max_num_reads_checked;
+  std::unordered_map<size_t, uint64_t> max_num_writes_checked;
+
+  std::unordered_map<size_t, uint64_t> strand_num_reads_checked;
+  std::unordered_map<size_t, uint64_t> strand_num_writes_checked;
+
+  void update_strand_stats() {
+    if (!collect_stats)
+      return;
+
+    ++strand_count;
+
+    for (auto &entry : strand_num_reads_checked) {
+      if (!max_num_reads_checked.count(entry.first))
+        max_num_reads_checked.insert(entry);
+      else if (max_num_reads_checked[entry.first] < entry.second)
+        max_num_reads_checked[entry.first] = entry.second;
+    }
+    strand_num_reads_checked.clear();
+    for (auto &entry : strand_num_writes_checked) {
+      if (!max_num_writes_checked.count(entry.first))
+        max_num_writes_checked.insert(entry);
+      else if (max_num_writes_checked[entry.first] < entry.second)
+        max_num_writes_checked[entry.first] = entry.second;
+    }
+    strand_num_writes_checked.clear();
+  }
 };
 
 #endif // __CILKSAN_INTERNAL_H__
