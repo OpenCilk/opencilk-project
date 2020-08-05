@@ -307,6 +307,7 @@ struct CilkSanitizerImpl : public CSIImpl {
     Options.jitMode = JitMode;
     Options.CallsMayThrow = CallsMayThrow;
   }
+  bool setup();
   bool run();
 
   static StructType *getUnitObjTableType(LLVMContext &C,
@@ -321,6 +322,7 @@ struct CilkSanitizerImpl : public CSIImpl {
       Type *SizeTy, Type *AddrTy, const TargetLibraryInfo &TLI);
 
   void setupBlocks(Function &F, DominatorTree *DT = nullptr);
+  bool setupFunction(Function &F);
 
   // Methods for handling FED tables
   void initializeFEDTables() {}
@@ -659,6 +661,17 @@ namespace {
 using SCCNodeSet = SmallSetVector<Function *, 8>;
 
 } // end anonymous namespace
+
+bool CilkSanitizerImpl::setup() {
+  // Setup functions for instrumentation.
+  for (scc_iterator<CallGraph *> I = scc_begin(CG); !I.isAtEnd(); ++I) {
+    const std::vector<CallGraphNode *> &SCC = *I;
+    for (CallGraphNode *N : SCC)
+      if (Function *F = N->getFunction())
+        setupFunction(*F);
+  }
+  return true;
+}
 
 bool CilkSanitizerImpl::run() {
   // Initialize components of the CSI and Cilksan system.
@@ -2633,6 +2646,39 @@ static bool CheckSanitizeCilkAttr(Function &F) {
   return F.hasFnAttribute(Attribute::SanitizeCilk);
 }
 
+bool CilkSanitizerImpl::setupFunction(Function &F) {
+  if (F.empty() || shouldNotInstrumentFunction(F) ||
+      !CheckSanitizeCilkAttr(F)) {
+    LLVM_DEBUG({
+        dbgs() << "Skipping " << F.getName() << "\n";
+        if (F.empty())
+          dbgs() << "  Empty function\n";
+        else if (shouldNotInstrumentFunction(F))
+          dbgs() << "  Function should not be instrumented\n";
+        else if (!CheckSanitizeCilkAttr(F))
+          dbgs() << "  Function lacks sanitize_cilk attribute\n";});
+    return false;
+  }
+
+  LLVM_DEBUG(dbgs() << "Setting up " << F.getName()
+                    << " for instrumentation\n");
+
+  if (Options.CallsMayThrow)
+    setupCalls(F);
+
+  setupBlocks(F);
+
+  DominatorTree *DT = &GetDomTree(F);
+  LoopInfo &LI = GetLoopInfo(F);
+
+  if (Options.InstrumentLoops)
+    for (Loop *L : LI)
+      simplifyLoop(L, DT, &LI, nullptr, nullptr, nullptr,
+                   /* PreserveLCSSA */ false);
+
+  return true;
+}
+
 bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
   if (F.empty() || shouldNotInstrumentFunction(F) ||
@@ -2650,19 +2696,6 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
   LLVM_DEBUG(dbgs() << "Instrumenting " << F.getName() << "\n");
 
-  if (Options.CallsMayThrow)
-    setupCalls(F);
-
-  setupBlocks(F);
-
-  DominatorTree *DT = &GetDomTree(F);
-  LoopInfo &LI = GetLoopInfo(F);
-
-  if (Options.InstrumentLoops)
-    for (Loop *L : LI)
-      simplifyLoop(L, DT, &LI, nullptr, nullptr, nullptr,
-                   /* PreserveLCSSA */false);
-
   SmallVector<Instruction *, 8> AllLoadsAndStores;
   SmallVector<Instruction *, 8> LocalLoadsAndStores;
   SmallVector<Instruction *, 8> AtomicAccesses;
@@ -2679,11 +2712,10 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   // Find instructions in loops that can only race via ancestor
   SmallPtrSet<Instruction *, 8> LoopInstInAncestRace;
 
+  DominatorTree *DT = &GetDomTree(F);
+  LoopInfo &LI = GetLoopInfo(F);
   TaskInfo &TI = GetTaskInfo(F);
   RaceInfo &RI = GetRaceInfo(F);
-  // Evaluate the tasks that might be in parallel with each spindle.
-  MaybeParallelTasks MPTasks;
-  TI.evaluateParallelState<MaybeParallelTasks>(MPTasks);
 
   ScalarEvolution &SE = (*GetScalarEvolution)(F);
 
@@ -2787,10 +2819,14 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                                      LI);
   }
 
+  // Evaluate the tasks that might be in parallel with each spindle.
+  MaybeParallelTasks MPTasks;
+  TI.evaluateParallelState<MaybeParallelTasks>(MPTasks);
+
   // Map each detach instruction with the sync instructions that could sync it.
   for (SyncInst *Sync : Syncs)
     for (const Task *MPT :
-           MPTasks.TaskList[TI.getSpindleFor(Sync->getParent())])
+             MPTasks.TaskList[TI.getSpindleFor(Sync->getParent())])
       DetachToSync[MPT->getDetach()].push_back(Sync);
 
   // Record objects involved in races
@@ -3453,7 +3489,12 @@ void CilkSanitizerImpl::instrumentTapirLoop(Loop &L, TaskInfo &TI,
 
   // Insert after-loop hooks.
   for (BasicBlock *BB : ExitBlocks) {
-    if (!T->simplyEncloses(BB)) {
+    // If the exit block is simply enclosed inside the task, then its on an
+    // exceptional exit path from the task.  In that case, the exit path will
+    // reach the unwind destination of the detach.  Because the unwind
+    // destination of the detach is in the set of exit blocks, we can safely
+    // skip any exit blocks enclosed in the task.
+    if (!T->encloses(BB)) {
       IRB.SetInsertPoint(&*BB->getFirstInsertionPt());
       insertHookCall(&*IRB.GetInsertPoint(), CsanAfterLoop,
                      {LoopCsiId, IRB.getInt8(SyncRegNum), LoopPropVal});
@@ -3770,9 +3811,15 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
     return this->getAnalysis<ScalarEvolutionWrapperPass>(F).getSE();
   };
 
-  return CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo,
-                           GetDepInfo, GetRaceInfo, TLI, GetSE, JitMode,
-                           CallsMayThrow).run();
+  bool Changed =
+      CilkSanitizerImpl(M, CG, GetDomTree, nullptr, GetLoopInfo, nullptr,
+                        nullptr, TLI, nullptr, JitMode, CallsMayThrow)
+          .setup();
+  Changed |=
+      CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo, GetDepInfo,
+                        GetRaceInfo, TLI, GetSE, JitMode, CallsMayThrow)
+          .run();
+  return Changed;
 }
 
 PreservedAnalyses CilkSanitizerPass::run(Module &M, ModuleAnalysisManager &AM) {
@@ -3803,8 +3850,14 @@ PreservedAnalyses CilkSanitizerPass::run(Module &M, ModuleAnalysisManager &AM) {
     return FAM.getResult<ScalarEvolutionAnalysis>(F);
   };
 
-  if (!CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetDI, GetRI, TLI, GetSE)
-      .run())
+  bool Changed = CilkSanitizerImpl(M, &CG, GetDT, nullptr, GetLI, nullptr,
+                                   nullptr, TLI, nullptr)
+                     .setup();
+  Changed |=
+      CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetDI, GetRI, TLI, GetSE)
+          .run();
+
+  if (!Changed)
     return PreservedAnalyses::all();
 
   return PreservedAnalyses::none();
