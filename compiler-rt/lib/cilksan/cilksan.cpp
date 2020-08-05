@@ -390,12 +390,16 @@ void CilkSanImpl_t::do_enter_end(uintptr_t stack_ptr) {
   cilksan_assert(last_event == ENTER_FRAME || last_event == ENTER_HELPER);
   WHEN_CILKSAN_DEBUG(last_event = NONE);
   DBG_TRACE(DEBUG_CALLBACK, "cilk_enter_end, frame stack ptr: %p\n", stack_ptr);
+
+  update_strand_stats();
 }
 
 void CilkSanImpl_t::do_detach_begin() {
   cilksan_assert(CILKSAN_INITIALIZED);
   cilksan_assert(last_event == NONE);
   WHEN_CILKSAN_DEBUG(last_event = DETACH);
+
+  update_strand_stats();
 }
 
 void CilkSanImpl_t::do_detach_end() {
@@ -453,12 +457,16 @@ void CilkSanImpl_t::do_loop_iteration_begin(uintptr_t stack_ptr,
     cilksan_assert(in_loop());
     func->Sbag->get_node()->set_rsp(stack_ptr);
     func->Iterbag->get_node()->set_rsp(stack_ptr);
+
+    update_strand_stats();
   }
 }
 
 void CilkSanImpl_t::do_loop_iteration_end() {
   // frame_stack.head()->Sbag->set_version(
   //     frame_stack.head()->Sbag->get_node()->get_version());
+
+  update_strand_stats();
 
   // At the end of each iteration, update the LOOP_FRAME for reuse.
   DBG_TRACE(DEBUG_CALLBACK, "do_loop_iteration_end()\n");
@@ -560,6 +568,8 @@ void CilkSanImpl_t::do_sync_begin() {
             frame_stack.head()->Sbag->get_node()->get_func_id());
   cilksan_assert(last_event == NONE);
   WHEN_CILKSAN_DEBUG(last_event = CILK_SYNC);
+
+  update_strand_stats();
 }
 
 void CilkSanImpl_t::do_sync_end(unsigned sync_reg) {
@@ -577,6 +587,8 @@ void CilkSanImpl_t::do_leave_begin(unsigned sync_reg) {
   DBG_TRACE(DEBUG_CALLBACK, "frame %ld cilk_leave_begin\n",
             frame_stack.head()->frame_data.frame_id);
   cilksan_assert(frame_stack.size() > 1);
+
+  update_strand_stats();
 
   switch(frame_stack.head()->frame_data.entry_type) {
   case SPAWNER:
@@ -759,6 +771,10 @@ void CilkSanImpl_t::do_read(const csi_id_t load_id,
     if (!num_reads_checked.count(mem_size))
       num_reads_checked.insert(std::make_pair(mem_size, 0));
     ++num_reads_checked[mem_size];
+
+    if (!strand_num_reads_checked.count(mem_size))
+      strand_num_reads_checked.insert(std::make_pair(mem_size, 0));
+    ++strand_num_reads_checked[mem_size];
   }
 
   bool on_stack = is_on_stack(addr);
@@ -778,6 +794,10 @@ void CilkSanImpl_t::do_write(const csi_id_t store_id,
     if (!num_writes_checked.count(mem_size))
       num_writes_checked.insert(std::make_pair(mem_size, 0));
     ++num_writes_checked[mem_size];
+
+    if (!strand_num_writes_checked.count(mem_size))
+      strand_num_writes_checked.insert(std::make_pair(mem_size, 0));
+    ++strand_num_writes_checked[mem_size];
   }
 
   bool on_stack = is_on_stack(addr);
@@ -827,6 +847,14 @@ inline void CilkSanImpl_t::print_stats() {
   for (std::pair<size_t, uint64_t> writes : num_writes_checked)
     std::cout << "writes," << writes.first << "," << writes.second << "\n";
   std::cout << "total writes,," << total_writes_checked << "\n";
+
+  std::cout << "total strands,," << strand_count << "\n";
+
+  for (std::pair<size_t, uint64_t> reads : max_num_reads_checked)
+    std::cout << "max reads," << reads.first << "," << reads.second << "\n";
+
+  for (std::pair<size_t, uint64_t> writes : max_num_writes_checked)
+    std::cout << "max writes," << writes.first << "," << writes.second << "\n";
 }
 
 void CilkSanImpl_t::deinit() {
