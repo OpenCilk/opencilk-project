@@ -984,6 +984,10 @@ void TaskInfo::findTaskFrameTreeHelper(
 
 /// Compute the spindles and subtasks contained in all taskframes.
 void TaskInfo::findTaskFrameTree() {
+  // If we've already found the taskframe tree, don't recompute it.
+  if (ComputedTaskFrameTree)
+    return;
+
   SmallPtrSet<Spindle *, 8> SubTFVisited;
   // Get the taskframe tree under each taskframe.create in the root task.
   for (Spindle *TFSpindle : getRootTask()->taskframe_creates()) {
@@ -1037,6 +1041,9 @@ void TaskInfo::findTaskFrameTree() {
       }
     }
   }
+
+  // Record that the taskframe tree has been computed.
+  ComputedTaskFrameTree = true;
 }
 
 /// Determine which blocks the value is live in.
