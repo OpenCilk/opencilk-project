@@ -243,6 +243,7 @@ inline void CilkSanImpl_t::start_new_function(unsigned num_sync_reg) {
   FrameData_t *child = frame_stack.head();
   cilksan_assert(child->Sbag == NULL);
   cilksan_assert(child->Pbags == NULL);
+  cilksan_assert(child->num_Pbags == 0);
 
   DBG_TRACE(DEBUG_BAGS, "Creating SBag for frame %ld\n", frame_id);
   child_sbag =
@@ -251,7 +252,8 @@ inline void CilkSanImpl_t::start_new_function(unsigned num_sync_reg) {
   child->init_new_function(child_sbag);
 
   if (num_sync_reg > 0) {
-    DBG_TRACE(DEBUG_BAGS, "Creating PBag array for frame %ld\n", frame_id);
+    DBG_TRACE(DEBUG_BAGS, "Creating PBag array of size %d for frame %ld\n",
+              num_sync_reg, frame_id);
     child->make_pbag_array(num_sync_reg);
   } else {
     DBG_TRACE(DEBUG_BAGS, "Skipping PBag-array creation for frame %ld\n", frame_id);
@@ -325,6 +327,8 @@ inline void CilkSanImpl_t::complete_sync(unsigned sync_reg) {
   cilksan_assert(f->Sbag->get_set_node()->is_SBag());
   // Pbag could be NULL if we encounter a sync without any spawn (i.e., any Cilk
   // function that executes the base case)
+  cilksan_assert(sync_reg < f->num_Pbags && "Invalid sync_reg");
+  cilksan_assert(f->Pbags && "Cannot sync NULL pbags array");
   if (f->Pbags[sync_reg]) {
     DBG_TRACE(DEBUG_BAGS,
               "Merge P-bag %d (%p) in frame %ld into S-bag.\n", sync_reg,
