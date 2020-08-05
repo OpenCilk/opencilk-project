@@ -102,8 +102,13 @@ static cl::opt<unsigned>
         cl::Hidden,
         cl::desc("Maximum number of uses to explore for a capture query."));
 
-static cl::opt<bool> MAAPChecks("maap-checks", cl::init(true), cl::Hidden,
+static cl::opt<bool> MAAPChecks("cilksan-maap-checks", cl::init(true),
+                                cl::Hidden,
                                 cl::desc("Enable or disable MAAP checks."));
+
+static cl::opt<bool> LoopHoisting(
+    "cilksan-loop-hoisting", cl::init(true), cl::Hidden,
+    cl::desc("Enable or disable hoisting instrumentation out of loops."));
 
 static cl::opt<bool>
     IgnoreSanitizeCilkAttr(
@@ -2733,7 +2738,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
       bool can_hoist = false;
       // if the instruction is in a loop and can only race via ancestor,
       // and size < stride, store it.
-      if (L) {
+      if (L && LoopHoisting) {
         // TODO: for now, only look @ loads and stores. Add atomics later.
         //       Need to add any others?
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
