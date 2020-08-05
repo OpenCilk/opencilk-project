@@ -2584,7 +2584,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   // get loop
   Loop *L = LI.getLoopFor(I->getParent());
 
-  // get size and stride
+  // get size and stride (stride casted to i64)
   Value *ptr = getLoadStorePointerOperand(I);
   Value *Addr;
   // TODO: what if not a GEP? what could it be?
@@ -2600,10 +2600,24 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   const SCEV *Size = SE->getElementSize(I);
   const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
   const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
-  const SCEV *Stride = SrcAR->getStepRecurrence(*SE);
+  const SCEV *StrideExpr = SrcAR->getStepRecurrence(*SE);
 
-  // get trip count
-  const SCEV* TripCount = getRuntimeTripCount(*L, SE);
+  const SCEV *Stride;
+  if (StrideExpr->getType()->getPrimitiveSizeInBits() < 64) {
+    Stride = SE->getSignExtendExpr(StrideExpr, IRB.getInt64Ty());
+  } else {
+    Stride = StrideExpr;
+  }
+
+  // get trip count (casted to i64)
+  const SCEV* TripCountExpr = getRuntimeTripCount(*L, SE);
+
+  const SCEV *TripCount;
+  if (TripCountExpr->getType()->getPrimitiveSizeInBits() < 64) {
+    TripCount = SE->getSignExtendExpr(TripCountExpr, IRB.getInt64Ty());
+  } else {
+    TripCount = TripCountExpr;
+  }
 
   // get address range
   const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
@@ -2767,7 +2781,6 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           // if this instruction can only race via an ancestor, see if it
           // can be hoisted.
           if (raceViaAncestor && !otherRace) {
-            Value *ptr = getLoadStorePointerOperand(&Inst);
             const SCEV *Size = SE.getElementSize(&Inst);
             const SCEV *V = SE.getSCEV(getLoadStorePointerOperand(&Inst));
             // if not an AddRecExpr, don't proceed
