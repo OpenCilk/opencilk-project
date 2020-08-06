@@ -2562,13 +2562,14 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     Loop *L = LI.getLoopFor(I->getParent());
     Instruction *PreheaderTermInst = L->getLoopPreheader()->getTerminator();
     IRBuilder<> IRB(PreheaderTermInst);
-
-    Value *MAAPChk = getMAAPCheck(I, IRB);
-    Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-        IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), PreheaderTermInst,
-                         false, nullptr, DT, /*LI*/ nullptr);
-    IRB.SetInsertPoint(CheckTerm);
-
+    Instruction *CheckTerm = PreheaderTermInst;
+    if (MAAPChecks) {
+      Value *MAAPChk = getSuppressionCheck(I, IRB);
+      CheckTerm = SplitBlockAndInsertIfThen(
+          IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), PreheaderTermInst, false,
+          nullptr, DT, /*LI*/ nullptr);
+      IRB.SetInsertPoint(CheckTerm);
+    }
     Result = true;
     CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE);
   }
@@ -2586,15 +2587,16 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
 
   // get size and stride (stride casted to i64)
   Value *ptr = getLoadStorePointerOperand(I);
-  Value *Addr;
+  Value *Addr = ptr;
   // TODO: what if not a GEP? what could it be?
   // Phi nodes
   if (isa<GetElementPtrInst>(ptr)) {
     // evaluate this ptr at index 0
     Addr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
   } else {
-    // fail the moment we see something other than a GEP
-    assert(false && "Trying to hoist something other than a GEP\n");
+    // // fail the moment we see something other than a GEP
+    // assert(false && "Trying to hoist something other than a GEP\n");
+    dbgs() << "Hoisting instruction with non-GEP pointer: " << *I << "\n";
   }
 
   const SCEV *Size = SE->getElementSize(I);
