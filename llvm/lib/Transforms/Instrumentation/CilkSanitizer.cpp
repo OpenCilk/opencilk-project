@@ -106,7 +106,7 @@ static cl::opt<unsigned>
         cl::Hidden,
         cl::desc("Maximum number of uses to explore for a capture query."));
 
-static cl::opt<bool> MAAPChecks("cilksan-maap-checks", cl::init(true),
+static cl::opt<bool> MAAPChecks("cilksan-maap-checks", cl::init(false),
                                 cl::Hidden,
                                 cl::desc("Enable or disable MAAP checks."));
 
