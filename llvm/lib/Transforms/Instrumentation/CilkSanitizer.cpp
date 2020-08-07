@@ -2711,6 +2711,17 @@ bool CilkSanitizerImpl::setupFunction(Function &F) {
   return true;
 }
 
+/// Set DebugLoc on the call instruction to a CSI hook, based on the
+/// debug information of the instrumented instruction.
+static void setInstrumentationDebugLoc(Function &Instrumented,
+                                       Instruction *Call) {
+  DISubprogram *Subprog = Instrumented.getSubprogram();
+  if (Subprog) {
+    LLVMContext &C = Instrumented.getParent()->getContext();
+    Call->setDebugLoc(DILocation::get(C, 0, 0, Subprog));
+  }
+}
+
 bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
   if (F.empty() || shouldNotInstrumentFunction(F) ||
@@ -2910,31 +2921,38 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   }
 
   if (Result) {
-    IRBuilder<> IRB(&*(++(cast<Instruction>(FuncId)->getIterator())));
-    CsiFuncProperty FuncEntryProp;
     bool MaySpawn = !TI.isSerial();
-    FuncEntryProp.setMaySpawn(MaySpawn);
-    if (MaySpawn)
-      FuncEntryProp.setNumSyncReg(SRCounters[TI.getRootTask()->getEntry()]);
-    // TODO: Determine if we actually want the frame pointer, not the stack
-    // pointer.
-    Value *FrameAddr = IRB.CreateCall(
-        Intrinsic::getDeclaration(&M, Intrinsic::frameaddress),
-        {IRB.getInt32(0)});
-    Value *StackSave = IRB.CreateCall(
-        Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
-    IRB.CreateCall(CsanFuncEntry,
-                   {FuncId, FrameAddr, StackSave, FuncEntryProp.getValue(IRB)});
+    if (InstrumentationSet & SERIESPARALLEL) {
+      IRBuilder<> IRB(&*(++(cast<Instruction>(FuncId)->getIterator())));
+      CsiFuncProperty FuncEntryProp;
+      FuncEntryProp.setMaySpawn(MaySpawn);
+      if (MaySpawn)
+        FuncEntryProp.setNumSyncReg(SRCounters[TI.getRootTask()->getEntry()]);
+      // TODO: Determine if we actually want the frame pointer, not the stack
+      // pointer.
+      Value *FrameAddr =
+          IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::frameaddress),
+                         {IRB.getInt32(0)});
+      Value *StackSave =
+          IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
+      CallInst *EntryCall =
+          IRB.CreateCall(CsanFuncEntry, {FuncId, FrameAddr, StackSave,
+                                         FuncEntryProp.getValue(IRB)});
+      setInstrumentationDebugLoc(F, EntryCall);
+    }
 
     EscapeEnumerator EE(F, "csan_cleanup", false);
     while (IRBuilder<> *AtExit = EE.Next()) {
-      uint64_t ExitLocalId = FunctionExitFED.add(*AtExit->GetInsertPoint());
-      Value *ExitCsiId = FunctionExitFED.localToGlobalId(ExitLocalId, *AtExit);
-      CsiFuncExitProperty FuncExitProp;
-      FuncExitProp.setMaySpawn(MaySpawn);
-      FuncExitProp.setEHReturn(isa<ResumeInst>(AtExit->GetInsertPoint()));
-      AtExit->CreateCall(CsanFuncExit,
-                         {ExitCsiId, FuncId, FuncExitProp.getValue(*AtExit)});
+      if (InstrumentationSet & SERIESPARALLEL) {
+        uint64_t ExitLocalId = FunctionExitFED.add(*AtExit->GetInsertPoint());
+        Value *ExitCsiId = FunctionExitFED.localToGlobalId(ExitLocalId, *AtExit);
+        CsiFuncExitProperty FuncExitProp;
+        FuncExitProp.setMaySpawn(MaySpawn);
+        FuncExitProp.setEHReturn(isa<ResumeInst>(AtExit->GetInsertPoint()));
+        CallInst *ExitCall = AtExit->CreateCall(
+            CsanFuncExit, {ExitCsiId, FuncId, FuncExitProp.getValue(*AtExit)});
+        setInstrumentationDebugLoc(F, ExitCall);
+      }
     }
   }
 
