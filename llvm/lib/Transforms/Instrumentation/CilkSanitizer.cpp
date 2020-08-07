@@ -2576,6 +2576,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                                                      Instruction *InsertPt,
                                                      LoopInfo &LI,
                                                      ScalarEvolution* SE) {
+  dbgs() << "-------------------------------------\n";
   // get loop
   Loop *L = LI.getLoopFor(I->getParent());
 
@@ -2596,14 +2597,24 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   const SCEV *Size = SE->getElementSize(I);
   const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
   const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
+
+  // can be negative
   const SCEV *StrideExpr = SrcAR->getStepRecurrence(*SE);
 
+  // get abs value of stride
+  const SCEV *StrideAbs = SE->isKnownNonNegative(StrideExpr) ?
+                          StrideExpr :
+                          SE->getMinusSCEV(SE->getZero(StrideExpr->getType()),
+                                                       StrideExpr);
+
+  // always will be positive 64-bit int
   const SCEV *Stride;
-  if (StrideExpr->getType()->getPrimitiveSizeInBits() < 64) {
-    Stride = SE->getSignExtendExpr(StrideExpr, IRB.getInt64Ty());
+  if (StrideAbs->getType()->getPrimitiveSizeInBits() < 64) {
+    Stride = SE->getSignExtendExpr(StrideAbs, IRB.getInt64Ty());
   } else {
-    Stride = StrideExpr;
+    Stride = StrideAbs;
   }
+  assert (!isa<SCEVCouldNotCompute>(Stride) && "Stride should be computable");
 
   // get trip count (casted to i64)
   const SCEV* TripCountExpr = getRuntimeTripCount(*L, SE);
@@ -2614,8 +2625,46 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   } else {
     TripCount = TripCountExpr;
   }
+  assert (!isa<SCEVCouldNotCompute>(TripCount) && "TripCount should be computable");
+  dbgs() << "Trip count = " << *TripCount << "\n";
 
-  // get address range
+  // get address range start
+
+  Value *ptr = getLoadStorePointerOperand(I);
+  Value *ObjAddr;
+  Value *RangeAddr;
+
+  // TODO: what if not a GEP? what could it be?
+  // TODO: Phi nodes
+  if (isa<GetElementPtrInst>(ptr)) {
+    // Vevaluate this ptr at index 0
+    ObjAddr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
+    dbgs() << "Base Addr = " << *ObjAddr << "\n";
+    const SCEV *RangeAddrSCEV = SE->getSCEV(ptr);
+    dbgs() << "Base Addr scev = " << *RangeAddrSCEV << "\n";
+    if (const SCEVAddRecExpr *RangeAddrAddRecExpr = dyn_cast<SCEVAddRecExpr>(RangeAddrSCEV)) {
+      const SCEV *RangeAddrStartSCEV;
+      if (SE->isKnownNonNegative(StrideExpr)) {
+        dbgs() << "===POS===========\n";
+        // if our stride is positive, addr start is the start of the loop.
+        RangeAddrStartSCEV = RangeAddrAddRecExpr->getStart();
+        dbgs() << "Base Addr scev start = " << *RangeAddrAddRecExpr->getStart() << "\n";
+      } else {
+        dbgs() << "===NEG===========\n";
+        // if our stride is negative, addr start is the end of the loop.
+        RangeAddrStartSCEV = RangeAddrAddRecExpr->evaluateAtIteration(SE->getBackedgeTakenCount(L), *SE);
+        dbgs() << "Base Addr scev start = " << *RangeAddrStartSCEV << "\n";
+      }
+      RangeAddr = Expander.expandCodeFor(RangeAddrStartSCEV, RangeAddrStartSCEV->getType(),
+                             InsertPt);
+      dbgs() << "Base Addr value = " << *RangeAddr << "\n\n";
+    }
+  } else {
+    // fail the moment we see something other than a GEP
+    assert(false && "Trying to hoist something other than a GEP\n");
+  }
+
+  // get address range size
   const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
 
   // get instructions for calculating address range
