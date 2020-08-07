@@ -2576,7 +2576,6 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                                                      Instruction *InsertPt,
                                                      LoopInfo &LI,
                                                      ScalarEvolution* SE) {
-  dbgs() << "-------------------------------------\n";
   // get loop
   Loop *L = LI.getLoopFor(I->getParent());
 
@@ -2625,8 +2624,8 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   } else {
     TripCount = TripCountExpr;
   }
-  assert (!isa<SCEVCouldNotCompute>(TripCount) && "TripCount should be computable");
-  dbgs() << "Trip count = " << *TripCount << "\n";
+  assert (!isa<SCEVCouldNotCompute>(TripCount) &&
+          "TripCount should be computable");
 
   // get address range start
 
@@ -2639,25 +2638,20 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   if (isa<GetElementPtrInst>(ptr)) {
     // Vevaluate this ptr at index 0
     ObjAddr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
-    dbgs() << "Base Addr = " << *ObjAddr << "\n";
     const SCEV *RangeAddrSCEV = SE->getSCEV(ptr);
-    dbgs() << "Base Addr scev = " << *RangeAddrSCEV << "\n";
     if (const SCEVAddRecExpr *RangeAddrAddRecExpr = dyn_cast<SCEVAddRecExpr>(RangeAddrSCEV)) {
       const SCEV *RangeAddrStartSCEV;
       if (SE->isKnownNonNegative(StrideExpr)) {
-        dbgs() << "===POS===========\n";
         // if our stride is positive, addr start is the start of the loop.
         RangeAddrStartSCEV = RangeAddrAddRecExpr->getStart();
-        dbgs() << "Base Addr scev start = " << *RangeAddrAddRecExpr->getStart() << "\n";
       } else {
-        dbgs() << "===NEG===========\n";
         // if our stride is negative, addr start is the end of the loop.
-        RangeAddrStartSCEV = RangeAddrAddRecExpr->evaluateAtIteration(SE->getBackedgeTakenCount(L), *SE);
-        dbgs() << "Base Addr scev start = " << *RangeAddrStartSCEV << "\n";
+        RangeAddrStartSCEV = RangeAddrAddRecExpr->evaluateAtIteration(
+                                            SE->getBackedgeTakenCount(L), *SE);
       }
-      RangeAddr = Expander.expandCodeFor(RangeAddrStartSCEV, RangeAddrStartSCEV->getType(),
-                             InsertPt);
-      dbgs() << "Base Addr value = " << *RangeAddr << "\n\n";
+      RangeAddr = Expander.expandCodeFor(RangeAddrStartSCEV,
+                                         RangeAddrStartSCEV->getType(),
+                                         InsertPt);
     }
   } else {
     // fail the moment we see something other than a GEP
@@ -2843,9 +2837,18 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
             // if not an AddRecExpr, don't proceed
             if (const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V)) {
               const SCEV *Stride = SrcAR->getStepRecurrence(SE);
-              const SCEV *Diff = SE.getMinusSCEV(Size, Stride);
+              const SCEV *Diff;
+              if (SE.isKnownNonNegative(Stride)) {
+                Diff = SE.getMinusSCEV(Size, Stride);
+              } else {
+                // if we can't compare size and stride,
+                // SE.isKnownNonNegative(Diff) will be false.
+                Diff = SE.getAddExpr(Size, Stride);
+              }
               const SCEV* TripCount = getRuntimeTripCount(*L, &SE);
-              // can only hoist if stride <= size and the tripcount is known
+
+              // can only hoist if |stride| <= |size| and the tripcount is known
+              // TODO: sink instrumentation if tripcount not known, but size and stride are fine?
               if (SE.isKnownNonNegative(Diff) &&
                   !isa<SCEVCouldNotCompute>(TripCount)) {
                 LoopInstInAncestRace.insert(&Inst);
