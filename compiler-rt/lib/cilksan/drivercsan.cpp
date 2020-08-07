@@ -1221,7 +1221,7 @@ typedef cilkred_map *(*merge_two_rmaps_t)(__cilkrts_worker *const,
                                           cilkred_map *, cilkred_map *);
 static merge_two_rmaps_t dl_merge_two_rmaps = NULL;
 
-__attribute__((weak)) CILKSAN_API cilkred_map *
+CILKSAN_API __attribute__((weak)) cilkred_map *
 __cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
                                    cilkred_map *left, cilkred_map *right) {
   if (__builtin_expect(dl_merge_two_rmaps == NULL, 0)) {
@@ -1242,7 +1242,7 @@ __cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
 }
 
 /// Wrapped __cilkrts_internal_merge_two_rmaps method for link-time interpositioning.
-__attribute__((weak)) CILKSAN_API cilkred_map *
+CILKSAN_API __attribute__((weak)) cilkred_map *
 __real___cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
                                           cilkred_map *left,
                                           cilkred_map *right) {
