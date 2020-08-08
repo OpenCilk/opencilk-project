@@ -2758,7 +2758,8 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   TaskInfo &TI = GetTaskInfo(F);
   RaceInfo &RI = GetRaceInfo(F);
 
-  ScalarEvolution &SE = (*GetScalarEvolution)(F);
+  // ScalarEvolution &SE = (*GetScalarEvolution)(F);
+  ScalarEvolution &SE = *(RI.getSE());
 
   for (BasicBlock &BB : F) {
     // Record the Tapir sync instructions found
