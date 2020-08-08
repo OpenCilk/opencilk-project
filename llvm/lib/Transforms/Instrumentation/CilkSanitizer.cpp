@@ -2812,6 +2812,8 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           LocalLoadsAndStores.push_back(&Inst);
         else if (isa<AtomicRMWInst>(Inst) || isa<AtomicCmpXchgInst>(Inst))
           AtomicAccesses.push_back(&Inst);
+        else if (isa<AllocaInst>(Inst))
+          Allocas.insert(&Inst);
         else if (isa<CallInst>(Inst) || isa<InvokeInst>(Inst)) {
           // if (CallInst *CI = dyn_cast<CallInst>(&Inst))
           //   maybeMarkSanitizerLibraryCallNoBuiltin(CI, TLI);
@@ -2848,8 +2850,6 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           chooseInstructionsToInstrument(LocalLoadsAndStores,
                                          AllLoadsAndStores, TI, LI);
         }
-      } else if (isa<AllocaInst>(Inst)) {
-        Allocas.insert(&Inst);
       }
     }
     chooseInstructionsToInstrument(LocalLoadsAndStores, AllLoadsAndStores, TI,
