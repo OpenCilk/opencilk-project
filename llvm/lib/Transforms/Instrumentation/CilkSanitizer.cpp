@@ -2571,17 +2571,14 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE);
   }
 
-  // TODO: map from loop to end-result counter inst.
+  // map to keep track of which loops we have already created counters for
   SmallMapVector<Loop*, Value*, 8> LoopToCounterMap;
 
   for (Instruction *I : LoopInstToSink) {
-    dbgs() << "Instrumenting : " << *I << "\n";
     Loop *L = LI.getLoopFor(I->getParent());
-    dbgs() << "in loop : " << *L << "\n";
 
     Value *CounterAlloca;
 
-    // TODO
     // create a counter for this loop if we haven't already done so
     if (LoopToCounterMap.find(L) == LoopToCounterMap.end()) {
       Instruction *PreheaderTermInst = L->getLoopPreheader()->getTerminator();
@@ -2599,168 +2596,28 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
 
       LoopToCounterMap.insert(std::make_pair(L, CounterAlloca));
     } else {
-      dbgs() << "Already added counter to loop : " << *L << "\n";
       CounterAlloca = LoopToCounterMap.find(L)->second;
     }
 
-    /*
-    SmallVector<BasicBlock*, 8> ExitBBs;
-    L->getExitBlocks(ExitBBs);
-    for (unsigned i = 0, e = ExitBBs.size(); i != e; i++) {
-    */
-      BasicBlock *ExitBB = L->getUniqueExitBlock();//ExitBBs[i];
-      dbgs() << "counter alloca : " << *CounterAlloca << "\n in preheader : " << *L->getLoopPreheader();
+    BasicBlock *ExitBB = L->getUniqueExitBlock();
 
-      // after the loop, perform the coalesced read/write
-      // TODO: can there be multiple exit blocks?
-      dbgs() << "exit block : " << *ExitBB << "\n";
+    // after the loop, perform the coalesced read/write
+    // TODO: I'm not sure this'll work if there are multiple exit blocks...
+    BasicBlock::iterator FirstInsertPt = ExitBB->getFirstInsertionPt();
+    IRBuilder<> IRB(&*FirstInsertPt);
 
-      BasicBlock::iterator FirstInsertPt = ExitBB->getFirstInsertionPt();
-      IRBuilder<> IRB(&*FirstInsertPt);
-     // IRB.SetInsertPoint(&*FirstInsertPt);
+    Value *MAAPChk = getMAAPCheck(I, IRB);
+    Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+      IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), &*FirstInsertPt,
+                       false, nullptr, DT, /*LI*/ nullptr);
+    IRB.SetInsertPoint(CheckTerm);
 
-      Value *MAAPChk = getMAAPCheck(I, IRB);
-      Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-        IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), &*FirstInsertPt,
-                         false, nullptr, DT, /*LI*/ nullptr);
-      IRB.SetInsertPoint(CheckTerm);
-
-      Result = true;
-      CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE, CounterAlloca);
-      dbgs() << "new exit block : " << *ExitBB;
-    //}
+    Result = true;
+    CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE, CounterAlloca);
   }
 
   return Result;
 }
-
-/*
-bool CilkSanitizerImpl::instrumentLoadOrStoreSinked(Instruction *I,
-                                                    IRBuilder<> &IRB,
-                                                    Instruction *InsertPt,
-                                                    LoopInfo &LI,
-                                                    ScalarEvolution *SE,
-                                                    Value *TripCountAlloca) {
-  // get loop
-  Loop *L = LI.getLoopFor(I->getParent());
-
-  BasicBlock *PreheaderBB = L->getLoopPreheader();
-
-  // get SCEV expander
-  const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
-  SCEVExpander Expander(*SE, DL, "csi");
-
-  // get size and stride (stride casted to i64)
-
-  // TODO: if size != stride, need to be more careful about calculating range.
-  //const SCEV *Size = SE->getElementSize(I);
-  const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
-  const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
-
-  // can be negative
-  const SCEV *StrideExpr = SrcAR->getStepRecurrence(*SE);
-
-  // get abs value of stride
-  const SCEV *StrideAbs = SE->isKnownNonNegative(StrideExpr) ?
-                          StrideExpr :
-                          SE->getMinusSCEV(SE->getZero(StrideExpr->getType()),
-                                                       StrideExpr);
-
-  // always will be positive 64-bit int
-  const SCEV *Stride;
-  if (StrideAbs->getType()->getPrimitiveSizeInBits() < 64) {
-    Stride = SE->getSignExtendExpr(StrideAbs, IRB.getInt64Ty());
-  } else {
-    Stride = StrideAbs;
-  }
-  assert (!isa<SCEVCouldNotCompute>(Stride) && "Stride should be computable");
-
-  // get trip count (casted to i64)
-  Value *TripCountLoadV = IRB.CreateLoad(TripCountAlloca);
-
-  // get address range size
-  //const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
-  Value *StrideV = Expander.expandCodeFor(Stride, IRB.getInt64Ty(), InsertPt);
-  Value *RangeSize = IRB.CreateMul(TripCountLoadV, StrideV);
-
-  // get address range start
-
-  Value *ptr = getLoadStorePointerOperand(I);
-  Value *ObjAddr;
-  Value *RangeAddr;
-
-  // TODO: what if not a GEP? what could it be?
-  // TODO: Phi nodes
-  if (isa<GetElementPtrInst>(ptr)) {
-    // Vevaluate this ptr at index 0
-    ObjAddr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
-    const SCEV *RangeAddrSCEV = SE->getSCEV(ptr);
-    if (const SCEVAddRecExpr *RangeAddrAddRecExpr = dyn_cast<SCEVAddRecExpr>(RangeAddrSCEV)) {
-      const SCEV *RangeAddrStartSCEV;
-      if (SE->isKnownNonNegative(StrideExpr)) {
-        // if our stride is positive, addr start is the start of the loop.
-        RangeAddrStartSCEV = RangeAddrAddRecExpr->getStart();
-      } else {
-        // if our stride is negative, addr start is the end of the loop.
-        Value *BackedgeTakenCountV = IRB.CreateSub(TripCountLoadV, ConstantInt.get(IRB.getInt64Ty(), 1));
-        RangeAddrStartSCEV = RangeAddrAddRecExpr->evaluateAtIteration(
-                                            SE->getBackedgeTakenCount(L), *SE); // TODO: fix iteration
-      }
-      RangeAddr = Expander.expandCodeFor(RangeAddrStartSCEV,
-                                         RangeAddrStartSCEV->getType(),
-                                         InsertPt);
-    }
-  } else {
-    // fail the moment we see something other than a GEP
-    assert(false && "Trying to hoist something other than a GEP\n");
-  }
-
-  // get instructions for calculating address range
-  //Value *RangeSize = Expander.expandCodeFor(RangeExpr, RangeExpr->getType(),
-  //                                         InsertPt);
-
-  CsiLoadStoreProperty Prop;
-
-  if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-    Prop.setAlignment(LI->getAlignment());
-    // Instrument the load
-    uint64_t LoadId = LoadFED.add(*LI);
-
-    // TODO: Don't recalculate underlying objects
-    uint64_t LoadObjId = LoadObj.add(*LI, lookupUnderlyingObject(ObjAddr));
-    assert(LoadId == LoadObjId &&
-           "Load received different ID's in FED and object tables.");
-
-    Value *CsiId = LoadFED.localToGlobalId(LoadId, IRB);
-    Value *Args[] = {CsiId, IRB.CreatePointerCast(RangeAddr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(RangeSize, IntptrTy, false),
-                     Prop.getValue(IRB)};
-    Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
-    IRB.SetInstDebugLocation(Call);
-    ++NumHoistedInstrumentedReads;
-  } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-    Prop.setAlignment(SI->getAlignment());
-    // Instrument the store
-    uint64_t StoreId = StoreFED.add(*SI);
-
-    // TODO: Don't recalculate underlying objects
-    uint64_t StoreObjId = StoreObj.add(*SI, lookupUnderlyingObject(ObjAddr));
-    assert(StoreId == StoreObjId &&
-           "Store received different ID's in FED and object tables.");
-
-    Value *CsiId = StoreFED.localToGlobalId(StoreId, IRB);
-    Value *Args[] = {CsiId, IRB.CreatePointerCast(RangeAddr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(RangeSize, IntptrTy, false),
-                     Prop.getValue(IRB)};
-    Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
-    IRB.SetInstDebugLocation(Call);
-    ++NumHoistedInstrumentedWrites;
-  }
-
-  return true;
-}
-*/
-
 
 bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                                                      IRBuilder<> &IRB,
@@ -2787,7 +2644,6 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
 
   // TODO: if size != stride, need to be more careful about calculating range.
   //const SCEV *Size = SE->getElementSize(I);
-  dbgs() << "HERE : " << *getLoadStorePointerOperand(I) << "\n";
   const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
   const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
 
@@ -2828,13 +2684,11 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   }
 
   // get address range start
-
   Value *ptr = getLoadStorePointerOperand(I);
   Value *ObjAddr;
   Value *RangeAddr;
 
-  // TODO: what if not a GEP? what could it be?
-  // TODO: Phi nodes
+  // TODO: what if not a GEP or Phi node?
   if (isa<GetElementPtrInst>(ptr) || isa<PHINode>(ptr)) {
     // Vevaluate this ptr at index 0
     if (isa<GetElementPtrInst>(ptr)) {
@@ -2860,9 +2714,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                                          InsertPt);
     }
   } else {
-    // fail the moment we see something other than a GEP
-    dbgs() << "inst = " << *I << "\n";
-    dbgs() << "ptr = " << *ptr << "\n";
+    // fail the moment we see something other than a GEP or Phi node
     assert(false && "Trying to hoist something other than a GEP\n");
   }
 
@@ -3064,7 +2916,6 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                 } else {
                   // can sink if |stride| <= |size| and the tripcount is unknown
                   LoopInstToSink.insert(&Inst);
-                  dbgs() << "CAN SINK INST : " << Inst << "\n";
                 }
               }
             }
