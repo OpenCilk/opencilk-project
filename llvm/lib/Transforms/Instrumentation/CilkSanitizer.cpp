@@ -2771,7 +2771,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
       bool can_hoist = false;
       // if the instruction is in a loop and can only race via ancestor,
       // and size < stride, store it.
-      if (L && LoopHoisting) {
+      if (L && EnableStaticRaceDetection && LoopHoisting) {
         // TODO: for now, only look @ loads and stores. Add atomics later.
         //       Need to add any others?
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
