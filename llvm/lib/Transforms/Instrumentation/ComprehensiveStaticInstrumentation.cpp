@@ -339,14 +339,16 @@ Constant *ForensicTable::getObjectStrGV(Module &M, StringRef Str,
 }
 
 ForensicTable::ForensicTable(Module &M, StringRef BaseIdName,
-                             StringRef TableName)
+                             StringRef TableName, bool UseExistingBaseId)
     : TableName(TableName) {
   LLVMContext &C = M.getContext();
   IntegerType *Int64Ty = IntegerType::get(C, 64);
   IdCounter = 0;
 
-  BaseId = M.getGlobalVariable(BaseIdName, true);
-  if (NULL == BaseId)
+  if (UseExistingBaseId)
+    // Try to look up an existing BaseId to use.
+    BaseId = M.getGlobalVariable(BaseIdName, true);
+  if (nullptr == BaseId)
     BaseId = new GlobalVariable(M, Int64Ty, false, GlobalValue::InternalLinkage,
                                 ConstantInt::get(Int64Ty, 0), BaseIdName);
   assert(BaseId);
@@ -1795,7 +1797,8 @@ void CSIImpl::insertHookCallAtSharedEHSpindleExits(
 void CSIImpl::initializeFEDTables() {
   FunctionFED = FrontEndDataTable(M, CsiFunctionBaseIdName,
                                   "__csi_unit_fed_table_function",
-                                  "__csi_unit_function_name_");
+                                  "__csi_unit_function_name_",
+                                  /*UseExistingBaseId=*/false);
   FunctionExitFED = FrontEndDataTable(M, CsiFunctionExitBaseIdName,
                                       "__csi_unit_fed_table_function_exit",
                                       "__csi_unit_function_name_");

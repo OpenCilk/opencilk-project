@@ -77,8 +77,9 @@ static const int CsiUnitCtorPriority = 0;
 /// Maintains a mapping from CSI ID to static data for that ID.
 class ForensicTable {
 public:
-  ForensicTable() : BaseId(nullptr), IdCounter(0) {}
-  ForensicTable(Module &M, StringRef BaseIdName, StringRef TableName = "");
+  ForensicTable() {}
+  ForensicTable(Module &M, StringRef BaseIdName, StringRef TableName = "",
+                bool UseExistingBaseId = true);
 
   /// The number of entries in this forensic table
   uint64_t size() const { return IdCounter; }
@@ -103,9 +104,9 @@ public:
 
 protected:
   /// The GlobalVariable holding the base ID for this FED table.
-  GlobalVariable *BaseId;
+  GlobalVariable *BaseId = nullptr;
   /// Counter of local IDs used so far.
-  uint64_t IdCounter;
+  uint64_t IdCounter = 0;
   /// Map of Value to Local ID.
   DenseMap<const Value *, uint64_t> ValueToLocalIdMap;
   StringRef TableName;
@@ -120,8 +121,9 @@ public:
   FrontEndDataTable() : ForensicTable() {}
   FrontEndDataTable(Module &M, StringRef BaseIdName,
                     StringRef TableName = CsiUnitFedTableName,
-                    StringRef DebugNamePrefix = CsiDefaultDebugNamePrefix)
-      : ForensicTable(M, BaseIdName, TableName),
+                    StringRef DebugNamePrefix = CsiDefaultDebugNamePrefix,
+                    bool UseExistingBaseId = true)
+      : ForensicTable(M, BaseIdName, TableName, UseExistingBaseId),
         DebugNamePrefix(DebugNamePrefix) {}
 
   /// The number of entries in this FED table
