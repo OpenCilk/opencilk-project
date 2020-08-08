@@ -133,8 +133,7 @@ static const char *const CsiUnitObjTableArrayName = "__csi_unit_obj_tables";
 class ObjectTable : public ForensicTable {
 public:
   ObjectTable() : ForensicTable() {}
-  ObjectTable(Module &M, StringRef BaseIdName)
-      : ForensicTable(M, BaseIdName) {}
+  ObjectTable(Module &M, StringRef BaseIdName) : ForensicTable(M, BaseIdName) {}
 
   /// The number of entries in this table
   uint64_t size() const { return LocalIdToSourceLocationMap.size(); }
@@ -2935,6 +2934,17 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           IRB.CreateCall(CsanFuncEntry, {FuncId, FrameAddr, StackSave,
                                          FuncEntryProp.getValue(IRB)});
       setInstrumentationDebugLoc(F, EntryCall);
+    } else {
+      // Search for a call to CsanFuncEntry, and update its ID argument.
+      for (BasicBlock::iterator I = cast<Instruction>(FuncId)->getIterator(),
+                                E = F.getEntryBlock().end();
+           I != E; ++I) {
+        if (CallBase *CB = dyn_cast<CallBase>(&*I))
+          if (CB->getCalledFunction() == CsanFuncEntry.getCallee()) {
+            CB->setArgOperand(0, FuncId);
+            break;
+          }
+      }
     }
 
     EscapeEnumerator EE(F, "csan_cleanup", false);
@@ -2948,6 +2958,17 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
         CallInst *ExitCall = AtExit->CreateCall(
             CsanFuncExit, {ExitCsiId, FuncId, FuncExitProp.getValue(*AtExit)});
         setInstrumentationDebugLoc(F, ExitCall);
+      } else {
+        // Search for a call to CsanFuncExit, and update its ID argument.
+        for (BasicBlock::iterator I = AtExit->GetInsertBlock()->begin(),
+                                  E = AtExit->GetInsertBlock()->end();
+             I != E; ++I) {
+          if (CallBase *CB = dyn_cast<CallBase>(&*I))
+            if (CB->getCalledFunction() == CsanFuncExit.getCallee()) {
+              CB->setArgOperand(1, FuncId);
+              break;
+            }
+        }
       }
     }
   }
