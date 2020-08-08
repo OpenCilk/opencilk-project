@@ -23,7 +23,6 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/CaptureTracking.h"
-#include "llvm/Analysis/DependenceAnalysis.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
@@ -279,7 +278,6 @@ struct CilkSanitizerImpl : public CSIImpl {
                     function_ref<DominatorTree &(Function &)> GetDomTree,
                     function_ref<TaskInfo &(Function &)> GetTaskInfo,
                     function_ref<LoopInfo &(Function &)> GetLoopInfo,
-                    function_ref<DependenceInfo &(Function &)> GetDepInfo,
                     function_ref<RaceInfo &(Function &)> GetRaceInfo,
                     const TargetLibraryInfo *TLI,
                     function_ref<ScalarEvolution &(Function &)> GetSE,
@@ -287,7 +285,7 @@ struct CilkSanitizerImpl : public CSIImpl {
                     bool JitMode = false,
                     bool CallsMayThrow = !AssumeNoExceptions)
       : CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, TLI, GetSE, nullptr),
-        GetDepInfo(GetDepInfo), GetRaceInfo(GetRaceInfo) {
+        GetRaceInfo(GetRaceInfo) {
     // Even though we're doing our own instrumentation, we want the CSI setup
     // for the instrumentation of function entry/exit, memory accesses (i.e.,
     // loads and stores), atomics, memory intrinsics.  We also want call sites,
@@ -388,7 +386,6 @@ struct CilkSanitizerImpl : public CSIImpl {
 
 private:
   // Analysis results
-  function_ref<DependenceInfo &(Function &)> GetDepInfo;
   function_ref<RaceInfo &(Function &)> GetRaceInfo;
 
   // Instrumentation hooks
@@ -514,7 +511,6 @@ INITIALIZE_PASS_DEPENDENCY(BasicAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(GlobalsAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(CallGraphWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(DependenceAnalysisWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TapirRaceDetectWrapperPass)
@@ -528,7 +524,6 @@ INITIALIZE_PASS_END(
 
 void CilkSanitizerLegacyPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<CallGraphWrapperPass>();
-  AU.addRequired<DependenceAnalysisWrapperPass>();
   AU.addRequired<DominatorTreeWrapperPass>();
   AU.addRequired<LoopInfoWrapperPass>();
   AU.addRequired<TapirRaceDetectWrapperPass>();
@@ -3882,9 +3877,6 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
   auto GetLoopInfo = [this](Function &F) -> LoopInfo & {
     return this->getAnalysis<LoopInfoWrapperPass>(F).getLoopInfo();
   };
-  auto GetDepInfo = [this](Function &F) -> DependenceInfo & {
-    return this->getAnalysis<DependenceAnalysisWrapperPass>(F).getDI();
-  };
   auto GetRaceInfo = [this](Function &F) -> RaceInfo & {
     return this->getAnalysis<TapirRaceDetectWrapperPass>(F).getRaceInfo();
   };
@@ -3893,13 +3885,12 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
   };
 
   bool Changed =
-      CilkSanitizerImpl(M, CG, GetDomTree, nullptr, GetLoopInfo, nullptr,
-                        nullptr, TLI, nullptr, JitMode, CallsMayThrow)
+      CilkSanitizerImpl(M, CG, GetDomTree, nullptr, GetLoopInfo, nullptr, TLI,
+                        nullptr, JitMode, CallsMayThrow)
           .setup();
-  Changed |=
-      CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo, GetDepInfo,
-                        GetRaceInfo, TLI, GetSE, JitMode, CallsMayThrow)
-          .run();
+  Changed |= CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo,
+                               GetRaceInfo, TLI, GetSE, JitMode, CallsMayThrow)
+                 .run();
   return Changed;
 }
 
@@ -3918,10 +3909,6 @@ PreservedAnalyses CilkSanitizerPass::run(Module &M, ModuleAnalysisManager &AM) {
     [&FAM](Function &F) -> LoopInfo & {
       return FAM.getResult<LoopAnalysis>(F);
     };
-  auto GetDI =
-    [&FAM](Function &F) -> DependenceInfo & {
-      return FAM.getResult<DependenceAnalysis>(F);
-    };
   auto GetRI =
     [&FAM](Function &F) -> RaceInfo & {
       return FAM.getResult<TapirRaceDetect>(F);
@@ -3931,12 +3918,11 @@ PreservedAnalyses CilkSanitizerPass::run(Module &M, ModuleAnalysisManager &AM) {
     return FAM.getResult<ScalarEvolutionAnalysis>(F);
   };
 
-  bool Changed = CilkSanitizerImpl(M, &CG, GetDT, nullptr, GetLI, nullptr,
-                                   nullptr, TLI, nullptr)
-                     .setup();
+  bool Changed =
+      CilkSanitizerImpl(M, &CG, GetDT, nullptr, GetLI, nullptr, TLI, nullptr)
+          .setup();
   Changed |=
-      CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetDI, GetRI, TLI, GetSE)
-          .run();
+      CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetRI, TLI, GetSE).run();
 
   if (!Changed)
     return PreservedAnalyses::all();
