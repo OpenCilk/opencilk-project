@@ -231,8 +231,8 @@ struct CilkSanitizerImpl : public CSIImpl {
         DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL,
         const TargetLibraryInfo *TLI);
     bool InstrumentLoops(SmallPtrSetImpl<Instruction *> &LoopInstToHoist,
-        SmallPtrSetImpl<Instruction *> &LoopInstToSink,
-        ScalarEvolution *);
+                         SmallPtrSetImpl<Instruction *> &LoopInstToSink,
+                         ScalarEvolution *);
     bool PerformDelayedInstrumentation();
 
   private:
@@ -2548,8 +2548,7 @@ static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE) {
 // (which is unrelated to this), rename this to involve the word "hoist" or something.
 bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     SmallPtrSetImpl<Instruction *> &LoopInstToHoist,
-    SmallPtrSetImpl<Instruction *> &LoopInstToSink,
-    ScalarEvolution *SE) {
+    SmallPtrSetImpl<Instruction *> &LoopInstToSink, ScalarEvolution *SE) {
   bool Result = false;
 
   // TODO: for now, only LoadInst and StoreInst (add atomics later)
@@ -2599,21 +2598,26 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
       CounterAlloca = LoopToCounterMap.find(L)->second;
     }
 
-    BasicBlock *ExitBB = L->getUniqueExitBlock();
-
-    // after the loop, perform the coalesced read/write
-    // TODO: I'm not sure this'll work if there are multiple exit blocks...
-    BasicBlock::iterator FirstInsertPt = ExitBB->getFirstInsertionPt();
-    IRBuilder<> IRB(&*FirstInsertPt);
-
-    Value *MAAPChk = getMAAPCheck(I, IRB);
-    Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-      IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), &*FirstInsertPt,
-                       false, nullptr, DT, /*LI*/ nullptr);
-    IRB.SetInsertPoint(CheckTerm);
-
-    Result = true;
-    CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE, CounterAlloca);
+    // BasicBlock *ExitBB = L->getUniqueExitBlock();
+    SmallVector<BasicBlock *, 4> ExitBlocks;
+    L->getUniqueExitBlocks(ExitBlocks);
+    for (BasicBlock *ExitBB : ExitBlocks) {
+      // after the loop, perform the coalesced read/write
+      // TODO: I'm not sure this'll work if there are multiple exit blocks...
+      BasicBlock::iterator FirstInsertPt = ExitBB->getFirstInsertionPt();
+      IRBuilder<> IRB(&*FirstInsertPt);
+      Instruction *CheckTerm = &*ExitBB->getFirstInsertionPt();
+      if (MAAPChecks) {
+        Value *MAAPChk = getSuppressionCheck(I, IRB);
+        CheckTerm = SplitBlockAndInsertIfThen(
+            IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), &*FirstInsertPt, false,
+            nullptr, DT, /*LI*/ nullptr);
+        IRB.SetInsertPoint(CheckTerm);
+      }
+      Result = true;
+      CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE,
+                                               CounterAlloca);
+    }
   }
 
   return Result;
@@ -2627,20 +2631,13 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
                                                      Value *TripCountAlloca) {
   // get loop
   Loop *L = LI.getLoopFor(I->getParent());
+  BasicBlock *PreheaderBB = L->getLoopPreheader();
+
+  // get SCEV expander
+  const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
+  SCEVExpander Expander(*SE, DL, "csi");
 
   // get size and stride (stride casted to i64)
-  Value *ptr = getLoadStorePointerOperand(I);
-  Value *Addr = ptr;
-  // TODO: what if not a GEP? what could it be?
-  // Phi nodes
-  if (isa<GetElementPtrInst>(ptr)) {
-    // evaluate this ptr at index 0
-    Addr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
-  } else {
-    // // fail the moment we see something other than a GEP
-    // assert(false && "Trying to hoist something other than a GEP\n");
-    dbgs() << "Hoisting instruction with non-GEP pointer: " << *I << "\n";
-  }
 
   // TODO: if size != stride, need to be more careful about calculating range.
   //const SCEV *Size = SE->getElementSize(I);
@@ -2722,11 +2719,11 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
   const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
 
   // get instructions for calculating address range
-  BasicBlock *PreheaderBB = L->getLoopPreheader();
-  const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
-  SCEVExpander Expander(*SE, DL, "csi");
-  Value *RangeVal = Expander.expandCodeFor(RangeExpr, RangeExpr->getType(),
-                                           InsertPt);
+  // BasicBlock *PreheaderBB = L->getLoopPreheader();
+  // const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
+  // SCEVExpander Expander(*SE, DL, "csi");
+  Value *RangeSize = Expander.expandCodeFor(RangeExpr, RangeExpr->getType(),
+                                            InsertPt);
 
   CsiLoadStoreProperty Prop;
 
@@ -2736,13 +2733,13 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
     uint64_t LoadId = LoadFED.add(*LI);
 
     // TODO: Don't recalculate underlying objects
-    uint64_t LoadObjId = LoadObj.add(*LI, lookupUnderlyingObject(Addr));
+    uint64_t LoadObjId = LoadObj.add(*LI, lookupUnderlyingObject(ObjAddr));
     assert(LoadId == LoadObjId &&
            "Load received different ID's in FED and object tables.");
 
     Value *CsiId = LoadFED.localToGlobalId(LoadId, IRB);
-    Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(RangeVal, IntptrTy, false),
+    Value *Args[] = {CsiId, IRB.CreatePointerCast(RangeAddr, IRB.getInt8PtrTy()),
+                     IRB.CreateIntCast(RangeSize, IntptrTy, false),
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
     IRB.SetInstDebugLocation(Call);
@@ -2753,13 +2750,13 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
     uint64_t StoreId = StoreFED.add(*SI);
 
     // TODO: Don't recalculate underlying objects
-    uint64_t StoreObjId = StoreObj.add(*SI, lookupUnderlyingObject(Addr));
+    uint64_t StoreObjId = StoreObj.add(*SI, lookupUnderlyingObject(ObjAddr));
     assert(StoreId == StoreObjId &&
            "Store received different ID's in FED and object tables.");
 
     Value *CsiId = StoreFED.localToGlobalId(StoreId, IRB);
-    Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(RangeVal, IntptrTy, false),
+    Value *Args[] = {CsiId, IRB.CreatePointerCast(RangeAddr, IRB.getInt8PtrTy()),
+                     IRB.CreateIntCast(RangeSize, IntptrTy, false),
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
     IRB.SetInstDebugLocation(Call);
