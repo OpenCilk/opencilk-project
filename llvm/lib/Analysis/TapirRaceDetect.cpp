@@ -287,9 +287,9 @@ public:
   //   DenseMap<MemAccessInfo, SmallPtrSet<Value *, 1>>;
   using AccessToUnderlyingObjMap = RaceInfo::AccessToUnderlyingObjMap;
 
-  AccessPtrAnalysis(const DataLayout &DL, DominatorTree &DT,
-                    TaskInfo &TI, LoopInfo &LI, DependenceInfo &DI,
-                    ScalarEvolution &SE, const TargetLibraryInfo *TLI,
+  AccessPtrAnalysis(const DataLayout &DL, DominatorTree &DT, TaskInfo &TI,
+                    LoopInfo &LI, DependenceInfo &DI, ScalarEvolution &SE,
+                    const TargetLibraryInfo *TLI,
                     AccessToUnderlyingObjMap &AccessToObjs)
       : DL(DL), DT(DT), TI(TI), LI(LI), DI(DI), AA(DI.getAA()), SE(SE),
         TLI(TLI), AccessToObjs(AccessToObjs), MPTasksInLoop(LI) {
@@ -2116,11 +2116,11 @@ void RaceInfo::print(raw_ostream &OS) const {
       OS << " Ref";
     OS << "\n";
   }
-  OS << "RT pointer checks:\n";
-  for (auto &RtChecks : AllPtrRtChecks) {
-    OS << RtChecks.first->getHeader()->getName() << ":\n";
-    RtChecks.second->print(OS);
-  }
+  // OS << "RT pointer checks:\n";
+  // for (auto &RtChecks : AllPtrRtChecks) {
+  //   OS << RtChecks.first->getHeader()->getName() << ":\n";
+  //   RtChecks.second->print(OS);
+  // }
   // for (Loop *TopLevelLoop : LI)
   //   for (Loop *L : depth_first(TopLevelLoop))
   //     if (AllPtrRtChecks.count(L)) {
