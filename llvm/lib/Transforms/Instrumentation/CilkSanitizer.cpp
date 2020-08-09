@@ -26,6 +26,7 @@
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
+#include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpander.h"
 #include "llvm/Analysis/TapirRaceDetect.h"
@@ -60,8 +61,7 @@ STATISTIC(NumInstrumentedWrites, "Number of instrumented writes");
 STATISTIC(NumAccessesWithBadSize, "Number of accesses with bad size");
 STATISTIC(NumOmittedReadsBeforeWrite,
           "Number of reads ignored due to following writes");
-STATISTIC(NumOmittedReadsFromConstants,
-          "Number of reads from constant data");
+STATISTIC(NumOmittedReadsFromConstants, "Number of reads from constant data");
 STATISTIC(NumOmittedNonCaptured, "Number of accesses ignored due to capturing");
 STATISTIC(NumInstrumentedMemIntrinsicReads,
           "Number of instrumented reads from memory intrinsics");
@@ -74,10 +74,16 @@ STATISTIC(NumInstrumentedAllocas, "Number of instrumented allocas");
 STATISTIC(NumInstrumentedAllocFns,
           "Number of instrumented allocation functions");
 STATISTIC(NumInstrumentedFrees, "Number of instrumented free calls");
-STATISTIC(NumHoistedInstrumentedReads,
-          "Number of reads whose instrumentation has been hoisted");
-STATISTIC(NumHoistedInstrumentedWrites,
-          "Number of writes whose instrumentation has been hoisted");
+STATISTIC(
+    NumHoistedInstrumentedReads,
+    "Number of reads whose instrumentation has been coalesced and hoisted");
+STATISTIC(
+    NumHoistedInstrumentedWrites,
+    "Number of writes whose instrumentation has been coalesced and hoisted");
+STATISTIC(NumSunkInstrumentedReads,
+          "Number of reads whose instrumentation has been coalesced and sunk");
+STATISTIC(NumSunkInstrumentedWrites,
+          "Number of writes whose instrumentation has been coalesced and sunk");
 
 static cl::opt<bool>
     EnableStaticRaceDetection(
@@ -223,6 +229,9 @@ struct CilkSanitizerImpl : public CSIImpl {
     bool InstrumentAnyMemIntrinsics(
         SmallVectorImpl<Instruction *> &MemIntrinsics);
     bool InstrumentCalls(SmallVectorImpl<Instruction *> &Calls);
+    void GetDetachesForCoalescedInstrumentation(
+        SmallPtrSetImpl<Instruction *> &LoopInstToHoist,
+        SmallPtrSetImpl<Instruction *> &LoopInstToSink);
     bool InstrumentAncillaryInstructions(
         SmallPtrSetImpl<Instruction *> &Allocas,
         SmallPtrSetImpl<Instruction *> &AllocationFnCalls,
@@ -391,11 +400,10 @@ struct CilkSanitizerImpl : public CSIImpl {
   }
 
   bool instrumentLoadOrStoreHoisted(Instruction *I,
+                                    Value *Addr,
+                                    Value *RangeVal,
                                     IRBuilder<> &IRB,
-                                    Instruction *InsertPt,
-                                    LoopInfo &LI,
-                                    ScalarEvolution *SE,
-                                    Value *TripCountAlloca = nullptr);
+                                    uint64_t LocalId);
 
 private:
   // Analysis results
@@ -2441,6 +2449,51 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
   return Result;
 }
 
+// Helper function to walk the hierarchy of tasks containing BasicBlock BB to
+// get the top-level task in loop L that contains BB.
+static Task *GetTopLevelTaskFor(BasicBlock *BB, Loop *L, TaskInfo &TI) {
+  Task *T = TI.getTaskFor(BB);
+  // Return null if we don't find a task for BB contained in L.
+  if (!T || !L->contains(T->getEntry()))
+    return nullptr;
+
+  // Walk up the tree of tasks until we discover a task containing BB that is
+  // outside of L.
+  while (L->contains(T->getParentTask()->getEntry()))
+    T = T->getParentTask();
+
+  return T;
+}
+
+void CilkSanitizerImpl::Instrumentor::GetDetachesForCoalescedInstrumentation(
+    SmallPtrSetImpl<Instruction *> &LoopInstToHoist,
+    SmallPtrSetImpl<Instruction *> &LoopInstToSink) {
+  // Determine detaches to instrument for the coalesced instrumentation.
+  for (Instruction *I : LoopInstToHoist) {
+    Loop *L = LI.getLoopFor(I->getParent());
+    // Record the detaches for the loop preheader, where the coalesced
+    // instrumentation will be inserted.
+    getDetachesForInstruction(L->getLoopPreheader()->getTerminator());
+  }
+  for (Instruction *I : LoopInstToSink) {
+    Loop *L = LI.getLoopFor(I->getParent());
+    SmallVector<BasicBlock *, 4> ExitBlocks;
+    L->getUniqueExitBlocks(ExitBlocks);
+    for (BasicBlock *ExitBB : ExitBlocks) {
+      if (GetTopLevelTaskFor(ExitBB, L, TI))
+        // Skip any exit blocks in a Tapir task inside the loop.  These exit
+        // blocks lie on exception-handling paths, and to handle these blocks,
+        // it suffices to insert instrumentation in the unwind destination of
+        // the corresponding detach, which must also be a loop-exit block.
+        continue;
+
+      // Record the detaches for the exit block, where the coalesced
+      // instrumentation will be inserted.
+      getDetachesForInstruction(ExitBB->getTerminator());
+    }
+  }
+}
+
 bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
     SmallPtrSetImpl<Instruction *> &Allocas,
     SmallPtrSetImpl<Instruction *> &AllocationFnCalls,
@@ -2543,6 +2596,28 @@ static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE) {
   return TripCountSC;
 }
 
+// Helper function to find where in the given basic block to insert coalesced
+// instrumentation.
+static Instruction *getLoopBlockInsertPt(BasicBlock *BB, FunctionCallee LoopHook,
+                                         bool AfterHook) {
+  // BasicBlock *PreheaderBB = L->getLoopPreheader();
+  for (Instruction &I : *BB)
+    if (CallBase *CB = dyn_cast<CallBase>(&I))
+      if (const Function *Called = CB->getCalledFunction())
+        if (Called == LoopHook.getCallee()) {
+          // We found a call to the specified hook.  Pick an insertion point
+          // with respect to it.
+          if (AfterHook)
+            return &*CB->getIterator()->getNextNode();
+          else
+            return CB;
+        }
+
+  if (AfterHook)
+    return &*BB->getFirstInsertionPt();
+  else
+    return BB->getTerminator();
+}
 
 // TODO: Maybe to avoid confusion with CilkSanImpl.Options.InstrumentLoops
 // (which is unrelated to this), rename this to involve the word "hoist" or something.
@@ -2551,218 +2626,317 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     SmallPtrSetImpl<Instruction *> &LoopInstToSink, ScalarEvolution *SE) {
   bool Result = false;
 
-  // TODO: for now, only LoadInst and StoreInst (add atomics later)
+  // First insert computation for the hook arguments for all instructions to
+  // hoist or sink coalesced instrumentation.  We do this before inserting the
+  // hook calls themselves, so that changes to the CFG -- specifically, from
+  // inserting MAAP checks -- do not disrupt any function analyses we need.
+
+  // Map instructions in the loop to address and range arguments for coalesced
+  // instrumentation.
+  DenseMap<Instruction *, std::pair<Value *, Value *>> HoistedHookArgs;
+  // Compute arguments for coalesced instrumentation hoisted to before the loop.
   for (Instruction *I : LoopInstToHoist) {
-    // For now, there shouldn't be a reason to return false since we already
-    // verified the size, stride, and tripcount.
+    // Get the insertion point in the preheader of the loop.
     Loop *L = LI.getLoopFor(I->getParent());
-    Instruction *PreheaderTermInst = L->getLoopPreheader()->getTerminator();
-    IRBuilder<> IRB(PreheaderTermInst);
-    Instruction *CheckTerm = PreheaderTermInst;
-    if (MAAPChecks) {
-      Value *MAAPChk = getSuppressionCheck(I, IRB);
-      CheckTerm = SplitBlockAndInsertIfThen(
-          IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), PreheaderTermInst, false,
-          nullptr, DT, /*LI*/ nullptr);
-      IRB.SetInsertPoint(CheckTerm);
-    }
-    Result = true;
-    CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE);
+    assert(L->getLoopPreheader() && "No preheader for loop");
+    Instruction *PreheaderInsertPt =
+        getLoopBlockInsertPt(L->getLoopPreheader(), CilkSanImpl.CsanBeforeLoop,
+                             /*AfterHook*/ false);
+
+    // TODO: Unify this SCEV computation with the similar computation for
+    // instructions in LoopInstToSink.
+
+    // Get the SCEV describing this instruction's pointer
+    const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
+    const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
+
+    // Get the stride
+    const SCEV *StrideExpr = SrcAR->getStepRecurrence(*SE);
+    assert(!isa<SCEVCouldNotCompute>(StrideExpr) &&
+           "Stride should be computable");
+    bool NegativeStride = SE->isKnownNegative(StrideExpr);
+    if (NegativeStride)
+      StrideExpr = SE->getNegativeSCEV(StrideExpr);
+
+    // Get the first address accessed.
+    const SCEV *FirstAddr = SrcAR->getStart();
+
+    // Get the last address accessed.
+    BasicBlock *Latch = L->getLoopLatch();
+    const SCEV *BECount = SE->getExitCount(L, Latch);
+    const SCEV *LastAddr = SrcAR->evaluateAtIteration(BECount, *SE);
+
+    // Get the size (number of bytes) of the address range accessed.
+    const SCEV *RangeExpr = NegativeStride
+                                ? SE->getMinusSCEV(FirstAddr, LastAddr)
+                                : SE->getMinusSCEV(LastAddr, FirstAddr);
+    RangeExpr = SE->getAddExpr(RangeExpr, StrideExpr);
+
+    // Get the start (lowest address) of the address range accessed.
+    const SCEV *Addr = NegativeStride ? LastAddr : FirstAddr;
+
+    // Get instructions for calculating address range
+    const DataLayout &DL = CilkSanImpl.M.getDataLayout();
+    LLVMContext &Ctx = CilkSanImpl.M.getContext();
+    SCEVExpander Expander(*SE, DL, "cilksan");
+
+    Value *AddrVal = Expander.expandCodeFor(Addr, Type::getInt8PtrTy(Ctx),
+                                            PreheaderInsertPt);
+    Value *RangeVal = Expander.expandCodeFor(RangeExpr, Type::getInt64Ty(Ctx),
+                                             PreheaderInsertPt);
+    HoistedHookArgs[I] = std::make_pair(AddrVal, RangeVal);
   }
 
-  // map to keep track of which loops we have already created counters for
+  // Map pairs of instruction and loop-exit to address and range arguments for
+  // coalesced instrumentation.
+  DenseMap<std::pair<Instruction *, BasicBlock *>, std::pair<Value *, Value *>>
+      SunkHookArgs;
+  // Map to track which loops we have already created counters for
   SmallMapVector<Loop*, Value*, 8> LoopToCounterMap;
-
+  // Compute arguments for coalesced instrumentation sunk after the loop.
   for (Instruction *I : LoopInstToSink) {
+    // Get the loop
     Loop *L = LI.getLoopFor(I->getParent());
 
-    Value *CounterAlloca;
+    // Add a counter to count the number of iterations executed in this loop.
+    // In particular, this count will record the number of times the backedge of
+    // the loop is taken.
+    if (!LoopToCounterMap.count(L)) {
+      assert(L->getLoopPreheader() && "No preheader for loop");
+      assert(L->getLoopLatch() && "No unique latch for loop");
+      IRBuilder<> IRB(&L->getHeader()->front());
+      LLVMContext &Ctx = CilkSanImpl.M.getContext();
 
-    // create a counter for this loop if we haven't already done so
-    if (LoopToCounterMap.find(L) == LoopToCounterMap.end()) {
-      Instruction *PreheaderTermInst = L->getLoopPreheader()->getTerminator();
-      IRBuilder<> IRB(PreheaderTermInst);
-
-      // create the counter (64 bit, to be safe), and place in loop preheader
-      CounterAlloca = IRB.CreateAlloca(IRB.getInt64Ty());
-      IRB.CreateStore(ConstantInt::get(IRB.getInt64Ty(), 0), CounterAlloca);
-
-      // on every loop iteration, increment the counter
-      IRB.SetInsertPoint(I);
-      Value *LoadI = IRB.CreateLoad(CounterAlloca);
-      Value *AddI = IRB.CreateAdd(LoadI, ConstantInt::get(IRB.getInt64Ty(), 1));
-      IRB.CreateStore(AddI, CounterAlloca);
-
-      LoopToCounterMap.insert(std::make_pair(L, CounterAlloca));
-    } else {
-      CounterAlloca = LoopToCounterMap.find(L)->second;
+      PHINode *PN = IRB.CreatePHI(Type::getInt64Ty(Ctx), 2);
+      PN->addIncoming(ConstantInt::getNullValue(Type::getInt64Ty(Ctx)),
+                      L->getLoopPreheader());
+      IRB.SetInsertPoint(&*L->getLoopLatch()->getFirstInsertionPt());
+      Value *Add = IRB.CreateAdd(PN, ConstantInt::get(Type::getInt64Ty(Ctx), 1),
+                                 "", true, true);
+      PN->addIncoming(Add, L->getLoopLatch());
+      LoopToCounterMap.insert(std::make_pair(L, PN));
     }
 
-    // BasicBlock *ExitBB = L->getUniqueExitBlock();
+    // Get the counter for this loop.
+    Value *Counter = LoopToCounterMap[L];
+
+    // Get the SCEV describing this instruction's pointer
+    const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
+    const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
+
+    // Get the stride
+    const SCEV *StrideExpr = SrcAR->getStepRecurrence(*SE);
+    assert(!isa<SCEVCouldNotCompute>(StrideExpr) &&
+           "Stride should be computable");
+    bool NegativeStride = SE->isKnownNegative(StrideExpr);
+    if (NegativeStride)
+      StrideExpr = SE->getNegativeSCEV(StrideExpr);
+
+    // Get the first address accessed.
+    const SCEV *FirstAddr = SrcAR->getStart();
+
+    // Get the last address accessed, based on the counter value..
+    const SCEV *BECount = SE->getUnknown(Counter);
+    const SCEV *LastAddr = SrcAR->evaluateAtIteration(BECount, *SE);
+
+    // Get the size (number of bytes) of the address range accessed.
+    const SCEV *RangeExpr = NegativeStride
+                                ? SE->getMinusSCEV(FirstAddr, LastAddr)
+                                : SE->getMinusSCEV(LastAddr, FirstAddr);
+    RangeExpr = SE->getAddExpr(RangeExpr, StrideExpr);
+    // Get the start (lowest address) of the address range accessed.
+    const SCEV *Addr = NegativeStride ? LastAddr : FirstAddr;
+
+    // Expand SCEV's into instructions for calculating the coalesced hook
+    // arguments in each exit block.
+    LLVMContext &Ctx = CilkSanImpl.M.getContext();
+    const DataLayout &DL = CilkSanImpl.M.getDataLayout();
+    SCEVExpander Expander(*SE, DL, "cilksan");
     SmallVector<BasicBlock *, 4> ExitBlocks;
     L->getUniqueExitBlocks(ExitBlocks);
     for (BasicBlock *ExitBB : ExitBlocks) {
-      // after the loop, perform the coalesced read/write
-      // TODO: I'm not sure this'll work if there are multiple exit blocks...
-      BasicBlock::iterator FirstInsertPt = ExitBB->getFirstInsertionPt();
-      IRBuilder<> IRB(&*FirstInsertPt);
-      Instruction *CheckTerm = &*ExitBB->getFirstInsertionPt();
+      if (GetTopLevelTaskFor(ExitBB, L, TI))
+        // Skip any exit blocks in a Tapir task inside the loop.  These exit
+        // blocks lie on exception-handling paths, and to handle these blocks,
+        // it suffices to insert instrumentation in the unwind destination of
+        // the corresponding detach, which must also be a loop-exit block.
+        continue;
+
+      // Instruction *InsertPt = &*ExitBB->getFirstInsertionPt();
+      Instruction *InsertPt =
+          getLoopBlockInsertPt(ExitBB, CilkSanImpl.CsanAfterLoop,
+                               /*AfterHook*/ true);
+      Value *AddrVal =
+          Expander.expandCodeFor(Addr, Type::getInt8PtrTy(Ctx), InsertPt);
+      Value *RangeVal =
+          Expander.expandCodeFor(RangeExpr, Type::getInt64Ty(Ctx), InsertPt);
+
+      assert(isa<Instruction>(RangeVal) &&
+             "Expected computation of RangeVal to produce an instruction.");
+      SunkHookArgs[std::make_pair(I, ExitBB)] =
+          std::make_pair(AddrVal, RangeVal);
+    }
+  }
+
+  // Now insert coalesced instrumentation, including relevant MAAP checks.
+  //
+  // TODO: For now, we only handle LoadInst and StoreInst.  Add other operations
+  // later, such as atomics and memory intrinsics.
+
+  // Insert coalesced instrumentation hoisted before the loop.
+  for (Instruction *I : LoopInstToHoist) {
+    LLVM_DEBUG(dbgs() << "Loop instruction for hoisting instrumentation: " << *I
+                      << "\n");
+
+    // Get the local ID of this instruction.
+    uint64_t LocalId;
+    if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
+      uint64_t LoadId = CilkSanImpl.LoadFED.add(*LI);
+
+      // TODO: Don't recalculate underlying objects
+      uint64_t LoadObjId = CilkSanImpl.LoadObj.add(
+          *LI,
+          CilkSanImpl.lookupUnderlyingObject(getLoadStorePointerOperand(LI)));
+      assert(LoadId == LoadObjId &&
+             "Load received different ID's in FED and object tables.");
+      LocalId = LoadId;
+      // Update the statistic here, since we're guaranteed to insert the hook at
+      // this point.
+      ++NumHoistedInstrumentedReads;
+    } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+      uint64_t StoreId = CilkSanImpl.StoreFED.add(*SI);
+
+      // TODO: Don't recalculate underlying objects
+      uint64_t StoreObjId = CilkSanImpl.StoreObj.add(
+          *SI,
+          CilkSanImpl.lookupUnderlyingObject(getLoadStorePointerOperand(SI)));
+      assert(StoreId == StoreObjId &&
+             "Store received different ID's in FED and object tables.");
+      LocalId = StoreId;
+      // Update the statistic here, since we're guaranteed to insert the hook at
+      // this point.
+      ++NumHoistedInstrumentedWrites;
+    } else
+      llvm_unreachable("Unexpected instruction to hoist instrumentation.");
+
+    // For now, there shouldn't be a reason to return false since we already
+    // verified the size, stride, and tripcount.
+    Loop *L = LI.getLoopFor(I->getParent());
+    Instruction *PreheaderInsertPt =
+        getLoopBlockInsertPt(L->getLoopPreheader(), CilkSanImpl.CsanBeforeLoop,
+                             /*AfterLoop*/ false);
+    IRBuilder<> IRB(PreheaderInsertPt);
+    if (MAAPChecks) {
+      Value *MAAPChk = getSuppressionCheck(I, IRB);
+      Instruction *CheckTerm =
+          SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
+                                    PreheaderInsertPt, false, nullptr, DT, &LI);
+      IRB.SetInsertPoint(CheckTerm);
+    }
+
+    CilkSanImpl.instrumentLoadOrStoreHoisted(
+        I, HoistedHookArgs[I].first, HoistedHookArgs[I].second, IRB, LocalId);
+    Result = true;
+  }
+
+  // Insert coalesced instrumentation sunk after the loop.
+  for (Instruction *I : LoopInstToSink) {
+    LLVM_DEBUG(dbgs() << "Loop instruction for sinking instrumentation: " << *I
+                      << "\n");
+    Loop *L = LI.getLoopFor(I->getParent());
+
+    // Get the local ID of this instruction.  We do this computation early to
+    // avoid recomputing the local ID once per exit block.
+    uint64_t LocalId;
+    if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
+      uint64_t LoadId = CilkSanImpl.LoadFED.add(*LI);
+
+      // TODO: Don't recalculate underlying objects
+      uint64_t LoadObjId = CilkSanImpl.LoadObj.add(
+          *LI,
+          CilkSanImpl.lookupUnderlyingObject(getLoadStorePointerOperand(LI)));
+      assert(LoadId == LoadObjId &&
+             "Load received different ID's in FED and object tables.");
+      LocalId = LoadId;
+      // Update the statistic here, since we're guaranteed to insert the hooks
+      // at this point, and to avoid overcounting the number of instructions on
+      // loops with multiple exits.
+      ++NumSunkInstrumentedReads;
+    } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+      uint64_t StoreId = CilkSanImpl.StoreFED.add(*SI);
+
+      // TODO: Don't recalculate underlying objects
+      uint64_t StoreObjId = CilkSanImpl.StoreObj.add(
+          *SI,
+          CilkSanImpl.lookupUnderlyingObject(getLoadStorePointerOperand(SI)));
+      assert(StoreId == StoreObjId &&
+             "Store received different ID's in FED and object tables.");
+      LocalId = StoreId;
+      // Update the statistic here, since we're guaranteed to insert the hooks
+      // at this point, and to avoid overcounting the number of instructions on
+      // loops with multiple exits.
+      ++NumSunkInstrumentedWrites;
+    } else
+      llvm_unreachable("Unexpected instruction to sink instrumentation.");
+
+    SmallVector<BasicBlock *, 4> ExitBlocks;
+    L->getUniqueExitBlocks(ExitBlocks);
+    for (BasicBlock *ExitBB : ExitBlocks) {
+      if (GetTopLevelTaskFor(ExitBB, L, TI))
+        // Skip any exit blocks in a Tapir task inside the loop.  These exit
+        // blocks lie on exception-handling paths, and to handle these blocks,
+        // it suffices to insert instrumentation in the unwind destination of
+        // the corresponding detach, which must also be a loop-exit block.
+        continue;
+
+      // After the loop, perform the coalesced read/write.
+      auto HookArgsKey = std::make_pair(I, ExitBB);
+
+      // Insert the hook call after the computation of RangeVal.
+      Instruction *InsertPt =
+          cast<Instruction>(SunkHookArgs[HookArgsKey].second)
+              ->getIterator()
+              ->getNextNode();
+      IRBuilder<> IRB(&*InsertPt);
       if (MAAPChecks) {
         Value *MAAPChk = getSuppressionCheck(I, IRB);
-        CheckTerm = SplitBlockAndInsertIfThen(
-            IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), &*FirstInsertPt, false,
-            nullptr, DT, /*LI*/ nullptr);
+        Instruction *CheckTerm =
+            SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
+                                      &*InsertPt, false, nullptr, DT, &LI);
         IRB.SetInsertPoint(CheckTerm);
       }
+
+      CilkSanImpl.instrumentLoadOrStoreHoisted(
+          I, SunkHookArgs[HookArgsKey].first, SunkHookArgs[HookArgsKey].second,
+          IRB, LocalId);
       Result = true;
-      CilkSanImpl.instrumentLoadOrStoreHoisted(I, IRB, CheckTerm, LI, SE,
-                                               CounterAlloca);
     }
   }
 
   return Result;
 }
 
-bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(Instruction *I,
-                                                     IRBuilder<> &IRB,
-                                                     Instruction *InsertPt,
-                                                     LoopInfo &LI,
-                                                     ScalarEvolution *SE,
-                                                     Value *TripCountAlloca) {
-  // get loop
-  Loop *L = LI.getLoopFor(I->getParent());
-  BasicBlock *PreheaderBB = L->getLoopPreheader();
-
-  // get SCEV expander
-  const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
-  SCEVExpander Expander(*SE, DL, "csi");
-
-  // get size and stride (stride casted to i64)
-
-  // TODO: if size != stride, need to be more careful about calculating range.
-  //const SCEV *Size = SE->getElementSize(I);
-  const SCEV *V = SE->getSCEV(getLoadStorePointerOperand(I));
-  const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V);
-
-  // can be negative
-  const SCEV *StrideExpr = SrcAR->getStepRecurrence(*SE);
-
-  // get abs value of stride
-  const SCEV *StrideAbs = SE->isKnownNonNegative(StrideExpr) ?
-                          StrideExpr :
-                          SE->getMinusSCEV(SE->getZero(StrideExpr->getType()),
-                                                       StrideExpr);
-
-  // always will be positive 64-bit int
-  const SCEV *Stride;
-  if (StrideAbs->getType()->getPrimitiveSizeInBits() < 64) {
-    Stride = SE->getSignExtendExpr(StrideAbs, IRB.getInt64Ty());
-  } else {
-    Stride = StrideAbs;
-  }
-  assert (!isa<SCEVCouldNotCompute>(Stride) && "Stride should be computable");
-
-  // get trip count (casted to i64)
-  const SCEV *TripCount;
-  if (TripCountAlloca) {
-    // TripCountAlloca is already 64 bits
-    Value *TripCountLoad = IRB.CreateLoad(TripCountAlloca);
-    TripCount = SE->getUnknown(TripCountLoad);
-  } else {
-    const SCEV *TripCountExpr = getRuntimeTripCount(*L, SE);
-
-    if (TripCountExpr->getType()->getPrimitiveSizeInBits() < 64) {
-      TripCount = SE->getSignExtendExpr(TripCountExpr, IRB.getInt64Ty());
-    } else {
-      TripCount = TripCountExpr;
-    }
-    assert (!isa<SCEVCouldNotCompute>(TripCount) &&
-            "TripCount should be computable");
-  }
-
-  // get address range start
-  Value *ptr = getLoadStorePointerOperand(I);
-  Value *ObjAddr;
-  Value *RangeAddr;
-
-  // TODO: what if not a GEP or Phi node?
-  if (isa<GetElementPtrInst>(ptr) || isa<PHINode>(ptr)) {
-    // Vevaluate this ptr at index 0
-    if (isa<GetElementPtrInst>(ptr)) {
-      ObjAddr = cast<GetElementPtrInst>(ptr)->getPointerOperand();
-    } else {
-      ObjAddr = ptr;
-    }
-    const SCEV *RangeAddrSCEV = SE->getSCEV(ptr);
-    if (const SCEVAddRecExpr *RangeAddrAddRecExpr = dyn_cast<SCEVAddRecExpr>(RangeAddrSCEV)) {
-      const SCEV *RangeAddrStartSCEV;
-      if (SE->isKnownNonNegative(StrideExpr)) {
-        // if our stride is positive, addr start is the start of the loop.
-        RangeAddrStartSCEV = RangeAddrAddRecExpr->getStart();
-      } else {
-        // if our stride is negative, addr start is the end of the loop.
-        const SCEV *BackedgeTakenCount = SE->getMinusSCEV(TripCount,
-                                                  SE->getOne(IRB.getInt64Ty()));
-        RangeAddrStartSCEV = RangeAddrAddRecExpr->evaluateAtIteration(
-                                            BackedgeTakenCount, *SE);
-      }
-      RangeAddr = Expander.expandCodeFor(RangeAddrStartSCEV,
-                                         RangeAddrStartSCEV->getType(),
-                                         InsertPt);
-    }
-  } else {
-    // fail the moment we see something other than a GEP or Phi node
-    assert(false && "Trying to hoist something other than a GEP\n");
-  }
-
-  // get address range size
-  const SCEV *RangeExpr = SE->getMulExpr(Stride, TripCount);
-
-  // get instructions for calculating address range
-  // BasicBlock *PreheaderBB = L->getLoopPreheader();
-  // const DataLayout &DL = PreheaderBB->getModule()->getDataLayout();
-  // SCEVExpander Expander(*SE, DL, "csi");
-  Value *RangeSize = Expander.expandCodeFor(RangeExpr, RangeExpr->getType(),
-                                            InsertPt);
-
+bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(
+    Instruction *I, Value *Addr, Value *Size, IRBuilder<> &IRB, uint64_t LocalId) {
+  // The caller of this method is guaranteed to have computed the Addr and Size
+  // values with the right type for the hook, so no additional type conversions
+  // are needed.
   CsiLoadStoreProperty Prop;
-
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
     Prop.setAlignment(LI->getAlignment());
     // Instrument the load
-    uint64_t LoadId = LoadFED.add(*LI);
-
-    // TODO: Don't recalculate underlying objects
-    uint64_t LoadObjId = LoadObj.add(*LI, lookupUnderlyingObject(ObjAddr));
-    assert(LoadId == LoadObjId &&
-           "Load received different ID's in FED and object tables.");
-
-    Value *CsiId = LoadFED.localToGlobalId(LoadId, IRB);
-    Value *Args[] = {CsiId, IRB.CreatePointerCast(RangeAddr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(RangeSize, IntptrTy, false),
-                     Prop.getValue(IRB)};
+    Value *CsiId = LoadFED.localToGlobalId(LocalId, IRB);
+    Value *Args[] = {CsiId, Addr, Size, Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
     IRB.SetInstDebugLocation(Call);
-    ++NumHoistedInstrumentedReads;
   } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
     Prop.setAlignment(SI->getAlignment());
     // Instrument the store
-    uint64_t StoreId = StoreFED.add(*SI);
-
-    // TODO: Don't recalculate underlying objects
-    uint64_t StoreObjId = StoreObj.add(*SI, lookupUnderlyingObject(ObjAddr));
-    assert(StoreId == StoreObjId &&
-           "Store received different ID's in FED and object tables.");
-
-    Value *CsiId = StoreFED.localToGlobalId(StoreId, IRB);
-    Value *Args[] = {CsiId, IRB.CreatePointerCast(RangeAddr, IRB.getInt8PtrTy()),
-                     IRB.CreateIntCast(RangeSize, IntptrTy, false),
-                     Prop.getValue(IRB)};
+    Value *CsiId = StoreFED.localToGlobalId(LocalId, IRB);
+    Value *Args[] = {CsiId, Addr, Size, Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
     IRB.SetInstDebugLocation(Call);
-    ++NumHoistedInstrumentedWrites;
   }
-
   return true;
 }
 
@@ -2855,6 +3029,8 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   TaskInfo &TI = GetTaskInfo(F);
   RaceInfo &RI = GetRaceInfo(F);
 
+  ICFLoopSafetyInfo SafetyInfo(DT);
+
   // ScalarEvolution &SE = (*GetScalarEvolution)(F);
   ScalarEvolution &SE = *(RI.getSE());
 
@@ -2868,11 +3044,11 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
     // Record the memory accesses in the basic block
     for (Instruction &Inst : BB) {
-
-      bool can_coalesce = false;
+      bool canCoalesce = false;
       // if the instruction is in a loop and can only race via ancestor,
-      // and size < stride, it can be hoisted
-      if (L && EnableStaticRaceDetection && LoopHoisting) {
+      // and size < stride, store it.
+      if (L && EnableStaticRaceDetection && LoopHoisting &&
+          SafetyInfo.isGuaranteedToExecute(Inst, DT, &TI, L)) {
         // TODO: for now, only look @ loads and stores. Add atomics later.
         //       Need to add any others?
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
@@ -2906,7 +3082,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
               const SCEV* TripCount = getRuntimeTripCount(*L, &SE);
 
               if (SE.isKnownNonNegative(Diff)) {
-                can_coalesce = true;
+                canCoalesce = true;
                 if (!isa<SCEVCouldNotCompute>(TripCount)) {
                   // can hoist if |stride| <= |size| and the tripcount is known
                   LoopInstToHoist.insert(&Inst);
@@ -2920,7 +3096,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
         }
       }
 
-      if (!can_coalesce) {
+      if (!canCoalesce) {
         // TODO: Handle VAArgInst
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst))
           LocalLoadsAndStores.push_back(&Inst);
@@ -3010,6 +3186,11 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
     Result |= FuncI.InstrumentSimpleInstructions(AtomicAccesses);
     Result |= FuncI.InstrumentAnyMemIntrinsics(MemIntrinCalls);
     Result |= FuncI.InstrumentCalls(Callsites);
+
+    // Find detaches that need to be instrumented for loop instructions whose
+    // instrumentation will be coalesced.
+    FuncI.GetDetachesForCoalescedInstrumentation(LoopInstToHoist,
+                                                 LoopInstToSink);
 
     // Instrument ancillary instructions including allocas, allocation-function
     // calls, free calls, detaches, and syncs.
