@@ -2575,10 +2575,15 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
 }
 
 // Helper function to get a value for the runtime trip count of the given loop.
-static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE) {
+static const SCEV *getRuntimeTripCount(Loop &L, ScalarEvolution *SE,
+                                       bool IsTapirLoop) {
   BasicBlock *Latch = L.getLoopLatch();
 
-  const SCEV *BECountSC = SE->getExitCount(&L, Latch);
+  // The exit count from the latch is sufficient for Tapir loops, because early
+  // exits from such loops are handled in a special manner.  For other loops, we
+  // use the backedge taken count.
+  const SCEV *BECountSC =
+      IsTapirLoop ? SE->getExitCount(&L, Latch) : SE->getBackedgeTakenCount(&L);
   if (isa<SCEVCouldNotCompute>(BECountSC) ||
       !BECountSC->getType()->isIntegerTy()) {
     LLVM_DEBUG(dbgs() << "Could not compute exit block SCEV\n");
@@ -3079,16 +3084,20 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                 // SE.isKnownNonNegative(Diff) will be false.
                 Diff = SE.getAddExpr(Size, Stride);
               }
-              const SCEV* TripCount = getRuntimeTripCount(*L, &SE);
+              const SCEV *TripCount = getRuntimeTripCount(
+                  *L, &SE, static_cast<bool>(getTaskIfTapirLoop(L, &TI)));
 
               if (SE.isKnownNonNegative(Diff)) {
-                canCoalesce = true;
                 if (!isa<SCEVCouldNotCompute>(TripCount)) {
                   // can hoist if |stride| <= |size| and the tripcount is known
                   LoopInstToHoist.insert(&Inst);
-                } else {
-                  // can sink if |stride| <= |size| and the tripcount is unknown
+                  canCoalesce = true;
+                } else if (!isa<SCEVCouldNotCompute>(
+                               SE.getMaxBackedgeTakenCount(L))) {
+                  // can sink if |stride| <= |size| and the tripcount is
+                  // unknown, but the loop is guaranteed finite.
                   LoopInstToSink.insert(&Inst);
+                  canCoalesce = true;
                 }
               }
             }
@@ -3812,7 +3821,7 @@ void CilkSanitizerImpl::instrumentTapirLoop(Loop &L, TaskInfo &TI,
   // of -1 for unknown trip counts.
   Value *TripCount = IRB.getInt64(-1);
   if (SE) {
-    const SCEV *TripCountSC = getRuntimeTripCount(L, SE);
+    const SCEV *TripCountSC = getRuntimeTripCount(L, SE, true);
     if (!isa<SCEVCouldNotCompute>(TripCountSC)) {
       // Extend the TripCount type if necessary.
       if (TripCountSC->getType() != IRB.getInt64Ty())
