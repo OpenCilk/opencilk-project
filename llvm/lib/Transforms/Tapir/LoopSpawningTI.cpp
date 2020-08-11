@@ -1173,6 +1173,40 @@ static void updateClonedIVs(
   }
 }
 
+namespace {
+// ValueMaterializer to manage remapping uses of the tripcount in the helper
+// function for the loop, when the only uses of tripcount occur in the condition
+// for the loop backedge and, possibly, in metadata.
+class ArgEndMaterializer final : public ValueMaterializer {
+private:
+  Value *TripCount;
+  Value *ArgEnd;
+public:
+  ArgEndMaterializer(Value *TripCount, Value *ArgEnd)
+      : TripCount(TripCount), ArgEnd(ArgEnd) {}
+
+  Value *materialize(Value *V) final {
+    // If we're materializing metadata for TripCount, materialize empty metadata
+    // instead.
+    if (auto *MDV = dyn_cast<MetadataAsValue>(V)) {
+      Metadata *MD = MDV->getMetadata();
+      if (auto *LAM = dyn_cast<LocalAsMetadata>(MD))
+        if (LAM->getValue() == TripCount)
+          return MetadataAsValue::get(V->getContext(),
+                                      MDTuple::get(V->getContext(), None));
+    }
+
+    // Materialize TripCount with ArgEnd.  This should only occur in the loop
+    // latch, and we'll overwrite the use of ArgEnd later.
+    if (V == TripCount)
+      return ArgEnd;
+
+    // Otherwise go with the default behavior.
+    return nullptr;
+  }
+};
+}
+
 /// Outline Tapir loop \p TL into a helper function.  The \p Args set specified
 /// the arguments to that helper function.  The map \p VMap will store the
 /// mapping of values in the original function to values in the outlined helper.
@@ -1202,12 +1236,15 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
 
   DetachInst *DI = T->getDetach();
   const Instruction *InputSyncRegion =
-    dyn_cast<Instruction>(DI->getSyncRegion());
+      dyn_cast<Instruction>(DI->getSyncRegion());
 
+  ArgEndMaterializer *Mat = nullptr;
   // If the trip count is variable and we're not otherwise passing the trip
   // count as an argument, temporarily map the trip count to the end argument.
-  if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount()))
-    VMap[TL->getTripCount()] = Args[LimitArgIndex];
+  if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount())) {
+    // Create an ArgEndMaterializer to handle uses of TL->getTripCount().
+    Mat = new ArgEndMaterializer(TL->getTripCount(), Args[LimitArgIndex]);
+  }
 
   Twine NameSuffix = ".ls" + Twine(TL->getLoop()->getLoopDepth());
   SmallVector<ReturnInst *, 4> Returns;  // Ignore returns cloned.
@@ -1224,7 +1261,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
                  F.getSubprogram() != nullptr, Returns,
                  NameSuffix.str(), nullptr, &DetachedRethrowBlocks,
                  &SharedEHEntries, TL->getUnwindDest(), &UnreachableExits,
-                 InputSyncRegion, nullptr, nullptr, nullptr, nullptr);
+                 InputSyncRegion, nullptr, nullptr, nullptr, Mat);
   } // end timed region
 
   assert(Returns.empty() && "Returns cloned when cloning detached CFG.");
@@ -1247,9 +1284,11 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
 
   // If the trip count is variable and we're not passing the trip count as an
   // argument, undo the eariler temporarily mapping.
-  if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount()))
-    // If we need to remap the trip count, map it to the end-iteration argument.
+  if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount())) {
     VMap.erase(TL->getTripCount());
+    // Delete the ArgEndMaterializer.
+    delete Mat;
+  }
 
   // Rewrite cloned IV's to start at their start-iteration arguments.
   updateClonedIVs(TL, Preheader, Args, VMap, IVArgIndex);
