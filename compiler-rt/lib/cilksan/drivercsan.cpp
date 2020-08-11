@@ -800,9 +800,14 @@ void __csan_after_allocfn(const csi_id_t allocfn_id, const void *addr,
       }
 
       if (iter != malloc_sizes.end()) {
-        // Take note of the freeing of the old memory.
-        CilkSanImpl.record_free((uintptr_t)oldaddr, iter->second, allocfn_id,
-                                MAType_t::REALLOC);
+        if (!(*parallel_execution.head())) {
+          CilkSanImpl.clear_alloc((size_t)oldaddr, iter->second);
+          CilkSanImpl.clear_shadow_memory((size_t)oldaddr, iter->second);
+        } else {
+          // Take note of the freeing of the old memory.
+          CilkSanImpl.record_free((uintptr_t)oldaddr, iter->second, allocfn_id,
+                                  MAType_t::REALLOC);
+        }
         malloc_sizes.erase(iter);
       }
     } else {
@@ -813,10 +818,17 @@ void __csan_after_allocfn(const csi_id_t allocfn_id, const void *addr,
           CilkSanImpl.clear_shadow_memory((size_t)addr + old_size,
                                           new_size - old_size);
         } else if (old_size > new_size) {
-          // Take note of the effective free of the old space.
-          CilkSanImpl.record_free((uintptr_t)oldaddr + new_size,
-                                  old_size - new_size, allocfn_id,
-                                  MAType_t::REALLOC);
+          if (!(*parallel_execution.head())) {
+            CilkSanImpl.clear_alloc((size_t)addr + old_size,
+                                    new_size - old_size);
+            CilkSanImpl.clear_shadow_memory((size_t)addr + old_size,
+                                            new_size - old_size);
+          } else {
+            // Take note of the effective free of the old space.
+            CilkSanImpl.record_free((uintptr_t)oldaddr + new_size,
+                                    old_size - new_size, allocfn_id,
+                                    MAType_t::REALLOC);
+          }
         }
         CilkSanImpl.record_alloc((size_t)addr, new_size, 2 * allocfn_id + 1);
         malloc_sizes.erase(iter);
@@ -857,12 +869,16 @@ void __csan_after_free(const csi_id_t free_id, const void *ptr,
   auto iter = malloc_sizes.find((uintptr_t)ptr);
   if (iter != malloc_sizes.end()) {
     // cilksan_clear_shadow_memory((size_t)ptr, iter->second);
-
-    // Treat a free as a write to all freed addresses.  This way the tool will
-    // report a race if an operation tries to access a location that was freed
-    // in parallel.
-    CilkSanImpl.record_free((uintptr_t)ptr, iter->second, free_id,
-                            MAType_t::FREE);
+    if (!(*parallel_execution.head())) {
+      CilkSanImpl.clear_alloc((size_t)ptr, iter->second);
+      CilkSanImpl.clear_shadow_memory((size_t)ptr, iter->second);
+    } else {
+      // Treat a free as a write to all freed addresses.  This way the tool will
+      // report a race if an operation tries to access a location that was freed
+      // in parallel.
+      CilkSanImpl.record_free((uintptr_t)ptr, iter->second, free_id,
+                              MAType_t::FREE);
+    }
     malloc_sizes.erase(iter);
   }
 }
