@@ -3088,14 +3088,16 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                   *L, &SE, static_cast<bool>(getTaskIfTapirLoop(L, &TI)));
 
               if (SE.isKnownNonNegative(Diff)) {
-                if (!isa<SCEVCouldNotCompute>(TripCount)) {
+                if (!isa<SCEVCouldNotCompute>(TripCount) &&
+                    SE.isAvailableAtLoopEntry(SrcAR->getStart(), L)) {
                   // can hoist if |stride| <= |size| and the tripcount is known
+                  // and the start is available at loop entry.
                   LoopInstToHoist.insert(&Inst);
                   canCoalesce = true;
                 } else if (!isa<SCEVCouldNotCompute>(
                                SE.getMaxBackedgeTakenCount(L))) {
                   // can sink if |stride| <= |size| and the tripcount is
-                  // unknown, but the loop is guaranteed finite.
+                  // unknown but guaranteed to be finite.
                   LoopInstToSink.insert(&Inst);
                   canCoalesce = true;
                 }
