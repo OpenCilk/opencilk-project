@@ -1203,22 +1203,24 @@ void *mremap(void *start, size_t old_len, size_t len, int flags, ...) {
 
 #endif  // CILKSAN_DYNAMIC
 
-/// Wrapping for merge_two_rmaps Cilk runtime method for performing reduce
-/// operations on reducer views.
+/// Wrapping for __cilkrts_internal_merge_two_rmaps Cilk runtime method for
+/// performing reduce operations on reducer views.
 
 struct cilkred_map;
 struct __cilkrts_worker;
 
-// Wrapped merge_two_rmaps method for dynamic interpositioning.
+// Wrapped __cilkrts_internal_merge_two_rmaps method for dynamic
+// interpositioning.
 typedef cilkred_map *(*merge_two_rmaps_t)(__cilkrts_worker *const,
                                           cilkred_map *, cilkred_map *);
 static merge_two_rmaps_t dl_merge_two_rmaps = NULL;
 
-__attribute__((weak)) CILKSAN_API
-cilkred_map *merge_two_rmaps(__cilkrts_worker *const ws,
-                             cilkred_map *left, cilkred_map *right) {
+__attribute__((weak)) CILKSAN_API cilkred_map *
+__cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
+                                   cilkred_map *left, cilkred_map *right) {
   if (__builtin_expect(dl_merge_two_rmaps == NULL, 0)) {
-    dl_merge_two_rmaps = (merge_two_rmaps_t)dlsym(RTLD_NEXT, "merge_two_rmaps");
+    dl_merge_two_rmaps = (merge_two_rmaps_t)dlsym(
+        RTLD_NEXT, "__cilkrts_internal_merge_two_rmaps");
     char *error = dlerror();
     if (error != NULL) {
       fputs(error, err_io);
@@ -1233,18 +1235,19 @@ cilkred_map *merge_two_rmaps(__cilkrts_worker *const ws,
   return res;
 }
 
-/// Wrapped merge_two_rmaps method for link-time interpositioning.
-__attribute__((weak)) CILKSAN_API
-cilkred_map *__real_merge_two_rmaps(__cilkrts_worker *const ws,
-                                    cilkred_map *left, cilkred_map *right) {
-  return merge_two_rmaps(ws, left, right);
+/// Wrapped __cilkrts_internal_merge_two_rmaps method for link-time interpositioning.
+__attribute__((weak)) CILKSAN_API cilkred_map *
+__real___cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
+                                          cilkred_map *left,
+                                          cilkred_map *right) {
+  return __cilkrts_internal_merge_two_rmaps(ws, left, right);
 }
 
 CILKSAN_API
-cilkred_map *__wrap_merge_two_rmaps(__cilkrts_worker *const ws,
-                                    cilkred_map *left, cilkred_map *right) {
+cilkred_map *__wrap___cilkrts_internal_merge_two_rmaps(
+    __cilkrts_worker *const ws, cilkred_map *left, cilkred_map *right) {
   disable_checking();
-  cilkred_map *res = __real_merge_two_rmaps(ws, left, right);
+  cilkred_map *res = __real___cilkrts_internal_merge_two_rmaps(ws, left, right);
   enable_checking();
   return res;
 }
