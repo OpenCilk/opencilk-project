@@ -2832,7 +2832,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
                              /*AfterLoop*/ false);
     IRBuilder<> IRB(PreheaderInsertPt);
     if (MAAPChecks) {
-      Value *MAAPChk = getSuppressionCheck(I, IRB);
+      Value *MAAPChk = getMAAPCheck(I, IRB);
       Instruction *CheckTerm =
           SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
                                     PreheaderInsertPt, false, nullptr, DT, &LI);
@@ -2904,7 +2904,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
               ->getNextNode();
       IRBuilder<> IRB(&*InsertPt);
       if (MAAPChecks) {
-        Value *MAAPChk = getSuppressionCheck(I, IRB);
+        Value *MAAPChk = getMAAPCheck(I, IRB);
         Instruction *CheckTerm =
             SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
                                       &*InsertPt, false, nullptr, DT, &LI);
