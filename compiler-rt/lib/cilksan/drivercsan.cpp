@@ -819,10 +819,10 @@ void __csan_after_allocfn(const csi_id_t allocfn_id, const void *addr,
                                           new_size - old_size);
         } else if (old_size > new_size) {
           if (!(*parallel_execution.head())) {
-            CilkSanImpl.clear_alloc((size_t)addr + old_size,
-                                    new_size - old_size);
-            CilkSanImpl.clear_shadow_memory((size_t)addr + old_size,
-                                            new_size - old_size);
+            CilkSanImpl.clear_alloc((size_t)oldaddr + new_size,
+                                    old_size - new_size);
+            CilkSanImpl.clear_shadow_memory((size_t)oldaddr + new_size,
+                                            old_size - new_size);
           } else {
             // Take note of the effective free of the old space.
             CilkSanImpl.record_free((uintptr_t)oldaddr + new_size,
