@@ -34,7 +34,7 @@
 #include <cilk/reducer_ostream.h>
 #endif
 
-extern int __cilkrts_get_worker_number(void);
+extern unsigned __cilkrts_get_worker_number(void);
 
 ///////////////////////////////////////////////////////////////////////////
 // Data structures for tracking work and span.
