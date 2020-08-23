@@ -123,8 +123,8 @@ public:
   void do_enter_end(uintptr_t stack_ptr);
   void do_detach_begin();
   void do_detach_end();
+  void do_detach_continue();
   void do_loop_begin() {
-    update_strand_stats();
     start_new_loop = true;
   }
   void do_loop_iteration_begin(uintptr_t stack_ptr, unsigned num_sync_reg);
