@@ -91,6 +91,22 @@ public:
   }
 
   /*
+   * Simulate entering a function.  Effectively pushes a new
+   * STACK_DATA_T onto the head of the call stack.
+   */
+  void push_back(STACK_DATA_T val) {
+    push();
+    _stack[_head] = val;
+  }
+
+  STACK_DATA_T &back() const {
+    return _stack[_head];
+  }
+  STACK_DATA_T &from_back(uint32_t i) const {
+    return _stack[_head - i];
+  }
+
+  /*
    * Simulate exiting a function.  Effectively pops the head
    * STACK_DATA_T off of the stack.
    */
@@ -108,7 +124,7 @@ public:
    * @param i the ancestor for the call at the head of the stack,
    * where i = 0 indicates the head of the call stack.
    */
-  STACK_DATA_T* ancestor(uint32_t i) const {
+  STACK_DATA_T *ancestor(uint32_t i) const {
     cilksan_assert(i <= _head);
     cilksan_assert(_head < _capacity);
     return &(_stack[_head - i]);
@@ -121,7 +137,7 @@ public:
    * @param i the index of the stack element,
    * where element at index 0 is the oldest element.
    */
-  STACK_DATA_T* at(uint32_t i) const {
+  STACK_DATA_T *at(uint32_t i) const {
     cilksan_assert(i >= 0 && i <= _head);
     cilksan_assert(_head < _capacity);
     return &(_stack[i]);
@@ -130,7 +146,7 @@ public:
   /*
    * Retrieves the STACK_DATA_T at the head of the call stack.
    */
-  STACK_DATA_T* head() const {
+  STACK_DATA_T *head() const {
     return ancestor(0);
   }
 
