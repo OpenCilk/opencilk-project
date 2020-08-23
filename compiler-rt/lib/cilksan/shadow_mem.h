@@ -72,6 +72,11 @@ public:
 
   void init(CilkSanImpl_t &CilkSanImpl);
 
+  bool setOccupied(bool is_read, uintptr_t addr, size_t mem_size);
+  void clearOccupied();
+
+  void freePages();
+
   // Inserts access, and replaces any that are already in the shadow memory.
   template<bool is_read>
   void insert_access(const csi_id_t acc_id, uintptr_t addr, size_t mem_size,
