@@ -80,19 +80,19 @@ call_stack_node_t *call_stack_node_t::free_list = nullptr;
 CilkSanImpl_t CilkSanImpl;
 
 // Initialize custom memory allocators for dictionaries in shadow memory.
-template<>
-MALineAllocator &SimpleDictionary<0>::MAAlloc =
-  CilkSanImpl.getMALineAllocator(0);
-template<>
-MALineAllocator &SimpleDictionary<1>::MAAlloc =
-  CilkSanImpl.getMALineAllocator(1);
-template<>
-MALineAllocator &SimpleDictionary<2>::MAAlloc =
-  CilkSanImpl.getMALineAllocator(2);
+template <>
+MALineAllocator &
+    SimpleDictionary<0>::MAAlloc = CilkSanImpl.getMALineAllocator(0);
+template <>
+MALineAllocator &
+    SimpleDictionary<1>::MAAlloc = CilkSanImpl.getMALineAllocator(1);
+template <>
+MALineAllocator &
+    SimpleDictionary<2>::MAAlloc = CilkSanImpl.getMALineAllocator(2);
 
-template<>
-DisjointSet_t<SPBagInterface *>::DJSAllocator
-&DisjointSet_t<SPBagInterface *>::Alloc = CilkSanImpl.getDJSAllocator();
+template <>
+DisjointSet_t<SPBagInterface *>::DJSAllocator &
+    DisjointSet_t<SPBagInterface *>::Alloc = CilkSanImpl.getDJSAllocator();
 
 ////////////////////////////////////////////////////////////////////////
 // Events functions
@@ -391,7 +391,6 @@ void CilkSanImpl_t::do_enter_end(uintptr_t stack_ptr) {
   WHEN_CILKSAN_DEBUG(last_event = NONE);
   DBG_TRACE(DEBUG_CALLBACK, "cilk_enter_end, frame stack ptr: %p\n", stack_ptr);
 
-  update_strand_stats();
 }
 
 void CilkSanImpl_t::do_detach_begin() {
@@ -400,6 +399,7 @@ void CilkSanImpl_t::do_detach_begin() {
   WHEN_CILKSAN_DEBUG(last_event = DETACH);
 
   update_strand_stats();
+  shadow_memory.clearOccupied();
 }
 
 void CilkSanImpl_t::do_detach_end() {
@@ -426,6 +426,14 @@ void CilkSanImpl_t::do_detach_end() {
   //   parent->set_pbag(parent_pbag);
   // }
   // enter_detach_child();
+}
+
+void CilkSanImpl_t::do_detach_continue() {
+  cilksan_assert(CILKSAN_INITIALIZED);
+  DBG_TRACE(DEBUG_CALLBACK, "cilk_detach_continue\n");
+
+  update_strand_stats();
+  shadow_memory.clearOccupied();
 }
 
 void CilkSanImpl_t::do_loop_iteration_begin(uintptr_t stack_ptr,
@@ -459,6 +467,7 @@ void CilkSanImpl_t::do_loop_iteration_begin(uintptr_t stack_ptr,
     func->Iterbag->get_node()->set_rsp(stack_ptr);
 
     update_strand_stats();
+    shadow_memory.clearOccupied();
   }
 }
 
@@ -467,6 +476,7 @@ void CilkSanImpl_t::do_loop_iteration_end() {
   //     frame_stack.head()->Sbag->get_node()->get_version());
 
   update_strand_stats();
+  shadow_memory.clearOccupied();
 
   // At the end of each iteration, update the LOOP_FRAME for reuse.
   DBG_TRACE(DEBUG_CALLBACK, "do_loop_iteration_end()\n");
@@ -570,6 +580,7 @@ void CilkSanImpl_t::do_sync_begin() {
   WHEN_CILKSAN_DEBUG(last_event = CILK_SYNC);
 
   update_strand_stats();
+  shadow_memory.clearOccupied();
 }
 
 void CilkSanImpl_t::do_sync_end(unsigned sync_reg) {
@@ -588,7 +599,6 @@ void CilkSanImpl_t::do_leave_begin(unsigned sync_reg) {
             frame_stack.head()->frame_data.frame_id);
   cilksan_assert(frame_stack.size() > 1);
 
-  update_strand_stats();
 
   switch(frame_stack.head()->frame_data.entry_type) {
   case SPAWNER:
@@ -623,6 +633,9 @@ CilkSanImpl_t::record_mem_helper(const csi_id_t acc_id, uintptr_t addr,
                                  size_t mem_size, bool on_stack) {
   // Do nothing for 0-byte accesses
   if (!mem_size)
+    return;
+
+  if (!shadow_memory.setOccupied(is_read, addr, mem_size))
     return;
 
   FrameData_t *f = frame_stack.head();
@@ -816,6 +829,8 @@ void CilkSanImpl_t::clear_shadow_memory(size_t start, size_t size) {
 
 void CilkSanImpl_t::record_alloc(size_t start, size_t size,
                                  csi_id_t alloca_id) {
+  if (!size)
+    return;
   DBG_TRACE(DEBUG_MEMORY, "cilksan_record_alloc(%p, %ld)\n",
             start, size);
   FrameData_t *f = frame_stack.head();
