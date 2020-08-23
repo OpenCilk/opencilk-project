@@ -50,10 +50,10 @@ typedef struct {
 // Property bitfields.
 
 typedef struct {
-  // The function might spawn.
-  unsigned may_spawn : 1;
   // Number of sync regions in this function.
   unsigned num_sync_reg : 8;
+  // The function might spawn.
+  unsigned may_spawn : 1;
   // Pad struct to 64 total bits.
   uint64_t _padding : 55;
 } func_prop_t;

@@ -117,6 +117,7 @@ static inline bool should_check() {
 }
 
 Stack_t<uint8_t> parallel_execution;
+Stack_t<bool> spbags_frame_skipped;
 
 Stack_t<std::pair<csi_id_t, uint64_t>> MAAPs;
 Stack_t<unsigned> MAAP_counts;
@@ -124,8 +125,7 @@ Stack_t<unsigned> MAAP_counts;
 CILKSAN_API void __csan_set_MAAP(uint64_t val, csi_id_t id) {
   DBG_TRACE(DEBUG_CALLBACK, "__csan_set_MAAP(%ld, %ld)\n",
             val, id);
-  MAAPs.push();
-  *MAAPs.head() = std::make_pair(id, val);
+  MAAPs.push_back(std::make_pair(id, val));
 }
 
 CILKSAN_API void __csan_get_MAAP(uint64_t *ptr, csi_id_t id, unsigned idx) {
@@ -138,7 +138,7 @@ CILKSAN_API void __csan_get_MAAP(uint64_t *ptr, csi_id_t id, unsigned idx) {
     return;
   }
 
-  unsigned MAAP_count = *MAAP_counts.head();
+  unsigned MAAP_count = MAAP_counts.back();
   if (idx >= MAAP_count) {
     DBG_TRACE(DEBUG_CALLBACK, "  No MAAP found: idx %d >= count %d\n", idx,
               MAAP_count);
@@ -305,8 +305,7 @@ CILKSAN_API void __csan_func_entry(const csi_id_t func_id,
       CilkSanImpl.init();
       enable_instrumentation();
       // Note that we start executing the program in series.
-      parallel_execution.push();
-      *parallel_execution.head() = 0;
+      parallel_execution.push_back(0);
       first_call = false;
     }
   }
@@ -332,19 +331,22 @@ CILKSAN_API void __csan_func_entry(const csi_id_t func_id,
   cilksan_assert(TOOL_INITIALIZED);
 
   // Propagate the parallel-execution state to the child.
-  uint8_t current_pe = *parallel_execution.head();
+  uint8_t current_pe = parallel_execution.back();
   // First we push the pe value on function entry.
-  parallel_execution.push();
-  *parallel_execution.head() = current_pe;
+  parallel_execution.push_back(current_pe);
   // We push a second copy to update aggressively on detaches.
-  parallel_execution.push();
-  *parallel_execution.head() = current_pe;
+  parallel_execution.push_back(current_pe);
 
   CilkSanImpl.push_stack_frame((uintptr_t)bp, (uintptr_t)sp);
 
-  // if (!prop.may_spawn)
-  //   // Ignore entry calls into non-Cilk functions.
-  //   return;
+  if (!prop.may_spawn && CilkSanImpl.is_local_synced()) {
+    spbags_frame_skipped.push_back(true);
+    // Ignore entry calls into non-Cilk functions when the parent frame is
+    // synced.
+    enable_instrumentation();
+    return;
+  }
+  spbags_frame_skipped.push_back(false);
 
   // Update the tool for entering a Cilk function.
   CilkSanImpl.do_enter_begin(prop.num_sync_reg);
@@ -368,7 +370,7 @@ CILKSAN_API void __csan_func_exit(const csi_id_t func_exit_id,
             srcloc->name, srcloc->filename,
             srcloc->line_number);
 
-  // if (prop.may_spawn) {
+  if (!spbags_frame_skipped.back()) {
     // Update the tool for leaving a Cilk function.
     //
     // NOTE: Technically the sync region that would synchronize any orphaned
@@ -376,7 +378,8 @@ CILKSAN_API void __csan_func_exit(const csi_id_t func_exit_id,
     // programs.
     CilkSanImpl.do_leave_begin(0);
     CilkSanImpl.do_leave_end();
-  // }
+  }
+  spbags_frame_skipped.pop();
 
   // Pop both local copies of the parallel-execution state.
   parallel_execution.pop();
@@ -408,13 +411,11 @@ CILKSAN_API void __csan_before_loop(const csi_id_t loop_id,
   CilkSanImpl.record_call(loop_id, LOOP);
 
   // Propagate the parallel-execution state to the child.
-  uint8_t current_pe = *parallel_execution.head();
+  uint8_t current_pe = parallel_execution.back();
   // First push the pe value on function entry.
-  parallel_execution.push();
-  *parallel_execution.head() = current_pe;
+  parallel_execution.push_back(current_pe);
   // Push an extra copy to the head, to be updated aggressively due to detaches.
-  parallel_execution.push();
-  *parallel_execution.head() = current_pe;
+  parallel_execution.push_back(current_pe);
 
   CilkSanImpl.do_loop_begin();
 }
@@ -457,9 +458,8 @@ CILKSAN_API void __csan_before_call(const csi_id_t call_id,
     call_pc[call_id] = CALLERPC;
 
   // Push the MAAP count onto the stack.
-  MAAP_counts.push();
-  *MAAP_counts.head() = MAAP_count;
-  cilksan_assert(MAAP_count == *MAAP_counts.head() &&
+  MAAP_counts.push_back(MAAP_count);
+  cilksan_assert(MAAP_count == MAAP_counts.back() &&
                  "Mismatched MAAP counts before call.");
 
   // Push the call onto the call stack.
@@ -478,7 +478,7 @@ CILKSAN_API void __csan_after_call(const csi_id_t call_id,
             call_id, func_id);
 
   // Pop any MAAPs.
-  cilksan_assert(MAAP_count == *MAAP_counts.head() &&
+  cilksan_assert(MAAP_count == MAAP_counts.back() &&
                  "Mismatched MAAP counts after call.");
   for (unsigned i = 0; i < MAAP_count; ++i)
     MAAPs.pop();
@@ -506,7 +506,7 @@ CILKSAN_API void __csan_detach(const csi_id_t detach_id,
 
   // Update the parallel-execution state to reflect this detach.  Essentially,
   // this notes the change of peer sets.
-  *parallel_execution.head() = 1;
+  parallel_execution.back() = 1;
 
   if (!CilkSanImpl.handle_loop())
     // Push the detach onto the call stack.
@@ -537,13 +537,11 @@ CILKSAN_API void __csan_task(const csi_id_t task_id, const csi_id_t detach_id,
   }
 
   // Propagate the parallel-execution state to the child.
-  uint8_t current_pe = *parallel_execution.head();
+  uint8_t current_pe = parallel_execution.back();
   // Push the pe value on function entry.
-  parallel_execution.push();
-  *parallel_execution.head() = current_pe;
+  parallel_execution.push_back(current_pe);
   // Push a second copy to update aggressively on detaches.
-  parallel_execution.push();
-  *parallel_execution.head() = current_pe;
+  parallel_execution.push_back(current_pe);
 
   // Update tool for entering detach-helper function and performing detach.
   CilkSanImpl.do_enter_helper_begin(prop.num_sync_reg);
@@ -612,8 +610,9 @@ CILKSAN_API void __csan_sync(csi_id_t sync_id, const unsigned sync_reg) {
   CilkSanImpl.do_sync_end(sync_reg);
 
   // Restore the parallel-execution state to that of the function/task entry.
-  if (CilkSanImpl.is_local_synced())
-    *parallel_execution.head() = *parallel_execution.ancestor(1);
+  if (CilkSanImpl.is_local_synced()) {
+    parallel_execution.back() = parallel_execution.from_back(1);
+  }
 }
 
 // Assuming __csan_load/store is inlined, the stack should look like this:
@@ -640,7 +639,7 @@ void __csan_load(csi_id_t load_id, const void *addr, int32_t size,
               size);
     return;
   }
-  if (!(*parallel_execution.head())) {
+  if (!parallel_execution.back()) {
     DBG_TRACE(DEBUG_MEMORY, "SKIP %s read (%p, %ld) during serial execution\n",
               __FUNCTION__, addr, size);
     return;
@@ -666,7 +665,7 @@ void __csan_large_load(csi_id_t load_id, const void *addr, size_t size,
               size);
     return;
   }
-  if (!(*parallel_execution.head())) {
+  if (!parallel_execution.back()) {
     DBG_TRACE(DEBUG_MEMORY, "SKIP %s read (%p, %ld) during serial execution\n",
               __FUNCTION__, addr, size);
     return;
@@ -692,7 +691,7 @@ void __csan_store(csi_id_t store_id, const void *addr, int32_t size,
               size);
     return;
   }
-  if (!(*parallel_execution.head())) {
+  if (!parallel_execution.back()) {
     DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote (%p, %ld) during serial execution\n",
               __FUNCTION__, addr, size);
     return;
@@ -718,7 +717,7 @@ void __csan_large_store(csi_id_t store_id, const void *addr, size_t size,
               size);
     return;
   }
-  if (!(*parallel_execution.head())) {
+  if (!parallel_execution.back()) {
     DBG_TRACE(DEBUG_MEMORY, "SKIP %s wrote (%p, %ld) during serial execution\n",
               __FUNCTION__, addr, size);
     return;
@@ -800,7 +799,7 @@ void __csan_after_allocfn(const csi_id_t allocfn_id, const void *addr,
       }
 
       if (iter != malloc_sizes.end()) {
-        if (!(*parallel_execution.head())) {
+        if (!parallel_execution.back()) {
           CilkSanImpl.clear_alloc((size_t)oldaddr, iter->second);
           CilkSanImpl.clear_shadow_memory((size_t)oldaddr, iter->second);
         } else {
@@ -818,7 +817,7 @@ void __csan_after_allocfn(const csi_id_t allocfn_id, const void *addr,
           CilkSanImpl.clear_shadow_memory((size_t)addr + old_size,
                                           new_size - old_size);
         } else if (old_size > new_size) {
-          if (!(*parallel_execution.head())) {
+          if (!parallel_execution.back()) {
             CilkSanImpl.clear_alloc((size_t)oldaddr + new_size,
                                     old_size - new_size);
             CilkSanImpl.clear_shadow_memory((size_t)oldaddr + new_size,
@@ -869,7 +868,7 @@ void __csan_after_free(const csi_id_t free_id, const void *ptr,
   auto iter = malloc_sizes.find((uintptr_t)ptr);
   if (iter != malloc_sizes.end()) {
     // cilksan_clear_shadow_memory((size_t)ptr, iter->second);
-    if (!(*parallel_execution.head())) {
+    if (!parallel_execution.back()) {
       CilkSanImpl.clear_alloc((size_t)ptr, iter->second);
       CilkSanImpl.clear_shadow_memory((size_t)ptr, iter->second);
     } else {
