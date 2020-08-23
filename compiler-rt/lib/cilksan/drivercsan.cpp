@@ -1232,13 +1232,13 @@ struct __cilkrts_worker;
 
 // Wrapped __cilkrts_internal_merge_two_rmaps method for dynamic
 // interpositioning.
-typedef cilkred_map *(*merge_two_rmaps_t)(__cilkrts_worker *const,
-                                          cilkred_map *, cilkred_map *);
+typedef cilkred_map *(*merge_two_rmaps_t)(__cilkrts_worker *, cilkred_map *,
+                                          cilkred_map *);
 static merge_two_rmaps_t dl_merge_two_rmaps = NULL;
 
 CILKSAN_API __attribute__((weak)) cilkred_map *
-__cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
-                                   cilkred_map *left, cilkred_map *right) {
+__cilkrts_internal_merge_two_rmaps(__cilkrts_worker *ws, cilkred_map *left,
+                                   cilkred_map *right) {
   if (__builtin_expect(dl_merge_two_rmaps == NULL, 0)) {
     dl_merge_two_rmaps = (merge_two_rmaps_t)dlsym(
         RTLD_NEXT, "__cilkrts_internal_merge_two_rmaps");
@@ -1256,17 +1256,19 @@ __cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
   return res;
 }
 
-/// Wrapped __cilkrts_internal_merge_two_rmaps method for link-time interpositioning.
+/// Wrapped __cilkrts_internal_merge_two_rmaps method for link-time
+/// interpositioning.
 CILKSAN_API __attribute__((weak)) cilkred_map *
-__real___cilkrts_internal_merge_two_rmaps(__cilkrts_worker *const ws,
+__real___cilkrts_internal_merge_two_rmaps(__cilkrts_worker *ws,
                                           cilkred_map *left,
                                           cilkred_map *right) {
   return __cilkrts_internal_merge_two_rmaps(ws, left, right);
 }
 
 CILKSAN_API
-cilkred_map *__wrap___cilkrts_internal_merge_two_rmaps(
-    __cilkrts_worker *const ws, cilkred_map *left, cilkred_map *right) {
+cilkred_map *__wrap___cilkrts_internal_merge_two_rmaps(__cilkrts_worker *ws,
+                                                       cilkred_map *left,
+                                                       cilkred_map *right) {
   disable_checking();
   cilkred_map *res = __real___cilkrts_internal_merge_two_rmaps(ws, left, right);
   enable_checking();
