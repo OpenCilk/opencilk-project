@@ -5,11 +5,13 @@
 #include <cstdlib>
 #include <iostream>
 #include <inttypes.h>
+#include <sys/mman.h>
 
 #include "cilksan_internal.h"
 #include "debug_util.h"
 #include "dictionary.h"
 #include "shadow_mem_allocator.h"
+#include "vector.h"
 
 static const unsigned ReadMAAllocator = 0;
 static const unsigned WriteMAAllocator = 1;
@@ -469,13 +471,14 @@ private:
       // Get the grainsize of the access.
       unsigned AccessedLgGrainsize = Accessed.getLgGrainsize();
 
+      // Materialize the line, if necessary.
+      if (!isMaterialized())
+        materialize();
+
       // If neither the line nor the access are refined, then we can optimize
       // the insert process.
       if ((AccessedLgGrainsize == LG_LINE_SIZE) &&
           (getLgGrainsize() == LG_LINE_SIZE)) {
-        // Materialize the line, if necessary.
-        if (!isMaterialized())
-          materialize();
 
         MemoryAccess_t *MemAccs = getMemAccs();
         // Check if we're adding a new valid entry.
@@ -506,9 +509,6 @@ private:
         AccessedLgGrainsize = LgGrainsize;
       }
 
-      // Materialize the line, if necessary.
-      if (!isMaterialized())
-        materialize();
 
       MemoryAccess_t *MemAccs = getMemAccs();
       const MemoryAccess_t Previous = MemAccs[PrevIdx];
@@ -603,7 +603,13 @@ private:
 
   // A page is an array of lines.
   struct Page_t {
-    Line_t lines[1 << LG_PAGE_SIZE];
+    static constexpr unsigned LG_OCCUPANCY_PAGE_SIZE =
+        LG_PAGE_SIZE + LG_LINE_SIZE;
+    static constexpr size_t OCC_ARR_SIZE =
+        (1UL << LG_OCCUPANCY_PAGE_SIZE) / (8 * sizeof(uint64_t));
+    uint64_t occupancy[OCC_ARR_SIZE] = {0};
+
+    Line_t lines[1UL << LG_PAGE_SIZE];
 
     Line_t &operator[] (uintptr_t line) {
       return lines[line];
@@ -611,15 +617,100 @@ private:
     const Line_t &operator[] (uintptr_t line) const {
       return lines[line];
     }
+
+    // To accommodate their size and sparse access pattern, Use mmap/munmap to
+    // allocate and free Page_t's.
+    void *operator new(size_t size) {
+      return mmap(nullptr, sizeof(Page_t), PROT_READ | PROT_WRITE,
+                  MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    }
+    void operator delete(void *ptr) { munmap(ptr, sizeof(Page_t)); }
+
+    static constexpr uintptr_t LG_OCCUPANCY_WORD_SIZE = 6;
+    static constexpr uintptr_t OCCUPANCY_WORD_SIZE = 1UL
+                                                     << LG_OCCUPANCY_WORD_SIZE;
+    static_assert(
+        OCCUPANCY_WORD_SIZE == (8 * sizeof(uint64_t)),
+        "LG_OCCUPANCY_WORD_SIZE does not correspond with occupancy-word size");
+    static constexpr uintptr_t OCCUPANCY_BIT_MASK = OCCUPANCY_WORD_SIZE - 1;
+    static constexpr uintptr_t OCCUPANCY_WORD_MASK = ~OCCUPANCY_BIT_MASK;
+    static constexpr uintptr_t OCCUPANCY_WORD_IDX =
+        OCCUPANCY_WORD_MASK ^ ~((1UL << LG_OCCUPANCY_PAGE_SIZE) - 1);
+
+    __attribute__((always_inline))
+    static uintptr_t occupancyWordAddr(uintptr_t addr) {
+      return (addr & OCCUPANCY_WORD_MASK);
+    }
+    __attribute__((always_inline))
+    static uintptr_t occupancyWord(uintptr_t addr) {
+      return ((addr & OCCUPANCY_WORD_IDX) >> LG_OCCUPANCY_WORD_SIZE);
+    }
+    __attribute__((always_inline))
+    static uintptr_t occupancyWordStartBit(uintptr_t addr) {
+      return (addr & OCCUPANCY_BIT_MASK);
+    }
+    __attribute__((always_inline))
+    static bool isOccupancyWordStart(uintptr_t addr) {
+      return occupancyWordStartBit(addr) == 0;
+    }
+
+    // Get the chunk after this chunk whose address is grainsize-aligned.
+    __attribute__((always_inline))
+    Chunk_t nextOccupancyWord(Chunk_t Accessed) const {
+      uintptr_t nextAddr =
+          alignByNextGrainsize(Accessed.addr, LG_OCCUPANCY_WORD_SIZE);
+      size_t chunkSize = nextAddr - Accessed.addr;
+      if (chunkSize > Accessed.size)
+        return Chunk_t(nextAddr, 0);
+      return Chunk_t(nextAddr, Accessed.size - chunkSize);
+    }
+
+    // __attribute__((always_inline))
+    bool setOccupied(Chunk_t &Accessed, Vector_t<uintptr_t> &TouchedWords) {
+      bool foundUnoccupied = false;
+      while (!Accessed.isEmpty()) {
+        uintptr_t addr = Accessed.addr;
+        uint64_t mask;
+        if (Accessed.size >= OCCUPANCY_WORD_SIZE)
+          mask = (uint64_t)(-1);
+        else
+          mask = (1UL << Accessed.size) - 1;
+        mask = (uint64_t)mask << (unsigned)occupancyWordStartBit(addr);
+
+        uint64_t current = occupancy[occupancyWord(addr)];
+        if (0UL == current)
+          TouchedWords.push_back(addr);
+        if (~current & mask)
+          foundUnoccupied = true;
+
+        occupancy[occupancyWord(addr)] |= mask;
+        Accessed = nextOccupancyWord(Accessed);
+
+        if (isPageStart(Accessed.addr))
+          return foundUnoccupied;
+      }
+      return foundUnoccupied;
+    }
+
+    __attribute__((always_inline))
+    void clear(uintptr_t wordAddr) {
+      occupancy[occupancyWord(wordAddr)] = 0;
+    }
   };
 
   // A table is an array of pages.
-  Page_t *Table[1 << LG_TABLE_SIZE] = { nullptr };
+  Page_t *Table[1UL << LG_TABLE_SIZE] = {nullptr};
+
+  // Table of occupancy pages, along with vectors to track non-null values in
+  // the 2-level occupancy table.
+  Vector_t<uintptr_t> TouchedWords;
+  Vector_t<uintptr_t> AllocatedPages;
 
 public:
   SimpleDictionary() {}
   ~SimpleDictionary() {
-    for (int i = 0; i < (1 << LG_TABLE_SIZE); ++i)
+    freePages();
+    for (int64_t i = 0; i < (1L << LG_TABLE_SIZE); ++i)
       if (Table[i]) {
         delete Table[i];
         Table[i] = nullptr;
@@ -722,6 +813,8 @@ public:
       cilksan_assert(!isEnd() &&
                      "Cannot call next() on an empty Line iterator");
       const Entry_t Previous = Entry;
+      const MemoryAccess_t *PrevMemAcc = Previous.get();
+      const MemoryAccess_t *EntryMemAcc = nullptr;
       do {
         if (Line->isEmpty())
           Accessed = Accessed.next(LG_LINE_SIZE);
@@ -742,8 +835,8 @@ public:
             return;
 
         Entry = Entry_t(Dict, Accessed.addr);
-      } while(!Entry.get() ||
-              (Previous.get() && (*Previous.get() == *Entry.get())));
+        EntryMemAcc = Entry.get();
+      } while (!EntryMemAcc || (PrevMemAcc && (*PrevMemAcc == *EntryMemAcc)));
     }
 
   private:
@@ -805,13 +898,13 @@ public:
       if (Accessed.isEmpty())
         return;
 
-      // Get the page for this access.
-      if (!nextPage())
-        return;
+      // // Get the page for this access.
+      // if (!nextPage())
+      //   return;
 
-      // Get the line for this access.
-      if (!nextLine())
-        return;
+      nextPage();
+
+      nextLine();
 
       Entry = Entry_t(Dict, Accessed.addr);
     }
@@ -884,6 +977,7 @@ public:
           Page = new Page_t;
           Dict.Table[page(Accessed.addr)] = Page;
           Line = &(*Page)[line(Accessed.addr)];
+          assert(!Line->isMaterialized() && "Materialized line found in new page");
         }
 
         // Set MemoryAccess_t objects in the current line.
@@ -919,6 +1013,7 @@ public:
           Page = new Page_t;
           Dict.Table[page(Accessed.addr)] = Page;
           Line = &(*Page)[line(Accessed.addr)];
+          assert(!Line->isMaterialized() && "Materialized line found in new page");
         }
 
         // Set MemoryAccess_t objects in the current line.
@@ -1023,6 +1118,44 @@ public:
     }
   };
 
+  // High-level method to set the occupancy of the shadow memory to include
+  // Accessed
+  bool setOccupied(uintptr_t addr, size_t mem_size) {
+    assert(AllocIdx != AllocMAAllocator &&
+           "Called setOccupied on Alloc shadow memory");
+
+    Chunk_t Accessed(addr, mem_size);
+    bool foundUnoccupied = false;
+    while (!Accessed.isEmpty()) {
+      Page_t *Page = Table[page(Accessed.addr)];
+      if (__builtin_expect(!Page, false)) {
+        foundUnoccupied = true;
+        Page = new Page_t;
+        AllocatedPages.push_back(page(Accessed.addr));
+        Table[page(Accessed.addr)] = Page;
+      }
+      foundUnoccupied |= Page->setOccupied(Accessed, TouchedWords);
+    }
+    return foundUnoccupied;
+  }
+
+  // High-level method to clear any occupancy information recorded.
+  void clearOccupied() {
+    for (uintptr_t wordAddr : TouchedWords)
+      Table[page(wordAddr)]->clear(wordAddr);
+    TouchedWords.clear();
+  }
+
+  // Free pages of shadow memory.
+  void freePages() {
+    TouchedWords.clear();
+    for (uintptr_t Addr : AllocatedPages) {
+      delete Table[Addr];
+      Table[Addr] = nullptr;
+    }
+    AllocatedPages.clear();
+  }
+
   // High-level method to check if this dictionary contains any entries covered
   // by the specified chunk of memory.
   __attribute__((always_inline))
@@ -1078,6 +1211,26 @@ private:
 public:
   SimpleShadowMem(CilkSanImpl_t &CilkSanImpl) : CilkSanImpl(CilkSanImpl) {}
   ~SimpleShadowMem() { destruct(); }
+
+  __attribute__((always_inline))
+  bool setOccupied(bool is_read, uintptr_t addr, size_t mem_size) {
+    if (is_read)
+      return Reads.setOccupied(addr, mem_size);
+    else
+      return Writes.setOccupied(addr, mem_size);
+  }
+
+  __attribute__((always_inline))
+  void clearOccupied() {
+    Reads.clearOccupied();
+    Writes.clearOccupied();
+  }
+
+  __attribute__((always_inline))
+  void freePages() {
+    Reads.freePages();
+    Writes.freePages();
+  }
 
   template<bool is_read>
   __attribute__((always_inline))
@@ -1328,9 +1481,23 @@ public:
   void destruct() {}
 };
 
-
 void Shadow_Memory::init(CilkSanImpl_t &CilkSanImpl) {
   shadow_mem = new SimpleShadowMem(CilkSanImpl);
+}
+
+__attribute__((always_inline))
+bool Shadow_Memory::setOccupied(bool is_read, uintptr_t addr, size_t mem_size) {
+  return shadow_mem->setOccupied(is_read, addr, mem_size);
+}
+
+__attribute__((always_inline))
+void Shadow_Memory::clearOccupied() {
+  shadow_mem->clearOccupied();
+}
+
+__attribute__((always_inline))
+void Shadow_Memory::freePages() {
+  shadow_mem->freePages();
 }
 
 // Inserts access, and replaces any that are already in the shadow memory.
