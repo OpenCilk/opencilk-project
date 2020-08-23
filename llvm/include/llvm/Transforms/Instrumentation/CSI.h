@@ -276,7 +276,8 @@ public:
   static Type *getType(LLVMContext &C) {
     // Must match the definition of property type in csi.h
     return CsiProperty::getCoercedType(
-        C, StructType::get(IntegerType::get(C, PropBits.MaySpawn),
+        C, StructType::get(IntegerType::get(C, PropBits.NumSyncReg),
+                           IntegerType::get(C, PropBits.MaySpawn),
                            IntegerType::get(C, PropBits.Padding)));
   }
   /// Get the default value for this property.
@@ -296,18 +297,19 @@ public:
     return ConstantInt::get(getType(C), PropValue.Bits);
   }
 
+  /// Set the number of sync regions in this function.
+  void setNumSyncReg(unsigned v) { PropValue.Fields.NumSyncReg = v; }
+
   /// Set the value of the MaySpawn property.
   void setMaySpawn(bool v) { PropValue.Fields.MaySpawn = v; }
 
-  /// Set the number of sync regions in this function.
-  void setNumSyncReg(unsigned v) { PropValue.Fields.NumSyncReg = v; }
 
 private:
   typedef union {
     // Must match the definition of property type in csi.h
     struct {
-      unsigned MaySpawn : 1;
       unsigned NumSyncReg : 8;
+      unsigned MaySpawn : 1;
       uint64_t Padding : 55;
     } Fields;
     uint64_t Bits;
@@ -317,13 +319,13 @@ private:
   Property PropValue;
 
   typedef struct {
-    int MaySpawn;
     int NumSyncReg;
+    int MaySpawn;
     int Padding;
   } PropertyBits;
 
   /// The number of bits representing each property.
-  static constexpr PropertyBits PropBits = {1, 8, (64 - 1 - 8)};
+  static constexpr PropertyBits PropBits = {8, 1, (64 - 8 - 1)};
 };
 
 class CsiFuncExitProperty : public CsiProperty {
