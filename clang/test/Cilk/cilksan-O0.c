@@ -12,19 +12,19 @@ int c = 2;
 
 void addA() {
   // CHECK: define void @addA()
-  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i64 0)
+  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i8* {{.+}}, i64 0)
   a = c;
 }
 
 void addB() {
   // CHECK: define void @addB()
-  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i64 0)
+  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i8* {{.+}}, i64 0)
   b = a;
 }
 
 void foo() {
   // CHECK: define void @foo()
-  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i64 3)
+  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i8* {{.+}}, i64 257)
   _Cilk_spawn addA();
   addB();
   _Cilk_sync;
@@ -32,7 +32,7 @@ void foo() {
 
 int main() {
   // CHECK: define i32 @main()
-  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i64 0)
+  // CHECK: __csan_func_entry(i64 {{.+}}, i8* {{.+}}, i8* {{.+}}, i64 0)
   foo();
   return 0;
 }
