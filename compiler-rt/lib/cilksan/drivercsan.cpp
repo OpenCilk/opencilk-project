@@ -966,10 +966,12 @@ static void initialize_memory_functions() {
   if (error != NULL)
     goto error_exit;
 
+#if __linux__
   real_mremap = (mremap_t)dlsym(RTLD_NEXT, "mremap");
   error = dlerror();
   if (error != NULL)
     goto error_exit;
+#endif // __linux__
 
   mem_initialized = 1;
   enable_checking();
