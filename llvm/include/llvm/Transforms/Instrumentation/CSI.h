@@ -1029,12 +1029,12 @@ public:
           function_ref<DominatorTree &(Function &)> GetDomTree,
           function_ref<LoopInfo &(Function &)> GetLoopInfo,
           function_ref<TaskInfo &(Function &)> GetTaskInfo,
-          const TargetLibraryInfo *TLI,
+          function_ref<TargetLibraryInfo &(Function &)> GetTLI,
           function_ref<ScalarEvolution &(Function &)> GetSE,
           function_ref<TargetTransformInfo &(Function &)> GetTTI,
           const CSIOptions &Options = CSIOptions())
       : M(M), DL(M.getDataLayout()), CG(CG), GetDomTree(GetDomTree),
-        GetLoopInfo(GetLoopInfo), GetTaskInfo(GetTaskInfo), TLI(TLI),
+        GetLoopInfo(GetLoopInfo), GetTaskInfo(GetTaskInfo), GetTLI(GetTLI),
         GetScalarEvolution(GetSE), GetTTI(GetTTI), Options(Options) {
     loadConfiguration();
   }
@@ -1042,10 +1042,10 @@ public:
           function_ref<DominatorTree &(Function &)> GetDomTree,
           function_ref<LoopInfo &(Function &)> GetLoopInfo,
           function_ref<TaskInfo &(Function &)> GetTaskInfo,
-          const TargetLibraryInfo *TLI,
+          function_ref<TargetLibraryInfo &(Function &)> GetTLI,
           const CSIOptions &Options = CSIOptions())
       : M(M), DL(M.getDataLayout()), CG(CG), GetDomTree(GetDomTree),
-        GetLoopInfo(GetLoopInfo), GetTaskInfo(GetTaskInfo), TLI(TLI),
+        GetLoopInfo(GetLoopInfo), GetTaskInfo(GetTaskInfo), GetTLI(GetTLI),
         Options(Options) {
     loadConfiguration();
   }
@@ -1154,8 +1154,9 @@ protected:
   void instrumentSync(SyncInst *SI,
                       const DenseMap<Value *, Value *> &TrackVars);
   void instrumentAlloca(Instruction *I);
-  void instrumentAllocFn(Instruction *I, DominatorTree *DT);
-  void instrumentFree(Instruction *I);
+  void instrumentAllocFn(Instruction *I, DominatorTree *DT,
+                         const TargetLibraryInfo *TLI);
+  void instrumentFree(Instruction *I, const TargetLibraryInfo *TLI);
 
   void interposeCall(Instruction *I);
 
@@ -1442,7 +1443,7 @@ protected:
   function_ref<DominatorTree &(Function &)> GetDomTree;
   function_ref<LoopInfo &(Function &)> GetLoopInfo;
   function_ref<TaskInfo &(Function &)> GetTaskInfo;
-  const TargetLibraryInfo *TLI;
+  function_ref<TargetLibraryInfo &(Function &)> GetTLI;
   Optional<function_ref<ScalarEvolution &(Function &)>> GetScalarEvolution;
   Optional<function_ref<TargetTransformInfo &(Function &)>> GetTTI;
   CSIOptions Options;
