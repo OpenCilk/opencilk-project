@@ -463,17 +463,17 @@ static Value *EmitISOVolatileStore(CodeGenFunction &CGF, const CallExpr *E) {
 static Value *emitUnaryMaybeConstrainedFPBuiltin(CodeGenFunction &CGF,
                                 const CallExpr *E, unsigned IntrinsicID,
                                 unsigned ConstrainedIntrinsicID) {
-  CodeGenFunction::IsSpawnedScope SpawnedScp(this);
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   llvm::Value *Src0 = CGF.EmitScalarExpr(E->getArg(0));
 
   if (CGF.Builder.getIsFPConstrained()) {
     CodeGenFunction::CGFPOptionsRAII FPOptsRAII(CGF, E);
     Function *F = CGF.CGM.getIntrinsic(ConstrainedIntrinsicID, Src0->getType());
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateConstrainedFPCall(F, { Src0 });
   } else {
     Function *F = CGF.CGM.getIntrinsic(IntrinsicID, Src0->getType());
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateCall(F, Src0);
   }
 }
@@ -483,18 +483,18 @@ static Value *emitUnaryMaybeConstrainedFPBuiltin(CodeGenFunction &CGF,
 static Value *emitBinaryMaybeConstrainedFPBuiltin(CodeGenFunction &CGF,
                                 const CallExpr *E, unsigned IntrinsicID,
                                 unsigned ConstrainedIntrinsicID) {
-  CodeGenFunction::IsSpawnedScope SpawnedScp(this);
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   llvm::Value *Src0 = CGF.EmitScalarExpr(E->getArg(0));
   llvm::Value *Src1 = CGF.EmitScalarExpr(E->getArg(1));
 
   if (CGF.Builder.getIsFPConstrained()) {
     CodeGenFunction::CGFPOptionsRAII FPOptsRAII(CGF, E);
     Function *F = CGF.CGM.getIntrinsic(ConstrainedIntrinsicID, Src0->getType());
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateConstrainedFPCall(F, { Src0, Src1 });
   } else {
     Function *F = CGF.CGM.getIntrinsic(IntrinsicID, Src0->getType());
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateCall(F, { Src0, Src1 });
   }
 }
@@ -504,7 +504,7 @@ static Value *emitBinaryMaybeConstrainedFPBuiltin(CodeGenFunction &CGF,
 static Value *emitTernaryMaybeConstrainedFPBuiltin(CodeGenFunction &CGF,
                                  const CallExpr *E, unsigned IntrinsicID,
                                  unsigned ConstrainedIntrinsicID) {
-  CodeGenFunction::IsSpawnedScope SpawnedScp(this);
+  CodeGenFunction::IsSpawnedScope SpawnedScp(&CGF);
   llvm::Value *Src0 = CGF.EmitScalarExpr(E->getArg(0));
   llvm::Value *Src1 = CGF.EmitScalarExpr(E->getArg(1));
   llvm::Value *Src2 = CGF.EmitScalarExpr(E->getArg(2));
@@ -512,11 +512,11 @@ static Value *emitTernaryMaybeConstrainedFPBuiltin(CodeGenFunction &CGF,
   if (CGF.Builder.getIsFPConstrained()) {
     CodeGenFunction::CGFPOptionsRAII FPOptsRAII(CGF, E);
     Function *F = CGF.CGM.getIntrinsic(ConstrainedIntrinsicID, Src0->getType());
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateConstrainedFPCall(F, { Src0, Src1, Src2 });
   } else {
     Function *F = CGF.CGM.getIntrinsic(IntrinsicID, Src0->getType());
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateCall(F, { Src0, Src1, Src2 });
   }
 }
@@ -606,12 +606,12 @@ emitMaybeConstrainedFPToIntRoundBuiltin(CodeGenFunction &CGF, const CallExpr *E,
     CodeGenFunction::CGFPOptionsRAII FPOptsRAII(CGF, E);
     Function *F = CGF.CGM.getIntrinsic(ConstrainedIntrinsicID,
                                        {ResultType, Src0->getType()});
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateConstrainedFPCall(F, {Src0});
   } else {
     Function *F =
         CGF.CGM.getIntrinsic(IntrinsicID, {ResultType, Src0->getType()});
-    MaybeDetach(this, SpawnedScp);
+    MaybeDetach(&CGF, SpawnedScp);
     return CGF.Builder.CreateCall(F, Src0);
   }
 }
