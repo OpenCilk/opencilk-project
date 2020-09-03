@@ -19,6 +19,8 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Tapir.h"
@@ -43,14 +45,11 @@ static const char TimerGroupDescription[] = "Tapir to Target";
 
 class TapirToTargetImpl {
 public:
-  TapirToTargetImpl(Module &M,
-                    function_ref<DominatorTree &(Function &)> GetDT,
+  TapirToTargetImpl(Module &M, function_ref<DominatorTree &(Function &)> GetDT,
                     function_ref<TaskInfo &(Function &)> GetTI,
                     function_ref<AssumptionCache &(Function &)> GetAC,
-                    TapirTarget *Target)
-      : Target(Target), M(M), GetDT(GetDT), GetTI(GetTI), GetAC(GetAC) {
-    assert(this->Target);
-  }
+                    function_ref<TargetLibraryInfo &(Function &)> GetTLI)
+      : M(M), GetDT(GetDT), GetTI(GetTI), GetAC(GetAC), GetTLI(GetTLI) {}
   ~TapirToTargetImpl() {
     if (Target)
       delete Target;
@@ -83,6 +82,7 @@ private:
   function_ref<DominatorTree &(Function &)> GetDT;
   function_ref<TaskInfo &(Function &)> GetTI;
   function_ref<AssumptionCache &(Function &)> GetAC;
+  function_ref<TargetLibraryInfo &(Function &)> GetTLI;
 };
 
 bool TapirToTargetImpl::unifyReturns(Function &F) {
@@ -449,9 +449,14 @@ void TapirToTargetImpl::processFunction(
 bool TapirToTargetImpl::run() {
   // Add functions that detach to the work list.
   SmallVector<Function *, 4> WorkList;
-  for (Function &F : M)
+  for (Function &F : M) {
+    // TODO: Use per-function Tapir targets?
+    if (!Target)
+      Target = getTapirTargetFromID(M, GetTLI(F).getTapirTarget());
+    assert(Target && "Missing Tapir target");
     if (Target->shouldProcessFunction(F))
       WorkList.push_back(&F);
+  }
 
   if (WorkList.empty())
     return false;
@@ -475,26 +480,21 @@ bool TapirToTargetImpl::run() {
 }
 
 PreservedAnalyses TapirToTargetPass::run(Module &M, ModuleAnalysisManager &AM) {
-  auto &TLI = AM.getResult<TargetLibraryAnalysis>(M);
-  auto &FAM =
-    AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
-  auto GetDT =
-    [&FAM](Function &F) -> DominatorTree & {
-      return FAM.getResult<DominatorTreeAnalysis>(F);
-    };
-  auto GetTI =
-    [&FAM](Function &F) -> TaskInfo & {
-      return FAM.getResult<TaskAnalysis>(F);
-    };
-  auto GetAC =
-    [&FAM](Function &F) -> AssumptionCache & {
-      return FAM.getResult<AssumptionAnalysis>(F);
-    };
+  auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+  auto GetDT = [&FAM](Function &F) -> DominatorTree & {
+    return FAM.getResult<DominatorTreeAnalysis>(F);
+  };
+  auto GetTI = [&FAM](Function &F) -> TaskInfo & {
+    return FAM.getResult<TaskAnalysis>(F);
+  };
+  auto GetAC = [&FAM](Function &F) -> AssumptionCache & {
+    return FAM.getResult<AssumptionAnalysis>(F);
+  };
+  auto GetTLI = [&FAM](Function &F) -> TargetLibraryInfo & {
+    return FAM.getResult<TargetLibraryAnalysis>(F);
+  };
 
-  bool Changed = false;
-  TapirTargetID TargetID = TLI.getTapirTarget();
-  Changed |= TapirToTargetImpl(M, GetDT, GetTI, GetAC,
-                               getTapirTargetFromID(M, TargetID)).run();
+  bool Changed = TapirToTargetImpl(M, GetDT, GetTI, GetAC, GetTLI).run();
 
   if (Changed)
     return PreservedAnalyses::none();
@@ -504,14 +504,11 @@ PreservedAnalyses TapirToTargetPass::run(Module &M, ModuleAnalysisManager &AM) {
 namespace {
 struct LowerTapirToTarget : public ModulePass {
   static char ID; // Pass identification, replacement for typeid
-  explicit LowerTapirToTarget()
-      : ModulePass(ID) {
+  explicit LowerTapirToTarget() : ModulePass(ID) {
     initializeLowerTapirToTargetPass(*PassRegistry::getPassRegistry());
   }
 
-  StringRef getPassName() const override {
-    return "Lower Tapir to target";
-  }
+  StringRef getPassName() const override { return "Lower Tapir to target"; }
 
   bool runOnModule(Module &M) override;
 
@@ -522,7 +519,7 @@ struct LowerTapirToTarget : public ModulePass {
     AU.addRequired<TaskInfoWrapperPass>();
   }
 };
-}  // End of anonymous namespace
+} // End of anonymous namespace
 
 char LowerTapirToTarget::ID = 0;
 INITIALIZE_PASS_BEGIN(LowerTapirToTarget, "tapir2target",
@@ -537,33 +534,25 @@ INITIALIZE_PASS_END(LowerTapirToTarget, "tapir2target",
 bool LowerTapirToTarget::runOnModule(Module &M) {
   if (skipModule(M))
     return false;
-  auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
-  TapirTargetID TargetID = TLI.getTapirTarget();
-
-  auto GetDT =
-    [this](Function &F) -> DominatorTree & {
-      return this->getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
-    };
-  auto GetTI =
-    [this](Function &F) -> TaskInfo & {
-      return this->getAnalysis<TaskInfoWrapperPass>(F).getTaskInfo();
-    };
+  auto GetDT = [this](Function &F) -> DominatorTree & {
+    return this->getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
+  };
+  auto GetTI = [this](Function &F) -> TaskInfo & {
+    return this->getAnalysis<TaskInfoWrapperPass>(F).getTaskInfo();
+  };
   AssumptionCacheTracker *ACT = &getAnalysis<AssumptionCacheTracker>();
-  auto GetAC =
-    [&ACT](Function &F) -> AssumptionCache & {
-      return ACT->getAssumptionCache(F);
-    };
+  auto GetAC = [&ACT](Function &F) -> AssumptionCache & {
+    return ACT->getAssumptionCache(F);
+  };
+  auto GetTLI = [this](Function &F) -> TargetLibraryInfo & {
+    return this->getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+  };
 
-  bool Changed = false;
-  Changed |= TapirToTargetImpl(M, GetDT, GetTI, GetAC,
-                               getTapirTargetFromID(M, TargetID)).run();
-  return Changed;
+  return TapirToTargetImpl(M, GetDT, GetTI, GetAC, GetTLI).run();
 }
 
 // createLowerTapirToTargetPass - Provide an entry point to create this pass.
 //
 namespace llvm {
-ModulePass *createLowerTapirToTargetPass() {
-  return new LowerTapirToTarget();
-}
-}
+ModulePass *createLowerTapirToTargetPass() { return new LowerTapirToTarget(); }
+} // namespace llvm

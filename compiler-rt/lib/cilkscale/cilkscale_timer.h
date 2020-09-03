@@ -174,6 +174,11 @@ struct cilkscale_timer_t {
   cilkscale_timer_t() {}
   cilkscale_timer_t(const cilkscale_timer_t &copy) : time(copy.time) {}
 
+  cilkscale_timer_t &operator=(cilkscale_timer_t copy) {
+    time = copy.time;
+    return *this;
+  }
+
   void gettime() {
 #if CSCALETIMER == RDTSC
     time = __rdtsc();

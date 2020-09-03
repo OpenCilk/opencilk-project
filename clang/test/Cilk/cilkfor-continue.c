@@ -11090,7 +11090,7 @@ int estimate_fill (int m,
       K[c - 1] = 0;
     }
 
-    // CHECK: %[[SYNCREGION:.+]] = {{.+}}call token @llvm.syncregion.start()
+    // CHECK: %[[SYNCREGION:.+]] = {{.*}}call token @llvm.syncregion.start()
     /* loop over block rows */
     cilk_for (int I = 0; I < M; I++) {
       // CHECK: detach within %[[SYNCREGION]], label %[[PFORBODY:.+]], label %[[PFORINC:.+]]
@@ -11146,7 +11146,7 @@ int estimate_fill (int m,
     // CHECK: [[PFORINC]]:
     // CHECK: br i1
 
-    // CHECK-NOT: [[PFORPREATTACH]]
+    // CHECK-NOT: label %[[PFORPREATTACH]]
     // CHECK: return
 
     /*

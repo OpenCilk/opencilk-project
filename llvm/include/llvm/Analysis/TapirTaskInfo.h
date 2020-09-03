@@ -1501,9 +1501,7 @@ class TaskInfoWrapperPass : public FunctionPass {
 public:
   static char ID; // Pass identification, replacement for typeid
 
-  TaskInfoWrapperPass() : FunctionPass(ID) {
-    initializeTaskInfoWrapperPassPass(*PassRegistry::getPassRegistry());
-  }
+  TaskInfoWrapperPass();
 
   TaskInfo &getTaskInfo() { return TI; }
   const TaskInfo &getTaskInfo() const { return TI; }

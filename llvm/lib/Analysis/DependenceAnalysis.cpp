@@ -4217,7 +4217,7 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
 
   if (!SrcA->isValid() || !DstA->isValid()) {
     LLVM_DEBUG(dbgs() << "could not interpret general accesses\n");
-    return make_unique<Dependence>(Src, Dst);
+    return std::make_unique<Dependence>(Src, Dst);
   }
 
   Value *SrcPtr = getGeneralAccessPointerOperand(SrcA);
@@ -4242,10 +4242,10 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
   // location's size, give up.
   if (isa<CallBase>(Src))
     if (!SrcA->Loc->Size.hasValue())
-      return make_unique<Dependence>(Src, Dst);
+      return std::make_unique<Dependence>(Src, Dst);
   if (isa<CallBase>(Dst))
     if (!DstA->Loc->Size.hasValue())
-      return make_unique<Dependence>(Src, Dst);
+      return std::make_unique<Dependence>(Src, Dst);
 
   // establish loop nesting levels
   establishNestingLevels(Src, Dst);
@@ -4260,7 +4260,7 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
   if (!SE->isSCEVable(SrcPtr->getType()) ||
       !SE->isSCEVable(DstPtr->getType())) {
     LLVM_DEBUG(dbgs() << "can't analyze non-scevable pointers\n");
-    return make_unique<Dependence>(Src, Dst);
+    return std::make_unique<Dependence>(Src, Dst);
   }
   const SCEV *SrcSCEV = SE->getSCEV(SrcPtr);
   const SCEV *DstSCEV = SE->getSCEV(DstPtr);
@@ -4344,7 +4344,7 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
   // to either Separable or Coupled).
   //
   // Next, we consider 1 and 2. The intersection of the GroupLoops is empty.
-  // Next, 1 and 3. The intersectionof their GroupLoops = {2}, not empty,
+  // Next, 1 and 3. The intersection of their GroupLoops = {2}, not empty,
   // so Pair[3].Group = {0, 1, 3} and Done = false.
   //
   // Next, we compare 2 against 3. The intersection of the GroupLoops is empty.
@@ -4590,5 +4590,5 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
       return nullptr;
   }
 
-  return make_unique<FullDependence>(std::move(Result));
+  return std::make_unique<FullDependence>(std::move(Result));
 }

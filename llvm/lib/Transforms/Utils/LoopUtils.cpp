@@ -535,7 +535,7 @@ llvm::collectChildrenInLoop(DomTreeNode *N, const Loop *CurLoop) {
 void llvm::deleteDeadLoop(Loop *L, DominatorTree *DT = nullptr,
                           ScalarEvolution *SE = nullptr,
                           LoopInfo *LI = nullptr,
-                          TaskInfo *TI = nullptr) {
+                          TaskInfo *TI) {
   assert((!DT || L->isLCSSAForm(*DT)) && "Expected LCSSA!");
   auto *Preheader = L->getLoopPreheader();
   assert(Preheader && "Preheader should exist!");

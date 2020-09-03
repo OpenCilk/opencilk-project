@@ -245,10 +245,6 @@
 ; CHECK-O2-NEXT: Running pass: LoopStripMinePass
 ; CHECK-O2-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-O2-NEXT: Running pass: FunctionToLoopPassAdaptor<{{.*}}LoopStandardAnalysisResults{{.*}}>
-; CHECK-O2-NEXT: Starting llvm::Function pass manager run.
-; CHECK-O2-NEXT: Running pass: LoopSimplifyPass
-; CHECK-O2-NEXT: Running pass: LCSSAPass
-; CHECK-O2-NEXT: Finished llvm::Function pass manager run.
 ; CHECK-O2-NEXT: Starting Loop pass manager run.
 ; CHECK-O2-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-O2-NEXT: Running pass: IndVarSimplifyPass
@@ -260,10 +256,6 @@
 ; CHECK-O3-NEXT: Running pass: LoopStripMinePass
 ; CHECK-O3-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-O3-NEXT: Running pass: FunctionToLoopPassAdaptor<{{.*}}LoopStandardAnalysisResults{{.*}}>
-; CHECK-O3-NEXT: Starting llvm::Function pass manager run.
-; CHECK-O3-NEXT: Running pass: LoopSimplifyPass
-; CHECK-O3-NEXT: Running pass: LCSSAPass
-; CHECK-O3-NEXT: Finished llvm::Function pass manager run.
 ; CHECK-O3-NEXT: Starting Loop pass manager run.
 ; CHECK-O3-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-O3-NEXT: Running pass: IndVarSimplifyPass

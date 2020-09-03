@@ -53,6 +53,8 @@
 ; CHECK-O2-NOT: Manager
 ; CHECK-O2: Loop Pass Manager
 ; CHECK-O2-NOT: Manager
+; CHECK-O2: Loop Pass Manager
+; CHECK-O2-NOT: Manager
 ; FIXME: We shouldn't be pulling out to simplify-cfg and instcombine and
 ; causing new loop pass managers.
 ; CHECK-O2: Simplify the CFG
@@ -62,7 +64,6 @@
 ; To handle Tapir, we now check the task information and try to
 ; simplify induction variables.
 ; CHECK-O2: Loop Pass Manager
-; CHECK-O2-NOT: Manager
 ; FIXME: It isn't clear that we need yet another loop pass pipeline
 ; and run of LICM here.
 ; CHECK-O2-NOT: Manager
@@ -88,6 +89,8 @@
 ; CHECK-O2-NEXT: Stripmine Tapir loops
 ; CHECK-O2: Loop Pass Manager
 ; CHECK-O2-NEXT: Simplify loop CFG
+; CHECK-O2: Loop Pass Manager
+; CHECK-O2-NEXT: Induction Variable Simplification
 ; We rotate loops prior to vectorization.
 ; CHECK-O2: Loop Pass Manager
 ; CHECK-O2-NEXT: Rotate Loops
