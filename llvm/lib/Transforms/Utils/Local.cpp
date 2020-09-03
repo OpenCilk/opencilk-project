@@ -2645,7 +2645,7 @@ bool llvm::removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU,
 
   DeleteDeadBlocks(BlocksToRemove.takeVector(), DTU);
 
-  removeDeadDetachUnwinds(F, LVI, DTU, MSSAU);
+  removeDeadDetachUnwinds(F, DTU, MSSAU);
 
   return Changed;
 }
@@ -2696,8 +2696,7 @@ static bool recursivelyCheckDetachedRethrows(
   return false;
 }
 
-bool llvm::removeDeadDetachUnwinds(Function &F, LazyValueInfo *LVI,
-                                   DomTreeUpdater *DTU,
+bool llvm::removeDeadDetachUnwinds(Function &F, DomTreeUpdater *DTU,
                                    MemorySSAUpdater *MSSAU) {
   SmallPtrSet<BasicBlock *, 16> DeadDU;
   // Recusirvely check all tasks for dead detach-unwinds.
@@ -2713,7 +2712,7 @@ bool llvm::removeDeadDetachUnwinds(Function &F, LazyValueInfo *LVI,
         }
   // If any dead detach-unwinds were removed, remove unreachable blocks.
   if (Changed)
-    removeUnreachableBlocks(F, LVI, DTU, MSSAU);
+    removeUnreachableBlocks(F, DTU, MSSAU);
   return Changed;
 }
 

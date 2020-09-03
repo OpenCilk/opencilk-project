@@ -23,6 +23,7 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Vectorize.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/Support/TargetRegistry.h"
 
 using namespace llvm;
@@ -296,7 +297,7 @@ void PTXLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
 
   bool Fail = PTXTargetMachine->addPassesToEmitFile(
       *PassManager, Ostr, &Ostr,
-      TargetMachine::CodeGenFileType::CGFT_AssemblyFile, false);
+      CodeGenFileType::CGFT_AssemblyFile, false);
   assert(!Fail && "Failed to emit PTX");
 
   PassManager->run(PTXM);

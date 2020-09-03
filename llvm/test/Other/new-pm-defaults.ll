@@ -240,8 +240,6 @@
 ; CHECK-O23SZ-NEXT: Running pass: LoopStripMinePass
 ; CHECK-O23SZ-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-O23SZ-NEXT: Running pass: LoopSimplifyPass
-; CHECK-O23SZ-NEXT: Running pass: LCSSAPass
-; CHECK-O23SZ-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-O23SZ-NEXT: Running pass: IndVarSimplifyPass
 ; CHECK-O23SZ-NEXT: Running pass: EarlyCSEPass
 ; CHECK-O23SZ-NEXT: Running pass: JumpThreadingPass

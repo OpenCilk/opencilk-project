@@ -15386,7 +15386,7 @@ public:
     notePostMod(O, UO, UK_ModAsSideEffect);
   }
 
-  void VisitCilkSpawnExpr(CilkSpawnExpr *E) {
+  void VisitCilkSpawnExpr(const CilkSpawnExpr *E) {
     Object O = getObject(E->getSpawnedExpr(), true);
     if (!O)
       return VisitExpr(E);

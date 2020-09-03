@@ -36,6 +36,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/ValueMap.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
@@ -1584,38 +1585,31 @@ bool LoopSpawningImpl::run() {
 }
 
 PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
-  auto &FAM =
-    AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
-  auto GetDT =
-    [&FAM](Function &F) -> DominatorTree & {
-      return FAM.getResult<DominatorTreeAnalysis>(F);
-    };
-  auto GetLI =
-    [&FAM](Function &F) -> LoopInfo & {
-      return FAM.getResult<LoopAnalysis>(F);
-    };
-  auto GetTI =
-    [&FAM](Function &F) -> TaskInfo & {
-      return FAM.getResult<TaskAnalysis>(F);
-    };
-  auto GetSE =
-    [&FAM](Function &F) -> ScalarEvolution & {
-      return FAM.getResult<ScalarEvolutionAnalysis>(F);
-    };
-  auto GetAC =
-    [&FAM](Function &F) -> AssumptionCache & {
-      return FAM.getResult<AssumptionAnalysis>(F);
-    };
-  auto GetTTI =
-    [&FAM](Function &F) -> TargetTransformInfo & {
-      return FAM.getResult<TargetIRAnalysis>(F);
-    };
-  auto &TLI = AM.getResult<TargetLibraryAnalysis>(M);
-  TapirTargetID TargetID = TLI.getTapirTarget();
-  auto GetORE =
-    [&FAM](Function &F) -> OptimizationRemarkEmitter & {
-      return FAM.getResult<OptimizationRemarkEmitterAnalysis>(F);
-    };
+  auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+  auto GetDT = [&FAM](Function &F) -> DominatorTree & {
+    return FAM.getResult<DominatorTreeAnalysis>(F);
+  };
+  auto GetLI = [&FAM](Function &F) -> LoopInfo & {
+    return FAM.getResult<LoopAnalysis>(F);
+  };
+  auto GetTI = [&FAM](Function &F) -> TaskInfo & {
+    return FAM.getResult<TaskAnalysis>(F);
+  };
+  auto GetSE = [&FAM](Function &F) -> ScalarEvolution & {
+    return FAM.getResult<ScalarEvolutionAnalysis>(F);
+  };
+  auto GetAC = [&FAM](Function &F) -> AssumptionCache & {
+    return FAM.getResult<AssumptionAnalysis>(F);
+  };
+  auto GetTTI = [&FAM](Function &F) -> TargetTransformInfo & {
+    return FAM.getResult<TargetIRAnalysis>(F);
+  };
+  auto GetTLI = [&FAM](Function &F) -> TargetLibraryInfo & {
+    return FAM.getResult<TargetLibraryAnalysis>(F);
+  };
+  auto GetORE = [&FAM](Function &F) -> OptimizationRemarkEmitter & {
+    return FAM.getResult<OptimizationRemarkEmitterAnalysis>(F);
+  };
 
   SmallVector<Function *, 8> WorkList;
   bool Changed = false;
@@ -1638,12 +1632,14 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
       Changed |= formLCSSARecursively(*L, DT, &LI, &SE);
   }
 
-  std::unique_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
   // Now process each loop.
-  for (Function *F : WorkList)
+  for (Function *F : WorkList) {
+    TapirTargetID TargetID = GetTLI(*F).getTapirTarget();
+    std::unique_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
     Changed |= LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
-                                GetAC(*F), GetTTI(*F), Target.get(),
-                                GetORE(*F)).run();
+                                GetAC(*F), GetTTI(*F), Target.get(), GetORE(*F))
+                   .run();
+  }
   if (Changed)
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
@@ -1672,7 +1668,7 @@ struct LoopSpawningTI : public FunctionPass {
     auto &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
     auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
     auto &AC = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
-    auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+    auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
     TapirTargetID TargetID = TLI.getTapirTarget();
     auto &TTI = getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
     auto &ORE = getAnalysis<OptimizationRemarkEmitterWrapperPass>().getORE();
