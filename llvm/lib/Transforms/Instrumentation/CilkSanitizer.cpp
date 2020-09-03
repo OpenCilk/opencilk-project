@@ -40,6 +40,7 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/CSI.h"
@@ -186,8 +187,9 @@ struct CilkSanitizerImpl : public CSIImpl {
   class SimpleInstrumentor {
   public:
     SimpleInstrumentor(CilkSanitizerImpl &CilkSanImpl, TaskInfo &TI,
-                       LoopInfo &LI, DominatorTree *DT)
-        : CilkSanImpl(CilkSanImpl), TI(TI), LI(LI), DT(DT) {}
+                       LoopInfo &LI, DominatorTree *DT,
+                       const TargetLibraryInfo *TLI)
+        : CilkSanImpl(CilkSanImpl), TI(TI), LI(LI), DT(DT), TLI(TLI) {}
 
     bool InstrumentSimpleInstructions(
         SmallVectorImpl<Instruction *> &Instructions);
@@ -199,8 +201,7 @@ struct CilkSanitizerImpl : public CSIImpl {
         SmallPtrSetImpl<Instruction *> &AllocationFnCalls,
         SmallPtrSetImpl<Instruction *> &FreeCalls,
         DenseMap<Value *, unsigned> &SyncRegNums,
-        DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL,
-        const TargetLibraryInfo *TLI);
+        DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL);
 
   private:
     void getDetachesForInstruction(Instruction *I);
@@ -209,6 +210,7 @@ struct CilkSanitizerImpl : public CSIImpl {
     TaskInfo &TI;
     LoopInfo &LI;
     DominatorTree *DT;
+    const TargetLibraryInfo *TLI;
 
     SmallPtrSet<DetachInst *, 8> Detaches;
 
@@ -220,8 +222,8 @@ struct CilkSanitizerImpl : public CSIImpl {
   class Instrumentor {
   public:
     Instrumentor(CilkSanitizerImpl &CilkSanImpl, RaceInfo &RI, TaskInfo &TI,
-                 LoopInfo &LI, DominatorTree *DT)
-        : CilkSanImpl(CilkSanImpl), RI(RI), TI(TI), LI(LI), DT(DT) {}
+                 LoopInfo &LI, DominatorTree *DT, const TargetLibraryInfo *TLI)
+        : CilkSanImpl(CilkSanImpl), RI(RI), TI(TI), LI(LI), DT(DT), TLI(TLI) {}
 
     void InsertArgMAAPs(Function &F, Value *FuncId);
     bool InstrumentSimpleInstructions(
@@ -237,8 +239,7 @@ struct CilkSanitizerImpl : public CSIImpl {
         SmallPtrSetImpl<Instruction *> &AllocationFnCalls,
         SmallPtrSetImpl<Instruction *> &FreeCalls,
         DenseMap<Value *, unsigned> &SyncRegNums,
-        DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL,
-        const TargetLibraryInfo *TLI);
+        DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL);
     bool InstrumentLoops(SmallPtrSetImpl<Instruction *> &LoopInstToHoist,
                          SmallPtrSetImpl<Instruction *> &LoopInstToSink,
                          ScalarEvolution *);
@@ -284,6 +285,7 @@ struct CilkSanitizerImpl : public CSIImpl {
     TaskInfo &TI;
     LoopInfo &LI;
     DominatorTree *DT;
+    const TargetLibraryInfo *TLI;
 
     SmallPtrSet<DetachInst *, 8> Detaches;
 
@@ -300,12 +302,13 @@ struct CilkSanitizerImpl : public CSIImpl {
                     function_ref<TaskInfo &(Function &)> GetTaskInfo,
                     function_ref<LoopInfo &(Function &)> GetLoopInfo,
                     function_ref<RaceInfo &(Function &)> GetRaceInfo,
-                    const TargetLibraryInfo *TLI,
+                    function_ref<TargetLibraryInfo &(Function &)> GetTLI,
                     function_ref<ScalarEvolution &(Function &)> GetSE,
-                    //function_ref<TargetTransformInfo &(Function &)> GetTTI,
+                    // function_ref<TargetTransformInfo &(Function &)> GetTTI,
                     bool JitMode = false,
                     bool CallsMayThrow = !AssumeNoExceptions)
-      : CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, TLI, GetSE, nullptr),
+      : CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, GetTLI, GetSE,
+                nullptr),
         GetRaceInfo(GetRaceInfo) {
     // Even though we're doing our own instrumentation, we want the CSI setup
     // for the instrumentation of function entry/exit, memory accesses (i.e.,
@@ -359,10 +362,10 @@ struct CilkSanitizerImpl : public CSIImpl {
 
   // Helper function for prepareToInstrumentFunction that chooses loads and
   // stores in a basic block to instrument.
-  void chooseInstructionsToInstrument(
-      SmallVectorImpl<Instruction *> &Local,
-      SmallVectorImpl<Instruction *> &All,
-      const TaskInfo &TI, LoopInfo &LI);
+  void chooseInstructionsToInstrument(SmallVectorImpl<Instruction *> &Local,
+                                      SmallVectorImpl<Instruction *> &All,
+                                      const TaskInfo &TI, LoopInfo &LI,
+                                      const TargetLibraryInfo *TLI);
 
   // Helper methods for instrumenting different IR objects.
   bool instrumentLoadOrStore(Instruction *I, IRBuilder<> &IRB);
@@ -378,8 +381,9 @@ struct CilkSanitizerImpl : public CSIImpl {
   bool instrumentCallsite(Instruction *I,
                           SmallVectorImpl<Value *> *MAAPVals = nullptr);
   bool suppressCallsite(Instruction *I);
-  bool instrumentAllocationFn(Instruction *I, DominatorTree *DT);
-  bool instrumentFree(Instruction *I);
+  bool instrumentAllocationFn(Instruction *I, DominatorTree *DT,
+                              const TargetLibraryInfo *TLI);
+  bool instrumentFree(Instruction *I, const TargetLibraryInfo *TLI);
   bool instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
                         unsigned NumSyncRegs, DominatorTree *DT, TaskInfo &TI,
                         LoopInfo &LI);
@@ -1152,7 +1156,7 @@ void CilkSanitizerImpl::setupBlocks(Function &F, DominatorTree *DT) {
   }
 
   for (BasicBlock *BB : BlocksToSetup)
-    setupBlock(BB, DT, TLI);
+    setupBlock(BB, DT, &GetTLI(F));
 }
 
 // Do not instrument known races/"benign races" that come from compiler
@@ -1366,7 +1370,7 @@ bool CilkSanitizerImpl::unknownObjectUses(const Value *Addr, LoopInfo *LI,
 
 void CilkSanitizerImpl::chooseInstructionsToInstrument(
     SmallVectorImpl<Instruction *> &Local, SmallVectorImpl<Instruction *> &All,
-    const TaskInfo &TI, LoopInfo &LI) {
+    const TaskInfo &TI, LoopInfo &LI, const TargetLibraryInfo *TLI) {
   SmallSet<Value*, 8> WriteTargets;
   // Iterate from the end.
   for (Instruction *I : reverse(Local)) {
@@ -1508,8 +1512,7 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentCalls(
   bool Result = false;
   for (Instruction *I : Calls) {
     // Allocation-function and free calls are handled separately.
-    if (isAllocationFn(I, CilkSanImpl.TLI, false, true) ||
-        isFreeCall(I, CilkSanImpl.TLI))
+    if (isAllocationFn(I, TLI, false, true) || isFreeCall(I, TLI))
       continue;
 
     bool LocalResult = false;
@@ -1529,8 +1532,7 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAncillaryInstructions(
     SmallPtrSetImpl<Instruction *> &AllocationFnCalls,
     SmallPtrSetImpl<Instruction *> &FreeCalls,
     DenseMap<Value *, unsigned> &SyncRegNums,
-    DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL,
-    const TargetLibraryInfo *TLI) {
+    DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL) {
   bool Result = false;
   SmallPtrSet<SyncInst *, 4> Syncs;
   SmallPtrSet<Loop *, 4> Loops;
@@ -1545,7 +1547,7 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAncillaryInstructions(
   }
   for (Instruction *I : AllocationFnCalls) {
     // The simple instrumentor just instruments everything
-    CilkSanImpl.instrumentAllocationFn(I, DT);
+    CilkSanImpl.instrumentAllocationFn(I, DT, TLI);
     getDetachesForInstruction(I);
     Result = true;
   }
@@ -1556,14 +1558,14 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAncillaryInstructions(
     // function, then instrument it.
     if (Instruction *PtrI = dyn_cast<Instruction>(Ptr)) {
       if (AllocationFnCalls.count(PtrI)) {
-        CilkSanImpl.instrumentFree(I);
+        CilkSanImpl.instrumentFree(I, TLI);
         getDetachesForInstruction(I);
         Result = true;
         continue;
       }
     }
     // The simple instrumentor just instruments everything
-    CilkSanImpl.instrumentFree(I);
+    CilkSanImpl.instrumentFree(I, TLI);
     getDetachesForInstruction(I);
     Result = true;
   }
@@ -1801,8 +1803,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
   bool Result = false;
   for (Instruction *I : Calls) {
     // Allocation-function and free calls are handled separately.
-    if (isAllocationFn(I, CilkSanImpl.TLI, false, true) ||
-        isFreeCall(I, CilkSanImpl.TLI))
+    if (isAllocationFn(I, TLI, false, true) || isFreeCall(I, TLI))
       continue;
 
     bool LocalResult = false;
@@ -1987,8 +1988,7 @@ Value *CilkSanitizerImpl::Instrumentor::getNoAliasMAAPValue(
 
     // If we can tell statically that these two memory locations don't alias,
     // move on.
-    if (!AA->alias(Loc, getMemoryLocation(I, OtherRD.OperandNum,
-                                          CilkSanImpl.TLI)))
+    if (!AA->alias(Loc, getMemoryLocation(I, OtherRD.OperandNum, TLI)))
       continue;
 
     // We trust that the MAAP value in LocalMAAPs[] for this object Obj, set by
@@ -2043,7 +2043,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
     MAAPVal DefaultMV, bool CheckArgs) {
   Function *F = I->getFunction();
   AliasAnalysis *AA = RI.getAA();
-  MemoryLocation Loc = getMemoryLocation(I, OperandNum, CilkSanImpl.TLI);
+  MemoryLocation Loc = getMemoryLocation(I, OperandNum, TLI);
   Value *MV = getMAAPIRValue(IRB, static_cast<unsigned>(MAAPVal::NoAccess));
   Value *DefaultMAAP = getMAAPIRValue(IRB, static_cast<unsigned>(DefaultMV));
   Value *NoAliasFlag = getMAAPIRValue(IRB,
@@ -2063,7 +2063,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
       }
 
       // If this argument does not alias Loc, skip it.
-      if (!AA->alias(Loc, getMemoryLocation(I, OpIdx, CilkSanImpl.TLI))) {
+      if (!AA->alias(Loc, getMemoryLocation(I, OpIdx, TLI))) {
         ++OpIdx;
         continue;
       }
@@ -2071,7 +2071,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
       // If the operands must alias, then discard the default noalias MAAP
       // value.
       AliasResult ArgAlias =
-          AA->alias(Loc, getMemoryLocation(I, OpIdx, CilkSanImpl.TLI));
+          AA->alias(Loc, getMemoryLocation(I, OpIdx, TLI));
       if (MustAlias == ArgAlias || PartialAlias == ArgAlias) {
         NoAliasFlag = getMAAPIRValue(IRB, 0);
         break;
@@ -2263,7 +2263,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
   Function *F = I->getFunction();
   bool LocalRace = RI.mightRaceLocally(I);
   AliasAnalysis *AA = RI.getAA();
-  MemoryLocation Loc = getMemoryLocation(I, OperandNum, CilkSanImpl.TLI);
+  MemoryLocation Loc = getMemoryLocation(I, OperandNum, TLI);
   Value *MAAPChk = IRB.getTrue();
   // Check the recorded race data for I.
   for (const RaceInfo::RaceData &RD : RI.getRaceData(I)) {
@@ -2499,8 +2499,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
     SmallPtrSetImpl<Instruction *> &AllocationFnCalls,
     SmallPtrSetImpl<Instruction *> &FreeCalls,
     DenseMap<Value *, unsigned> &SyncRegNums,
-    DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL,
-    const TargetLibraryInfo *TLI) {
+    DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL) {
   bool Result = false;
   SmallPtrSet<SyncInst *, 4> Syncs;
   SmallPtrSet<Loop *, 4> Loops;
@@ -2518,7 +2517,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
   for (Instruction *I : AllocationFnCalls) {
     if (CilkSanImpl.ObjectMRForRace.count(I) ||
         CilkSanImpl.lookupPointerMayBeCaptured(I)) {
-      CilkSanImpl.instrumentAllocationFn(I, DT);
+      CilkSanImpl.instrumentAllocationFn(I, DT, TLI);
       getDetachesForInstruction(I);
       Result = true;
     }
@@ -2530,7 +2529,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
     // function, or if the pointer is involved in a race, then instrument it.
     if (Instruction *PtrI = dyn_cast<Instruction>(Ptr)) {
       if (AllocationFnCalls.count(PtrI)) {
-        CilkSanImpl.instrumentFree(I);
+        CilkSanImpl.instrumentFree(I, TLI);
         getDetachesForInstruction(I);
         Result = true;
         continue;
@@ -2538,7 +2537,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
     }
     if (RI.ObjectInvolvedInRace(Ptr) ||
         CilkSanImpl.unknownObjectUses(Ptr, &LI, TLI)) {
-      CilkSanImpl.instrumentFree(I);
+      CilkSanImpl.instrumentFree(I, TLI);
       getDetachesForInstruction(I);
       Result = true;
     }
@@ -3029,6 +3028,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   SmallPtrSet<Instruction *, 8> LoopInstToHoist;
   SmallPtrSet<Instruction *, 8> LoopInstToSink;
 
+  const TargetLibraryInfo *TLI = &GetTLI(F);
   DominatorTree *DT = &GetDomTree(F);
   LoopInfo &LI = GetLoopInfo(F);
   TaskInfo &TI = GetTaskInfo(F);
@@ -3095,7 +3095,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                   LoopInstToHoist.insert(&Inst);
                   canCoalesce = true;
                 } else if (!isa<SCEVCouldNotCompute>(
-                               SE.getMaxBackedgeTakenCount(L))) {
+                               SE.getConstantMaxBackedgeTakenCount(L))) {
                   // can sink if |stride| <= |size| and the tripcount is
                   // unknown but guaranteed to be finite.
                   LoopInstToSink.insert(&Inst);
@@ -3148,13 +3148,13 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
         // Add the current set of local loads and stores to be considered for
         // instrumentation.
         if (!simpleCallCannotRace(Inst)) {
-          chooseInstructionsToInstrument(LocalLoadsAndStores,
-                                         AllLoadsAndStores, TI, LI);
+          chooseInstructionsToInstrument(LocalLoadsAndStores, AllLoadsAndStores,
+                                         TI, LI, TLI);
         }
       }
     }
     chooseInstructionsToInstrument(LocalLoadsAndStores, AllLoadsAndStores, TI,
-                                     LI);
+                                   LI, TLI);
   }
 
   // Evaluate the tasks that might be in parallel with each spindle.
@@ -3177,7 +3177,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
   bool Result = false;
   if (!EnableStaticRaceDetection) {
-    SimpleInstrumentor FuncI(*this, TI, LI, DT);
+    SimpleInstrumentor FuncI(*this, TI, LI, DT, TLI);
     Result |= FuncI.InstrumentSimpleInstructions(AllLoadsAndStores);
     Result |= FuncI.InstrumentSimpleInstructions(AtomicAccesses);
     Result |= FuncI.InstrumentAnyMemIntrinsics(MemIntrinCalls);
@@ -3187,9 +3187,9 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
     // calls, free calls, detaches, and syncs.
     Result |= FuncI.InstrumentAncillaryInstructions(Allocas, AllocationFnCalls,
                                                     FreeCalls, SyncRegNums,
-                                                    SRCounters, DL, TLI);
+                                                    SRCounters, DL);
   } else {
-    Instrumentor FuncI(*this, RI, TI, LI, DT);
+    Instrumentor FuncI(*this, RI, TI, LI, DT, TLI);
     // Insert MAAP flags for each function argument.
     FuncI.InsertArgMAAPs(F, FuncId);
 
@@ -3207,7 +3207,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
     // calls, free calls, detaches, and syncs.
     Result |= FuncI.InstrumentAncillaryInstructions(Allocas, AllocationFnCalls,
                                                     FreeCalls, SyncRegNums,
-                                                    SRCounters, DL, TLI);
+                                                    SRCounters, DL);
 
     // Hoist and sink instrumentation when possible (applies to all loops,
     // not just Tapir loops)
@@ -3232,7 +3232,8 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
       // TODO: Determine if we actually want the frame pointer, not the stack
       // pointer.
       Value *FrameAddr =
-          IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::frameaddress),
+          IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::frameaddress,
+                                                   IRB.getInt8PtrTy()),
                          {IRB.getInt32(0)});
       Value *StackSave =
           IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
@@ -4034,7 +4035,8 @@ void CilkSanitizerImpl::getAllocFnArgs(
 }
 
 bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
-                                               DominatorTree *DT) {
+                                               DominatorTree *DT,
+                                               const TargetLibraryInfo *TLI) {
   // Only insert instrumentation if requested
   if (!(InstrumentationSet & SHADOWMEMORY))
     return true;
@@ -4125,7 +4127,8 @@ bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
   return true;
 }
 
-bool CilkSanitizerImpl::instrumentFree(Instruction *I) {
+bool CilkSanitizerImpl::instrumentFree(Instruction *I,
+                                       const TargetLibraryInfo *TLI) {
   // Only insert instrumentation if requested
   if (!(InstrumentationSet & SHADOWMEMORY))
     return true;
@@ -4164,8 +4167,11 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
     return false;
 
   CallGraph *CG = &getAnalysis<CallGraphWrapperPass>().getCallGraph();
-  const TargetLibraryInfo *TLI =
-      &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+  // const TargetLibraryInfo *TLI =
+  //     &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+  auto GetTLI = [this](Function &F) -> TargetLibraryInfo & {
+    return this->getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+  };
   auto GetDomTree = [this](Function &F) -> DominatorTree & {
     return this->getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
   };
@@ -4183,12 +4189,13 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
   };
 
   bool Changed =
-      CilkSanitizerImpl(M, CG, GetDomTree, nullptr, GetLoopInfo, nullptr, TLI,
-                        nullptr, JitMode, CallsMayThrow)
+      CilkSanitizerImpl(M, CG, GetDomTree, nullptr, GetLoopInfo, nullptr,
+                        GetTLI, nullptr, JitMode, CallsMayThrow)
           .setup();
-  Changed |= CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo,
-                               GetRaceInfo, TLI, GetSE, JitMode, CallsMayThrow)
-                 .run();
+  Changed |=
+      CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo,
+                        GetRaceInfo, GetTLI, GetSE, JitMode, CallsMayThrow)
+          .run();
   return Changed;
 }
 
@@ -4211,16 +4218,20 @@ PreservedAnalyses CilkSanitizerPass::run(Module &M, ModuleAnalysisManager &AM) {
     [&FAM](Function &F) -> RaceInfo & {
       return FAM.getResult<TapirRaceDetect>(F);
     };
-  auto *TLI = &AM.getResult<TargetLibraryAnalysis>(M);
+  auto GetTLI =
+    [&FAM](Function &F) -> TargetLibraryInfo & {
+      return FAM.getResult<TargetLibraryAnalysis>(F);
+    };
   auto GetSE = [&FAM](Function &F) -> ScalarEvolution & {
     return FAM.getResult<ScalarEvolutionAnalysis>(F);
   };
 
   bool Changed =
-      CilkSanitizerImpl(M, &CG, GetDT, nullptr, GetLI, nullptr, TLI, nullptr)
+      CilkSanitizerImpl(M, &CG, GetDT, nullptr, GetLI, nullptr, GetTLI, nullptr)
           .setup();
   Changed |=
-      CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetRI, TLI, GetSE).run();
+      CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetRI, GetTLI, GetSE)
+          .run();
 
   if (!Changed)
     return PreservedAnalyses::all();

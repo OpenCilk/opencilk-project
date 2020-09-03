@@ -131,7 +131,6 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
     else
       SetHints(LoopHintAttr::UnrollAndJam, LoopHintAttr::Enable);
   } else if (PragmaName == "cilk") {
-    Spelling = LoopHintAttr::Pragma_cilk;
     Option = llvm::StringSwitch<LoopHintAttr::OptionType>(
                  OptionLoc->Ident->getName())
                  .Case("grainsize", LoopHintAttr::TapirGrainsize)
@@ -261,21 +260,21 @@ static Attr *handleUnlikely(Sema &S, Stmt *St, const ParsedAttr &A,
 static void
 CheckForIncompatibleAttributes(Sema &S,
                                const SmallVectorImpl<const Attr *> &Attrs) {
-  // There are 7 categories of loop hints attributes: vectorize, interleave,
-  // unroll, unroll_and_jam, pipeline, distribute, and (Tapir) grainsize. Except
-  // for distribute they come in two variants: a state form and a numeric form.
-  // The state form selectively defaults/enables/disables the transformation for
-  // the loop (for unroll, default indicates full unrolling rather than enabling
-  // the transformation). The numeric form form provides an integer hint (for
-  // example, unroll count) to the transformer. The following array accumulates
-  // the hints encountered while iterating through the attributes to check for
-  // compatibility.
+  // There are 8 categories of loop hints attributes: vectorize, interleave,
+  // unroll, unroll_and_jam, pipeline, distribute, vectorize_predicate, and
+  // (Tapir) grainsize. Except for distribute they come in two variants: a state
+  // form and a numeric form. The state form selectively
+  // defaults/enables/disables the transformation for the loop (for unroll,
+  // default indicates full unrolling rather than enabling the transformation).
+  // The numeric form form provides an integer hint (for example, unroll count)
+  // to the transformer. The following array accumulates the hints encountered
+  // while iterating through the attributes to check for compatibility.
   struct {
     const LoopHintAttr *StateAttr;
     const LoopHintAttr *NumericAttr;
   } HintAttrs[] = {{nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr},
                    {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr},
-                   {nullptr, nullptr}};
+                   {nullptr, nullptr}, {nullptr, nullptr}};
 
   for (const auto *I : Attrs) {
     const LoopHintAttr *LH = dyn_cast<LoopHintAttr>(I);

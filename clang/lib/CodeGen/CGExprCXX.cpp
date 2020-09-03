@@ -83,10 +83,11 @@ RValue CodeGenFunction::EmitCXXMemberOrOperatorCall(
   IsSpawnedScope SpawnedScp(this);
   const FunctionProtoType *FPT = MD->getType()->castAs<FunctionProtoType>();
   CallArgList Args;
-  if (CE)
-    if (auto *OCE = dyn_cast<CXXOperatorCallExpr>(CE))
-      if (OCE->isAssignmentOp())
-        SpawnedScp.RestoreOldScope();
+  if (auto *OCE = dyn_cast_or_null<CXXOperatorCallExpr>(CE))
+    if (OCE->isAssignmentOp())
+      // Restore the original spawned scope when handling an assignment
+      // operator, so that the RHS of the assignment is detached.
+      SpawnedScp.RestoreOldScope();
   MemberCallInfo CallInfo = commonEmitCXXMemberOrOperatorCall(
       *this, MD, This, ImplicitParam, ImplicitParamTy, CE, Args, RtlArgs);
   auto &FnInfo = CGM.getTypes().arrangeCXXMethodCall(
@@ -311,10 +312,10 @@ RValue CodeGenFunction::EmitCXXMemberOrOperatorMemberCallExpr(
       // We don't like to generate the trivial copy/move assignment operator
       // when it isn't necessary; just produce the proper effect here.
       if (isa<CXXOperatorCallExpr>(CE) && SpawnedScp.OldScopeIsSpawned()) {
+        // Restore the original spawned scope so that the RHS of the assignment
+        // is detached.
         SpawnedScp.RestoreOldScope();
-        RtlArgs = &RtlArgStorage;
-        EmitCallArgs(*RtlArgs, MD->getType()->castAs<FunctionProtoType>(),
-                     drop_begin(CE->arguments(), 1), CE->getDirectCallee());
+        TrivialAssignmentRHS = EmitLValue(CE->getArg(1));
       }
       // It's important that we use the result of EmitLValue here rather than
       // emitting call arguments, in order to preserve TBAA information from

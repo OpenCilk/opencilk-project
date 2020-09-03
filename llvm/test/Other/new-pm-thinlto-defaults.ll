@@ -214,10 +214,6 @@
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopStripMinePass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: FunctionToLoopPassAdaptor<{{.*}}LoopStandardAnalysisResults{{.*}}>
-; CHECK-POSTLINK-O2-NEXT: Starting llvm::Function pass manager run.
-; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyPass
-; CHECK-POSTLINK-O2-NEXT: Running pass: LCSSAPass
-; CHECK-POSTLINK-O2-NEXT: Finished llvm::Function pass manager run.
 ; CHECK-POSTLINK-O2-NEXT: Starting Loop pass manager run.
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: IndVarSimplifyPass
@@ -229,10 +225,6 @@
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopStripMinePass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: FunctionToLoopPassAdaptor<{{.*}}LoopStandardAnalysisResults{{.*}}>
-; CHECK-POSTLINK-O3-NEXT: Starting llvm::Function pass manager run.
-; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyPass
-; CHECK-POSTLINK-O3-NEXT: Running pass: LCSSAPass
-; CHECK-POSTLINK-O3-NEXT: Finished llvm::Function pass manager run.
 ; CHECK-POSTLINK-O3-NEXT: Starting Loop pass manager run.
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: IndVarSimplifyPass

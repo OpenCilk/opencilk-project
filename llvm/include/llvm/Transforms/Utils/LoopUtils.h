@@ -181,7 +181,8 @@ bool hoistRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
 /// It also updates the loop PM if an updater struct is provided.
 
 void deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
-                    LoopInfo *LI, TaskInfo *TI, MemorySSA *MSSA = nullptr);
+                    LoopInfo *LI, TaskInfo *TI = nullptr,
+                    MemorySSA *MSSA = nullptr);
 
 /// Remove the backedge of the specified loop.  Handles loop nests and general
 /// loop structures subject to the precondition that the loop has no parent

@@ -34,7 +34,9 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/Instrumentation.h"
@@ -1550,7 +1552,8 @@ void CSIImpl::getAllocFnArgs(const Instruction *I,
   }
 }
 
-void CSIImpl::instrumentAllocFn(Instruction *I, DominatorTree *DT) {
+void CSIImpl::instrumentAllocFn(Instruction *I, DominatorTree *DT,
+                                const TargetLibraryInfo *TLI) {
   bool IsInvoke = isa<InvokeInst>(I);
   Function *Called = nullptr;
   if (CallInst *CI = dyn_cast<CallInst>(I))
@@ -1631,7 +1634,7 @@ void CSIImpl::instrumentAllocFn(Instruction *I, DominatorTree *DT) {
   }
 }
 
-void CSIImpl::instrumentFree(Instruction *I) {
+void CSIImpl::instrumentFree(Instruction *I, const TargetLibraryInfo *TLI) {
   // It appears that frees (and deletes) never throw.
   assert(isa<CallInst>(I) && "Free call is not a call instruction");
 
@@ -2316,6 +2319,7 @@ void CSIImpl::instrumentFunction(Function &F) {
     // exception-handling code.
     setupCalls(F);
 
+  const TargetLibraryInfo *TLI = &GetTLI(F);
   // Canonicalize the CFG for CSI instrumentation
   setupBlocks(F, TLI);
 
@@ -2450,9 +2454,9 @@ void CSIImpl::instrumentFunction(Function &F) {
 
   if (Options.InstrumentAllocFns) {
     for (Instruction *I : AllocationFnCalls)
-      instrumentAllocFn(I, DT);
+      instrumentAllocFn(I, DT, TLI);
     for (Instruction *I : FreeCalls)
-      instrumentFree(I);
+      instrumentFree(I, TLI);
   }
 
   if (Options.Interpose && Config->DoesAnyFunctionRequireInterposition()) {
@@ -2557,8 +2561,9 @@ bool ComprehensiveStaticInstrumentationLegacyPass::runOnModule(Module &M) {
     return false;
 
   CallGraph *CG = &getAnalysis<CallGraphWrapperPass>().getCallGraph();
-  const TargetLibraryInfo *TLI =
-      &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+  auto GetTLI = [this](Function &F) -> TargetLibraryInfo & {
+    return this->getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
+  };
   auto GetDomTree = [this](Function &F) -> DominatorTree & {
     return this->getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
   };
@@ -2575,8 +2580,9 @@ bool ComprehensiveStaticInstrumentationLegacyPass::runOnModule(Module &M) {
     return this->getAnalysis<TaskInfoWrapperPass>(F).getTaskInfo();
   };
 
-  bool res = CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, TLI, GetSE,
-                     GetTTI, Options).run();
+  bool res = CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, GetTLI, GetSE,
+                     GetTTI, Options)
+                 .run();
 
   verifyModule(M, &llvm::errs());
 
@@ -2610,9 +2616,12 @@ ComprehensiveStaticInstrumentationPass::run(Module &M,
   auto GetTI = [&FAM](Function &F) -> TaskInfo & {
     return FAM.getResult<TaskAnalysis>(F);
   };
-  auto *TLI = &AM.getResult<TargetLibraryAnalysis>(M);
+  auto GetTLI = [&FAM](Function &F) -> TargetLibraryInfo & {
+    return FAM.getResult<TargetLibraryAnalysis>(F);
+  };
 
-  if (!CSIImpl(M, &CG, GetDT, GetLI, GetTI, TLI, GetSE, GetTTI, Options).run())
+  if (!CSIImpl(M, &CG, GetDT, GetLI, GetTI, GetTLI, GetSE, GetTTI, Options)
+           .run())
     return PreservedAnalyses::all();
 
   return PreservedAnalyses::none();
