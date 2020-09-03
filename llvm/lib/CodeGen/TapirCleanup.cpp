@@ -17,6 +17,7 @@
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 

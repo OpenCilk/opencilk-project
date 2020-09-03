@@ -154,7 +154,8 @@ bool hoistRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
 /// It also updates the loop PM if an updater struct is provided.
 
 void deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
-                    LoopInfo *LI, TaskInfo *TI, MemorySSA *MSSA = nullptr);
+                    LoopInfo *LI, TaskInfo *TI = nullptr,
+                    MemorySSA *MSSA = nullptr);
 
 /// Try to promote memory values to scalars by sinking stores out of
 /// the loop and moving loads to before the loop.  We do this by looping over

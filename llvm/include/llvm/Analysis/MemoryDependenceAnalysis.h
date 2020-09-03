@@ -371,8 +371,8 @@ public:
                           const TargetLibraryInfo &TLI, DominatorTree &DT,
                           PhiValues &PV, unsigned DefaultBlockScanLimit,
                           TaskInfo *TI = nullptr)
-      : AA(AA), AC(AC), TLI(TLI), DT(DT), PV(PV),
-        DefaultBlockScanLimit(DefaultBlockScanLimit), TI(TI) {}
+      : AA(AA), AC(AC), TLI(TLI), DT(DT), PV(PV), TI(TI),
+        DefaultBlockScanLimit(DefaultBlockScanLimit) {}
 
   /// Handle invalidation in the new PM.
   bool invalidate(Function &F, const PreservedAnalyses &PA,
