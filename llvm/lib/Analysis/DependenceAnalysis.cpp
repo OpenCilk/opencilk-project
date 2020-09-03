@@ -4509,7 +4509,7 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
 
   if (!SrcA->isValid() || !DstA->isValid()) {
     LLVM_DEBUG(dbgs() << "could not interpret general accesses\n");
-    return make_unique<Dependence>(Src, Dst);
+    return std::make_unique<Dependence>(Src, Dst);
   }
 
   Value *SrcPtr = getGeneralAccessPointerOperand(SrcA);
@@ -4534,10 +4534,10 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
   // location's size, give up.
   if (isa<CallBase>(Src))
     if (!SrcA->Loc->Size.hasValue())
-      return make_unique<Dependence>(Src, Dst);
+      return std::make_unique<Dependence>(Src, Dst);
   if (isa<CallBase>(Dst))
     if (!DstA->Loc->Size.hasValue())
-      return make_unique<Dependence>(Src, Dst);
+      return std::make_unique<Dependence>(Src, Dst);
 
   // establish loop nesting levels
   establishNestingLevels(Src, Dst);
@@ -4552,7 +4552,7 @@ DependenceInfo::depends(GeneralAccess *SrcA, GeneralAccess *DstA,
   if (!SE->isSCEVable(SrcPtr->getType()) ||
       !SE->isSCEVable(DstPtr->getType())) {
     LLVM_DEBUG(dbgs() << "can't analyze non-scevable pointers\n");
-    return make_unique<Dependence>(Src, Dst);
+    return std::make_unique<Dependence>(Src, Dst);
   }
   const SCEV *SrcSCEV = SE->getSCEV(SrcPtr);
   const SCEV *DstSCEV = SE->getSCEV(DstPtr);

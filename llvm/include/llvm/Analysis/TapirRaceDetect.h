@@ -315,10 +315,7 @@ class TapirRaceDetectWrapperPass : public FunctionPass {
 public:
   static char ID;
 
-  TapirRaceDetectWrapperPass() : FunctionPass(ID) {
-    initializeTapirRaceDetectWrapperPassPass(
-        *PassRegistry::getPassRegistry());
-  }
+  TapirRaceDetectWrapperPass();
 
   bool runOnFunction(Function &F) override;
   void releaseMemory() override;

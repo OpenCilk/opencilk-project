@@ -357,9 +357,9 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   Value *Buf = GEP(B, SF, StackFrameFields::ctx);
 
   // Store the frame pointer in the 0th slot
-  Value *FrameAddr =
-    B.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::frameaddress),
-                 ConstantInt::get(Int32Ty, 0));
+  Value *FrameAddr = B.CreateCall(
+      Intrinsic::getDeclaration(&M, Intrinsic::frameaddress, Int8PtrTy),
+      ConstantInt::get(Int32Ty, 0));
 
   Value *FrameSaveSlot = GEP(B, Buf, 0);
   B.CreateStore(FrameAddr, FrameSaveSlot, /*isVolatile=*/true);
@@ -1311,7 +1311,7 @@ AllocaInst *CilkABI::CreateStackFrame(Function &F) {
   AllocaInst *SF = B.CreateAlloca(SFTy, DL.getAllocaAddrSpace(),
                                   /*ArraySize*/nullptr,
                                   /*Name*/stack_frame_name);
-  SF->setAlignment(8);
+  SF->setAlignment(Align(8));
 
   return SF;
 }

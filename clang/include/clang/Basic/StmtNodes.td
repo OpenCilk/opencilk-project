@@ -218,10 +218,10 @@ def MSDependentExistsStmt : StmtNode<Stmt>;
 def AsTypeExpr : StmtNode<Expr>;
 
 // Cilk Plus Extensions.
-def CilkSyncStmt : Stmt;
-def CilkSpawnStmt : Stmt;
-def CilkSpawnExpr : DStmt<Expr>;
-def CilkForStmt : Stmt;
+def CilkSyncStmt : StmtNode<Stmt>;
+def CilkSpawnStmt : StmtNode<Stmt>;
+def CilkSpawnExpr : StmtNode<Expr>;
+def CilkForStmt : StmtNode<Stmt>;
 
 // OpenMP Directives.
 def OMPCanonicalLoop : StmtNode<Stmt>;

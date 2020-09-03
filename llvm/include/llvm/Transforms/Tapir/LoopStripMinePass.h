@@ -10,6 +10,7 @@
 #define LLVM_TRANSFORMS_TAPIR_LOOPSTRIPMINEPASS_H
 
 #include "llvm/IR/PassManager.h"
+#include "llvm/Support/CommandLine.h"
 
 namespace llvm {
 

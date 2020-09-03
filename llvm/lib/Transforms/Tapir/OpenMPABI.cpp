@@ -18,6 +18,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
@@ -229,10 +230,11 @@ Value *getThreadID(Function *F, IRBuilder<> &IRBuilder) {
     DataLayout DL(F->getParent());
     auto Alloca = I2->second;
     auto ThreadIDAddrs = IRBuilder.CreateLoad(Alloca);
-    ThreadIDAddrs->setAlignment(DL.getTypeAllocSize(ThreadIDAddrs->getType()));
+    ThreadIDAddrs->setAlignment(
+        Align(DL.getPrefTypeAlignment(ThreadIDAddrs->getType())));
     ThreadID = IRBuilder.CreateLoad(ThreadIDAddrs);
     ((LoadInst *)ThreadID)
-        ->setAlignment(DL.getTypeAllocSize(ThreadID->getType()));
+        ->setAlignment(Align(DL.getPrefTypeAlignment(ThreadID->getType())));
     auto &Elem = OpenMPThreadIDLoadMap.FindAndConstruct(F);
     Elem.second = ThreadID;
     return ThreadID;
@@ -326,7 +328,7 @@ Value *getOrCreateDefaultLocation(Module &M) {
     auto *GV =
         new GlobalVariable(M, C->getType(), true, GlobalValue::PrivateLinkage,
                            C, ".str", nullptr, GlobalValue::NotThreadLocal);
-    GV->setAlignment(Alignment);
+    GV->setAlignment(Align(Alignment));
     GV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
     DefaultOpenMPPSource = cast<Constant>(GV);
     DefaultOpenMPPSource = ConstantExpr::getBitCast(
@@ -346,7 +348,7 @@ Value *getOrCreateDefaultLocation(Module &M) {
         new GlobalVariable(M, C->getType(), true, GlobalValue::PrivateLinkage,
                            C, "", nullptr, GlobalValue::NotThreadLocal);
     GV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-    GV->setAlignment(8);
+    GV->setAlignment(Align(8));
     DefaultOpenMPLocation = GV;
   }
 
@@ -621,8 +623,9 @@ void OpenMPABI::postProcessFunction(Function &F,
       }
   }
 
+  CodeExtractorAnalysisCache CEAC(F);
   CodeExtractor RegionExtractor(VisitedVec);
-  Function *RegionFn = RegionExtractor.extractCodeRegion();
+  Function *RegionFn = RegionExtractor.extractCodeRegion(CEAC);
 
   std::vector<Type *> FnParams;
   std::vector<StringRef> FnArgNames;
