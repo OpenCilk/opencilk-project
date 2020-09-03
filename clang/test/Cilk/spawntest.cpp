@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -std=c++1z -verify %s
+// RUN: %clang_cc1 -std=c++11 -verify %s
 
 class Bar {
   int myVal;

@@ -16,6 +16,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 

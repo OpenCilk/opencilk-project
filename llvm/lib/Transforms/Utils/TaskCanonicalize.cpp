@@ -13,6 +13,7 @@
 
 #include "llvm/Transforms/Utils/TaskCanonicalize.h"
 #include "llvm/Analysis/GlobalsModRef.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 
 using namespace llvm;

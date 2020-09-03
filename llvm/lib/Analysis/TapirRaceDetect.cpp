@@ -32,11 +32,13 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PatternMatch.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SpecialCaseList.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace llvm;
 
@@ -94,13 +96,17 @@ INITIALIZE_PASS_END(TapirRaceDetectWrapperPass, "tapir-race-detect",
 
 char TapirRaceDetectWrapperPass::ID = 0;
 
+TapirRaceDetectWrapperPass::TapirRaceDetectWrapperPass() : FunctionPass(ID) {
+  initializeTapirRaceDetectWrapperPassPass(*PassRegistry::getPassRegistry());
+}
+
 bool TapirRaceDetectWrapperPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   auto &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
   auto &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
   auto &DI = getAnalysis<DependenceAnalysisWrapperPass>().getDI();
   auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-  auto *TLI = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+  auto *TLI = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
   Info.reset(new RaceInfo(&F, DT, LI, TI, DI, SE, TLI));
   return false;
 }
@@ -298,7 +304,8 @@ public:
     std::vector<std::string> AllABIListFiles;
     AllABIListFiles.insert(AllABIListFiles.end(), ClABIListFiles.begin(),
                            ClABIListFiles.end());
-    ABIList.set(SpecialCaseList::createOrDie(AllABIListFiles));
+    ABIList.set(SpecialCaseList::createOrDie(AllABIListFiles,
+                                             *vfs::getRealFileSystem()));
   }
 
   void addFunctionArgument(Value *Arg);
@@ -1911,8 +1918,7 @@ void AccessPtrAnalysis::getRTPtrChecks(Loop *L, RaceInfo::ResultTy &Result,
                                        RaceInfo::PtrChecksTy &AllPtrRtChecks) {
   LLVM_DEBUG(dbgs() << "getRTPtrChecks: " << *L << "\n");
 
-  AllPtrRtChecks[L] =
-    llvm::make_unique<RuntimePointerChecking>(&SE);
+  AllPtrRtChecks[L] = std::make_unique<RuntimePointerChecking>(&SE);
 
   RTPtrCheckAnalysis RPCA(L, *AllPtrRtChecks[L].get(), AA, SE);
   SmallPtrSet<const Value *, 16> Seen;
