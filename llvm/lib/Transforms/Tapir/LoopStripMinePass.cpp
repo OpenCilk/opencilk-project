@@ -271,12 +271,26 @@ static bool tryToStripMineLoop(
   if (!NeedNestedSync && TLI)
     NeedNestedSync = (TLI->getTapirTarget() == TapirTargetID::Cilk);
 
+  // Save loop properties before it is transformed.
+  MDNode *OrigLoopID = L->getLoopID();
+
+  // Stripmine the loop
+  Loop *RemainderLoop = nullptr;
   Loop *NewLoop = StripMineLoop(L, SMP.Count, SMP.AllowExpensiveTripCount,
                                 SMP.UnrollRemainder, LI, &SE, &DT, &AC, TI,
                                 &ORE, PreserveLCSSA, ParallelEpilog,
-                                NeedNestedSync);
+                                NeedNestedSync, &RemainderLoop);
   if (!NewLoop)
     return false;
+
+  // Copy metadata to remainder loop
+  if (RemainderLoop) {
+    // Optional<MDNode *> RemainderLoopID = makeFollowupLoopID(
+    //     OrigLoopID, {}, "tapir.loop");
+    MDNode *NewRemainderLoopID =
+        CopyNonTapirLoopMetadata(RemainderLoop->getLoopID(), OrigLoopID);
+    RemainderLoop->setLoopID(NewRemainderLoopID);
+  }
 
   // Mark the new loop as stripmined.
   TapirLoopHints NewHints(NewLoop);
