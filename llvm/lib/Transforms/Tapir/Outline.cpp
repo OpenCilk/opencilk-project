@@ -240,13 +240,31 @@ Function *llvm::CreateHelper(
       FTy, OldFunc->getLinkage(),
       OldFunc->getName() + ".outline_" + Header->getName() + NameSuffix, DestM);
 
-  // Set names for input and output arguments.
+  // Set names for input and output arguments.  At the same time, analyze
+  // notable arguments, such as vector arguments.
+  bool VectorArg = false;
+  uint64_t MaxVectorArgWidth = 0;
   Function::arg_iterator DestI = NewFunc->arg_begin();
-  for (Value *I : Inputs)
+  for (Value *I : Inputs) {
     if (VMap.count(I) == 0) {       // Is this argument preserved?
       DestI->setName(I->getName()+NameSuffix); // Copy the name over...
       VMap[I] = &*DestI++;          // Add mapping to VMap
     }
+    // Check for any vector arguments, and record the maximum width of any
+    // vector argument we find.
+    if (VectorType *VT = dyn_cast<VectorType>(I->getType())) {
+      VectorArg = true;
+      ElementCount EC = VT->getElementCount();
+      if (EC.Scalable)
+        // If we have a scalable vector, give up.
+        MaxVectorArgWidth = std::numeric_limits<uint64_t>::max();
+      else {
+        unsigned VectorArgWidth = EC.Min * VT->getScalarSizeInBits();
+        if (MaxVectorArgWidth < VectorArgWidth)
+          MaxVectorArgWidth = VectorArgWidth;
+      }
+    }
+  }
   for (Value *I : Outputs)
     if (VMap.count(I) == 0) {              // Is this argument preserved?
       DestI->setName(I->getName()+NameSuffix); // Copy the name over...
@@ -295,6 +313,25 @@ Function *llvm::CreateHelper(
   NewFunc->removeAttributes(
       AttributeList::ReturnIndex,
       AttributeFuncs::typeIncompatible(NewFunc->getReturnType()));
+
+  // Remove any attributes in the caller invalidated by outlining.
+  if (VectorArg && OldFunc->hasFnAttribute("min-legal-vector-width")) {
+    uint64_t CallerVectorWidth;
+    OldFunc->getFnAttribute("min-legal-vector-width")
+        .getValueAsString()
+        .getAsInteger(0, CallerVectorWidth);
+    if (std::numeric_limits<uint64_t>::max() == MaxVectorArgWidth)
+      // MaxVectorArgWidth is not a finite value.  Give up and remove the
+      // min-legal-vector-width attribute, so OldFunc wil be treated
+      // conservatively henceforth.
+      OldFunc->removeFnAttr("min-legal-vector-width");
+    else if (MaxVectorArgWidth > CallerVectorWidth)
+      // If MaxVectorArgWidth is a finite value and larger than the
+      // min-legal-vector-width of OldFunc, then set the min-legal-vector-width
+      // of OldFunc to match MaxVectorArgWidth.
+      OldFunc->addFnAttr("min-legal-vector-width",
+                         llvm::utostr(MaxVectorArgWidth));
+  }
 
   // Clone the metadata from the old function into the new.
   bool MustCloneSP =
