@@ -177,13 +177,13 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK:  %[[STRPLOOPITER:.+]] = add nsw i64 %[[TRIPCOUNT:.+]], -1
 ; CHECK:  %[[XTRAITER:.+]] = and i64 %[[TRIPCOUNT]], 15
 ; CHECK:  %[[ICMP:.+]] = icmp ult i64 %[[STRPLOOPITER]], 15
-; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !26
+; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPPH]]:
-; CHECK-NEXT: br label %[[STRPLOOPDETACH:.+]], !dbg !26
+; CHECK-NEXT: br label %[[STRPLOOPDETACH:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPDETACH]]:
-; CHECK-NEXT: detach within %syncreg, label %[[STRPLOOPDETACHENTRY:.+]], label %[[STRPLOOPDETACHCONT:.+]], !dbg !26
+; CHECK-NEXT: detach within %syncreg, label %[[STRPLOOPDETACHENTRY:.+]], label %[[STRPLOOPDETACHCONT:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPDETACHCONT]]:
 ; CHECK-NEXT: br label %[[EPILCHECK]]
@@ -191,24 +191,24 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK: [[STRPLOOPDETACHENTRY]]:
 ; CHECK-NEXT: %[[NESTEDSYNCREG:.+]] = call token @llvm.syncregion.start()
 ; CHECK-NEXT: udiv i64 %[[TRIPCOUNT]], 16
-; CHECK-NEXT: br label %[[STRPLOOPOUTERHEAD:.+]], !dbg !26
+; CHECK-NEXT: br label %[[STRPLOOPOUTERHEAD:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPOUTERHEAD]]:
 ; CHECK-NEXT: %[[STRPLOOPOUTERITER:.+]] = phi i64
-; CHECK-NEXT: detach within %[[NESTEDSYNCREG]], label %[[STRPLOOPOUTERENTRY:.+]], label %[[STRPLOOPOUTERINC:.+]], !dbg !26
+; CHECK-NEXT: detach within %[[NESTEDSYNCREG]], label %[[STRPLOOPOUTERENTRY:.+]], label %[[STRPLOOPOUTERINC:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPOUTERENTRY]]:
-; CHECK-NEXT: mul i64 16, %[[STRPLOOPOUTERITER]], !dbg !26
-; CHECK-NEXT: br label %[[STRPLOOPINNERHEAD:.+]], !dbg !26
+; CHECK-NEXT: mul i64 16, %[[STRPLOOPOUTERITER]], !dbg !25
+; CHECK-NEXT: br label %[[STRPLOOPINNERHEAD:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPINNERHEAD]]:
-; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !26
+; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPINNERBODY]]:
-; CHECK: br label %[[STRPLOOPINNERINC:.+]], !dbg !29
+; CHECK: br label %[[STRPLOOPINNERINC:.+]], !dbg !28
 
 ; CHECK: [[STRPLOOPINNERINC]]:
-; CHECK: br i1 {{.+}}, label %[[STRPLOOPINNEREXIT:.+]], label %[[STRPLOOPINNERHEAD]], !dbg !26
+; CHECK: br i1 {{.+}}, label %[[STRPLOOPINNEREXIT:.+]], label %[[STRPLOOPINNERHEAD]], !dbg !25
 
 ; CHECK: [[STRPLOOPINNEREXIT]]:
 ; CHECK-NEXT: reattach within %[[NESTEDSYNCREG]], label %[[STRPLOOPOUTERINC]]
@@ -217,7 +217,7 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK: br i1 {{.+}}, label %[[STRPLOOPSYNC:.+]], label %[[STRPLOOPOUTERHEAD]]
 
 ; CHECK: [[STRPLOOPSYNC]]:
-; CHECK-NEXT: sync within %[[NESTEDSYNCREG]], label %[[STRPLOOPREATTACH:.+]], !dbg !26
+; CHECK-NEXT: sync within %[[NESTEDSYNCREG]], label %[[STRPLOOPREATTACH:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPREATTACH]]:
 ; CHECK-NEXT: call void @llvm.sync.unwind(token %[[NESTEDSYNCREG]])
@@ -351,13 +351,13 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK:  %[[STRPLOOPITER:.+]] = add nsw i64 %[[TRIPCOUNT:.+]], -1
 ; CHECK:  %[[XTRAITER:.+]] = and i64 %[[TRIPCOUNT]], 31
 ; CHECK:  %[[ICMP:.+]] = icmp ult i64 %[[STRPLOOPITER]], 31
-; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !53
+; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPPH]]:
-; CHECK-NEXT: br label %[[STRPLOOPDETACH:.+]], !dbg !53
+; CHECK-NEXT: br label %[[STRPLOOPDETACH:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPDETACH]]:
-; CHECK-NEXT: detach within %syncreg, label %[[STRPLOOPDETACHENTRY:.+]], label %[[STRPLOOPDETACHCONT:.+]], !dbg !53
+; CHECK-NEXT: detach within %syncreg, label %[[STRPLOOPDETACHENTRY:.+]], label %[[STRPLOOPDETACHCONT:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPDETACHCONT]]:
 ; CHECK-NEXT: br label %[[EPILCHECK]]
@@ -366,10 +366,10 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK: br i1 {{.+}}, label %[[EPILPH:.+]], label
 
 ; CHECK: [[EPILPH]]:
-; CHECK: br label %[[EPILHEADER:.+]], !dbg !53
+; CHECK: br label %[[EPILHEADER:.+]], !dbg !51
 
 ; CHECK: [[EPILHEADER]]:
-; CHECK: br label %[[EPILBODY:.+]], !dbg !53
+; CHECK: br label %[[EPILBODY:.+]], !dbg !51
 
 ; CHECK: [[EPILBODY]]:
 ; CHECK-NEXT: call i8* @llvm.stacksave()
@@ -380,17 +380,17 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 
 ; CHECK: [[STRPLOOPDETACHENTRY]]:
 ; CHECK: %[[NEWSYNCREG:.+]] = call token @llvm.syncregion.start()
-; CHECK: br label %[[STRPLOOPOUTERHEAD:.+]], !dbg !53
+; CHECK: br label %[[STRPLOOPOUTERHEAD:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPOUTERHEAD]]:
-; CHECK: detach within %[[NEWSYNCREG]], label %[[STRPLOOPINNERENTRY:.+]], label %{{.+}}, !dbg !53
+; CHECK: detach within %[[NEWSYNCREG]], label %[[STRPLOOPINNERENTRY:.+]], label %{{.+}}, !dbg !51
 
 ; CHECK: [[STRPLOOPINNERENTRY]]:
 ; CHECK: alloca [7 x double]
-; CHECK: br label %[[STRPLOOPINNERHEAD:.+]], !dbg !53
+; CHECK: br label %[[STRPLOOPINNERHEAD:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPINNERHEAD]]:
-; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !53
+; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPINNERBODY]]:
 ; CHECK: call i8* @llvm.stacksave()
