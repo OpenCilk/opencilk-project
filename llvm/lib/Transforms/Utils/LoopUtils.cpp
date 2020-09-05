@@ -502,7 +502,6 @@ TransformationMode llvm::hasLoopSpawningTransformation(Loop *L) {
 
   switch (Hints.getStrategy()) {
   case TapirLoopHints::ST_DAC: {
-    dbgs() << "Has forced spawning transformation: " << *L << "\n";
     return TM_ForcedByUser;
   } case TapirLoopHints::ST_SEQ:
     return TM_Disable;

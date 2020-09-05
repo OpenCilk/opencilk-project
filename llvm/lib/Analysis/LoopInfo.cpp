@@ -572,7 +572,7 @@ void Loop::setLoopAlreadyUnrolled() {
 
 void Loop::setDerivedFromTapirLoop() {
   MDNode *LoopID = getLoopID();
-  // First Gather all existing loop metadata.
+  // First gather all existing loop metadata.
   SmallVector<Metadata *, 4> MDs;
   // Reserve first location for self reference to the LoopID metadata node.
   MDs.push_back(nullptr);
