@@ -339,6 +339,8 @@ private:
 /// Returns true if Tapir-loop hints require loop outlining during lowering.
 bool hintsDemandOutlining(const TapirLoopHints &Hints);
 
+/// Create a new Loop MDNode by copying non-Tapir metadata from OrigLoopID.
+MDNode *CopyNonTapirLoopMetadata(MDNode *LoopID, MDNode *OrigLoopID);
 
 /// Examine a given loop to determine if it is a Tapir loop that can and should
 /// be processed.  Returns the Task that encodes the loop body if so, or nullptr

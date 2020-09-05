@@ -2260,6 +2260,36 @@ bool llvm::hintsDemandOutlining(const TapirLoopHints &Hints) {
   }
 }
 
+MDNode *llvm::CopyNonTapirLoopMetadata(MDNode *LoopID, MDNode *OrigLoopID) {
+  SmallVector<Metadata *, 8> MDs;
+  MDs.push_back(nullptr);
+
+  // Gather all existing loop metadata.
+  if (LoopID)
+    for (unsigned i = 1, ie = LoopID->getNumOperands(); i < ie; ++i)
+      MDs.push_back(LoopID->getOperand(i));
+
+  // Inherit metadata from original loop.
+  for (const MDOperand &Existing : drop_begin(OrigLoopID->operands(), 1)) {
+    MDNode *Op = cast<MDNode>(Existing.get());
+
+    // Skip malformatted attribute metadata nodes.
+    if (Op->getNumOperands() == 0)
+      return nullptr;
+    Metadata *NameMD = Op->getOperand(0).get();
+    if (!isa<MDString>(NameMD))
+      return nullptr;
+    StringRef AttrName = cast<MDString>(NameMD)->getString();
+    // Skip tapir.loop metadata
+    if (!AttrName.startswith("tapir.loop"))
+      MDs.push_back(Op);
+  }
+
+  // Build the new loop ID.
+  MDTuple *NewLoopID = MDNode::get(OrigLoopID->getContext(), MDs);
+  NewLoopID->replaceOperandWith(0, NewLoopID);
+  return NewLoopID;
+}
 
 /// Examine a given loop to determine if it is a Tapir loop.  Returns the Task
 /// that encodes the loop body if so, or nullptr if not.

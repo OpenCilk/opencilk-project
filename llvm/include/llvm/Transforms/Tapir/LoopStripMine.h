@@ -43,7 +43,8 @@ Loop *StripMineLoop(
     Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     bool UnrollRemainder, LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
     AssumptionCache *AC, TaskInfo *TI, OptimizationRemarkEmitter *ORE,
-    bool PreserveLCSSA, bool ParallelEpilog, bool NeedNestedSync);
+    bool PreserveLCSSA, bool ParallelEpilog, bool NeedNestedSync,
+    Loop **Remainderloop = nullptr);
 
 } // end namespace llvm
 

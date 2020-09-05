@@ -649,7 +649,8 @@ Loop *llvm::StripMineLoop(
     Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     bool UnrollRemainder, LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
     AssumptionCache *AC, TaskInfo *TI, OptimizationRemarkEmitter *ORE,
-    bool PreserveLCSSA, bool ParallelEpilog, bool NeedNestedSync) {
+    bool PreserveLCSSA, bool ParallelEpilog, bool NeedNestedSync,
+    Loop **RemainderLoop) {
   Task *T = getTapirLoopForStripMining(L, *TI, ORE);
   if (!T)
     return nullptr;
@@ -852,10 +853,10 @@ Loop *llvm::StripMineLoop(
   Value *BranchVal = B.CreateICmpULT(BECount,
                                      ConstantInt::get(BECount->getType(),
                                                       Count - 1));
-  BasicBlock *RemainderLoop = NewExit;
-  BasicBlock *StripminedLoop = NewPreheader;
+  BasicBlock *RemainderLoopBB = NewExit;
+  BasicBlock *StripminedLoopBB = NewPreheader;
   // Branch to either remainder (extra iterations) loop or stripmined loop.
-  B.CreateCondBr(BranchVal, RemainderLoop, StripminedLoop);
+  B.CreateCondBr(BranchVal, RemainderLoopBB, StripminedLoopBB);
   PreheaderBR->eraseFromParent();
   if (DT) {
     // if (UseEpilogRemainder)
@@ -916,7 +917,7 @@ Loop *llvm::StripMineLoop(
   // iterations. This function adds the appropriate CFG connections.
   BasicBlock *InsertBot = LatchExit;
   BasicBlock *InsertTop = EpilogPreheader;
-  Loop *remainderLoop = CloneLoopBlocks(
+  *RemainderLoop = CloneLoopBlocks(
       L, ModVal, CreateRemainderLoop, true, UnrollRemainder,
       InsertTop, InsertBot,
       NewPreheader, NewBlocks, LoopBlocks, ExtraTaskBlocks, VMap, DT, LI);
@@ -1388,9 +1389,9 @@ Loop *llvm::StripMineLoop(
 
   // FIXME: Optionally unroll remainder loop
   //
-  // if (remainderLoop && UnrollRemainder) {
+  // if (RemainderLoop && UnrollRemainder) {
   //   LLVM_DEBUG(dbgs() << "Unrolling remainder loop\n");
-  //   UnrollLoop(remainderLoop, /*Count*/ Count - 1, /*TripCount*/ Count - 1,
+  //   UnrollLoop(RemainderLoop, /*Count*/ Count - 1, /*TripCount*/ Count - 1,
   //              /*Force*/ false, /*AllowRuntime*/ false,
   //              /*AllowExpensiveTripCount*/ false, /*PreserveCondBr*/ true,
   //              /*PreserveOnlyFirst*/ false, /*TripMultiple*/ 1,
@@ -1399,13 +1400,13 @@ Loop *llvm::StripMineLoop(
   // }
 
   // Record that the remainder loop was derived from a Tapir loop.
-  remainderLoop->setDerivedFromTapirLoop();
+  (*RemainderLoop)->setDerivedFromTapirLoop();
 
   // At this point, the code is well formed.  We now simplify the new loops,
   // doing constant propagation and dead code elimination as we go.
-  simplifyLoopAfterStripMine(L, /*SimplifyIVs*/true, LI, SE, DT, AC);
-  simplifyLoopAfterStripMine(NewLoop, /*SimplifyIVs*/true, LI, SE, DT, AC);
-  simplifyLoopAfterStripMine(remainderLoop, /*SimplifyIVs*/true, LI, SE, DT,
+  simplifyLoopAfterStripMine(L, /*SimplifyIVs*/ true, LI, SE, DT, AC);
+  simplifyLoopAfterStripMine(NewLoop, /*SimplifyIVs*/ true, LI, SE, DT, AC);
+  simplifyLoopAfterStripMine(*RemainderLoop, /*SimplifyIVs*/ true, LI, SE, DT,
                              AC);
 
 #ifndef NDEBUG
