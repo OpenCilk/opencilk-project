@@ -254,7 +254,7 @@ struct CilkSanitizerImpl : public CSIImpl {
     // caller or some ancestor may read or write the referenced memory in
     // parallel and whether the caller can provide any noalias guarantee on that
     // memory location.
-    enum class MAAPVal : uint8_t
+    enum class MAAPValue : uint8_t
       {
        NoAccess = 0,
        Mod = 1,
@@ -266,7 +266,7 @@ struct CilkSanitizerImpl : public CSIImpl {
     // Get the MAAP value for specific instruction and operand.
     Value *getMAAPValue(Instruction *I, IRBuilder<> &IRB,
                         unsigned OperandNum = static_cast<unsigned>(-1),
-                        MAAPVal DefaultMV = MAAPVal::ModRef,
+                        MAAPValue DefaultMV = MAAPValue::ModRef,
                         bool CheckArgs = true);
     // Helper method to determine noalias MAAP bit.
     Value *getNoAliasMAAPValue(Instruction *I, IRBuilder<> &IRB,
@@ -1635,13 +1635,13 @@ void CilkSanitizerImpl::Instrumentor::getDetachesForInstruction(
 
 unsigned CilkSanitizerImpl::Instrumentor::RaceTypeToFlagVal(
     RaceInfo::RaceType RT) {
-  unsigned FlagVal = static_cast<unsigned>(MAAPVal::NoAccess);
+  unsigned FlagVal = static_cast<unsigned>(MAAPValue::NoAccess);
   if (RaceInfo::isLocalRace(RT) || RaceInfo::isOpaqueRace(RT))
-    FlagVal = static_cast<unsigned>(MAAPVal::ModRef);
+    FlagVal = static_cast<unsigned>(MAAPValue::ModRef);
   if (RaceInfo::isRaceViaAncestorMod(RT))
-    FlagVal |= static_cast<unsigned>(MAAPVal::Mod);
+    FlagVal |= static_cast<unsigned>(MAAPValue::Mod);
   if (RaceInfo::isRaceViaAncestorRef(RT))
-    FlagVal |= static_cast<unsigned>(MAAPVal::Ref);
+    FlagVal |= static_cast<unsigned>(MAAPValue::Ref);
   return FlagVal;
 }
 
@@ -1671,22 +1671,22 @@ void CilkSanitizerImpl::Instrumentor::InsertArgMAAPs(Function &F,
       IRB.CreateStore(FinalMV, NewFlag);
     } else {
       // Call the runtime function to set the value of this flag.
-      IRB.CreateCall(CilkSanImpl.GetMAAP, {NewFlag, FuncId,
-                                           IRB.getInt8(ArgIdx)});
+      IRB.CreateCall(CilkSanImpl.GetMAAP,
+                     {NewFlag, FuncId, IRB.getInt8(ArgIdx)});
 
       // Incorporate local information into this MAAP value.
-      unsigned LocalMV = static_cast<unsigned>(MAAPVal::NoAccess);
+      unsigned LocalMV = static_cast<unsigned>(MAAPValue::NoAccess);
       if (Arg.hasNoAliasAttr())
-        LocalMV |= static_cast<unsigned>(MAAPVal::NoAlias);
+        LocalMV |= static_cast<unsigned>(MAAPValue::NoAlias);
 
       // Store this local MAAP value.
-      FinalMV = IRB.CreateOr(getMAAPIRValue(IRB, LocalMV),
-                             IRB.CreateLoad(NewFlag));
+      FinalMV =
+          IRB.CreateOr(getMAAPIRValue(IRB, LocalMV), IRB.CreateLoad(NewFlag));
       IRB.CreateStore(FinalMV, NewFlag);
     }
     // Associate this flag with the argument for future lookups.
     LLVM_DEBUG(dbgs() << "Recording local MAAP for arg " << Arg << ": "
-               << *NewFlag << "\n");
+                      << *NewFlag << "\n");
     LocalMAAPs[&Arg] = FinalMV;
     ArgMAAPs.insert(FinalMV);
     ++ArgIdx;
@@ -1695,20 +1695,20 @@ void CilkSanitizerImpl::Instrumentor::InsertArgMAAPs(Function &F,
   // Record other objects known to be involved in races.
   for (auto &ObjRD : RI.getObjectMRForRace()) {
     if (isa<Instruction>(ObjRD.first)) {
-      unsigned MAAPVal = static_cast<unsigned>(MAAPVal::NoAccess);
+      unsigned MAAPVal = static_cast<unsigned>(MAAPValue::NoAccess);
       if (isModSet(ObjRD.second))
-        MAAPVal |= static_cast<unsigned>(MAAPVal::Mod);
+        MAAPVal |= static_cast<unsigned>(MAAPValue::Mod);
       if (isRefSet(ObjRD.second))
-        MAAPVal |= static_cast<unsigned>(MAAPVal::Ref);
+        MAAPVal |= static_cast<unsigned>(MAAPValue::Ref);
       // Determine if this object is no-alias.
       if (const CallBase *CB = dyn_cast<CallBase>(ObjRD.first)) {
         if (CB->hasRetAttr(Attribute::NoAlias))
-          MAAPVal |= static_cast<unsigned>(MAAPVal::NoAlias);
+          MAAPVal |= static_cast<unsigned>(MAAPValue::NoAlias);
       } else if (isa<AllocaInst>(ObjRD.first))
-        MAAPVal |= static_cast<unsigned>(MAAPVal::NoAlias);
+        MAAPVal |= static_cast<unsigned>(MAAPValue::NoAlias);
 
-      LLVM_DEBUG(dbgs() << "Setting LocalMAAPs for " << *ObjRD.first
-                 << " = " << MAAPVal << "\n");
+      LLVM_DEBUG(dbgs() << "Setting LocalMAAPs for " << *ObjRD.first << " = "
+                        << MAAPVal << "\n");
       LocalMAAPs[ObjRD.first] = getMAAPIRValue(IRB, MAAPVal);
     }
   }
@@ -1894,7 +1894,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
         // an ancestor.  We want to propagate MAAP information on pointer
         // arguments, but we don't need to be pessimistic when a value can't be
         // found.
-        MAAPVal = getMAAPValue(I, IRB, OpIdx, MAAPVal::NoAccess,
+        MAAPVal = getMAAPValue(I, IRB, OpIdx, MAAPValue::NoAccess,
                                /*CheckArgs*/ false);
       LLVM_DEBUG({
           dbgs() << "  Op: " << *CB->getArgOperand(OpIdx) << "\n";
@@ -2038,16 +2038,18 @@ Value *CilkSanitizerImpl::Instrumentor::getNoAliasMAAPValue(
   return ObjNoAliasFlag;
 }
 
-Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
-    Instruction *I, IRBuilder<> &IRB, unsigned OperandNum,
-    MAAPVal DefaultMV, bool CheckArgs) {
+Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
+                                                     IRBuilder<> &IRB,
+                                                     unsigned OperandNum,
+                                                     MAAPValue DefaultMV,
+                                                     bool CheckArgs) {
   Function *F = I->getFunction();
   AliasAnalysis *AA = RI.getAA();
   MemoryLocation Loc = getMemoryLocation(I, OperandNum, TLI);
-  Value *MV = getMAAPIRValue(IRB, static_cast<unsigned>(MAAPVal::NoAccess));
+  Value *MV = getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAccess));
   Value *DefaultMAAP = getMAAPIRValue(IRB, static_cast<unsigned>(DefaultMV));
-  Value *NoAliasFlag = getMAAPIRValue(IRB,
-                                      static_cast<unsigned>(MAAPVal::NoAlias));
+  Value *NoAliasFlag =
+      getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias));
 
   // If I is a call, check if any other arguments of this call alias the
   // specified operand.
@@ -2056,8 +2058,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
     bool FoundAliasingArg = false;
     for (const Value *Arg : CB->args()) {
       // Skip this operand and any operands that are not pointers.
-      if (OpIdx == OperandNum ||
-          !Arg->getType()->isPtrOrPtrVectorTy()) {
+      if (OpIdx == OperandNum || !Arg->getType()->isPtrOrPtrVectorTy()) {
         ++OpIdx;
         continue;
       }
@@ -2070,8 +2071,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
 
       // If the operands must alias, then discard the default noalias MAAP
       // value.
-      AliasResult ArgAlias =
-          AA->alias(Loc, getMemoryLocation(I, OpIdx, TLI));
+      AliasResult ArgAlias = AA->alias(Loc, getMemoryLocation(I, OpIdx, TLI));
       if (MustAlias == ArgAlias || PartialAlias == ArgAlias) {
         NoAliasFlag = getMAAPIRValue(IRB, 0);
         break;
@@ -2098,8 +2098,8 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
         // noalias flag.
         Value *FlagLoad = readMAAPVal(LocalMAAPs[Obj], IRB);
         Value *ObjNoAliasFlag = IRB.CreateAnd(
-            FlagLoad, getMAAPIRValue(IRB,
-                                     static_cast<unsigned>(MAAPVal::NoAlias)));
+            FlagLoad,
+            getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
         NoAliasFlag = IRB.CreateAnd(NoAliasFlag, ObjNoAliasFlag);
       }
 
@@ -2125,26 +2125,24 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
 
     // If we have a valid racer, get the objects that that racer might access.
     SmallPtrSet<const Value *, 1> RacerObjects;
-    unsigned LocalRaceVal =
-        static_cast<unsigned>(MAAPVal::NoAccess);
+    unsigned LocalRaceVal = static_cast<unsigned>(MAAPValue::NoAccess);
     if (RD.Racer.isValid()) {
       // Get the local race value for this racer
       assert(RaceInfo::isLocalRace(RD.Type) && "Valid racer for nonlocal race");
-      RI.getObjectsFor(RaceInfo::MemAccessInfo(RD.Racer.getPtr(),
-                                               RD.Racer.isMod()),
-                       RacerObjects);
+      RI.getObjectsFor(
+          RaceInfo::MemAccessInfo(RD.Racer.getPtr(), RD.Racer.isMod()),
+          RacerObjects);
       if (RD.Racer.isMod())
-        LocalRaceVal |= static_cast<unsigned>(MAAPVal::Mod);
+        LocalRaceVal |= static_cast<unsigned>(MAAPValue::Mod);
       if (RD.Racer.isRef())
-        LocalRaceVal |= static_cast<unsigned>(MAAPVal::Ref);
+        LocalRaceVal |= static_cast<unsigned>(MAAPValue::Ref);
     }
 
     // Get MAAPs from objects
     for (const Value *Obj : Objects) {
       // If we find an object with no MAAP, give up.
       if (!LocalMAAPs.count(Obj)) {
-        LLVM_DEBUG(dbgs() << "No local MAAP found for obj " << *Obj
-                   << "\n");
+        LLVM_DEBUG(dbgs() << "No local MAAP found for obj " << *Obj << "\n");
         if (RD.Racer.isValid())
           return getMAAPIRValue(IRB, LocalRaceVal);
         return DefaultMAAP;
@@ -2157,10 +2155,10 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
 
       // Get the dynamic no-alias bit from the MAAP value.
       Value *ObjNoAliasFlag = IRB.CreateAnd(
-          FlagLoad, getMAAPIRValue(
-              IRB, static_cast<unsigned>(MAAPVal::NoAlias)));
-      Value *NoAliasCheck = IRB.CreateICmpNE(getMAAPIRValue(IRB, 0),
-                                             ObjNoAliasFlag);
+          FlagLoad,
+          getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
+      Value *NoAliasCheck =
+          IRB.CreateICmpNE(getMAAPIRValue(IRB, 0), ObjNoAliasFlag);
 
       if (RD.Racer.isValid()) {
         for (const Value *RObj : RacerObjects) {
@@ -2173,7 +2171,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
           // If Loc and the racer object cannot alias, then there's nothing to
           // check.
           if (!AA->alias(Loc, MemoryLocation(RObj)))
-              continue;
+            continue;
 
           // If there is must or partial aliasing between this object and racer
           // object, or we have no local MAAP information for RObj, then
@@ -2183,10 +2181,11 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
               !LocalMAAPs.count(RObj)) {
             if (!LocalMAAPs.count(RObj))
               LLVM_DEBUG(dbgs() << "No local MAAP found for racer object "
-                         << *RObj << "\n");
+                                << *RObj << "\n");
             else
               LLVM_DEBUG(dbgs() << "AA indicates must or partial alias with "
-                         "racer object " << *RObj << "\n");
+                                   "racer object "
+                                << *RObj << "\n");
             MV = IRB.CreateOr(MV, LocalRaceVal);
             continue;
           }
@@ -2197,15 +2196,14 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
           // was derived from an allocation or noalias function argument.
           Value *FlagLoad = readMAAPVal(LocalMAAPs[RObj], IRB);
           Value *RObjNoAliasFlag = IRB.CreateAnd(
-              FlagLoad, getMAAPIRValue(
-                  IRB, static_cast<unsigned>(MAAPVal::NoAlias)));
-          Value *RObjNoAliasCheck = IRB.CreateICmpNE(
-              getMAAPIRValue(IRB, 0), RObjNoAliasFlag);
+              FlagLoad,
+              getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
+          Value *RObjNoAliasCheck =
+              IRB.CreateICmpNE(getMAAPIRValue(IRB, 0), RObjNoAliasFlag);
           Value *FlagCheck = IRB.CreateSelect(
               IRB.CreateOr(NoAliasCheck, RObjNoAliasCheck),
               getMAAPIRValue(IRB, 0),
-              IRB.CreateAnd(FlagLoad,
-                            getMAAPIRValue(IRB, LocalRaceVal)));
+              IRB.CreateAnd(FlagLoad, getMAAPIRValue(IRB, LocalRaceVal)));
           MV = IRB.CreateOr(MV, FlagCheck);
         }
       } else if (CheckArgs) {
@@ -2223,8 +2221,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
           // If we have no local MAAP information about the argument,
           // then there's nothing to check.
           if (!LocalMAAPs.count(&Arg)) {
-            LLVM_DEBUG(dbgs() << "No local MAAP found for arg " << Arg
-                       << "\n");
+            LLVM_DEBUG(dbgs() << "No local MAAP found for arg " << Arg << "\n");
             return DefaultMAAP;
           }
 
@@ -2234,23 +2231,24 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
           // either was derived from an allocation or noalias function argument.
           Value *FlagLoad = readMAAPVal(LocalMAAPs[&Arg], IRB);
           Value *ArgNoAliasFlag = IRB.CreateAnd(
-              FlagLoad, getMAAPIRValue(
-                  IRB, static_cast<unsigned>(MAAPVal::NoAlias)));
-          Value *ArgNoAliasCheck = IRB.CreateICmpNE(
-              getMAAPIRValue(IRB, 0), ArgNoAliasFlag);
+              FlagLoad,
+              getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
+          Value *ArgNoAliasCheck =
+              IRB.CreateICmpNE(getMAAPIRValue(IRB, 0), ArgNoAliasFlag);
           Value *FlagCheck = IRB.CreateSelect(
               IRB.CreateOr(NoAliasCheck, ArgNoAliasCheck),
-              getMAAPIRValue(IRB, 0), IRB.CreateAnd(
-                  FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type))));
+              getMAAPIRValue(IRB, 0),
+              IRB.CreateAnd(FlagLoad,
+                            getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type))));
           MV = IRB.CreateOr(MV, FlagCheck);
         }
       }
       // Call getNoAliasMAAPValue to evaluate the no-alias value in the
       // MAAP for Obj, and intersect that result with the noalias
       // information for other objects.
-      NoAliasFlag = IRB.CreateAnd(NoAliasFlag, getNoAliasMAAPValue(
-                                      I, IRB, OperandNum, Loc, RD, Obj,
-                                      ObjNoAliasFlag));
+      NoAliasFlag = IRB.CreateAnd(NoAliasFlag,
+                                  getNoAliasMAAPValue(I, IRB, OperandNum, Loc,
+                                                      RD, Obj, ObjNoAliasFlag));
     }
   }
   // Record the no-alias information.
@@ -2258,8 +2256,9 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(
   return MV;
 }
 
-Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
-    Instruction *I, IRBuilder<> &IRB, unsigned OperandNum) {
+Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
+                                                     IRBuilder<> &IRB,
+                                                     unsigned OperandNum) {
   Function *F = I->getFunction();
   bool LocalRace = RI.mightRaceLocally(I);
   AliasAnalysis *AA = RI.getAA();
@@ -2276,17 +2275,16 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
 
     // If we have a valid racer, get the objects that that racer might access.
     SmallPtrSet<const Value *, 1> RacerObjects;
-    unsigned LocalRaceVal =
-        static_cast<unsigned>(MAAPVal::NoAccess);
+    unsigned LocalRaceVal = static_cast<unsigned>(MAAPValue::NoAccess);
     if (RD.Racer.isValid()) {
       assert(RaceInfo::isLocalRace(RD.Type) && "Valid racer for nonlocal race");
-      RI.getObjectsFor(RaceInfo::MemAccessInfo(RD.Racer.getPtr(),
-                                               RD.Racer.isMod()),
-                       RacerObjects);
+      RI.getObjectsFor(
+          RaceInfo::MemAccessInfo(RD.Racer.getPtr(), RD.Racer.isMod()),
+          RacerObjects);
       if (RD.Racer.isMod())
-        LocalRaceVal |= static_cast<unsigned>(MAAPVal::Mod);
+        LocalRaceVal |= static_cast<unsigned>(MAAPValue::Mod);
       if (RD.Racer.isRef())
-        LocalRaceVal |= static_cast<unsigned>(MAAPVal::Ref);
+        LocalRaceVal |= static_cast<unsigned>(MAAPValue::Ref);
     }
 
     for (const Value *Obj : Objects) {
@@ -2296,10 +2294,9 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
 
       // If we find an object with no MAAP, give up.
       if (!LocalMAAPs.count(Obj)) {
-        LLVM_DEBUG(
-            dbgs() << "No local MAAP found for obj " << *Obj << "\n"
-            << "  I: " << *I << "\n"
-            << "  Ptr: " << *RD.Access.getPointer() << "\n");
+        LLVM_DEBUG(dbgs() << "No local MAAP found for obj " << *Obj << "\n"
+                          << "  I: " << *I << "\n"
+                          << "  Ptr: " << *RD.Access.getPointer() << "\n");
         return IRB.getFalse();
       }
 
@@ -2310,19 +2307,19 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
       // not disable checking of local races.
       Value *FlagCheck;
       if (LocalRace)
-        FlagCheck = getMAAPIRValue(
-            IRB, static_cast<unsigned>(MAAPVal::ModRef));
+        FlagCheck =
+            getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::ModRef));
       else
         FlagCheck = IRB.CreateAnd(
             FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
       MAAPChk = IRB.CreateAnd(
-          MAAPChk, IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0),
-                                           FlagCheck));
+          MAAPChk, IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck));
       // Get the dynamic no-alias bit from the MAAP value.
       Value *NoAliasCheck = IRB.CreateICmpNE(
-          getMAAPIRValue(IRB, 0), IRB.CreateAnd(
-              FlagLoad, getMAAPIRValue(
-                  IRB, static_cast<unsigned>(MAAPVal::NoAlias))));
+          getMAAPIRValue(IRB, 0),
+          IRB.CreateAnd(
+              FlagLoad,
+              getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias))));
 
       if (RD.Racer.isValid()) {
         for (const Value *RObj : RacerObjects) {
@@ -2334,11 +2331,11 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
 
           // Check if Loc and the racer object may alias.
           if (!AA->alias(Loc, MemoryLocation(RObj)))
-              continue;
+            continue;
 
           if (!LocalMAAPs.count(RObj)) {
-            LLVM_DEBUG(dbgs() << "No local MAAP found for racer object "
-                       << RObj << "\n");
+            LLVM_DEBUG(dbgs() << "No local MAAP found for racer object " << RObj
+                              << "\n");
             MAAPChk = IRB.getFalse();
             continue;
           }
@@ -2346,18 +2343,19 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
           Value *FlagLoad = readMAAPVal(LocalMAAPs[RObj], IRB);
           Value *FlagCheck;
           if (LocalRace)
-            FlagCheck = getMAAPIRValue(
-                IRB, static_cast<unsigned>(MAAPVal::ModRef));
+            FlagCheck =
+                getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::ModRef));
           else
-            FlagCheck = IRB.CreateAnd(FlagLoad, getMAAPIRValue(
-                                          IRB, LocalRaceVal));
+            FlagCheck =
+                IRB.CreateAnd(FlagLoad, getMAAPIRValue(IRB, LocalRaceVal));
           Value *RObjNoAliasFlag = IRB.CreateAnd(
-              FlagLoad, getMAAPIRValue(
-                  IRB, static_cast<unsigned>(MAAPVal::NoAlias)));
-          Value *RObjNoAliasCheck = IRB.CreateICmpNE(
-              getMAAPIRValue(IRB, 0), RObjNoAliasFlag);
+              FlagLoad,
+              getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
+          Value *RObjNoAliasCheck =
+              IRB.CreateICmpNE(getMAAPIRValue(IRB, 0), RObjNoAliasFlag);
           MAAPChk = IRB.CreateAnd(
-              MAAPChk, IRB.CreateOr(
+              MAAPChk,
+              IRB.CreateOr(
                   IRB.CreateOr(NoAliasCheck, RObjNoAliasCheck),
                   IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck)));
         }
@@ -2376,8 +2374,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
           continue;
         // If we have no local MAAP information about the argument, give up.
         if (!LocalMAAPs.count(&Arg)) {
-          LLVM_DEBUG(dbgs() << "No local MAAP found for arg " << Arg
-                     << "\n");
+          LLVM_DEBUG(dbgs() << "No local MAAP found for arg " << Arg << "\n");
           return IRB.getFalse();
         }
 
@@ -2386,20 +2383,20 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(
         Value *FlagLoad = readMAAPVal(LocalMAAPs[&Arg], IRB);
         Value *FlagCheck;
         if (LocalRace)
-          FlagCheck = getMAAPIRValue(
-              IRB, static_cast<unsigned>(MAAPVal::ModRef));
+          FlagCheck =
+              getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::ModRef));
         else
           FlagCheck = IRB.CreateAnd(
               FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
         Value *ArgNoAliasFlag = IRB.CreateAnd(
-            FlagLoad, getMAAPIRValue(
-                IRB, static_cast<unsigned>(MAAPVal::NoAlias)));
-        Value *ArgNoAliasCheck = IRB.CreateICmpNE(
-            getMAAPIRValue(IRB, 0), ArgNoAliasFlag);
+            FlagLoad,
+            getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
+        Value *ArgNoAliasCheck =
+            IRB.CreateICmpNE(getMAAPIRValue(IRB, 0), ArgNoAliasFlag);
         MAAPChk = IRB.CreateAnd(
-            MAAPChk, IRB.CreateOr(
-                IRB.CreateOr(NoAliasCheck, ArgNoAliasCheck),
-                IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck)));
+            MAAPChk,
+            IRB.CreateOr(IRB.CreateOr(NoAliasCheck, ArgNoAliasCheck),
+                         IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck)));
       }
     }
   }
