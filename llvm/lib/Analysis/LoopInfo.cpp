@@ -59,8 +59,8 @@ static cl::opt<bool, true>
 // Loop implementation
 //
 
-static bool succIsDetachUnwind(BasicBlock *BB, BasicBlock *Succ) {
-  if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator()))
+static bool succIsDetachUnwind(const BasicBlock *BB, const BasicBlock *Succ) {
+  if (const DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator()))
     return Succ == DI->getUnwindDest();
   return false;
 }
