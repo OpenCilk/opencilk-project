@@ -173,7 +173,7 @@ public:
   bool isSpindleExiting(const BasicBlock *BB) const {
     if (BB->getTerminator()->getNumSuccessors() == 0)
       return true;
-    for (const auto &Succ : children<const BasicBlock *>(BB))
+    for (const auto *Succ : children<const BasicBlock *>(BB))
       if (!contains(Succ))
         return true;
     return false;
@@ -892,7 +892,7 @@ public:
   bool isTaskExiting(const BasicBlock *BB) const {
     if (BB->getTerminator()->getNumSuccessors() == 0)
       return true;
-    for (const auto &Succ : children<const BasicBlock *>(BB)) {
+    for (const auto *Succ : children<const BasicBlock *>(BB)) {
       if (isa<UnreachableInst>(Succ->getFirstNonPHIOrDbgOrLifetime()))
         continue;
       if (!encloses(Succ))
