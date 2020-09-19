@@ -1370,7 +1370,7 @@ bool TaskInfo::invalidate(Function &F, const PreservedAnalyses &PA,
 static const BasicBlock *getSingleNotUnreachableSuccessor(
     const BasicBlock *BB) {
   const BasicBlock *SingleSuccessor = nullptr;
-  for (const auto &Succ : children<const BasicBlock *>(BB)) {
+  for (const auto *Succ : children<const BasicBlock *>(BB)) {
     if (isa<UnreachableInst>(Succ->getFirstNonPHIOrDbgOrLifetime()))
       continue;
     if (!SingleSuccessor)
