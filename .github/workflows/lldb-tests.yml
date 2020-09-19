@@ -28,8 +28,9 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - windows-latest
-          - macOS-latest
+          # NOTE: LLDB in LLVM 10.0.1 contains bugs that prevent compilation on windows-latest and macOS-latest.  These bugs seem to be addressed in later LLVM versions.
+          # - windows-latest
+          # - macOS-latest
     steps:
     - name: Setup Windows
       if: startsWith(matrix.os, 'windows')
