@@ -75,7 +75,7 @@ void Loop::getExitingBlocks(
     bool IgnoreDetachUnwind) const {
   assert(!isInvalid() && "Loop not in a valid state!");
   for (const auto BB : blocks())
-    for (const auto &Succ : children<BasicBlock *>(BB))
+    for (const auto *Succ : children<BasicBlock *>(BB))
       if (!contains(Succ)) {
         if (IgnoreDetachUnwind && succIsDetachUnwind(BB, Succ))
           continue;
