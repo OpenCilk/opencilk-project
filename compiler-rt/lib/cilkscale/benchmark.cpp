@@ -234,12 +234,14 @@ CILKSCALE_EXTERN_C wsp_t wsp_getworkspan() CILKSCALE_NOTHROW {
   return result;
 }
 
-wsp_t operator+(wsp_t lhs, const wsp_t &rhs) {
-  return { lhs.work + rhs.work, 0, 0 };
+wsp_t &operator+=(wsp_t &lhs, const wsp_t &rhs) noexcept {
+  lhs.work += rhs.work;
+  return lhs;
 }
 
-wsp_t operator-(wsp_t lhs, const wsp_t &rhs) {
-  return { lhs.work - rhs.work, 0, 0 };
+wsp_t &operator-=(wsp_t &lhs, const wsp_t &rhs) noexcept {
+  lhs.work -= rhs.work;
+  return lhs;
 }
 
 std::ostream &operator<<(std::ostream &OS, const wsp_t &pt) {
