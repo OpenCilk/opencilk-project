@@ -23,21 +23,19 @@ typedef struct wsp_t {
 #define CILKSCALE_EXTERN_C extern "C"
 #define CILKSCALE_NOTHROW noexcept
 
-wsp_t operator+(wsp_t lhs, const wsp_t &rhs) noexcept;
-wsp_t operator-(wsp_t lhs, const wsp_t &rhs) noexcept;
+wsp_t &operator+=(wsp_t &lhs, const wsp_t &rhs) noexcept;
+wsp_t &operator-=(wsp_t &lhs, const wsp_t &rhs) noexcept;
 std::ostream &operator<<(std::ostream &os, const wsp_t &pt);
 std::ofstream &operator<<(std::ofstream &os, const wsp_t &pt);
 
 #ifndef __cilkscale__
 // Default implementations when the program is not compiled with Cilkscale.
-wsp_t operator+(wsp_t lhs, const wsp_t &rhs) noexcept {
-  wsp_t res = {0, 0, 0};
-  return res;
+wsp_t &operator+=(wsp_t &lhs, const wsp_t &rhs) noexcept {
+  return lhs;
 }
 
-wsp_t operator-(wsp_t lhs, const wsp_t &rhs) noexcept {
-  wsp_t res = {0, 0, 0};
-  return res;
+wsp_t &operator-=(wsp_t &lhs, const wsp_t &rhs) noexcept {
+  return lhs;
 }
 
 std::ostream &operator<<(std::ostream &os, const wsp_t &pt) {
@@ -66,6 +64,15 @@ CILKSCALE_EXTERN_C
 void wsp_dump(wsp_t wsp, const char *tag);
 
 #ifdef __cplusplus
+static inline wsp_t operator+(wsp_t lhs, const wsp_t &rhs) noexcept {
+  lhs += rhs;
+  return lhs;
+}
+static inline wsp_t operator-(wsp_t lhs, const wsp_t &rhs) noexcept {
+  lhs -= rhs;
+  return lhs;
+}
+
 extern "C" {
 #endif // #ifdef __cplusplus
 static inline wsp_t wsp_zero(void) CILKSCALE_NOTHROW {
