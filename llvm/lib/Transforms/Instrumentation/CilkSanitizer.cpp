@@ -242,6 +242,7 @@ struct CilkSanitizerImpl : public CSIImpl {
         DenseMap<BasicBlock *, unsigned> &SRCounters, const DataLayout &DL);
     bool InstrumentLoops(SmallPtrSetImpl<Instruction *> &LoopInstToHoist,
                          SmallPtrSetImpl<Instruction *> &LoopInstToSink,
+                         SmallPtrSetImpl<const Loop *> &TapirLoops,
                          ScalarEvolution *);
     bool PerformDelayedInstrumentation();
 
@@ -2624,7 +2625,8 @@ static Instruction *getLoopBlockInsertPt(BasicBlock *BB, FunctionCallee LoopHook
 // (which is unrelated to this), rename this to involve the word "hoist" or something.
 bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     SmallPtrSetImpl<Instruction *> &LoopInstToHoist,
-    SmallPtrSetImpl<Instruction *> &LoopInstToSink, ScalarEvolution *SE) {
+    SmallPtrSetImpl<Instruction *> &LoopInstToSink,
+    SmallPtrSetImpl<const Loop *> &TapirLoops, ScalarEvolution *SE) {
   bool Result = false;
 
   // First insert computation for the hook arguments for all instructions to
@@ -2664,7 +2666,8 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
 
     // Get the last address accessed.
     BasicBlock *Latch = L->getLoopLatch();
-    const SCEV *BECount = SE->getExitCount(L, Latch);
+    const SCEV *BECount = TapirLoops.count(L) ? SE->getExitCount(L, Latch)
+                                              : SE->getBackedgeTakenCount(L);
     const SCEV *LastAddr = SrcAR->evaluateAtIteration(BECount, *SE);
 
     // Get the size (number of bytes) of the address range accessed.
@@ -3024,6 +3027,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   // Find instructions that can be hoisted or sinked
   SmallPtrSet<Instruction *, 8> LoopInstToHoist;
   SmallPtrSet<Instruction *, 8> LoopInstToSink;
+  SmallPtrSet<const Loop *, 8> TapirLoops;
 
   const TargetLibraryInfo *TLI = &GetTLI(F);
   DominatorTree *DT = &GetDomTree(F);
@@ -3081,8 +3085,10 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                 // SE.isKnownNonNegative(Diff) will be false.
                 Diff = SE.getAddExpr(Size, Stride);
               }
-              const SCEV *TripCount = getRuntimeTripCount(
-                  *L, &SE, static_cast<bool>(getTaskIfTapirLoop(L, &TI)));
+              bool isTapirLoop = static_cast<bool>(getTaskIfTapirLoop(L, &TI));
+              if (isTapirLoop)
+                TapirLoops.insert(L);
+              const SCEV *TripCount = getRuntimeTripCount(*L, &SE, isTapirLoop);
 
               if (SE.isKnownNonNegative(Diff)) {
                 if (!isa<SCEVCouldNotCompute>(TripCount) &&
@@ -3187,6 +3193,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
                                                     SRCounters, DL);
   } else {
     Instrumentor FuncI(*this, RI, TI, LI, DT, TLI);
+
     // Insert MAAP flags for each function argument.
     FuncI.InsertArgMAAPs(F, FuncId);
 
@@ -3209,8 +3216,8 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
     // Hoist and sink instrumentation when possible (applies to all loops,
     // not just Tapir loops)
     // Also inserts MAAP checks for hoisted/sinked instrumentation
-    Result |= FuncI.InstrumentLoops(LoopInstToHoist, LoopInstToSink, &SE);
-
+    Result |=
+        FuncI.InstrumentLoops(LoopInstToHoist, LoopInstToSink, TapirLoops, &SE);
 
     // Once we have handled ancillary instructions, we've done the necessary
     // analysis on this function.  We now perform delayed instrumentation, which
