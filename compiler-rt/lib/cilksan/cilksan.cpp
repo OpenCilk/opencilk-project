@@ -822,6 +822,8 @@ void CilkSanImpl_t::do_write(const csi_id_t store_id,
 
 // clear the memory block at [start,start+size) (end is exclusive).
 void CilkSanImpl_t::clear_shadow_memory(size_t start, size_t size) {
+  if (!size)
+    return;
   DBG_TRACE(DEBUG_MEMORY, "cilksan_clear_shadow_memory(%p, %ld)\n",
             start, size);
   shadow_memory.clear(start, size);
@@ -838,6 +840,8 @@ void CilkSanImpl_t::record_alloc(size_t start, size_t size,
 }
 
 void CilkSanImpl_t::clear_alloc(size_t start, size_t size) {
+  if (!size)
+    return;
   DBG_TRACE(DEBUG_MEMORY, "cilksan_clear_alloc(%p, %ld)\n",
             start, size);
   shadow_memory.clear_alloc(start, size);
