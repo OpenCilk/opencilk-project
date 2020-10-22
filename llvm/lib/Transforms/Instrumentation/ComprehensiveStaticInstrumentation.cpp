@@ -381,7 +381,7 @@ uint64_t SizeTable::add(const BasicBlock &BB, TargetTransformInfo *TTI) {
   for (const Instruction &I : BB) {
     if (TTI) {
       int ICost =
-          TTI->getInstructionCost(&I, TargetTransformInfo::TCK_RecipThroughput);
+          TTI->getInstructionCost(&I, TargetTransformInfo::TCK_Latency);
       if (-1 == ICost)
         IRCost += static_cast<int>(TargetTransformInfo::TCC_Basic);
       else
