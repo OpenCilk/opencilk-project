@@ -976,10 +976,14 @@ bool tools::addSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
   if (SanArgs.hasCrossDsoCfi() && !AddExportDynamic)
     CmdArgs.push_back("--export-dynamic-symbol=__cfi_check");
 
-  if (SanArgs.needsCilksanRt())
-    // Interpose the __cilkrts_internal_merge_two_rmaps function in the OpenCilk
-    // runtime, to properly suppress races involving reducer hyperobjects.
+  if (SanArgs.needsCilksanRt()) {
+    // Interpose the __cilkrts_internal_merge_two_rmaps, __cilkrts_hyper_alloc,
+    // and __cilkrts_hyper_dealloc functions in the OpenCilk runtime, to properly
+    // suppress races involving reducer hyperobjects.
     CmdArgs.push_back("--wrap=__cilkrts_internal_merge_two_rmaps");
+    CmdArgs.push_back("--wrap=__cilkrts_hyper_alloc");
+    CmdArgs.push_back("--wrap=__cilkrts_hyper_dealloc");
+  }
 
   return !StaticRuntimes.empty() || !NonWholeStaticRuntimes.empty();
 }
