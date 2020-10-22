@@ -748,9 +748,8 @@ void __csi_after_alloca(const csi_id_t alloca_id, const void *addr,
   if (__builtin_expect(!alloca_pc[alloca_id], false))
     alloca_pc[alloca_id] = CALLERPC;
 
-  DBG_TRACE(DEBUG_CALLBACK, "__csi_after_alloca(%ld)\n", alloca_id);
-  DBG_TRACE(DEBUG_STACK, "__csi_after_alloca(%ld, %p, %ld)\n", alloca_id, addr,
-            size);
+  DBG_TRACE(DEBUG_CALLBACK, "__csi_after_alloca(%ld, %p, %ld)\n", alloca_id,
+            addr, size);
 
   // Record the alloca and clear the allocated portion of the shadow memory.
   CilkSanImpl.record_alloc((size_t) addr, size, 2 * alloca_id);
@@ -1275,4 +1274,84 @@ cilkred_map *__wrap___cilkrts_internal_merge_two_rmaps(__cilkrts_worker *ws,
   cilkred_map *res = __real___cilkrts_internal_merge_two_rmaps(ws, left, right);
   enable_checking();
   return res;
+}
+
+// Wrapped __cilkrts_hyper_alloc method for dynamic interpositioning.
+typedef void *(*hyper_alloc_t)(void *, size_t);
+static hyper_alloc_t dl_hyper_alloc = NULL;
+
+CILKSAN_API __attribute__((weak)) void*
+__cilkrts_hyper_alloc(void *ignored, size_t bytes) {
+  if (__builtin_expect(dl_hyper_alloc == NULL, 0)) {
+    dl_hyper_alloc = (hyper_alloc_t)dlsym(
+        RTLD_NEXT, "__cilkrts_hyper_alloc");
+    char *error = dlerror();
+    if (error != NULL) {
+      fputs(error, err_io);
+      fflush(err_io);
+      abort();
+    }
+  }
+  void *ptr = dl_hyper_alloc(ignored, bytes);
+  malloc_sizes.insert({(uintptr_t)ptr, bytes});
+  CilkSanImpl.record_alloc((size_t)ptr, bytes, 0);
+  CilkSanImpl.clear_shadow_memory((size_t)ptr, bytes);
+  return ptr;
+}
+
+/// Wrapped __cilkrts_hyper_alloc method for link-time interpositioning.
+CILKSAN_API __attribute__((weak)) void*
+__real___cilkrts_hyper_alloc(void *ignored, size_t bytes) {
+  return __cilkrts_hyper_alloc(ignored, bytes);
+}
+
+CILKSAN_API
+void *__wrap___cilkrts_hyper_alloc(void *ignored, size_t bytes) {
+  void *ptr = __real___cilkrts_hyper_alloc(ignored, bytes);
+  malloc_sizes.insert({(uintptr_t)ptr, bytes});
+  CilkSanImpl.record_alloc((size_t)ptr, bytes, 0);
+  CilkSanImpl.clear_shadow_memory((size_t)ptr, bytes);
+  return ptr;
+}
+
+// Wrapped __cilkrts_hyper_dealloc method for dynamic interpositioning.
+typedef void (*hyper_dealloc_t)(void *, void *);
+static hyper_dealloc_t dl_hyper_dealloc = NULL;
+
+CILKSAN_API __attribute__((weak)) void
+__cilkrts_hyper_dealloc(void *ignored, void *view) {
+  if (__builtin_expect(dl_hyper_dealloc == NULL, 0)) {
+    dl_hyper_dealloc = (hyper_dealloc_t)dlsym(
+        RTLD_NEXT, "__cilkrts_hyper_dealloc");
+    char *error = dlerror();
+    if (error != NULL) {
+      fputs(error, err_io);
+      fflush(err_io);
+      abort();
+    }
+  }
+  auto iter = malloc_sizes.find((uintptr_t)view);
+  if (iter != malloc_sizes.end()) {
+    CilkSanImpl.clear_alloc((size_t)view, iter->second);
+    CilkSanImpl.clear_shadow_memory((size_t)view, iter->second);
+    malloc_sizes.erase(iter);
+  }
+  dl_hyper_dealloc(ignored, view);
+}
+
+/// Wrapped __cilkrts_hyper_alloc method for link-time interpositioning.
+CILKSAN_API __attribute__((weak)) void
+__real___cilkrts_hyper_dealloc(void *ignored, void *view) {
+  __cilkrts_hyper_dealloc(ignored, view);
+}
+
+CILKSAN_API
+void __wrap___cilkrts_hyper_dealloc(void *ignored, void *view) {
+  auto iter = malloc_sizes.find((uintptr_t)view);
+  if (iter != malloc_sizes.end()) {
+    CilkSanImpl.clear_alloc((size_t)view, iter->second);
+    CilkSanImpl.clear_shadow_memory((size_t)view, iter->second);
+    malloc_sizes.erase(iter);
+  }
+  __real___cilkrts_hyper_dealloc(ignored, view);
 }
