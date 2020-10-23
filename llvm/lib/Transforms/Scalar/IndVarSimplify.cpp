@@ -711,6 +711,32 @@ static bool isLoopExitTestBasedOn(Value *V, BasicBlock *ExitingBB) {
   return ICmp->getOperand(0) == V || ICmp->getOperand(1) == V;
 }
 
+/// Helper method to check if the given IV has the widest induction type.
+static bool isWidestInductionType(Loop *L, PHINode *SimpleIV) {
+  const DataLayout &DL = L->getHeader()->getModule()->getDataLayout();
+  uint64_t IVWidth = SimpleIV->getType()->getPrimitiveSizeInBits();
+  for (BasicBlock::iterator I = L->getHeader()->begin(); isa<PHINode>(I); ++I) {
+    PHINode *Phi = cast<PHINode>(I);
+    if (Phi == SimpleIV)
+      continue;
+
+    // Skip PHI nodes that are not of integer type.
+    if (!Phi->getType()->isIntegerTy())
+      continue;
+
+    // Skip PHI nodes that are not loop counters.
+    int Idx = Phi->getBasicBlockIndex(L->getLoopLatch());
+    if (Idx < 0)
+      continue;
+
+    // Check if Phi has a larger valid width than SimpleIV.
+    uint64_t PhiWidth = Phi->getType()->getPrimitiveSizeInBits();
+    if (IVWidth < PhiWidth && DL.isLegalInteger(PhiWidth))
+      return false;
+  }
+  return true;
+}
+
 /// linearFunctionTestReplace policy. Return true unless we can show that the
 /// current exit test is already sufficiently canonical.
 static bool needsLFTR(Loop *L, BasicBlock *ExitingBB, TaskInfo *TI) {
@@ -761,12 +787,18 @@ static bool needsLFTR(Loop *L, BasicBlock *ExitingBB, TaskInfo *TI) {
     return true;
 
   // Tapir loops are particularly picky about having canonical induction
-  // variables that start at 0, so check if LFTR needs to create one.
-  if (getTaskIfTapirLoop(L, TI))
+  // variables, so check if LFTR needs to create one.
+  if (getTaskIfTapirLoop(L, TI)) {
+    // Check that the simple IV has the widest induction type.
+    if (!isWidestInductionType(L, Phi))
+      return true;
+
+    // Check that the simple IV starts at 0.
     if (BasicBlock *Preheader = L->getLoopPreheader())
       if (Constant *Start =
           dyn_cast<Constant>(Phi->getIncomingValueForBlock(Preheader)))
         return !(Start->isZeroValue());
+  }
 
   return false;
 }
