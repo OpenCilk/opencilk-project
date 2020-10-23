@@ -410,17 +410,17 @@ Value *TapirLoopInfo::getOrCreateTripCount(PredicatedScalarEvolution &PSE,
 
   Value *ConditionEnd = Condition->getOperand(0);
   {
-    Value *PrimaryIVInc =
-      PrimaryInduction->getIncomingValueForBlock(Condition->getParent());
-    if (ConditionEnd == (InclusiveRange ? PrimaryInduction : PrimaryIVInc))
+    if (!L->isLoopInvariant(ConditionEnd))
       ConditionEnd = Condition->getOperand(1);
   }
+  assert(L->isLoopInvariant(ConditionEnd) &&
+         "Condition end is not loop invariant.");
 
   IRBuilder<> Builder(L->getLoopPreheader()->getTerminator());
   ScalarEvolution *SE = PSE.getSE();
 
   // Find the loop boundaries.
-  const SCEV *BackedgeTakenCount = getBackedgeTakenCount(PSE);
+  const SCEV *BackedgeTakenCount = SE->getExitCount(L, L->getLoopLatch());
 
   if (BackedgeTakenCount == SE->getCouldNotCompute()) {
     LLVM_DEBUG(dbgs() << "Could not compute backedge-taken count.\n");
@@ -452,10 +452,16 @@ Value *TapirLoopInfo::getOrCreateTripCount(PredicatedScalarEvolution &PSE,
                                     L->getLoopPreheader()->getTerminator());
 
   // Try to use the existing ConditionEnd for the trip count.
-  if (TripCount != ConditionEnd)
-    if (PSE.areAddRecsEqualWithPreds(PSE.getAsAddRec(TripCount),
-                                     PSE.getAsAddRec(ConditionEnd)))
+  if (TripCount != ConditionEnd) {
+    // Compare the SCEV's of the TripCount and ConditionEnd to see if they're
+    // equal.  Normalize these SCEV types to be IdxTy.
+    const SCEV *TripCountSCEV =
+        SE->getNoopOrAnyExtend(SE->getSCEV(TripCount), IdxTy);
+    const SCEV *ConditionEndSCEV =
+        SE->getNoopOrAnyExtend(SE->getSCEV(ConditionEnd), IdxTy);
+    if (SE->getMinusSCEV(TripCountSCEV, ConditionEndSCEV)->isZero())
       TripCount = ConditionEnd;
+  }
 
   return TripCount;
 }
