@@ -2320,8 +2320,6 @@ void CSIImpl::instrumentFunction(Function &F) {
     setupCalls(F);
 
   const TargetLibraryInfo *TLI = &GetTLI(F);
-  // Canonicalize the CFG for CSI instrumentation
-  setupBlocks(F, TLI);
 
   // If we do not assume that calls terminate blocks, or if we're not
   // instrumenting basic blocks, then we're done.
@@ -2330,10 +2328,15 @@ void CSIImpl::instrumentFunction(Function &F) {
 
   DominatorTree *DT = &GetDomTree(F);
   LoopInfo &LI = GetLoopInfo(F);
+
   if (Options.InstrumentLoops)
+    // Simplify loops to prepare for loop instrumentation
     for (Loop *L : LI)
       simplifyLoop(L, DT, &LI, nullptr, nullptr, nullptr,
-                   /* PreserveLCSSA */false);
+                   /* PreserveLCSSA */ false);
+
+  // Canonicalize the CFG for CSI instrumentation
+  setupBlocks(F, TLI, DT, &LI);
 
   LLVM_DEBUG(dbgs() << "Canonicalized function:\n" << F);
 
