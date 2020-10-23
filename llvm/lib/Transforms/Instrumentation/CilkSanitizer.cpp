@@ -341,7 +341,8 @@ struct CilkSanitizerImpl : public CSIImpl {
       const Instruction *I, SmallVectorImpl<Value*> &AllocFnArgs,
       Type *SizeTy, Type *AddrTy, const TargetLibraryInfo &TLI);
 
-  void setupBlocks(Function &F, DominatorTree *DT = nullptr);
+  void setupBlocks(Function &F, DominatorTree *DT = nullptr,
+                   LoopInfo *LI = nullptr);
   bool setupFunction(Function &F);
 
   // Methods for handling FED tables
@@ -1046,21 +1047,22 @@ void CilkSanitizerImpl::initializeCsanHooks() {
 }
 
 static BasicBlock *SplitOffPreds(
-    BasicBlock *BB, SmallVectorImpl<BasicBlock *> &Preds, DominatorTree *DT) {
+    BasicBlock *BB, SmallVectorImpl<BasicBlock *> &Preds, DominatorTree *DT,
+    LoopInfo *LI) {
   if (BB->isLandingPad()) {
     SmallVector<BasicBlock *, 2> NewBBs;
     SplitLandingPadPredecessors(BB, Preds, ".csi-split-lp", ".csi-split",
-                                NewBBs, DT);
+                                NewBBs, DT, LI);
     return NewBBs[1];
   }
 
-  SplitBlockPredecessors(BB, Preds, ".csi-split", DT);
+  SplitBlockPredecessors(BB, Preds, ".csi-split", DT, LI);
   return BB;
 }
 
 // Setup each block such that all of its predecessors belong to the same CSI ID
 // space.
-static void setupBlock(BasicBlock *BB, DominatorTree *DT,
+static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
                        const TargetLibraryInfo *TLI) {
   if (BB->getUniquePredecessor())
     return;
@@ -1107,44 +1109,45 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT,
   BasicBlock *BBToSplit = BB;
   // Split off the predecessors of each type.
   if (!SyncPreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, SyncPreds, DT);
+    BBToSplit = SplitOffPreds(BBToSplit, SyncPreds, DT, LI);
     NumPredTypes--;
   }
   if (!SyncUnwindPreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, SyncUnwindPreds, DT);
+    BBToSplit = SplitOffPreds(BBToSplit, SyncUnwindPreds, DT, LI);
     NumPredTypes--;
   }
   if (!AllocFnPreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, AllocFnPreds, DT);
+    BBToSplit = SplitOffPreds(BBToSplit, AllocFnPreds, DT, LI);
     NumPredTypes--;
   }
   if (!InvokePreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, InvokePreds, DT);
+    BBToSplit = SplitOffPreds(BBToSplit, InvokePreds, DT, LI);
     NumPredTypes--;
   }
   if (!TFResumePreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, TFResumePreds, DT);
+    BBToSplit = SplitOffPreds(BBToSplit, TFResumePreds, DT, LI);
     NumPredTypes--;
   }
   // We handle detach and detached.rethrow predecessors at the end to preserve
   // invariants on the CFG structure about the deadness of basic blocks after
   // detached-rethrows.
   if (!DetachPreds.empty() && NumPredTypes > 1) {
-    BBToSplit = SplitOffPreds(BBToSplit, DetachPreds, DT);
+    BBToSplit = SplitOffPreds(BBToSplit, DetachPreds, DT, LI);
     NumPredTypes--;
   }
   // There is no need to split off detached-rethrow predecessors, since those
   // successors of a detached-rethrow are dead up to where control flow merges
   // with the unwind destination of a detach.
   // if (!DetRethrowPreds.empty() && NumPredTypes > 1) {
-  //   BBToSplit = SplitOffPreds(BBToSplit, DetRethrowPreds, DT);
+  //   BBToSplit = SplitOffPreds(BBToSplit, DetRethrowPreds, DT, LI);
   //   NumPredTypes--;
   // }
 }
 
 // Setup all basic blocks such that each block's predecessors belong entirely to
 // one CSI ID space.
-void CilkSanitizerImpl::setupBlocks(Function &F, DominatorTree *DT) {
+void CilkSanitizerImpl::setupBlocks(Function &F, DominatorTree *DT,
+                                    LoopInfo *LI) {
   SmallPtrSet<BasicBlock *, 8> BlocksToSetup;
   for (BasicBlock &BB : F) {
     if (BB.isLandingPad())
@@ -1157,7 +1160,7 @@ void CilkSanitizerImpl::setupBlocks(Function &F, DominatorTree *DT) {
   }
 
   for (BasicBlock *BB : BlocksToSetup)
-    setupBlock(BB, DT, &GetTLI(F));
+    setupBlock(BB, DT, LI, &GetTLI(F));
 }
 
 // Do not instrument known races/"benign races" that come from compiler
@@ -2968,17 +2971,21 @@ bool CilkSanitizerImpl::setupFunction(Function &F) {
                     << " for instrumentation\n");
 
   if (Options.CallsMayThrow)
+    // Promote calls to invokes to insert instrumentation in exception-handling
+    // code.
     setupCalls(F);
-
-  setupBlocks(F);
 
   DominatorTree *DT = &GetDomTree(F);
   LoopInfo &LI = GetLoopInfo(F);
 
   if (Options.InstrumentLoops)
+    // Simplify loops to prepare for loop instrumentation
     for (Loop *L : LI)
       simplifyLoop(L, DT, &LI, nullptr, nullptr, nullptr,
                    /* PreserveLCSSA */ false);
+
+  // Canonicalize the CFG for instrumentation
+  setupBlocks(F, DT, &LI);
 
   return true;
 }
