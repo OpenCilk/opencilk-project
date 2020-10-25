@@ -9,6 +9,7 @@
 #ifndef LLVM_ANALYSIS_TARGETLIBRARYINFO_H
 #define LLVM_ANALYSIS_TARGETLIBRARYINFO_H
 
+#include <functional>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Triple.h"
@@ -18,6 +19,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Tapir/TapirTargetIDs.h"
+#include "llvm/Transforms/Tapir/LoweringUtils.h"
 
 namespace llvm {
 template <typename T> class ArrayRef;
@@ -37,6 +39,8 @@ struct VecDesc {
 
     NumLibFuncs
   };
+
+using TapirTargetFactory = std::function<TapirTarget *(Module &)>;
 
 /// Implementation of the target library information.
 ///
@@ -203,6 +207,8 @@ public:
   void setTapirTarget(TapirTargetID TargetID) {
     TapirTarget = TargetID;
   }
+
+  void setTapirTarget(TapirTargetFactory target);
 
   /// Return the ID of the target for Tapir lowering.
   TapirTargetID getTapirTarget() const {
