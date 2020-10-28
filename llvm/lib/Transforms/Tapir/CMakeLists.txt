@@ -22,4 +22,4 @@ add_llvm_library(LLVMTapirOpts
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms/Tapir
   )
 
-add_dependencies(LLVMTapirOpts intrinsics_gen)
+add_dependencies(LLVMTapirOpts intrinsics_gen LLVMLinker)

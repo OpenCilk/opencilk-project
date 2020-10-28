@@ -12,7 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/OpenCilkABI.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -21,6 +23,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -28,12 +31,43 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 
+#include "llvm/Transforms/IPO/Internalize.h"
+
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Triple.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Mangler.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Linker/Linker.h"
+#include "llvm/Object/ObjectFile.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/IPO/Internalize.h"
+#include <stddef.h>
+#include <string.h>
+#include <map>
+#include <mutex>  // NOLINT(build/c++11): only using std::call_once, not mutex.
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 using namespace llvm;
 
 #define DEBUG_TYPE "opencilk"
 
 extern cl::opt<bool> DebugABICalls;
 extern cl::opt<bool> UseExternalABIFunctions;
+
+static cl::opt<bool> UseOpenCilkRuntimeBC("use-opencilk-runtime-bc", cl::init(false),
+    cl::desc("Use the bitcode file for opencilk runtime."), cl::Hidden);
+static cl::opt<std::string> OpenCilkRuntimeBCPath("opencilk-runtime-bc-path", cl::init(""),
+    cl::desc("Path to the bitcode file for the opencilk runtime"), cl::Hidden);
 
 enum {
   __CILKRTS_ABI_VERSION_OPENCILK = 3
@@ -72,6 +106,46 @@ OpenCilkABI::OpenCilkABI(Module &M)
   LLVMContext &C = M.getContext();
   Type *VoidPtrTy = Type::getInt8PtrTy(C);
   Type *Int32Ty = Type::getInt32Ty(C);
+
+  // NOTE(TFK): Removing the check for struct.__cilkrts_stack_frame in the conditional below 
+  //            can cause an infinite loop. I am unsure exactly why this infinite loop occurs.
+  //            However, I think it makes sense, independent of this "bug", to only link to 
+  //            the opencilk runtime bitcode once-per-module. Ideally, there is a more elegant
+  //            way to perform this check other than looking for a specific structure definition. 
+  if(UseOpenCilkRuntimeBC.getValue() && (M.getTypeByName("struct.__cilkrts_stack_frame") == nullptr ||
+     M.getTypeByName("struct.__cilkrts_stack_frame")->isOpaque())) {
+    llvm::errs() << "Using custom BC path \n"; 
+    llvm::SMDiagnostic smd;
+
+    // NOTE(TFK): The behavior I observe is that the invocation of llvm::parseIRFile 
+    //            imports global values like structure definitions into the current module
+    //            because it is using the current module's context "C".
+    //            llvm::parseIRFile, however, does not import function definitions (and
+    //            perhaps not even declarations?) into the module. Therefore, we need to
+    //            additionally run linkModules.
+    auto external_module = llvm::parseIRFile(OpenCilkRuntimeBCPath.getValue(), smd, C);
+
+    // NOTE(TFK): This links the functions in external_module (the source) into the current module
+    //            M (the destination). Because the needed functions, such as cilkrts_enter_frame,
+    //            are not yet declared when OpenCilkABI is called we use llvm::Linker::Flags::None
+    //            so that all functions in external_module are imported.
+    //            Using llvm::Linker::Flags::LinkOnlyNeeded will not import the needed functions unless
+    //            we declare those functions in this module in advance of linking.
+    bool result = llvm::Linker::linkModules(M, std::move(external_module), llvm::Linker::Flags::None,
+    [](llvm::Module& M, const llvm::StringSet<>& GVS) {
+      llvm::errs() << "Linking with bitcode file at " << OpenCilkRuntimeBCPath << "\n";
+      llvm::internalizeModule(M, 
+          [&GVS](const llvm::GlobalValue& GV) {
+            return !GV.hasName() || GVS.count(GV.getName()) == 0;
+          });
+      // NOTE(TFK): This prints the functions that are imported into the current module.
+      for (auto x = GVS.keys().begin(); x != GVS.keys().end(); ++x) {
+        llvm::errs() << *x << "\n";
+      }
+    });
+    assert(!result && "An error occurred when linking to the opencilk runtime bitcode module.\n");
+    llvm::errs() << "After link  modules \n"; 
+  }
 
   // Get or create local definitions of Cilk RTS structure types.
   const char *StackFrameName = "struct.__cilkrts_stack_frame";
@@ -449,8 +523,13 @@ Function *OpenCilkABI::Get__cilkrts_pop_frame() {
   Function *Fn = nullptr;
   if (GetOrCreateFunction(M, "__cilkrts_pop_frame",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
+                          Fn)) {
+    Fn->setLinkage(Function::AvailableExternallyLinkage);
+    Fn->setDoesNotThrow();
+    if (!DebugABICalls && !UseExternalABIFunctions)
+      Fn->addFnAttr(Attribute::AlwaysInline);
     return Fn;
+  }
 
   // Create the body of __cilkrts_pop_frame.
   const DataLayout &DL = M.getDataLayout();
@@ -520,8 +599,12 @@ Function *OpenCilkABI::Get__cilkrts_detach() {
   Function *Fn = nullptr;
   if (GetOrCreateFunction(M, "__cilkrts_detach",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
+                          Fn)) {
+    Fn->setLinkage(Function::AvailableExternallyLinkage);
+    Fn->setDoesNotThrow();
+    if (!DebugABICalls && !UseExternalABIFunctions)
+      Fn->addFnAttr(Attribute::AlwaysInline);
+  }
 
   // Create the body of __cilkrts_detach.
   const DataLayout &DL = M.getDataLayout();
@@ -888,11 +971,20 @@ Function *OpenCilkABI::Get__cilkrts_enter_frame() {
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Function *Fn = nullptr;
+  // NOTE(TFK): If the function was imported from the opencilk bitcode file
+  //            then it will not have the requisite attributes. It is perhaps
+  //            better to set these attributes when creating the opencilk bitcode
+  //            file... for now I set them here.
   if (GetOrCreateFunction(M, "__cilkrts_enter_frame",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
+                          Fn)) {
+    Fn->setLinkage(Function::AvailableExternallyLinkage);
+    Fn->setDoesNotThrow();
+    if (!DebugABICalls && !UseExternalABIFunctions)
+      Fn->addFnAttr(Attribute::AlwaysInline);
     return Fn;
-
+  }
+  //assert(false && "We should've used the existing enter_frame function here...\n");
   // Create the body of __cilkrts_enter_frame.
   const DataLayout &DL = M.getDataLayout();
 
@@ -1005,10 +1097,19 @@ Function *OpenCilkABI::Get__cilkrts_enter_frame_fast() {
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Function *Fn = nullptr;
+  // NOTE(TFK): If the function was imported from the opencilk bitcode file
+  //            then it will not have the requisite attributes. It is perhaps
+  //            better to set these attributes when creating the opencilk bitcode
+  //            file... for now I set them here.
   if (GetOrCreateFunction(M, "__cilkrts_enter_frame_fast",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
+                          Fn)) {
+    Fn->setLinkage(Function::AvailableExternallyLinkage);
+    Fn->setDoesNotThrow();
+    if (!DebugABICalls && !UseExternalABIFunctions)
+      Fn->addFnAttr(Attribute::AlwaysInline);
     return Fn;
+  }
 
   // Create the body of __cilkrts_enter_frame_fast.
   const DataLayout &DL = M.getDataLayout();
