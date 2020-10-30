@@ -436,12 +436,21 @@ void TapirToTargetImpl::processFunction(
   for (Function *H : NewHelpers)
     Target->postProcessHelper(*H);
   } // end timed region
-#ifndef NDEBUG
-  if (verifyModule(M, &errs())) {
-    LLVM_DEBUG(dbgs() << "Module after lowering:" << M);
-    llvm_unreachable("Tapir lowering produced bad IR!");
-  }
-#endif
+
+  LLVM_DEBUG({
+    NamedRegionTimer NRT("FunctionVerify",
+                         "Post-lowering function verification", TimerGroupName,
+                         TimerGroupDescription, TimePassesIsEnabled);
+    if (verifyFunction(F, &errs())) {
+      LLVM_DEBUG(dbgs() << "Function after lowering:" << F);
+      llvm_unreachable("Tapir lowering produced bad IR!");
+    }
+    for (Function *H : NewHelpers)
+      if (verifyFunction(*H, &errs())) {
+        LLVM_DEBUG(dbgs() << "Function after lowering:" << *H);
+        llvm_unreachable("Tapir lowering produced bad IR!");
+      }
+  });
 
   return;
 }
@@ -449,6 +458,10 @@ void TapirToTargetImpl::processFunction(
 bool TapirToTargetImpl::run() {
   // Add functions that detach to the work list.
   SmallVector<Function *, 4> WorkList;
+  {
+  NamedRegionTimer NRT("shouldProcessFunction", "Find functions to process",
+                       TimerGroupName, TimerGroupDescription,
+                       TimePassesIsEnabled);
   for (Function &F : M) {
     // TODO: Use per-function Tapir targets?
     if (!Target)
@@ -456,6 +469,7 @@ bool TapirToTargetImpl::run() {
     assert(Target && "Missing Tapir target");
     if (Target->shouldProcessFunction(F))
       WorkList.push_back(&F);
+  }
   }
 
   if (WorkList.empty())
@@ -472,9 +486,14 @@ bool TapirToTargetImpl::run() {
 
     // Check the generated helper functions to see if any need to be processed,
     // that is, to see if any of them themselves detach a subtask.
+    {
+    NamedRegionTimer NRT("shouldProcessHelper",
+                         "Find helper functions to process", TimerGroupName,
+                         TimerGroupDescription, TimePassesIsEnabled);
     for (Function *Helper : NewHelpers)
       if (Target->shouldProcessFunction(*Helper))
         WorkList.push_back(Helper);
+    }
   }
   return Changed;
 }
