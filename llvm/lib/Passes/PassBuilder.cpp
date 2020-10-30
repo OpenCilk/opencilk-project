@@ -290,6 +290,11 @@ static cl::opt<bool> EnableO3NonTrivialUnswitching(
     "enable-npm-O3-nontrivial-unswitch", cl::init(true), cl::Hidden,
     cl::ZeroOrMore, cl::desc("Enable non-trivial loop unswitching for -O3"));
 
+static cl::opt<bool>
+    VerifyTapirLowering("verify-tapir-lowering-npm", cl::init(false),
+                        cl::Hidden,
+                        cl::desc("Verify IR after Tapir lowering steps"));
+
 PipelineTuningOptions::PipelineTuningOptions() {
   LoopInterleaving = true;
   LoopVectorization = true;
@@ -1548,6 +1553,8 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   // Outline Tapir loops as needed.
   MPM.addPass(LoopSpawningPass());
+  if (VerifyTapirLowering)
+    MPM.addPass(VerifierPass());
 
   // The LoopSpawning pass may leave cruft around.  Clean it up using the
   // function simplification pipeline.
@@ -1564,6 +1571,8 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   // Lower Tapir to target runtime calls.
   MPM.addPass(TapirToTargetPass());
+  if (VerifyTapirLowering)
+    MPM.addPass(VerifierPass());
 
   // The TapirToTarget pass may leave cruft around.  Clean it up using the
   // function simplification pipeline.
