@@ -241,6 +241,11 @@ static cl::opt<bool>
     EnableCHR("enable-chr-npm", cl::init(true), cl::Hidden,
               cl::desc("Enable control height reduction optimization (CHR)"));
 
+static cl::opt<bool>
+    VerifyTapirLowering("verify-tapir-lowering-npm", cl::init(false),
+                        cl::Hidden,
+                        cl::desc("Verify IR after Tapir lowering steps"));
+
 PipelineTuningOptions::PipelineTuningOptions() {
   LoopInterleaving = EnableLoopInterleaving;
   LoopVectorization = EnableLoopVectorization;
@@ -1104,6 +1109,8 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   // Outline Tapir loops as needed.
   MPM.addPass(LoopSpawningPass());
+  if (VerifyTapirLowering)
+    MPM.addPass(VerifierPass());
 
   // The LoopSpawning pass may leave cruft around.  Clean it up using the
   // function simplification pipeline.
@@ -1120,6 +1127,8 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   // Lower Tapir to target runtime calls.
   MPM.addPass(TapirToTargetPass());
+  if (VerifyTapirLowering)
+    MPM.addPass(VerifierPass());
 
   // The TapirToTarget pass may leave cruft around.  Clean it up using the
   // function simplification pipeline.
