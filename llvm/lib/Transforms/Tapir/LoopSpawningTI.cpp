@@ -1574,12 +1574,15 @@ bool LoopSpawningImpl::run() {
   // Perform any Target-dependent postprocessing of F.
   Target->postProcessFunction(F, true);
 
-#ifndef NDEBUG
-  if (verifyModule(*F.getParent(), &errs())) {
-    LLVM_DEBUG(dbgs() << "Module after loop spawning:" << *F.getParent());
-    llvm_unreachable("Loop spawning produced bad IR!");
-  }
-#endif
+  LLVM_DEBUG({
+    NamedRegionTimer NRT("verify", "Post-loop-spawning verification",
+                         TimerGroupName, TimerGroupDescription,
+                         TimePassesIsEnabled);
+    if (verifyModule(*F.getParent(), &errs())) {
+      LLVM_DEBUG(dbgs() << "Module after loop spawning:" << *F.getParent());
+      llvm_unreachable("Loop spawning produced bad IR!");
+    }
+  });
 
   return true;
 }
