@@ -36,6 +36,13 @@ using namespace llvm;
 static const char TimerGroupName[] = DEBUG_TYPE;
 static const char TimerGroupDescription[] = "Tapir lowering";
 
+static TapirTargetFactory CUSTOM_TAPIR_TARGET;
+
+void llvm::TargetLibraryInfoImpl::setTapirTarget(TapirTargetFactory target) {
+  TapirTarget = TapirTargetID::Custom;
+  CUSTOM_TAPIR_TARGET = target;
+}
+
 TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
   switch (ID) {
   case TapirTargetID::None:
@@ -53,6 +60,8 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return new OpenMPABI(M);
   case TapirTargetID::Qthreads:
     return new QthreadsABI(M);
+  case TapirTargetID::Custom:
+    return CUSTOM_TAPIR_TARGET(M);
   default:
     llvm_unreachable("Invalid TapirTargetID");
   }

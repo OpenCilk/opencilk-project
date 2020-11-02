@@ -13,6 +13,7 @@
 #ifndef LOWERING_UTILS_H_
 #define LOWERING_UTILS_H_
 
+#include <functional>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
@@ -408,6 +409,8 @@ public:
 
 /// Generate a TapirTarget object for the specified TapirTargetID.
 TapirTarget *getTapirTargetFromID(Module &M, TapirTargetID TargetID);
+
+void setCustomTapirTarget(std::function<TapirTarget *(Module &)>);
 
 /// Find all inputs to tasks within a function \p F, including nested tasks.
 TaskValueSetMap findAllTaskInputs(Function &F, const DominatorTree &DT,
