@@ -1461,8 +1461,14 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
 
   if (O1 != O2) {
     // If V1/V2 point to two different objects, we know that we have no alias.
-    if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
-      return AliasResult::NoAlias;
+    if (AAQI.AssumeSameSpindle) {
+      if (isIdentifiedObjectInSameSpindle(O1) &&
+          isIdentifiedObjectInSameSpindle(O2))
+        return AliasResult::NoAlias;
+    } else {
+      if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
+        return AliasResult::NoAlias;
+    }
 
     // Constant pointers can't alias with non-const isIdentifiedObject objects.
     if ((isa<Constant>(O1) && isIdentifiedObject(O2) && !isa<Constant>(O2)) ||

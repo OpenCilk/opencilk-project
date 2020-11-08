@@ -112,6 +112,14 @@ AliasResult AAResults::alias(const MemoryLocation &LocA,
 }
 
 AliasResult AAResults::alias(const MemoryLocation &LocA,
+                             const MemoryLocation &LocB,
+                             bool AssumeSameSpindle) {
+  SimpleAAQueryInfo AAQIP(*this);
+  AAQIP.AssumeSameSpindle = AssumeSameSpindle;
+  return alias(LocA, LocB, AAQIP, nullptr);
+}
+
+AliasResult AAResults::alias(const MemoryLocation &LocA,
                              const MemoryLocation &LocB, AAQueryInfo &AAQI,
                              const Instruction *CtxI) {
   AliasResult Result = AliasResult::MayAlias;
@@ -187,6 +195,14 @@ ModRefInfo AAResults::getArgModRefInfo(const CallBase *Call, unsigned ArgIdx) {
 ModRefInfo AAResults::getModRefInfo(const Instruction *I,
                                     const CallBase *Call2) {
   SimpleAAQueryInfo AAQIP(*this);
+  return getModRefInfo(I, Call2, AAQIP);
+}
+
+ModRefInfo AAResults::getModRefInfo(const Instruction *I,
+                                    const CallBase *Call2,
+                                    bool AssumeSameSpindle) {
+  SimpleAAQueryInfo AAQIP(*this);
+  AAQIP.AssumeSameSpindle = AssumeSameSpindle;
   return getModRefInfo(I, Call2, AAQIP);
 }
 
@@ -273,6 +289,10 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I, const CallBase *Call2,
   if (isModOrRefSet(MR))
     return ModRefInfo::ModRef;
   return ModRefInfo::NoModRef;
+}
+
+static bool effectivelyArgMemOnly(const CallBase *Call, AAQueryInfo &AAQI) {
+  return Call->isStrandPure() && AAQI.AssumeSameSpindle;
 }
 
 ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
@@ -1104,6 +1124,12 @@ bool llvm::isNoAliasCall(const Value *V) {
   return false;
 }
 
+bool llvm::isNoAliasCallInSameSpindle(const Value *V) {
+  if (const auto *Call = dyn_cast<CallBase>(V))
+    return Call->hasRetAttr(Attribute::StrandNoAlias);
+  return isNoAliasCall(V);
+}
+
 static bool isNoAliasOrByValArgument(const Value *V) {
   if (const Argument *A = dyn_cast<Argument>(V))
     return A->hasNoAliasAttr() || A->hasByValAttr();
@@ -1118,6 +1144,14 @@ bool llvm::isIdentifiedObject(const Value *V) {
   if (isNoAliasCall(V))
     return true;
   if (isNoAliasOrByValArgument(V))
+    return true;
+  return false;
+}
+
+bool llvm::isIdentifiedObjectInSameSpindle(const Value *V) {
+  if (isIdentifiedObject(V))
+    return true;
+  if (isNoAliasCallInSameSpindle(V))
     return true;
   return false;
 }
