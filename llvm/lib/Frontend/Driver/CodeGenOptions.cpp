@@ -53,6 +53,7 @@ TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
   }
 
   TLII->setTapirTarget(TapirTarget);
+  TLII->addTapirTargetLibraryFunctions();
 
   return TLII;
 }
