@@ -6,6 +6,7 @@ module LLVM_Analysis {
   // This is intended for (repeated) textual inclusion.
   textual header "Analysis/TargetLibraryInfo.def"
   textual header "Analysis/VecFuncs.def"
+  textual header "Analysis/TapirTargetFuncs.def"
 }
 
 module LLVM_AsmParser {
