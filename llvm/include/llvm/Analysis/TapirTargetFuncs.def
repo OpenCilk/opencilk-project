@@ -1,0 +1,25 @@
+//===-- TapirTargetFuncs.def - Library information ----*- C++ -*-----------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+// This .def file will either fill in the enum definition or fill in the
+// string representation array definition for TargetLibraryInfo.
+// Which is defined depends on whether TLI_DEFINE_ENUM is defined or
+// TLI_DEFINE_STRING is defined. Only one should be defined at a time.
+
+#define TLI_DEFINE_STRING_INTERNAL(string_repr) string_repr,
+
+#if defined(TLI_DEFINE_CILK_LIBS)
+/// unsigned __cilkrts_get_nworkers(void);
+TLI_DEFINE_STRING_INTERNAL("__cilkrts_get_nworkers")
+/// unsigned __cilkrts_get_worker_number(void);
+TLI_DEFINE_STRING_INTERNAL("__cilkrts_get_worker_number")
+/// void *__cilkrts_hyper_lookup(__cilkrts_hyperobject_base *key);
+TLI_DEFINE_STRING_INTERNAL("__cilkrts_hyper_lookup")
+#endif
+
+#undef TLI_DEFINE_STRING_INTERNAL
