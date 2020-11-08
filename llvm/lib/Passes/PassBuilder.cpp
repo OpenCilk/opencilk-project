@@ -954,8 +954,9 @@ ModulePassManager PassBuilder::buildModuleOptimizationPipeline(
     LoopPassManager LPM(DebugLogging);
     LPM.addPass(LoopSimplifyCFGPass());
     LPM.addPass(IndVarSimplifyPass());
-    OptimizePM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM),
-                                                       DebugLogging));
+    LPM.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap));
+    OptimizePM.addPass(
+        createFunctionToLoopPassAdaptor(std::move(LPM), DebugLogging));
     OptimizePM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
     OptimizePM.addPass(JumpThreadingPass());
     OptimizePM.addPass(CorrelatedValuePropagationPass());
