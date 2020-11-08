@@ -92,6 +92,8 @@
 ; CHECK-O2-NEXT: Simplify loop CFG
 ; CHECK-O2: Loop Pass Manager
 ; CHECK-O2-NEXT: Induction Variable Simplification
+; CHECK-O2: Loop Pass Manager
+; CHECK-O2-NEXT: Loop Invariant Code Motion
 ; We rotate loops prior to vectorization.
 ; CHECK-O2: Loop Pass Manager
 ; CHECK-O2-NEXT: Rotate Loops
