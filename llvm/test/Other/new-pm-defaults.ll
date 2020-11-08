@@ -241,6 +241,7 @@
 ; CHECK-O23SZ-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-O23SZ-NEXT: Running pass: LoopSimplifyPass
 ; CHECK-O23SZ-NEXT: Running pass: IndVarSimplifyPass
+; CHECK-O23SZ-NEXT: Running pass: LICMPass
 ; CHECK-O23SZ-NEXT: Running pass: EarlyCSEPass
 ; CHECK-O23SZ-NEXT: Running pass: JumpThreadingPass
 ; CHECK-O23SZ-NEXT: Running pass: CorrelatedValuePropagationPass
