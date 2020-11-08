@@ -920,6 +920,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::ReturnsTwice:
       case Attribute::Speculatable:
       case Attribute::StackAlignment:
+      case Attribute::Stealable:
       case Attribute::WillReturn:
       case Attribute::WriteOnly:
         continue;
@@ -947,6 +948,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::SafeStack:
       case Attribute::ShadowCallStack:
       case Attribute::SanitizeAddress:
+      case Attribute::SanitizeCilk:
       case Attribute::SanitizeMemory:
       case Attribute::SanitizeThread:
       case Attribute::SanitizeHWAddress:
@@ -955,15 +957,13 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::StackProtect:
       case Attribute::StackProtectReq:
       case Attribute::StackProtectStrong:
+      case Attribute::StrandPure:
       case Attribute::StrictFP:
       case Attribute::UWTable:
       case Attribute::VScaleRange:
       case Attribute::NoCfCheck:
       case Attribute::MustProgress:
       case Attribute::NoProfile:
-      case Attribute::SanitizeCilk:
-      case Attribute::Stealable:
-      case Attribute::StrandPure:
         break;
       // These attributes cannot be applied to functions.
       case Attribute::Alignment:
@@ -981,6 +981,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::Preallocated:
       case Attribute::Returned:
       case Attribute::SExt:
+      case Attribute::StrandNoAlias:
       case Attribute::StructRet:
       case Attribute::SwiftError:
       case Attribute::SwiftSelf:
