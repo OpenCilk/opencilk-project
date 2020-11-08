@@ -788,10 +788,10 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: unreachable
 
 ; CHECK: [[DACLPAD]]:
-; CHECK-NEXT: landingpad
+; CHECK: landingpad
 ; CHECK-NEXT: cleanup
 ; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[DACSYNCREG]],
-; CHECK-NEXT: to label %[[UNREACHABLE2:.+]] unwind label
+; CHECK-NEXT: to label %[[UNREACHABLE2:.+]] unwind label %[[DACDU]]
 
 
 ; CHECK-LABEL: define private fastcc void @_Z27parfor_trycatch_destructorsi.outline_pfor.cond.ls1(
@@ -867,10 +867,10 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: unreachable
 
 ; CHECK: [[DACLPAD]]:
-; CHECK-NEXT: landingpad
+; CHECK: landingpad
 ; CHECK-NEXT: cleanup
 ; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[DACSYNCREG]],
-; CHECK-NEXT: to label %[[UNREACHABLE2:.+]] unwind label
+; CHECK-NEXT: to label %[[UNREACHABLE2:.+]] unwind label %[[DACDU]]
 
 attributes #0 = { uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { nounwind readnone }
