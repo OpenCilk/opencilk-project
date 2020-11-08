@@ -1,5 +1,5 @@
-; RUN: opt < %s -licm -S -o - | FileCheck %s
-; RUN: opt < %s -aa-pipeline=basic-aa -passes='require<opt-remark-emit>,loop(licm)' -S -o - | FileCheck %s
+; RUN: opt < %s -licm -require-taskinfo-memoryssa -S -o - | FileCheck %s
+; RUN: opt < %s -aa-pipeline=basic-aa -passes='require<opt-remark-emit>,loop-mssa(licm)' -S -o - | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -133,7 +133,7 @@ pfor.body:                                        ; preds = %pfor.cond
   %19 = bitcast %"class.cilk::reducer_opadd"* %accum to %"class.cilk::reducer"*
   %20 = getelementptr inbounds %"class.cilk::reducer", %"class.cilk::reducer"* %19, i64 0, i32 0, i32 0
   %m_base.i.i.i = getelementptr inbounds %"class.cilk::internal::reducer_base", %"class.cilk::internal::reducer_base"* %20, i64 0, i32 0
-  %call.i.i.i = call noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base* %m_base.i.i.i) #11
+  %call.i.i.i = call strand_noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base* %m_base.i.i.i) #11
   %21 = bitcast i8* %call.i.i.i to %"class.cilk::op_add_view"*
   %22 = load i64, i64* %ref.tmp1, align 8, !tbaa !2
   %m_value.i.i = getelementptr inbounds %"class.cilk::op_add_view", %"class.cilk::op_add_view"* %21, i64 0, i32 0, i32 0
@@ -153,14 +153,14 @@ pfor.inc:                                         ; preds = %invoke.cont2
   br i1 %inneriter.ncmp, label %pfor.inc.reattach, label %pfor.cond, !llvm.loop !27
 
 ; CHECK: pfor.cond.strpm.outer:
-; CHECK: call noalias i8* @__cilkrts_hyper_lookup(
+; CHECK: call strand_noalias i8* @__cilkrts_hyper_lookup(
 ; CHECK: br label %pfor.cond
 
 ; CHECK: pfor.cond:
 ; CHECK: br label %pfor.body
 
 ; CHECK: pfor.body:
-; CHECK-NOT: call noalias i8* @__cilkrts_hyper_lookup(
+; CHECK-NOT: call strand_noalias i8* @__cilkrts_hyper_lookup(
 ; CHECK: br label %pfor.inc
 
 ; CHECK: pfor.inc:
@@ -198,7 +198,7 @@ pfor.body.epil:                                   ; preds = %pfor.cond.epil
   %27 = bitcast %"class.cilk::reducer_opadd"* %accum to %"class.cilk::reducer"*
   %28 = getelementptr inbounds %"class.cilk::reducer", %"class.cilk::reducer"* %27, i64 0, i32 0, i32 0
   %m_base.i.i.i.epil = getelementptr inbounds %"class.cilk::internal::reducer_base", %"class.cilk::internal::reducer_base"* %28, i64 0, i32 0
-  %call.i.i.i.epil = call noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base* %m_base.i.i.i.epil) #11
+  %call.i.i.i.epil = call strand_noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base* %m_base.i.i.i.epil) #11
   %29 = bitcast i8* %call.i.i.i.epil to %"class.cilk::op_add_view"*
   %30 = load i64, i64* %ref.tmp1.epil, align 8, !tbaa !2
   %m_value.i.i.epil = getelementptr inbounds %"class.cilk::op_add_view", %"class.cilk::op_add_view"* %29, i64 0, i32 0, i32 0
@@ -248,7 +248,7 @@ cleanup:                                          ; preds = %sync.continue, %ent
   %33 = bitcast %"class.cilk::reducer_opadd"* %accum to %"class.cilk::reducer"*
   %34 = getelementptr inbounds %"class.cilk::reducer", %"class.cilk::reducer"* %33, i64 0, i32 0, i32 0
   %m_base.i.i.i.i1 = getelementptr inbounds %"class.cilk::internal::reducer_base", %"class.cilk::internal::reducer_base"* %34, i64 0, i32 0
-  %call.i.i.i.i = call noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base* %m_base.i.i.i.i1) #11
+  %call.i.i.i.i = call strand_noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base* %m_base.i.i.i.i1) #11
   %35 = bitcast i8* %call.i.i.i.i to %"class.cilk::op_add_view"*
   %36 = getelementptr inbounds %"class.cilk::op_add_view", %"class.cilk::op_add_view"* %35, i64 0, i32 0
   %m_value.i.i.i = getelementptr inbounds %"class.cilk::scalar_view", %"class.cilk::scalar_view"* %36, i64 0, i32 0
@@ -439,7 +439,7 @@ declare dso_local noalias nonnull i8* @_Znwm(i64) local_unnamed_addr #7
 declare dso_local void @_ZdlPv(i8*) local_unnamed_addr #8
 
 ; Function Attrs: nounwind readonly strand_pure
-declare dso_local noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base*) local_unnamed_addr #9
+declare dso_local strand_noalias i8* @__cilkrts_hyper_lookup(%struct.__cilkrts_hyperobject_base*) local_unnamed_addr #9
 
 attributes #0 = { uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind }
