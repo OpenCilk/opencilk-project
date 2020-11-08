@@ -12,6 +12,7 @@ module LLVM_Analysis {
   textual header "llvm/Analysis/ScalarFuncs.def"
   textual header "llvm/Analysis/TargetLibraryInfo.def"
   textual header "llvm/Analysis/VecFuncs.def"
+  textual header "llvm/Analysis/TapirTargetFuncs.def"
 }
 
 module LLVM_AsmParser {
