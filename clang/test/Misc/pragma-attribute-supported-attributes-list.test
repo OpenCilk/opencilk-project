@@ -155,6 +155,7 @@
 // CHECK-NEXT: SetTypestate (SubjectMatchRule_function_is_member)
 // CHECK-NEXT: SpeculativeLoadHardening (SubjectMatchRule_function, SubjectMatchRule_objc_method)
 // CHECK-NEXT: Stealable (SubjectMatchRule_hasType_functionType)
+// CHECK-NEXT: StrandMalloc (SubjectMatchRule_function)
 // CHECK-NEXT: StrandPure (SubjectMatchRule_hasType_functionType)
 // CHECK-NEXT: SwiftAsync (SubjectMatchRule_function, SubjectMatchRule_objc_method)
 // CHECK-NEXT: SwiftAsyncName (SubjectMatchRule_objc_method, SubjectMatchRule_function)

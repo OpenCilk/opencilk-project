@@ -5777,3 +5777,12 @@ The ``stealable`` attribute denotes that the function contains a continuation th
 can be stolen by a work-stealing scheduler.
   }];
 }
+
+def StrandMallocDocs : Documentation {
+  let Category = DocCatFunction;
+  let Content = [{
+The ``strand_malloc`` attribute denotes that the function pointer acts
+like a system memory allocation function from the perspective of
+memory operations within the same strand.
+}];
+}
