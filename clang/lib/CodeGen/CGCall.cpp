@@ -2232,6 +2232,8 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
     }
     if (TargetDecl->hasAttr<RestrictAttr>())
       RetAttrs.addAttribute(llvm::Attribute::NoAlias);
+    else if (TargetDecl->hasAttr<StrandMallocAttr>())
+      RetAttrs.addAttribute(llvm::Attribute::StrandNoAlias);
     if (TargetDecl->hasAttr<ReturnsNonNullAttr>() &&
         !CodeGenOpts.NullPointerIsValid)
       RetAttrs.addAttribute(llvm::Attribute::NonNull);
