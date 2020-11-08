@@ -118,6 +118,14 @@ AliasResult AAResults::alias(const MemoryLocation &LocA,
 }
 
 AliasResult AAResults::alias(const MemoryLocation &LocA,
+                             const MemoryLocation &LocB,
+                             bool AssumeSameSpindle) {
+  AAQueryInfo AAQIP;
+  AAQIP.AssumeSameSpindle = AssumeSameSpindle;
+  return alias(LocA, LocB, AAQIP);
+}
+
+AliasResult AAResults::alias(const MemoryLocation &LocA,
                              const MemoryLocation &LocB, AAQueryInfo &AAQI) {
   AliasResult Result = MayAlias;
 
@@ -169,8 +177,10 @@ ModRefInfo AAResults::getArgModRefInfo(const CallBase *Call, unsigned ArgIdx) {
   return Result;
 }
 
-ModRefInfo AAResults::getModRefInfo(Instruction *I, const CallBase *Call2) {
+ModRefInfo AAResults::getModRefInfo(Instruction *I, const CallBase *Call2,
+                                    bool AssumeSameSpindle) {
   AAQueryInfo AAQIP;
+  AAQIP.AssumeSameSpindle = AssumeSameSpindle;
   return getModRefInfo(I, Call2, AAQIP);
 }
 
@@ -266,6 +276,18 @@ ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
 
 ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
                                     const MemoryLocation &Loc,
+                                    bool SameSpindle) {
+  AAQueryInfo AAQIP;
+  AAQIP.AssumeSameSpindle = SameSpindle;
+  return getModRefInfo(Call, Loc, AAQIP);
+}
+
+static bool effectivelyArgMemOnly(const CallBase *Call, AAQueryInfo &AAQI) {
+  return Call->isStrandPure() && AAQI.AssumeSameSpindle;
+}
+
+ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
+                                    const MemoryLocation &Loc,
                                     AAQueryInfo &AAQI) {
   ModRefInfo Result = ModRefInfo::ModRef;
 
@@ -288,7 +310,8 @@ ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
   else if (doesNotReadMemory(MRB))
     Result = clearRef(Result);
 
-  if (onlyAccessesArgPointees(MRB) || onlyAccessesInaccessibleOrArgMem(MRB)) {
+  if (onlyAccessesArgPointees(MRB) || onlyAccessesInaccessibleOrArgMem(MRB) ||
+      effectivelyArgMemOnly(Call, AAQI)) {
     bool IsMustAlias = true;
     ModRefInfo AllArgsMask = ModRefInfo::NoModRef;
     if (doesAccessArgPointees(MRB)) {
@@ -326,8 +349,10 @@ ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
 }
 
 ModRefInfo AAResults::getModRefInfo(const CallBase *Call1,
-                                    const CallBase *Call2) {
+                                    const CallBase *Call2,
+                                    bool AssumeSameSpindle) {
   AAQueryInfo AAQIP;
+  AAQIP.AssumeSameSpindle = AssumeSameSpindle;
   return getModRefInfo(Call1, Call2, AAQIP);
 }
 
@@ -369,7 +394,7 @@ ModRefInfo AAResults::getModRefInfo(const CallBase *Call1,
   // If Call2 only access memory through arguments, accumulate the mod/ref
   // information from Call1's references to the memory referenced by
   // Call2's arguments.
-  if (onlyAccessesArgPointees(Call2B)) {
+  if (onlyAccessesArgPointees(Call2B) || effectivelyArgMemOnly(Call2, AAQI)) {
     if (!doesAccessArgPointees(Call2B))
       return ModRefInfo::NoModRef;
     ModRefInfo R = ModRefInfo::NoModRef;
@@ -420,7 +445,7 @@ ModRefInfo AAResults::getModRefInfo(const CallBase *Call1,
 
   // If Call1 only accesses memory through arguments, check if Call2 references
   // any of the memory referenced by Call1's arguments. If not, return NoModRef.
-  if (onlyAccessesArgPointees(Call1B)) {
+  if (onlyAccessesArgPointees(Call1B) || effectivelyArgMemOnly(Call1, AAQI)) {
     if (!doesAccessArgPointees(Call1B))
       return ModRefInfo::NoModRef;
     ModRefInfo R = ModRefInfo::NoModRef;
@@ -1188,6 +1213,12 @@ bool llvm::isNoAliasCall(const Value *V) {
   return false;
 }
 
+bool llvm::isNoAliasCallInSameSpindle(const Value *V) {
+  if (const auto *Call = dyn_cast<CallBase>(V))
+    return Call->hasRetAttr(Attribute::StrandNoAlias);
+  return isNoAliasCall(V);
+}
+
 static bool isNoAliasOrByValArgument(const Value *V) {
   if (const Argument *A = dyn_cast<Argument>(V))
     return A->hasNoAliasAttr() || A->hasByValAttr();
@@ -1202,6 +1233,14 @@ bool llvm::isIdentifiedObject(const Value *V) {
   if (isNoAliasCall(V))
     return true;
   if (isNoAliasOrByValArgument(V))
+    return true;
+  return false;
+}
+
+bool llvm::isIdentifiedObjectInSameSpindle(const Value *V) {
+  if (isIdentifiedObject(V))
+    return true;
+  if (isNoAliasCallInSameSpindle(V))
     return true;
   return false;
 }
