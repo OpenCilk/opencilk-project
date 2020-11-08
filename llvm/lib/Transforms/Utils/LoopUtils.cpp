@@ -67,10 +67,59 @@ static const char *LLVMLoopDisableNonforced = "llvm.loop.disable_nonforced";
 static const char *LLVMLoopDisableLICM = "llvm.licm.disable";
 static const char *LLVMLoopMustProgress = "llvm.loop.mustprogress";
 
+static void GetTaskExits(BasicBlock *TaskEntry, Loop *L,
+                         SmallPtrSetImpl<BasicBlock *> &TaskExits) {
+  // Traverse the CFG to find the exit blocks from SubT.
+  SmallVector<BasicBlock *, 4> Worklist;
+  SmallPtrSet<BasicBlock *, 4> Visited;
+  Worklist.push_back(TaskEntry);
+  while (!Worklist.empty()) {
+    BasicBlock *BB = Worklist.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+
+    // Record any block found in the task that is not contained in the loop
+    if (!L->contains(BB))
+      TaskExits.insert(BB);
+
+    // Stop the CFG traversal at any reattach or detached.rethrow
+    if (isa<ReattachInst>(BB->getTerminator()) ||
+        isDetachedRethrow(BB->getTerminator()))
+      continue;
+
+    // If we encounter a detach, only add its continuation and unwind
+    // destination
+    if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      Worklist.push_back(DI->getContinue());
+      if (DI->hasUnwindDest())
+        Worklist.push_back(DI->getUnwindDest());
+      continue;
+    }
+
+    // For all other basic blocks, traverse all successors
+    for (BasicBlock *Succ : successors(BB))
+      Worklist.push_back(Succ);
+  }
+}
+
 bool llvm::formDedicatedExitBlocks(Loop *L, DominatorTree *DT, LoopInfo *LI,
                                    MemorySSAUpdater *MSSAU,
                                    bool PreserveLCSSA) {
   bool Changed = false;
+
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  {
+    SmallVector<BasicBlock *, 4> TaskEntriesToCheck;
+    for (auto *BB : L->blocks())
+      if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator()))
+        if (DI->hasUnwindDest())
+          if (!L->contains(DI->getUnwindDest()))
+            TaskEntriesToCheck.push_back(DI->getDetached());
+
+    // For all tasks to check, get the loop exits that are in the task.
+    for (BasicBlock *TaskEntry : TaskEntriesToCheck)
+      GetTaskExits(TaskEntry, L, TaskExits);
+  }
 
   // We re-use a vector for the in-loop predecesosrs.
   SmallVector<BasicBlock *, 4> InLoopPredecessors;
@@ -84,7 +133,7 @@ bool llvm::formDedicatedExitBlocks(Loop *L, DominatorTree *DT, LoopInfo *LI,
     // keep track of the in-loop predecessors.
     bool IsDedicatedExit = true;
     for (auto *PredBB : predecessors(BB))
-      if (L->contains(PredBB)) {
+      if (L->contains(PredBB) || TaskExits.count(PredBB)) {
         if (isa<IndirectBrInst>(PredBB->getTerminator()))
           // We cannot rewrite exiting edges from an indirectbr.
           return false;
@@ -122,7 +171,21 @@ bool llvm::formDedicatedExitBlocks(Loop *L, DominatorTree *DT, LoopInfo *LI,
   for (auto *BB : L->blocks())
     for (auto *SuccBB : successors(BB)) {
       // We're looking for exit blocks so skip in-loop successors.
-      if (L->contains(SuccBB))
+      if (L->contains(SuccBB) || TaskExits.count(SuccBB))
+        continue;
+
+      // Visit each exit block exactly once.
+      if (!Visited.insert(SuccBB).second)
+        continue;
+
+      Changed |= RewriteExit(SuccBB);
+    }
+
+  // Visit exits from tasks within the loop as well.
+  for (auto *BB : TaskExits)
+    for (auto *SuccBB : successors(BB)) {
+      // We're looking for exit blocks so skip in-loop successors.
+      if (L->contains(SuccBB) || TaskExits.count(SuccBB))
         continue;
 
       // Visit each exit block exactly once.
