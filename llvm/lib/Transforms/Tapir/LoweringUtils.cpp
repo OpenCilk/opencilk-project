@@ -249,11 +249,11 @@ void llvm::getTaskFrameInputsOutputs(TFValueSetMap &TFInputs,
     if (T && T->contains(S))
       continue;
 
-    for (BasicBlock *BB : S->blocks()) {
-      // Skip spindles that are placeholders.
-      if (isPlaceholderSuccessor(S->getEntry()))
-        continue;
+    // Skip spindles that are placeholders.
+    if (isPlaceholderSuccessor(S->getEntry()))
+      continue;
 
+    for (BasicBlock *BB : S->blocks()) {
       for (Instruction &I : *BB) {
         // Ignore certain instructions from consideration: the taskframe.create
         // intrinsic for this taskframe, the detach instruction that spawns T,
