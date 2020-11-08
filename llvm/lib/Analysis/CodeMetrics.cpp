@@ -154,6 +154,10 @@ void CodeMetrics::analyzeBasicBlock(
         if (TLI && TLI->getLibFunc(*F, LF))
           ++NumBuiltinCalls;
 
+        // Check for a call to a Tapir-target library function.
+        if (TLI && TLI->isTapirTargetLibFunc(*F))
+          ++NumBuiltinCalls;
+
       } else {
         // We don't want inline asm to count as a call - that would prevent loop
         // unrolling. The argument setup cost is still real, though.
