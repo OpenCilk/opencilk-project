@@ -1423,6 +1423,7 @@ bool LLParser::parseFnAttributeValuePairs(AttrBuilder &B,
     // error handling.
     case lltok::kw_inreg:
     case lltok::kw_signext:
+    case lltok::kw_strand_noalias:
     case lltok::kw_zeroext:
       HaveError |=
           error(Lex.getLoc(), "invalid use of attribute on a function");
@@ -1813,6 +1814,11 @@ bool LLParser::parseOptionalParamAttrs(AttrBuilder &B) {
       HaveError |=
           error(Lex.getLoc(), "invalid use of function-only attribute");
       break;
+
+    case lltok::kw_strand_noalias:
+      HaveError |=
+          Error(Lex.getLoc(), "invalid use of function-return-only attribute");
+      break;
     }
 
     Lex.Lex();
@@ -1864,6 +1870,9 @@ bool LLParser::parseOptionalReturnAttrs(AttrBuilder &B) {
       break;
     case lltok::kw_nonnull:         B.addAttribute(Attribute::NonNull); break;
     case lltok::kw_signext:         B.addAttribute(Attribute::SExt); break;
+    case lltok::kw_strand_noalias:
+      B.addAttribute(Attribute::StrandNoAlias);
+      break;
     case lltok::kw_zeroext:         B.addAttribute(Attribute::ZExt); break;
 
     // error handling.

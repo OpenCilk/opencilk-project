@@ -718,6 +718,8 @@ static uint64_t getAttrKindEncoding(Attribute::AttrKind Kind) {
     return bitc::ATTR_KIND_SHADOWCALLSTACK;
   case Attribute::Stealable:
     return bitc::ATTR_KIND_STEALABLE;
+  case Attribute::StrandNoAlias:
+    return bitc::ATTR_KIND_STRAND_NO_ALIAS;
   case Attribute::StrandPure:
     return bitc::ATTR_KIND_STRAND_PURE;
   case Attribute::StrictFP:

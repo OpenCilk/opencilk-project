@@ -927,6 +927,9 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::SExt:
       case Attribute::Speculatable:
       case Attribute::StackAlignment:
+      case Attribute::Stealable:
+      case Attribute::StrandNoAlias:
+      case Attribute::StrandPure:
       case Attribute::StructRet:
       case Attribute::SwiftError:
       case Attribute::SwiftSelf:
@@ -975,8 +978,6 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::MustProgress:
       case Attribute::NoProfile:
       case Attribute::SanitizeCilk:
-      case Attribute::Stealable:
-      case Attribute::StrandPure:
         break;
       }
 

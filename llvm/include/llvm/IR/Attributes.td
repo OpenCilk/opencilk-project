@@ -212,6 +212,10 @@ def StackProtectStrong : EnumAttr<"sspstrong">;
 /// Multiple calls to this function in a strand return the same result.
 def StrandPure : EnumAttr<"strand_pure">;
 
+/// This function acts like a system memory allocation function from
+/// the perspective of memory accesses within the same strand.
+def StrandNoAlias : EnumAttr<"strand_noalias">;
+
 /// Function was called in a scope requiring strict floating point semantics.
 def StrictFP : EnumAttr<"strictfp">;
 
