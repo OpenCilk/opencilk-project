@@ -415,13 +415,14 @@ static FunctionAccessKind checkFunctionAccess(Function &F, bool ThisBody,
 
       // Check whether all pointer arguments point to local memory, and
       // ignore calls that only access local memory.
-      for (const Value *Arg : CS->args()) {
+      for (auto I = CS->arg_begin(), E = CS->arg_end(); I != E; ++I) {
+        const Value *Arg = *I;
         if (!Arg->getType()->isPtrOrPtrVectorTy())
           continue;
 
-        AAMDNodes AAInfo;
-        I->getAAMetadata(AAInfo);
-        MemoryLocation Loc(Arg, MemoryLocation::UnknownSize, AAInfo);
+        unsigned ArgIdx = std::distance(CS->arg_begin(), I);
+        MemoryLocation Loc =
+            MemoryLocation::getForArgument(CS, ArgIdx, nullptr);
 
         // Skip accesses to local or constant memory as they don't impact the
         // externally visible mod/ref behavior.
@@ -438,6 +439,13 @@ static FunctionAccessKind checkFunctionAccess(Function &F, bool ThisBody,
 
           if (isa<Argument>(Obj))
             AccessKind = FunctionAccessKind(AccessKind | FAK_ArgMem);
+
+          // If the underlying object is an arbitrary instruction that is not a
+          // local allocation, then conservatively deduce that this function
+          // might access memory other than its arguments.
+          if (isa<Instruction>(Obj) &&
+              !(isa<AllocaInst>(Obj) || isNoAliasCall(Obj)))
+            AccessKind = FunctionAccessKind(AccessKind | FAK_NonArgMem);
 
           // Early exit the function once we discover this function can access
           // non-argument memory and inaccessible memory.
@@ -479,10 +487,11 @@ static FunctionAccessKind checkFunctionAccess(Function &F, bool ThisBody,
         if (isa<Argument>(Obj))
           AccessKind = FunctionAccessKind(AccessKind | FAK_ArgMem);
 
-        // If the underlying object is an arbitrary instruction, then
-        // conservatively deduce that this function might access memory other
-        // than its arguments.
-        if (isa<Instruction>(Obj))
+        // If the underlying object is an arbitrary instruction that is not a
+        // local allocation, then conservatively deduce that this function might
+        // access memory other than its arguments.
+        if (isa<Instruction>(Obj) &&
+            !(isa<AllocaInst>(Obj) || isNoAliasCall(Obj)))
           AccessKind = FunctionAccessKind(AccessKind | FAK_NonArgMem);
 
         // Early exit the function once we discover this function can access
