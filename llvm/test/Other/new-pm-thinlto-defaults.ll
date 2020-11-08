@@ -217,6 +217,7 @@
 ; CHECK-POSTLINK-O2-NEXT: Starting Loop pass manager run.
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: IndVarSimplifyPass
+; CHECK-POSTLINK-O2-NEXT: Running pass: LICMPass
 ; CHECK-POSTLINK-O2-NEXT: Finished Loop pass manager run.
 ; CHECK-POSTLINK-O2-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: JumpThreadingPass
@@ -228,6 +229,7 @@
 ; CHECK-POSTLINK-O3-NEXT: Starting Loop pass manager run.
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: IndVarSimplifyPass
+; CHECK-POSTLINK-O3-NEXT: Running pass: LICMPass
 ; CHECK-POSTLINK-O3-NEXT: Finished Loop pass manager run.
 ; CHECK-POSTLINK-O3-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: JumpThreadingPass

@@ -832,6 +832,7 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createTaskSimplifyPass());
     MPM.add(createLoopSimplifyCFGPass());
     MPM.add(createIndVarSimplifyPass());        // Canonicalize indvars
+    MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap));
     MPM.add(createEarlyCSEPass());
     MPM.add(createJumpThreadingPass());         // Thread jumps
     MPM.add(createCorrelatedValuePropagationPass());
