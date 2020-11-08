@@ -982,8 +982,7 @@ int mix_parfor_trycatch(int a) {
 // CHECK: reattach within %[[PFORSYNCREG]], label %[[PFORINC]]
 
 // CHECK: [[PFORINC]]:
-// CHECK-O0: br i1 {{.+}}, label %{{.+}}, label %[[PFORSYNC:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label %{{.+}}, label %[[PFORSYNC:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC]]:
 // CHECK: sync within %[[PFORSYNCREG]], label %[[PFORSYNCCONT:.+]]
@@ -1010,7 +1009,7 @@ int mix_parfor_trycatch(int a) {
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG]],
-// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORLPADUNW:.+]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORUNW:.+]]
 
 // CHECK-O1: [[PFORUNW]]:
 // CHECK-O1-NEXT: landingpad
@@ -1018,15 +1017,9 @@ int mix_parfor_trycatch(int a) {
 // CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
 // CHECK-O1-NEXT: br label %[[CATCHDISPATCH]]
 
-// CHECK-O1: [[PFORLPADUNW]]:
-// CHECK-O1-NEXT: landingpad
-// CHECK-O1-NEXT: cleanup
-// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-// CHECK-O1-NEXT: br label %[[CATCHDISPATCH]]
-
 // CHECK-O1: [[PFORSYNCCONT]]:
 // CHECK-O1-NEXT: invoke void @llvm.sync.unwind(token %[[PFORSYNCREG]])
-// CHECK-O1-NEXT: to label %[[PFORSUCONT:.+]] unwind label %[[PFORLPADUNW]]
+// CHECK-O1-NEXT: to label %[[PFORSUCONT:.+]] unwind label %[[PFORUNW]]
 
 // CHECK: [[CATCHDISPATCH]]:
 // CHECK: br i1 {{.+}}, label %[[CATCH:.+]], label %[[RESUME:.+]]
@@ -1193,8 +1186,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK: reattach within %[[PFORSYNCREG]], label %[[PFORINC]]
 
 // CHECK: [[PFORINC]]:
-// CHECK-O0: br i1 {{.+}}, label %{{.+}}, label %[[PFORSYNC:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label %{{.+}}, label %[[PFORSYNC:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC]]:
 // CHECK: sync within %[[PFORSYNCREG]], label %[[PFORSYNCCONT:.+]]
@@ -1203,19 +1195,13 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG]],
-// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORLPADUNW:.+]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORUNW:.+]]
 
 // CHECK-O1: [[PFORUNW]]:
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
 // CHECK-O1-NEXT: br label %[[PFORLPADJOIN:.+]]
-
-// CHECK-O1: [[PFORLPADUNW]]:
-// CHECK-O1-NEXT: landingpad
-// CHECK-O1-NEXT: cleanup
-// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-// CHECK-O1-NEXT: br label %[[PFORLPADJOIN]]
 
 // CHECK-O1: [[PFORLPADJOIN]]:
 // CHECK-O1: br label %[[B2CLEANUP]]
@@ -1956,8 +1942,7 @@ int parfor_trycatch(int a) {
 // CHECK: reattach within %[[PFORSYNCREG1]], label %[[PFORINC1]]
 
 // CHECK: [[PFORINC1]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC1:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC1]]:
 // CHECK-O0: sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
@@ -2033,8 +2018,7 @@ int parfor_trycatch(int a) {
 // CHECK: reattach within %[[PFORSYNCREG2]], label %[[PFORINC2]]
 
 // CHECK: [[PFORINC2]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC2:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC2]]:
 // CHECK-O0: sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
@@ -2227,8 +2211,7 @@ int parfor_trycatch_destructors(int a) {
 // CHECK: reattach within %[[PFORSYNCREG1]], label %[[PFORINC1]]
 
 // CHECK: [[PFORINC1]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC1:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC1]]:
 // CHECK-O0: sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
@@ -2236,17 +2219,12 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[PFORCLEANUP1]]:
 // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG1]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORDU1DR:.+]]
+// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORDU1]]
 
 // CHECK-O1: [[PFORDU1]]:
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1-NEXT: br label %[[PFORLPAD1:.+]]
-
-// CHECK-O1: [[PFORDU1DR]]:
-// CHECK-O1-NEXT: landingpad
-// CHECK-O1-NEXT: cleanup
-// CHECK-O1-NEXT: br label %[[PFORLPAD1]]
 
 // CHECK-O1: [[PFORLPAD1]]:
 // CHECK-O1: br label %[[TASKCLEANUP1]]
@@ -2328,8 +2306,7 @@ int parfor_trycatch_destructors(int a) {
 // CHECK: reattach within %[[PFORSYNCREG2]], label %[[PFORINC2]]
 
 // CHECK: [[PFORINC2]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC2:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC2]]:
 // CHECK-O0: sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
@@ -2338,17 +2315,12 @@ int parfor_trycatch_destructors(int a) {
 // CHECK: [[PFORCLEANUP2]]:
 // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG2]],
 // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORDU1]]
-// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORDU2DR:.+]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[PFORDU2]]
 
 // CHECK-O1: [[PFORDU2]]:
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1-NEXT: br label %[[PFORLPAD2:.+]]
-
-// CHECK-O1: [[PFORDU2DR]]:
-// CHECK-O1-NEXT: landingpad
-// CHECK-O1-NEXT: cleanup
-// CHECK-O1-NEXT: br label %[[PFORLPAD2]]
 
 // CHECK-O1: [[PFORLPAD2]]:
 // CHECK-O1: br label %[[TASKCLEANUP1]]

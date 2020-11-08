@@ -1,5 +1,5 @@
-; RUN: opt < %s -loop-spawning-ti -S | FileCheck %s
-; RUN: opt < %s -passes=loop-spawning -S | FileCheck %s
+; RUN: opt < %s -loop-spawning-ti -S | FileCheck %s --check-prefixes=CHECK,CHECK-LCSSA
+; RUN: opt < %s -passes=loop-spawning -S | FileCheck %s --check-prefixes=CHECK,CHECK-NOLCSSA
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -509,9 +509,11 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK: resume [[LPADTYPE]] %{{.+}}
 
 ; CHECK: [[TASKLPAD]]:
+; CHECK-LCSSA-NEXT: phi
 ; CHECK-NEXT: landingpad [[LPADTYPE]]
 ; CHECK: invoke void @llvm.detached.rethrow
 ; CHECK: (token %[[SYNCREG]], [[LPADTYPE]] %{{.+}})
+; CHECK-NEXT: to label %{{.+}} unwind label %[[RECURUW]]
 
 
 ; CHECK-LABEL: define private fastcc void @_Z20parallelfor_tryblocki.outline_pfor.cond.ls1(
@@ -549,15 +551,16 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK-NEXT: landingpad [[LPADTYPE]]
 ; CHECK-NEXT: cleanup
 ; CHECK-NEXT: catch {{.+}} bitcast
-; CHECK: br i1 %{{.+}}, label %[[CATCHIN:.+]], label %[[RESUMEIN:.+]]
+; CHECK-NOLCSSA: br i1 %{{.+}}, label %[[CATCHIN:.+]], label %[[RESUMEIN:.+]]
+; CHECK-LCSSA: br i1 %{{.+}}, label %[[CATCHIN:.+]], label %[[RESUME_LOOPEXIT:.+]]
+; CHECK-LCSSA: [[RESUME_LOOPEXIT]]:
+; CHECK-LCSSA: br label %[[RESUMEIN:.+]]
 ; CHECK: [[RESUMEIN]]:
-; CHECK: br label %[[RESUMECOLLECT:.+]]
-; CHECK: [[RESUMECOLLECT]]:
 ; CHECK: br label %lpad.body.ls1
 ; CHECK: [[CATCHIN]]:
 ; CHECK: tail call i8* @__cxa_begin_catch(
 ; CHECK: invoke void @_Z10handle_exni(
-; CHECK: br label %[[RESUMECOLLECT]]
+; CHECK: br label %[[RESUMEIN]]
 
 ; CHECK: [[RECURUW]]:
 ; CHECK-NEXT: landingpad [[LPADTYPE]]
@@ -565,10 +568,12 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK: resume [[LPADTYPE]] %{{.+}}
 
 ; CHECK: [[TASKLPAD]]:
+; CHECK-LCSSA-NEXT: phi
 ; CHECK-NEXT: landingpad [[LPADTYPE]]
 ; CHECK-NEXT: cleanup
 ; CHECK: invoke void @llvm.detached.rethrow
 ; CHECK: (token %[[SYNCREG]], [[LPADTYPE]] %{{.+}})
+; CHECK-NEXT: to label %{{.+}} unwind label %[[RECURUW]]
 
 attributes #0 = { alwaysinline uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
