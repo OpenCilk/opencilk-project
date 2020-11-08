@@ -8440,6 +8440,9 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     break;
 
   // Cilk attributes
+  case ParsedAttr::AT_StrandMalloc:
+    handleSimpleAttribute<StrandMallocAttr>(S, D, AL);
+    break;
   case ParsedAttr::AT_StrandPure:
     handleSimpleAttribute<StrandPureAttr>(S, D, AL);
     break;
