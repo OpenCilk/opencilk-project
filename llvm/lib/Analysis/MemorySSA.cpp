@@ -273,7 +273,7 @@ template <typename AliasAnalysisType>
 static ClobberAlias
 instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
                          const Instruction *UseInst, AliasAnalysisType &AA,
-                         TaskInfo *TI = nullptr) {
+                         TaskInfo *TI) {
   Instruction *DefInst = MD->getMemoryInst();
   assert(DefInst && "Defining instruction not actually an instruction");
   const auto *UseCall = dyn_cast<CallBase>(UseInst);
@@ -353,7 +353,7 @@ static ClobberAlias instructionClobbersQuery(MemoryDef *MD,
                                              const MemoryUseOrDef *MU,
                                              const MemoryLocOrCall &UseMLOC,
                                              AliasAnalysisType &AA,
-                                             TaskInfo *TI = nullptr) {
+                                             TaskInfo *TI) {
   // FIXME: This is a temporary hack to allow a single instructionClobbersQuery
   // to exist while MemoryLocOrCall is pushed through places.
   if (UseMLOC.IsCall)
@@ -554,7 +554,7 @@ template <class AliasAnalysisType> class ClobberWalker {
   const MemorySSA &MSSA;
   AliasAnalysisType &AA;
   DominatorTree &DT;
-  TaskInfo *TI = nullptr;
+  TaskInfo *TI;
   UpwardsMemoryQuery *Query;
   unsigned *UpwardWalkLimit;
 
@@ -964,7 +964,7 @@ template <class AliasAnalysisType> class ClobberWalker {
 
 public:
 ClobberWalker(const MemorySSA &MSSA, AliasAnalysisType &AA, DominatorTree &DT,
-              TaskInfo *TI = nullptr)
+              TaskInfo *TI)
       : MSSA(MSSA), AA(AA), DT(DT), TI(TI) {}
 
   AliasAnalysisType *getAA() { return &AA; }
@@ -1318,7 +1318,7 @@ namespace llvm {
 class MemorySSA::OptimizeUses {
 public:
   OptimizeUses(MemorySSA *MSSA, CachingWalker<BatchAAResults> *Walker,
-               BatchAAResults *BAA, DominatorTree *DT, TaskInfo *TI = nullptr)
+               BatchAAResults *BAA, DominatorTree *DT, TaskInfo *TI)
       : MSSA(MSSA), Walker(Walker), AA(BAA), DT(DT), TI(TI) {}
 
   void optimizeUses();
@@ -1403,7 +1403,6 @@ void MemorySSA::OptimizeUses::optimizeUsesInBlock(
       MU->setDefiningAccess(MSSA->getLiveOnEntryDef(), true, None);
       continue;
     }
-
     MemoryLocOrCall UseMLOC(MU);
     auto &LocInfo = LocStackInfo[UseMLOC];
     // If the pop epoch changed, it means we've removed stuff from top of
@@ -1595,7 +1594,7 @@ void MemorySSA::buildMemorySSA(BatchAAResults &BAA) {
 
   ClobberWalkerBase<BatchAAResults> WalkerBase(this, &BAA, DT, TI);
   CachingWalker<BatchAAResults> WalkerLocal(this, &WalkerBase);
-  OptimizeUses(this, &WalkerLocal, &BAA, DT).optimizeUses();
+  OptimizeUses(this, &WalkerLocal, &BAA, DT, TI).optimizeUses();
 
   // Mark the uses in unreachable blocks as live on entry, so that they go
   // somewhere.
