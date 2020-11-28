@@ -1178,13 +1178,15 @@ namespace {
 // ValueMaterializer to manage remapping uses of the tripcount in the helper
 // function for the loop, when the only uses of tripcount occur in the condition
 // for the loop backedge and, possibly, in metadata.
-class ArgEndMaterializer final : public ValueMaterializer {
+class ArgEndMaterializer final : public OutlineMaterializer {
 private:
   Value *TripCount;
   Value *ArgEnd;
 public:
-  ArgEndMaterializer(Value *TripCount, Value *ArgEnd)
-      : TripCount(TripCount), ArgEnd(ArgEnd) {}
+  ArgEndMaterializer(const Instruction *SrcSyncRegion, Value *TripCount,
+                     Value *ArgEnd)
+      : OutlineMaterializer(SrcSyncRegion), TripCount(TripCount),
+        ArgEnd(ArgEnd) {}
 
   Value *materialize(Value *V) final {
     // If we're materializing metadata for TripCount, materialize empty metadata
@@ -1203,7 +1205,7 @@ public:
       return ArgEnd;
 
     // Otherwise go with the default behavior.
-    return nullptr;
+    return OutlineMaterializer::materialize(V);
   }
 };
 }
@@ -1239,30 +1241,27 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   const Instruction *InputSyncRegion =
       dyn_cast<Instruction>(DI->getSyncRegion());
 
-  ArgEndMaterializer *Mat = nullptr;
-  // If the trip count is variable and we're not otherwise passing the trip
-  // count as an argument, temporarily map the trip count to the end argument.
-  if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount())) {
+  OutlineMaterializer *Mat = nullptr;
+  if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount()))
     // Create an ArgEndMaterializer to handle uses of TL->getTripCount().
-    Mat = new ArgEndMaterializer(TL->getTripCount(), Args[LimitArgIndex]);
-  }
+    Mat = new ArgEndMaterializer(InputSyncRegion, TL->getTripCount(),
+                                 Args[LimitArgIndex]);
+  else
+    Mat = new OutlineMaterializer(InputSyncRegion);
 
   Twine NameSuffix = ".ls" + Twine(TL->getLoop()->getLoopDepth());
   SmallVector<ReturnInst *, 4> Returns;  // Ignore returns cloned.
   ValueSet Outputs;  // Outputs must be empty.
   Function *Helper;
   {
-  NamedRegionTimer NRT("CreateHelper",
-                       "Create helper for Tapir loop",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
-  Helper =
-    CreateHelper(Args, Outputs, TLBlocks, Header,
-                 Preheader, TL->getExitBlock(), VMap, DestM,
-                 F.getSubprogram() != nullptr, Returns,
-                 NameSuffix.str(), nullptr, &DetachedRethrowBlocks,
-                 &SharedEHEntries, TL->getUnwindDest(), &UnreachableExits,
-                 InputSyncRegion, nullptr, nullptr, nullptr, Mat);
+    NamedRegionTimer NRT("CreateHelper", "Create helper for Tapir loop",
+                         TimerGroupName, TimerGroupDescription,
+                         TimePassesIsEnabled);
+    Helper = CreateHelper(
+        Args, Outputs, TLBlocks, Header, Preheader, TL->getExitBlock(), VMap,
+        DestM, F.getSubprogram() != nullptr, Returns, NameSuffix.str(), nullptr,
+        &DetachedRethrowBlocks, &SharedEHEntries, TL->getUnwindDest(),
+        &UnreachableExits, nullptr, nullptr, nullptr, Mat);
   } // end timed region
 
   assert(Returns.empty() && "Returns cloned when cloning detached CFG.");
