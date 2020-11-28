@@ -85,7 +85,7 @@ lpad4:                                            ; preds = %invoke.cont7, %pfor
           cleanup
   call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %.lcssa) #10
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %5)
-          to label %unreachable unwind label %lpad10.loopexit.split-lp.loopexit.split-lp
+          to label %unreachable unwind label %lpad10.loopexit
 
 ; CHECK: lpad4:
 ; CHECK-NEXT: %call2.i.i.i.i1.i.i.lcssa1 = phi i8*
@@ -94,7 +94,6 @@ lpad4:                                            ; preds = %invoke.cont7, %pfor
 ; CHECK: to label %{{.+}} unwind label %[[DRDEST:.+]]
 
 ; CHECK: [[DRDEST]]:
-; CHECK-DAG: phi i8* [ %.lcssa, %lpad4 ]
 ; CHECK-DAG: phi i8* [ %call2.i.i.i.i1.i.i.lcssa1, %lpad4 ]
 
 ; CHECK: _ZNSt6vectorIiSaIiEED2Ev.exit11:
@@ -102,7 +101,7 @@ lpad4:                                            ; preds = %invoke.cont7, %pfor
 ; CHECK: unreachable
 
 lpad10.loopexit:                                  ; preds = %pfor.cond
-  %call2.i.i.i.i1.i.i.lcssa = phi i8* [ %call2.i.i.i.i1.i.i, %pfor.cond ]
+  %call2.i.i.i.i1.i.i.lcssa = phi i8* [ %call2.i.i.i.i1.i.i, %pfor.cond ], [ %call2.i.i.i.i1.i.i.lcssa1, %lpad4 ]
   %lpad.loopexit = landingpad { i8*, i32 }
           cleanup
   br label %_ZNSt6vectorIiSaIiEED2Ev.exit11
@@ -113,14 +112,9 @@ lpad10.loopexit.split-lp.loopexit:                ; preds = %sync.continue
           cleanup
   br label %_ZNSt6vectorIiSaIiEED2Ev.exit11
 
-lpad10.loopexit.split-lp.loopexit.split-lp:       ; preds = %lpad4
-  %lpad.loopexit.split-lp39 = landingpad { i8*, i32 }
-          cleanup
-  br label %_ZNSt6vectorIiSaIiEED2Ev.exit11
-
 _ZNSt6vectorIiSaIiEED2Ev.exit11:                  ; preds = %lpad10.loopexit.split-lp.loopexit.split-lp, %lpad10.loopexit.split-lp.loopexit, %lpad10.loopexit
-  %call2.i.i.i.i1.i.i3 = phi i8* [ %call2.i.i.i.i1.i.i.lcssa, %lpad10.loopexit ], [ %call2.i.i.i.i1.i.i.lcssa2, %lpad10.loopexit.split-lp.loopexit ], [ %call2.i.i.i.i1.i.i.lcssa1, %lpad10.loopexit.split-lp.loopexit.split-lp ]
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad10.loopexit ], [ %lpad.loopexit38, %lpad10.loopexit.split-lp.loopexit ], [ %lpad.loopexit.split-lp39, %lpad10.loopexit.split-lp.loopexit.split-lp ]
+  %call2.i.i.i.i1.i.i3 = phi i8* [ %call2.i.i.i.i1.i.i.lcssa, %lpad10.loopexit ], [ %call2.i.i.i.i1.i.i.lcssa2, %lpad10.loopexit.split-lp.loopexit ]
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad10.loopexit ], [ %lpad.loopexit38, %lpad10.loopexit.split-lp.loopexit ]
   %6 = extractvalue { i8*, i32 } %lpad.phi, 0
   %7 = extractvalue { i8*, i32 } %lpad.phi, 1
   call void @_ZdlPv(i8* nonnull %call2.i.i.i.i1.i.i3) #10

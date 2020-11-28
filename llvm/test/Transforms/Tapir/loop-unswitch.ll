@@ -316,7 +316,7 @@ lpad:                                             ; preds = %pfor.body27
   %7 = landingpad { i8*, i32 }
           catch i8* null
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg8, { i8*, i32 } %7)
-          to label %det.rethrow.unreachable unwind label %lpad52.loopexit.split-lp
+          to label %det.rethrow.unreachable unwind label %lpad52.loopexit
 
 det.rethrow.unreachable:                          ; preds = %lpad
   unreachable
@@ -326,18 +326,13 @@ lpad52.loopexit:                                  ; preds = %pfor.cond22
           catch i8* null
   br label %lpad52
 
-lpad52.loopexit.split-lp:                         ; preds = %lpad
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          catch i8* null
-  br label %lpad52
-
 lpad52:                                           ; preds = %lpad52.loopexit.split-lp, %lpad52.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad52.loopexit ], [ %lpad.loopexit.split-lp, %lpad52.loopexit.split-lp ]
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad52.loopexit ]
   sync within %syncreg8, label %sync.continue57
 
 sync.continue57:                                  ; preds = %lpad52
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %lpad.phi)
-          to label %det.rethrow.unreachable70 unwind label %lpad62.loopexit.split-lp
+          to label %det.rethrow.unreachable70 unwind label %lpad62.loopexit
 
 det.rethrow.unreachable70:                        ; preds = %sync.continue57
   unreachable
@@ -357,13 +352,8 @@ lpad62.loopexit:                                  ; preds = %pfor.cond
           cleanup
   br label %lpad62
 
-lpad62.loopexit.split-lp:                         ; preds = %sync.continue57
-  %lpad.loopexit.split-lp135 = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad62
-
 lpad62:                                           ; preds = %lpad62.loopexit.split-lp, %lpad62.loopexit
-  %lpad.phi136 = phi { i8*, i32 } [ %lpad.loopexit134, %lpad62.loopexit ], [ %lpad.loopexit.split-lp135, %lpad62.loopexit.split-lp ]
+  %lpad.phi136 = phi { i8*, i32 } [ %lpad.loopexit134, %lpad62.loopexit ]
   sync within %syncreg, label %sync.continue75
 
 sync.continue75:                                  ; preds = %lpad62
