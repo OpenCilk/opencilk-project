@@ -28,19 +28,42 @@ using namespace llvm;
 static const char TimerGroupName[] = DEBUG_TYPE;
 static const char TimerGroupDescription[] = "Tapir outlining";
 
+// Materialize any necessary information in DstM when outlining Tapir into DstM.
+Value *OutlineMaterializer::materialize(Value *V) {
+  if (V == SrcSyncRegion) {
+    // Create a new sync region to replace the sync region SrcSyncRegion from
+    // the source.
+
+    // Get the destination function
+    User *U = *(V->materialized_user_begin());
+    Function *DstFunc = cast<Instruction>(U)->getFunction();
+    // Add a new syncregion to the entry block of the destination function
+    Instruction *NewSyncReg = cast<Instruction>(SrcSyncRegion)->clone();
+    BasicBlock *EntryBlock = &DstFunc->getEntryBlock();
+    EntryBlock->getInstList().push_back(NewSyncReg);
+    // Record the entry block as needing remapping
+    BlocksToRemap.insert(EntryBlock);
+    return NewSyncReg;
+  }
+
+  return nullptr;
+}
+
 // Clone Blocks into NewFunc, transforming the old arguments into references to
 // VMap values.
 //
 /// TODO: Fix the std::vector part of the type of this function.
-void llvm::CloneIntoFunction(
-    Function *NewFunc, const Function *OldFunc,
-    std::vector<BasicBlock *> Blocks, ValueToValueMapTy &VMap,
-    bool ModuleLevelChanges, SmallVectorImpl<ReturnInst *> &Returns,
-    const StringRef NameSuffix, SmallPtrSetImpl<BasicBlock *> *ReattachBlocks,
-    SmallPtrSetImpl<BasicBlock *> *TaskResumeBlocks,
-    SmallPtrSetImpl<BasicBlock *> *SharedEHEntries,
-    DISubprogram *SP, ClonedCodeInfo *CodeInfo,
-    ValueMapTypeRemapper *TypeMapper, ValueMaterializer *Materializer) {
+void llvm::CloneIntoFunction(Function *NewFunc, const Function *OldFunc,
+                             std::vector<BasicBlock *> Blocks,
+                             ValueToValueMapTy &VMap, bool ModuleLevelChanges,
+                             SmallVectorImpl<ReturnInst *> &Returns,
+                             const StringRef NameSuffix,
+                             SmallPtrSetImpl<BasicBlock *> *ReattachBlocks,
+                             SmallPtrSetImpl<BasicBlock *> *TaskResumeBlocks,
+                             SmallPtrSetImpl<BasicBlock *> *SharedEHEntries,
+                             DISubprogram *SP, ClonedCodeInfo *CodeInfo,
+                             ValueMapTypeRemapper *TypeMapper,
+                             OutlineMaterializer *Materializer) {
   // Get the predecessors of the exit blocks
   SmallPtrSet<const BasicBlock *, 4> EHEntryPreds, ClonedEHEntryPreds;
   if (SharedEHEntries)
@@ -180,7 +203,38 @@ void llvm::CloneIntoFunction(
                        TypeMapper, Materializer);
     }
   }
+
+  // Remapping instructions could cause the Materializer to insert new
+  // instructions in the entry block. Now remap the instructions in the entry
+  // block.
+  if (Materializer)
+    while (!Materializer->BlocksToRemap.empty()) {
+      BasicBlock *BB = Materializer->BlocksToRemap.pop_back_val();
+      for (Instruction &II : *BB) {
+        LLVM_DEBUG(dbgs() << "  Remapping " << II << "\n");
+        RemapInstruction(&II, VMap,
+                         ModuleLevelChanges ? RF_None : RF_NoModuleLevelChanges,
+                         TypeMapper, Materializer);
+      }
+    }
   } // end timed region
+
+  // Register all DICompileUnits of the old parent module in the new parent
+  // module
+  auto *OldModule = OldFunc->getParent();
+  auto *NewModule = NewFunc->getParent();
+  if (OldModule && NewModule && OldModule != NewModule &&
+      DIFinder.compile_unit_count()) {
+    auto *NMD = NewModule->getOrInsertNamedMetadata("llvm.dbg.cu");
+    // Avoid multiple insertions of the same DICompileUnit to NMD.
+    SmallPtrSet<const void *, 8> Visited;
+    for (auto *Operand : NMD->operands())
+      Visited.insert(Operand);
+    for (auto *Unit : DIFinder.compile_units())
+      // VMap.MD()[Unit] == Unit
+      if (Visited.insert(Unit).second)
+        NMD->addOperand(Unit);
+  }
 }
 
 /// Create a helper function whose signature is based on Inputs and
@@ -198,9 +252,8 @@ Function *llvm::CreateHelper(
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries,
     const BasicBlock *OldUnwind,
     SmallPtrSetImpl<BasicBlock *> *UnreachableExits,
-    const Instruction *InputSyncRegion,
     Type *ReturnType, ClonedCodeInfo *CodeInfo,
-    ValueMapTypeRemapper *TypeMapper, ValueMaterializer *Materializer) {
+    ValueMapTypeRemapper *TypeMapper, OutlineMaterializer *Materializer) {
   LLVM_DEBUG(dbgs() << "inputs: " << Inputs.size() << "\n");
   LLVM_DEBUG(dbgs() << "outputs: " << Outputs.size() << "\n");
 
@@ -397,16 +450,6 @@ Function *llvm::CreateHelper(
     NewUnwind = BasicBlock::Create(
         NewFunc->getContext(), OldUnwind->getName()+NameSuffix);
     VMap[OldUnwind] = NewUnwind;
-  }
-
-  // Create new sync region to replace the old one containing any cloned Tapir
-  // instructions, and add the appropriate mappings.
-  if (InputSyncRegion) {
-    Instruction *NewSR = InputSyncRegion->clone();
-    if (InputSyncRegion->hasName())
-      NewSR->setName(InputSyncRegion->getName()+NameSuffix);
-    NewEntry->getInstList().push_back(NewSR);
-    VMap[InputSyncRegion] = NewSR;
   }
 
   // Create an new unreachable exit block, if needed.

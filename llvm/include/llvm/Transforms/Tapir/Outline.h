@@ -28,6 +28,19 @@ namespace llvm {
 
 using ValueSet = SetVector<Value *>;
 
+// Value materializer for Tapir outlining.
+class OutlineMaterializer : public ValueMaterializer {
+  const Value *SrcSyncRegion = nullptr;
+public:
+  OutlineMaterializer(const Value *SrcSyncRegion = nullptr)
+      : SrcSyncRegion(SrcSyncRegion) {}
+  virtual ~OutlineMaterializer() {}
+
+  Value *materialize(Value *V) override;
+
+  SetVector<BasicBlock *> BlocksToRemap;
+};
+
 /// Clone Blocks into NewFunc, transforming the old arguments into references to
 /// VMap values.
 ///
@@ -42,34 +55,33 @@ void CloneIntoFunction(
     SmallPtrSetImpl<BasicBlock *> *SharedEHEntries = nullptr,
     DISubprogram *SP = nullptr, ClonedCodeInfo *CodeInfo = nullptr,
     ValueMapTypeRemapper *TypeMapper = nullptr,
-    ValueMaterializer *Materializer = nullptr);
+    OutlineMaterializer *Materializer = nullptr);
 
 /// Create a helper function whose signature is based on Inputs and
 /// Outputs as follows: f(in0, ..., inN, out0, ..., outN)
 ///
 /// TODO: Fix the std::vector part of the type of this function.
-Function *CreateHelper(
-    const ValueSet &Inputs, const ValueSet &Outputs,
-    std::vector<BasicBlock *> Blocks, BasicBlock *Header,
-    const BasicBlock *OldEntry, const BasicBlock *OldExit,
-    ValueToValueMapTy &VMap, Module *DestM, bool ModuleLevelChanges,
-    SmallVectorImpl<ReturnInst *> &Returns, const StringRef NameSuffix,
-    SmallPtrSetImpl<BasicBlock *> *ReattachBlocks = nullptr,
-    SmallPtrSetImpl<BasicBlock *> *TaskResumeBlocks = nullptr,
-    SmallPtrSetImpl<BasicBlock *> *SharedEHEntries = nullptr,
-    const BasicBlock *OldUnwind = nullptr,
-    SmallPtrSetImpl<BasicBlock *> *UnreachableExits = nullptr,
-    const Instruction *InputSyncRegion = nullptr,
-    Type *ReturnType = nullptr,
-    ClonedCodeInfo *CodeInfo = nullptr,
-    ValueMapTypeRemapper *TypeMapper = nullptr,
-    ValueMaterializer *Materializer = nullptr);
+Function *
+CreateHelper(const ValueSet &Inputs, const ValueSet &Outputs,
+             std::vector<BasicBlock *> Blocks, BasicBlock *Header,
+             const BasicBlock *OldEntry, const BasicBlock *OldExit,
+             ValueToValueMapTy &VMap, Module *DestM, bool ModuleLevelChanges,
+             SmallVectorImpl<ReturnInst *> &Returns, const StringRef NameSuffix,
+             SmallPtrSetImpl<BasicBlock *> *ReattachBlocks = nullptr,
+             SmallPtrSetImpl<BasicBlock *> *TaskResumeBlocks = nullptr,
+             SmallPtrSetImpl<BasicBlock *> *SharedEHEntries = nullptr,
+             const BasicBlock *OldUnwind = nullptr,
+             SmallPtrSetImpl<BasicBlock *> *UnreachableExits = nullptr,
+             Type *ReturnType = nullptr, ClonedCodeInfo *CodeInfo = nullptr,
+             ValueMapTypeRemapper *TypeMapper = nullptr,
+             OutlineMaterializer *Materializer = nullptr);
 
 // Add alignment assumptions to parameters of outlined function, based on known
 // alignment data in the caller.
-void AddAlignmentAssumptions(
-    const Function *Caller, const ValueSet &Args, ValueToValueMapTy &VMap,
-    const Instruction *CallSite, AssumptionCache *AC, DominatorTree *DT);
+void AddAlignmentAssumptions(const Function *Caller, const ValueSet &Args,
+                             ValueToValueMapTy &VMap,
+                             const Instruction *CallSite, AssumptionCache *AC,
+                             DominatorTree *DT);
 
 } // End llvm namespace
 
