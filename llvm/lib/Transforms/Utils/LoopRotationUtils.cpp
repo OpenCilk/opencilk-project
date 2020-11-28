@@ -521,12 +521,6 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
   if (MSSAU && VerifyMemorySSA)
     MSSAU->getMemorySSA()->verifyMemorySSA();
 
-  if (TaskI && DT)
-    // Recompute task info.
-    // FIXME: Figure out a way to update task info that is less computationally
-    // wasteful.
-    TaskI->recalculate(*DT->getRoot()->getParent(), *DT);
-
   LLVM_DEBUG(dbgs() << "LoopRotation: into "; L->dump());
 
   ++NumRotated;
@@ -664,6 +658,12 @@ bool LoopRotate::processLoop(Loop *L) {
   // NB! We presume LoopRotation DOESN'T ADD its own metadata.
   if ((MadeChange || SimplifiedLatch) && LoopMD)
     L->setLoopID(LoopMD);
+
+  if ((MadeChange || SimplifiedLatch) && TaskI && DT)
+    // Recompute task info.
+    // FIXME: Figure out a way to update task info that is less computationally
+    // wasteful.
+    TaskI->recalculate(*DT->getRoot()->getParent(), *DT);
 
   return MadeChange || SimplifiedLatch;
 }
