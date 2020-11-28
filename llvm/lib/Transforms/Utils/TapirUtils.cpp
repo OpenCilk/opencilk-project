@@ -57,6 +57,21 @@ bool llvm::isTaskFrameResume(const Instruction *I, const Value *TaskFrame) {
       isTapirIntrinsic(Intrinsic::taskframe_resume, I, TaskFrame);
 }
 
+/// Returns true if the given basic block \p B is a placeholder successor of a
+/// taskframe.resume or detached.rethrow.
+bool llvm::isTapirPlaceholderSuccessor(const BasicBlock *B) {
+  for (const BasicBlock *Pred : predecessors(B)) {
+    if (!isDetachedRethrow(Pred->getTerminator()) &&
+        !isTaskFrameResume(Pred->getTerminator()))
+      return false;
+
+    const InvokeInst *II = dyn_cast<InvokeInst>(Pred->getTerminator());
+    if (B != II->getNormalDest())
+      return false;
+  }
+  return true;
+}
+
 /// Returns a taskframe.resume that uses the given taskframe, or nullptr if no
 /// taskframe.resume uses this taskframe.
 InvokeInst *llvm::getTaskFrameResume(Value *TaskFrame) {
