@@ -1646,6 +1646,11 @@ static bool sink(Instruction &I, LoopInfo *LI, DominatorTree *DT,
     ++NumMovedCalls;
   ++NumSunk;
 
+  // Get the Tapir task exits for the current loop, in order to check for users
+  // contained in those task exits.
+  SmallPtrSet<BasicBlock *, 4> CurLoopTaskExits;
+  CurLoop->getTaskExits(CurLoopTaskExits);
+
   // Iterate over users to be ready for actual sinking. Replace users via
   // unreachable blocks with undef and make all user PHIs trivially replaceable.
   SmallPtrSet<Instruction *, 8> VisitedUsers;
@@ -1654,7 +1659,8 @@ static bool sink(Instruction &I, LoopInfo *LI, DominatorTree *DT,
     Use &U = UI.getUse();
     ++UI;
 
-    if (VisitedUsers.count(User) || CurLoop->contains(User))
+    if (VisitedUsers.count(User) || CurLoop->contains(User) ||
+        CurLoopTaskExits.count(User->getParent()))
       continue;
 
     if (!DT->isReachableFromEntry(User->getParent())) {

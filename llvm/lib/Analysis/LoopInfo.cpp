@@ -60,19 +60,111 @@ static cl::opt<bool, true>
 // Loop implementation
 //
 
+// Returns true if the basic block Succ that succeeds BB is the unwind
+// destination of a detach.
 static bool succIsDetachUnwind(const BasicBlock *BB, const BasicBlock *Succ) {
   if (const DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator()))
     return Succ == DI->getUnwindDest();
   return false;
 }
 
+/// Returns true if the given instruction performs a taskframe resume, false
+/// otherwise.
+static bool isDetachedRethrow(const Instruction *I,
+                              const Value *SyncReg = nullptr) {
+  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
+    if (const Function *Called = II->getCalledFunction())
+      if (Intrinsic::detached_rethrow == Called->getIntrinsicID())
+        if (!SyncReg || (SyncReg == II->getArgOperand(0)))
+          return true;
+  return false;
+}
+
+/// Returns true if the given instruction performs a taskframe resume, false
+/// otherwise.
+static bool isTaskFrameResume(const Instruction *I,
+                              const Value *TaskFrame = nullptr) {
+  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
+    if (const Function *Called = II->getCalledFunction())
+      if (Intrinsic::taskframe_resume == Called->getIntrinsicID())
+        if (!TaskFrame || (TaskFrame == II->getArgOperand(0)))
+          return true;
+  return false;
+}
+
+/// Returns true if the given basic block is a placeholder successor of a
+/// taskframe.resume or detached.rethrow.
+static bool isTapirPlaceholderSuccessor(const BasicBlock *B) {
+  for (const BasicBlock *Pred : predecessors(B)) {
+    if (!isDetachedRethrow(Pred->getTerminator()) &&
+        !isTaskFrameResume(Pred->getTerminator()))
+      return false;
+
+    const InvokeInst *II = dyn_cast<InvokeInst>(Pred->getTerminator());
+    if (B != II->getNormalDest())
+      return false;
+  }
+  return true;
+}
+
+/// Helper method to find loop-exit blocks that are contained within tasks
+/// spawned within the loop.
+static void getTaskExitsHelper(BasicBlock *TaskEntry, const Loop *L,
+                               SmallPtrSetImpl<BasicBlock *> &TaskExits) {
+  // Traverse the CFG to find the exit blocks from SubT.
+  SmallVector<BasicBlock *, 4> Worklist;
+  SmallPtrSet<BasicBlock *, 4> Visited;
+  Worklist.push_back(TaskEntry);
+  while (!Worklist.empty()) {
+    BasicBlock *BB = Worklist.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+
+    // Record any block found in the task that is not contained in the loop
+    if (!L->contains(BB))
+      TaskExits.insert(BB);
+
+    // Stop the CFG traversal at any reattach or detached.rethrow
+    if (isa<ReattachInst>(BB->getTerminator()) ||
+        isDetachedRethrow(BB->getTerminator()))
+      continue;
+
+    // If we encounter a detach, only add its continuation and unwind
+    // destination
+    if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      Worklist.push_back(DI->getContinue());
+      if (DI->hasUnwindDest())
+        Worklist.push_back(DI->getUnwindDest());
+      continue;
+    }
+
+    // For all other basic blocks, traverse all successors
+    for (BasicBlock *Succ : successors(BB))
+      Worklist.push_back(Succ);
+  }
+}
+
+/// getTaskExits - Get basic blocks that are outside of the loop, based on CFG
+/// analysis, but inside tasks created within the loop.
+///
+void Loop::getTaskExits(SmallPtrSetImpl<BasicBlock *> &TaskExits) const {
+  SmallVector<BasicBlock *, 4> TaskEntriesToCheck;
+  for (auto *BB : blocks())
+    if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator()))
+      if (DI->hasUnwindDest())
+        if (!contains(DI->getUnwindDest()))
+          TaskEntriesToCheck.push_back(DI->getDetached());
+
+  for (BasicBlock *TaskEntry : TaskEntriesToCheck)
+    getTaskExitsHelper(TaskEntry, this, TaskExits);
+}
+
 /// getExitingBlocks - Return all blocks inside the loop that have successors
 /// outside of the loop.  These are the blocks _inside of the current loop_
 /// which branch out.  The returned list is always unique.
 ///
-void Loop::getExitingBlocks(
-    SmallVectorImpl<BasicBlock *> &ExitingBlocks,
-    bool IgnoreDetachUnwind) const {
+void Loop::getExitingBlocks(SmallVectorImpl<BasicBlock *> &ExitingBlocks,
+                            bool IgnoreDetachUnwind) const {
   assert(!isInvalid() && "Loop not in a valid state!");
   for (const auto BB : blocks())
     for (const auto *Succ : children<BasicBlock *>(BB))
@@ -94,6 +186,112 @@ BasicBlock *Loop::getExitingBlock(bool IgnoreDetachUnwind) const {
   if (ExitingBlocks.size() == 1)
     return ExitingBlocks[0];
   return nullptr;
+}
+
+/// getExitBlocks - Return all of the successor blocks of this loop.  These
+/// are the blocks _outside of the current loop_ which are branched to.
+///
+void Loop::getExitBlocks(
+    SmallVectorImpl<BasicBlock *> &ExitBlocks) const {
+  assert(!isInvalid() && "Loop not in a valid state!");
+  std::vector<BasicBlock *> Blocks(block_begin(), block_end());
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  getTaskExits(TaskExits);
+  Blocks.insert(Blocks.end(), TaskExits.begin(), TaskExits.end());
+
+  for (const auto BB : Blocks)
+    for (auto *Succ : children<BasicBlock *>(BB))
+      if (!contains(Succ) && !TaskExits.count(Succ) &&
+          !isTapirPlaceholderSuccessor(Succ))
+        // Not in current loop? It must be an exit block.
+        ExitBlocks.push_back(Succ);
+}
+
+/// getExitBlock - If getExitBlocks would return exactly one block,
+/// return that block. Otherwise return null.
+BasicBlock *Loop::getExitBlock() const {
+  assert(!isInvalid() && "Loop not in a valid state!");
+  SmallVector<BasicBlock *, 8> ExitBlocks;
+  getExitBlocks(ExitBlocks);
+  if (ExitBlocks.size() == 1)
+    return ExitBlocks[0];
+  return nullptr;
+}
+
+bool Loop::hasDedicatedExits() const {
+  // Each predecessor of each exit block of a normal loop is contained
+  // within the loop.
+  SmallVector<BasicBlock *, 4> UniqueExitBlocks;
+  getUniqueExitBlocks(UniqueExitBlocks);
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  getTaskExits(TaskExits);
+
+  for (BasicBlock *EB : UniqueExitBlocks)
+    for (BasicBlock *Predecessor : children<Inverse<BasicBlock *>>(EB))
+      if (!contains(Predecessor) && !TaskExits.count(Predecessor))
+        return false;
+  // All the requirements are met.
+  return true;
+}
+
+// Helper function to get unique loop exits. Pred is a predicate pointing to
+// BasicBlocks in a loop which should be considered to find loop exits.
+template <typename PredicateT>
+void getUniqueExitBlocksOutsideTasksHelper(
+    const Loop *L, SmallVectorImpl<BasicBlock *> &ExitBlocks, PredicateT Pred) {
+  assert(!L->isInvalid() && "Loop not in a valid state!");
+  SmallPtrSet<BasicBlock *, 32> Visited;
+  std::vector<BasicBlock *> Blocks(L->block_begin(), L->block_end());
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  L->getTaskExits(TaskExits);
+  Blocks.insert(Blocks.end(), TaskExits.begin(), TaskExits.end());
+
+  auto Filtered = make_filter_range(Blocks, Pred);
+  for (BasicBlock *BB : Filtered) {
+    for (BasicBlock *Successor : children<BasicBlock *>(BB))
+      if (!L->contains(Successor) && !TaskExits.count(Successor) &&
+          !isTapirPlaceholderSuccessor(Successor))
+        if (Visited.insert(Successor).second)
+          ExitBlocks.push_back(Successor);
+  }
+}
+
+void Loop::getUniqueExitBlocks(
+    SmallVectorImpl<BasicBlock *> &ExitBlocks) const {
+  getUniqueExitBlocksOutsideTasksHelper(
+      this, ExitBlocks, [](const BasicBlock *BB) { return true; });
+}
+
+void Loop::getUniqueNonLatchExitBlocks(
+    SmallVectorImpl<BasicBlock *> &ExitBlocks) const {
+  const BasicBlock *Latch = getLoopLatch();
+  assert(Latch && "Latch block must exists");
+  getUniqueExitBlocksOutsideTasksHelper(
+      this, ExitBlocks, [Latch](const BasicBlock *BB) { return BB != Latch; });
+}
+
+BasicBlock *Loop::getUniqueExitBlock() const {
+  SmallVector<BasicBlock *, 8> UniqueExitBlocks;
+  getUniqueExitBlocks(UniqueExitBlocks);
+  if (UniqueExitBlocks.size() == 1)
+    return UniqueExitBlocks[0];
+  return nullptr;
+}
+
+/// getExitEdges - Return all pairs of (_inside_block_,_outside_block_).
+void Loop::getExitEdges(SmallVectorImpl<Edge> &ExitEdges) const {
+  assert(!isInvalid() && "Loop not in a valid state!");
+  std::vector<BasicBlock *> Blocks(block_begin(), block_end());
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  getTaskExits(TaskExits);
+  Blocks.insert(Blocks.end(), TaskExits.begin(), TaskExits.end());
+
+  for (const auto BB : Blocks)
+    for (auto *Succ : children<BasicBlock *>(BB))
+      if (!contains(Succ) && !TaskExits.count(Succ) &&
+          !isTapirPlaceholderSuccessor(Succ))
+        // Not in current loop? It must be an exit block.
+        ExitEdges.emplace_back(BB, Succ);
 }
 
 bool Loop::isLoopInvariant(const Value *V) const {
@@ -457,7 +655,8 @@ bool Loop::isCanonical(ScalarEvolution &SE) const {
 
 // Check that 'BB' doesn't have any uses outside of the 'L'
 static bool isBlockInLCSSAForm(const Loop &L, const BasicBlock &BB,
-                               const DominatorTree &DT) {
+                               const DominatorTree &DT,
+                               SmallPtrSetImpl<BasicBlock *> &TaskExits) {
   for (const Instruction &I : BB) {
     // Tokens can't be used in PHI nodes and live-out tokens prevent loop
     // optimizations, so for the purposes of considered LCSSA form, we
@@ -479,7 +678,7 @@ static bool isBlockInLCSSAForm(const Loop &L, const BasicBlock &BB,
       // the use is anywhere in the loop.  Most values are used in the same
       // block they are defined in.  Also, blocks not reachable from the
       // entry are special; uses in them don't need to go through PHIs.
-      if (UserBB != &BB && !L.contains(UserBB) &&
+      if (UserBB != &BB && !L.contains(UserBB) && !TaskExits.count(UserBB) &&
           DT.isReachableFromEntry(UserBB))
         return false;
     }
@@ -489,8 +688,10 @@ static bool isBlockInLCSSAForm(const Loop &L, const BasicBlock &BB,
 
 bool Loop::isLCSSAForm(const DominatorTree &DT) const {
   // For each block we check that it doesn't have any uses outside of this loop.
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  getTaskExits(TaskExits);
   return all_of(this->blocks(), [&](const BasicBlock *BB) {
-    return isBlockInLCSSAForm(*this, *BB, DT);
+    return isBlockInLCSSAForm(*this, *BB, DT, TaskExits);
   });
 }
 
@@ -499,8 +700,10 @@ bool Loop::isRecursivelyLCSSAForm(const DominatorTree &DT,
   // For each block we check that it doesn't have any uses outside of its
   // innermost loop. This process will transitively guarantee that the current
   // loop and all of the nested loops are in LCSSA form.
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  getTaskExits(TaskExits);
   return all_of(this->blocks(), [&](const BasicBlock *BB) {
-    return isBlockInLCSSAForm(*LI.getLoopFor(BB), *BB, DT);
+    return isBlockInLCSSAForm(*LI.getLoopFor(BB), *BB, DT, TaskExits);
   });
 }
 
