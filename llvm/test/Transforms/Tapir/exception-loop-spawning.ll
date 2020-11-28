@@ -509,7 +509,6 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK: resume [[LPADTYPE]] %{{.+}}
 
 ; CHECK: [[TASKLPAD]]:
-; CHECK-LCSSA-NEXT: phi
 ; CHECK-NEXT: landingpad [[LPADTYPE]]
 ; CHECK: invoke void @llvm.detached.rethrow
 ; CHECK: (token %[[SYNCREG]], [[LPADTYPE]] %{{.+}})
@@ -568,7 +567,6 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK: resume [[LPADTYPE]] %{{.+}}
 
 ; CHECK: [[TASKLPAD]]:
-; CHECK-LCSSA-NEXT: phi
 ; CHECK-NEXT: landingpad [[LPADTYPE]]
 ; CHECK-NEXT: cleanup
 ; CHECK: invoke void @llvm.detached.rethrow
