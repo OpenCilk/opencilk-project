@@ -1484,6 +1484,7 @@ protected:
 
   DenseMap<std::pair<BasicBlock *, Function *>,
            SmallVector<PHINode *, 4>> ArgPHIs;
+  SmallPtrSet<SyncInst *, 12> SyncsWithUnwinds;
   DenseMap<BasicBlock *, CallInst *> callsAfterSync;
   std::unique_ptr<InstrumentationConfig> Config;
 
