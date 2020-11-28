@@ -1156,7 +1156,7 @@ bool TaskInfo::isAllocaParallelPromotable(const AllocaInst *AIP) const {
   AllocaInst *AI = const_cast<AllocaInst *>(AIP);
   SmallPtrSet<BasicBlock *, 32> DefBlocks;
   SmallVector<BasicBlock *, 32> UsingBlocks;
-  const Spindle *OnlySpindle = nullptr;
+  const Spindle *OnlySpindle = getSpindleFor(AIP->getParent());
   bool OnlyUsedInOneSpindle = true;
 
   // As we scan the uses of the alloca instruction, keep track of stores, and
@@ -1172,12 +1172,9 @@ bool TaskInfo::isAllocaParallelPromotable(const AllocaInst *AIP) const {
       UsingBlocks.push_back(LI->getParent());
     } else continue;
 
-    if (OnlyUsedInOneSpindle) {
-      if (!OnlySpindle)
-        OnlySpindle = getSpindleFor(User->getParent());
-      else if (OnlySpindle != getSpindleFor(User->getParent()))
+    if (OnlyUsedInOneSpindle)
+      if (getSpindleFor(User->getParent()) != OnlySpindle)
         OnlyUsedInOneSpindle = false;
-    }
   }
 
   // A spindle is guaranteed to execute as a serial unit.  Hence, if an alloca
