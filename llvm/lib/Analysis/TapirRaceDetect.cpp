@@ -334,6 +334,9 @@ private:
   bool PointerCapturedBefore(const Value *Ptr, const Instruction *I,
                              unsigned MaxUsesToExplore) const;
 
+  AliasResult underlyingObjectsAlias(const GeneralAccess &GAA,
+                                     const GeneralAccess &GAB);
+
   void recordLocalRace(const GeneralAccess &GA, RaceInfo::ResultTy &Result,
                        RaceInfo::ObjectMRTy &ObjectMRForRace,
                        const GeneralAccess &Competitor);
@@ -1236,6 +1239,45 @@ static void recordOpaqueRace(const GeneralAccess &GA, const Value *Ptr,
   setObjectMRForRace(ObjectMRForRace, Ptr, ModRefInfo::Mod);
 }
 
+// Returns NoAlias/MayAliass/MustAlias for two memory locations based upon their
+// underlaying objects. If LocA and LocB are known to not alias (for any reason:
+// tbaa, non-overlapping regions etc), then it is known there is no dependecy.
+// Otherwise the underlying objects are checked to see if they point to
+// different identifiable objects.
+AliasResult
+AccessPtrAnalysis::underlyingObjectsAlias(const GeneralAccess &GAA,
+                                          const GeneralAccess &GAB) {
+  MemoryLocation LocA = *GAA.Loc;
+  MemoryLocation LocB = *GAB.Loc;
+  // Check the original locations (minus size) for noalias, which can happen for
+  // tbaa, incompatible underlying object locations, etc.
+  MemoryLocation LocAS(LocA.Ptr, LocationSize::unknown(), LocA.AATags);
+  MemoryLocation LocBS(LocB.Ptr, LocationSize::unknown(), LocB.AATags);
+  if (AA->alias(LocAS, LocBS) == NoAlias)
+    return NoAlias;
+
+  // Check the underlying objects are the same
+  const Value *AObj = GetUnderlyingObject(LocA.Ptr, DL);
+  const Value *BObj = GetUnderlyingObject(LocB.Ptr, DL);
+
+  // If the underlying objects are the same, they must alias
+  if (AObj == BObj)
+    return MustAlias;
+
+  // We may have hit the recursion limit for underlying objects, or have
+  // underlying objects where we don't know they will alias.
+  if (!isIdentifiedObject(AObj) || !isIdentifiedObject(BObj)) {
+    if ((isIdentifiedObject(AObj) && !PointerCapturedBefore(AObj, GAB.I)) ||
+        (isIdentifiedObject(BObj) && !PointerCapturedBefore(BObj, GAA.I)))
+      return NoAlias;
+    return MayAlias;
+  }
+
+  // Otherwise we know the objects are different and both identified objects so
+  // must not alias.
+  return NoAlias;
+}
+
 void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
     GeneralAccess &GA1, GeneralAccess &GA2, RaceInfo::ResultTy &Result,
     RaceInfo::ObjectMRTy &ObjectMRForRace) {
@@ -1272,6 +1314,9 @@ void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
     if (isa<ConstantPointerNull>(GA2.getPtr()) &&
         !NullPointerIsDefined(
             F, GA2.getPtr()->getType()->getPointerAddressSpace()))
+      return;
+
+    if (NoAlias == underlyingObjectsAlias(GA1, GA2))
       return;
 
     LLVM_DEBUG(dbgs() << "Checking for race from dependence:\n"
