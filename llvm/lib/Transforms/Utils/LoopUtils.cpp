@@ -157,7 +157,8 @@ bool llvm::formDedicatedExitBlocks(Loop *L, DominatorTree *DT, LoopInfo *LI,
   for (auto *BB : L->blocks())
     for (auto *SuccBB : successors(BB)) {
       // We're looking for exit blocks so skip in-loop successors.
-      if (L->contains(SuccBB) || TaskExits.count(SuccBB))
+      if (L->contains(SuccBB) || TaskExits.count(SuccBB) ||
+          isTapirPlaceholderSuccessor(SuccBB))
         continue;
 
       // Visit each exit block exactly once.
@@ -171,7 +172,8 @@ bool llvm::formDedicatedExitBlocks(Loop *L, DominatorTree *DT, LoopInfo *LI,
   for (auto *BB : TaskExits)
     for (auto *SuccBB : successors(BB)) {
       // We're looking for exit blocks so skip in-loop successors.
-      if (L->contains(SuccBB) || TaskExits.count(SuccBB))
+      if (L->contains(SuccBB) || TaskExits.count(SuccBB) ||
+          isTapirPlaceholderSuccessor(SuccBB))
         continue;
 
       // Visit each exit block exactly once.

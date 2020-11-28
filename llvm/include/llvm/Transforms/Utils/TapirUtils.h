@@ -47,6 +47,10 @@ bool isTaskFrameResume(const Instruction *I, const Value *TaskFrame = nullptr);
 /// Check if the given instruction is a Tapir intrinsic that can be skipped.
 bool isSkippableTapirIntrinsic(const Instruction *I);
 
+/// Returns true if the given basic block \p B is a placeholder successor of a
+/// taskframe.resume or detached.rethrow.
+bool isTapirPlaceholderSuccessor(const BasicBlock *B);
+
 /// Returns a taskframe.resume that uses the given taskframe, or nullptr if no
 /// taskframe.resume uses this taskframe.
 InvokeInst *getTaskFrameResume(Value *TaskFrame);
@@ -65,9 +69,10 @@ bool isSyncUnwind(const Instruction *I, const Value *SyncRegion = nullptr);
 /// instructions.
 bool isPlaceholderSuccessor(const BasicBlock *B);
 
-/// Returns true if the given basic block ends a taskframe, false otherwise.  If
-/// \p TaskFrame is specified, then additionally checks that the
-/// taskframe.end uses \p TaskFrame.
+/// Returns true if the given basic block ends a taskframe, false otherwise.  In
+/// particular, this method checks if the penultimate instruction in the basic
+/// block is a taskframe.end intrinsic call.  If \p TaskFrame is specified, then
+/// additionally checks that the taskframe.end uses \p TaskFrame.
 bool endsTaskFrame(const BasicBlock *B, const Value *TaskFrame = nullptr);
 
 /// Returns the spindle containing the taskframe.create used by task \p T, or
