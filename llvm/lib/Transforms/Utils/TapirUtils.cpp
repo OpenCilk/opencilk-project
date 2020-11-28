@@ -1856,15 +1856,26 @@ BasicBlock *llvm::CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
 }
 
 static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
-                                           BasicBlock *UnwindEdge) {
-  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
+                                           BasicBlock *UnwindEdge,
+                                           const Value *TaskFrame) {
+  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E;) {
     Instruction *I = &*BBI++;
 
     // We only need to check for function calls: inlined invoke
     // instructions require no special handling.
     CallInst *CI = dyn_cast<CallInst>(I);
 
-    if (!CI || CI->doesNotThrow() || isa<InlineAsm>(CI->getCalledValue()))
+    if (!CI || isa<InlineAsm>(CI->getCalledValue()))
+      continue;
+
+    // Stop the search early if we encounter a taskframe.create or a
+    // taskframe.end.
+    if (isTapirIntrinsic(Intrinsic::taskframe_create, CI) ||
+        (TaskFrame &&
+         isTapirIntrinsic(Intrinsic::taskframe_end, CI, TaskFrame)))
+      return nullptr;
+
+    if (CI->doesNotThrow())
       continue;
 
     // We do not need to (and in fact, cannot) convert possibly throwing calls
@@ -1880,6 +1891,28 @@ static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
 
     changeToInvokeAndSplitBasicBlock(CI, UnwindEdge);
     return BB;
+  }
+  return nullptr;
+}
+
+static Instruction *GetTaskFrameInstructionInBlock(BasicBlock *BB,
+                                                   const Value *TaskFrame) {
+  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E;) {
+    Instruction *I = &*BBI++;
+
+    // We only need to check for function calls: inlined invoke
+    // instructions require no special handling.
+    CallInst *CI = dyn_cast<CallInst>(I);
+
+    if (!CI || isa<InlineAsm>(CI->getCalledValue()))
+      continue;
+
+    // Stop the search early if we encounter a taskframe.create or a
+    // taskframe.end.
+    if (isTapirIntrinsic(Intrinsic::taskframe_create, CI) ||
+        (TaskFrame &&
+         isTapirIntrinsic(Intrinsic::taskframe_end, CI, TaskFrame)))
+      return I;
   }
   return nullptr;
 }
@@ -1901,7 +1934,14 @@ static void PromoteCallsInTasksHelper(
     if (!Visited.insert(BB).second)
       continue;
 
-    if (Instruction *TFCreate = FindTaskFrameCreateInBlock(BB)) {
+    // Promote any calls in the block to invokes.
+    while (BasicBlock *NewBB =
+           MaybePromoteCallInBlock(BB, UnwindEdge, CurrentTaskFrame))
+      BB = cast<InvokeInst>(NewBB->getTerminator())->getNormalDest();
+
+    Instruction *TFI = GetTaskFrameInstructionInBlock(BB, CurrentTaskFrame);
+    if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI)) {
+      Instruction *TFCreate = TFI;
       if (TFCreate != CurrentTaskFrame) {
         // Split the block at the taskframe.create, if necessary.
         BasicBlock *NewBB;
@@ -1924,25 +1964,20 @@ static void PromoteCallsInTasksHelper(
           TaskFrameUnwindEdge->eraseFromParent();
         continue;
       }
-    }
-
-    // Promote any calls in the block to invokes.
-    while (BasicBlock *NewBB = MaybePromoteCallInBlock(BB, UnwindEdge)) {
-      BB = cast<InvokeInst>(NewBB->getTerminator())->getNormalDest();
+    } else if (TFI && isTapirIntrinsic(Intrinsic::taskframe_end, TFI,
+                                       CurrentTaskFrame)) {
+      // If we find a taskframe.end in this block that ends the current
+      // taskframe, add this block to the parent search.
+      assert(ParentWorklist &&
+             "Unexpected taskframe.resume: no parent worklist");
+      ParentWorklist->push_back(BB);
+      continue;
     }
 
     // Ignore reattach terminators.
     if (isa<ReattachInst>(BB->getTerminator()) ||
         isDetachedRethrow(BB->getTerminator()))
       continue;
-
-    // If we find a taskframe.end, add its successor to the parent search.
-    if (endsTaskFrame(BB, CurrentTaskFrame)) {
-      assert(ParentWorklist &&
-             "Unexpected taskframe.resume: no parent worklist");
-      ParentWorklist->push_back(BB->getSingleSuccessor());
-      continue;
-    }
 
     // If we find a taskframe.resume terminator, add its successor to the
     // parent search.
