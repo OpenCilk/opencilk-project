@@ -1068,7 +1068,6 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
     return;
 
   SmallVector<BasicBlock *, 4> DetachPreds;
-  SmallVector<BasicBlock *, 4> DetRethrowPreds;
   SmallVector<BasicBlock *, 4> TFResumePreds;
   SmallVector<BasicBlock *, 4> SyncPreds;
   SmallVector<BasicBlock *, 4> SyncUnwindPreds;
@@ -1079,10 +1078,9 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
 
   // Partition the predecessors of the landing pad.
   for (BasicBlock *Pred : predecessors(BB)) {
-    if (isa<DetachInst>(Pred->getTerminator()))
+    if (isa<DetachInst>(Pred->getTerminator()) ||
+        isDetachedRethrow(Pred->getTerminator()))
       DetachPreds.push_back(Pred);
-    else if (isDetachedRethrow(Pred->getTerminator()))
-      DetRethrowPreds.push_back(Pred);
     else if (isTaskFrameResume(Pred->getTerminator()))
       TFResumePreds.push_back(Pred);
     else if (isa<SyncInst>(Pred->getTerminator()))
@@ -1098,7 +1096,6 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
   }
 
   NumPredTypes = static_cast<unsigned>(!DetachPreds.empty()) +
-    static_cast<unsigned>(!DetRethrowPreds.empty()) +
     static_cast<unsigned>(!TFResumePreds.empty()) +
     static_cast<unsigned>(!SyncPreds.empty()) +
     static_cast<unsigned>(!SyncUnwindPreds.empty()) +
@@ -1135,13 +1132,6 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
     BBToSplit = SplitOffPreds(BBToSplit, DetachPreds, DT, LI);
     NumPredTypes--;
   }
-  // There is no need to split off detached-rethrow predecessors, since those
-  // successors of a detached-rethrow are dead up to where control flow merges
-  // with the unwind destination of a detach.
-  // if (!DetRethrowPreds.empty() && NumPredTypes > 1) {
-  //   BBToSplit = SplitOffPreds(BBToSplit, DetRethrowPreds, DT, LI);
-  //   NumPredTypes--;
-  // }
 }
 
 // Setup all basic blocks such that each block's predecessors belong entirely to
@@ -1153,9 +1143,10 @@ void CilkSanitizerImpl::setupBlocks(Function &F, DominatorTree *DT,
     if (BB.isLandingPad())
       BlocksToSetup.insert(&BB);
 
-    if (InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator()))
-      BlocksToSetup.insert(II->getNormalDest());
-    else if (SyncInst *SI = dyn_cast<SyncInst>(BB.getTerminator()))
+    if (InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator())) {
+      if (!isTapirPlaceholderSuccessor(II->getNormalDest()))
+        BlocksToSetup.insert(II->getNormalDest());
+    } else if (SyncInst *SI = dyn_cast<SyncInst>(BB.getTerminator()))
       BlocksToSetup.insert(SI->getSuccessor(0));
   }
 
@@ -3125,7 +3116,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           AtomicAccesses.push_back(&Inst);
         else if (isa<AllocaInst>(Inst))
           Allocas.insert(&Inst);
-        else if (isa<CallInst>(Inst) || isa<InvokeInst>(Inst)) {
+        else if (isa<CallBase>(Inst)) {
           // if (CallInst *CI = dyn_cast<CallInst>(&Inst))
           //   maybeMarkSanitizerLibraryCallNoBuiltin(CI, TLI);
 
@@ -3690,6 +3681,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   // Find the detached block, continuation, and associated reattaches.
   BasicBlock *DetachedBlock = DI->getDetached();
   BasicBlock *ContinueBlock = DI->getContinue();
+  Task *T = TI.getTaskFor(DetachedBlock);
   SmallVector<BasicBlock *, 8> TaskExits, TaskResumes;
   SmallVector<Spindle *, 2> SharedEHExits;
   getTaskExits(DI, TaskExits, TaskResumes, SharedEHExits, TI);
@@ -3743,7 +3735,6 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
       NumInstrumentedDetachExits++;
     }
 
-    Task *T = TI.getTaskFor(DetachedBlock);
     Value *DefaultID = getDefaultID(IDBuilder);
     for (Spindle *SharedEH : SharedEHExits) {
       CsiTaskExitProperty ExitProp;
@@ -3774,12 +3765,27 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   // Instrument the unwind of the detach, if it exists.
   if (DI->hasUnwindDest()) {
     BasicBlock *UnwindBlock = DI->getUnwindDest();
+    BasicBlock *PredBlock = DI->getParent();
+    if (Value *TF = T->getTaskFrameUsed()) {
+      // If the detached task uses a taskframe, then we want to insert the
+      // detach_continue instrumentation for the unwind destination after the
+      // taskframe.resume.
+      UnwindBlock = getTaskFrameResumeDest(TF);
+      assert(UnwindBlock &&
+             "Detach with unwind uses a taskframe with no resume");
+      PredBlock = getTaskFrameResume(TF)->getParent();
+    }
     Value *DefaultID = getDefaultID(IDBuilder);
     uint64_t LocalID = DetachContinueFED.add(*UnwindBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
-    insertHookCallInSuccessorBB(UnwindBlock, DI->getParent(),
+    insertHookCallInSuccessorBB(UnwindBlock, PredBlock, // DI->getParent(),
                                 CsanDetachContinue, {ContinueID, DetachID},
                                 {DefaultID, DefaultID});
+    for (BasicBlock *DRPred : predecessors(UnwindBlock))
+      if (isDetachedRethrow(DRPred->getTerminator(), DI->getSyncRegion()))
+        insertHookCallInSuccessorBB(UnwindBlock, DRPred, CsanDetachContinue,
+                                    {ContinueID, DetachID},
+                                    {DefaultID, DefaultID});
   }
   return true;
 }
