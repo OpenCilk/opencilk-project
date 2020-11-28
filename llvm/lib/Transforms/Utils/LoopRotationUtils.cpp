@@ -822,6 +822,12 @@ bool LoopRotate::processLoop(Loop *L) {
   if ((MadeChange || SimplifiedLatch) && LoopMD)
     L->setLoopID(LoopMD);
 
+  if ((MadeChange || SimplifiedLatch) && TaskI && DT)
+    // Recompute task info.
+    // FIXME: Figure out a way to update task info that is less computationally
+    // wasteful.
+    TaskI->recalculate(*DT->getRoot()->getParent(), *DT);
+
   return MadeChange || SimplifiedLatch;
 }
 
