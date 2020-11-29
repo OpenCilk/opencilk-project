@@ -1194,11 +1194,7 @@ bool llvm::mayBeUnsynced(const BasicBlock *BB) {
       // that detach spawned the current basic block.
       if (isa<DetachInst>(PredBB->getTerminator())) {
         const DetachInst *DI = cast<DetachInst>(PredBB->getTerminator());
-        if (DI->getDetached() == CurrBB)
-          // Return the current block, which is the entry of this detached
-          // sub-CFG.
-          continue;
-        else
+        if (DI->getDetached() != CurrBB)
           // We encountered a continue or unwind destination of a detach.
           // Conservatively return that we may not be synced.
           return true;
