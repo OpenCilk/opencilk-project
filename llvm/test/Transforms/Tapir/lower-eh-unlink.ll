@@ -435,23 +435,18 @@ lpad90:                                           ; preds = %pfor.body71
   %160 = landingpad { i8*, i32 }
           catch i8* null
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg55, { i8*, i32 } %160)
-          to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit.split-lp
+          to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit
 
 det.rethrow.unreachable105:                       ; preds = %lpad90
   unreachable
 
-lpad99.loopexit:                                  ; preds = %pfor.detach66
+lpad99.loopexit:                                  ; preds = %pfor.detach66, %lpad90
   %lpad.loopexit = landingpad { i8*, i32 }
           cleanup
   br label %lpad99
 
-lpad99.loopexit.split-lp:                         ; preds = %lpad90
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad99
-
-lpad99:                                           ; preds = %lpad99.loopexit.split-lp, %lpad99.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad99.loopexit ], [ %lpad.loopexit.split-lp, %lpad99.loopexit.split-lp ]
+lpad99:                                           ; preds = %lpad99.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad99.loopexit ]
   %161 = extractvalue { i8*, i32 } %lpad.phi, 0
   %162 = extractvalue { i8*, i32 } %lpad.phi, 1
   sync within %syncreg55, label %ehcleanup119

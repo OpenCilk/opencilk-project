@@ -160,23 +160,18 @@ lpad90:                                           ; preds = %pfor.body74
   %14 = landingpad { i8*, i32 }
           catch i8* null
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg56, { i8*, i32 } %14)
-          to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit.split-lp
+          to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit
 
 det.rethrow.unreachable105:                       ; preds = %lpad90
   unreachable
 
-lpad99.loopexit:                                  ; preds = %pfor.cond68
+lpad99.loopexit:                                  ; preds = %pfor.cond68, %lpad90
   %lpad.loopexit = landingpad { i8*, i32 }
           cleanup
   br label %lpad99
 
-lpad99.loopexit.split-lp:                         ; preds = %lpad90
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad99
-
-lpad99:                                           ; preds = %lpad99.loopexit.split-lp, %lpad99.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad99.loopexit ], [ %lpad.loopexit.split-lp, %lpad99.loopexit.split-lp ]
+lpad99:                                           ; preds = %lpad99.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad99.loopexit ]
   sync within %syncreg56, label %sync.continue111
 
 sync.continue111:                                 ; preds = %lpad99

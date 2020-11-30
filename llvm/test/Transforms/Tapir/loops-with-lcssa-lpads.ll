@@ -160,7 +160,7 @@ pfor.inc97.us:                                    ; preds = %invoke.cont87.us, %
   %exitcond394 = icmp eq i64 %inc98.us, %add
   br i1 %exitcond394, label %pfor.cond.cleanup71, label %pfor.detach73.us, !llvm.loop !141
 
-lpad99.loopexit.us-lcssa.us:                      ; preds = %pfor.detach73.us
+lpad99.loopexit.us-lcssa.us:                      ; preds = %pfor.detach73.us, %lpad84.us-lcssa.us
   %lpad.us-lcssa.us = landingpad { i8*, i32 }
           cleanup
   br label %lpad99
@@ -168,7 +168,8 @@ lpad99.loopexit.us-lcssa.us:                      ; preds = %pfor.detach73.us
 lpad84.us-lcssa.us:                               ; preds = %pfor.body77.us
   %lpad.us-lcssa383.us = landingpad { i8*, i32 }
           catch i8* null
-  br label %lpad84
+  invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg61, { i8*, i32 } %lpad.us-lcssa383.us)
+          to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit.us-lcssa.us
 
 pfor.cond.cleanup71:                              ; preds = %pfor.inc97, %pfor.inc97.us, %sync.continue55
   sync within %syncreg61, label %sync.continue106
@@ -302,30 +303,21 @@ pfor.inc97:                                       ; preds = %pfor.detach73, %inv
   br i1 %exitcond395, label %pfor.cond.cleanup71, label %pfor.detach73, !llvm.loop !141
 
 lpad84.us-lcssa:                                  ; preds = %pfor.body77
-  %lpad.us-lcssa383 = landingpad { i8*, i32 }
+  %23 = landingpad { i8*, i32 }
           catch i8* null
-  br label %lpad84
-
-lpad84:                                           ; preds = %lpad84.us-lcssa.us, %lpad84.us-lcssa
-  %23 = phi { i8*, i32 } [ %lpad.us-lcssa383.us, %lpad84.us-lcssa.us ], [ %lpad.us-lcssa383, %lpad84.us-lcssa ]
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg61, { i8*, i32 } %23)
-          to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit.split-lp
+          to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit.us-lcssa
 
 det.rethrow.unreachable105:                       ; preds = %lpad84
   unreachable
 
-lpad99.loopexit.us-lcssa:                         ; preds = %pfor.detach73
+lpad99.loopexit.us-lcssa:                         ; preds = %pfor.detach73, %lpad84.us-lcssa
   %lpad.us-lcssa = landingpad { i8*, i32 }
           cleanup
   br label %lpad99
 
-lpad99.loopexit.split-lp:                         ; preds = %lpad84
-  %lpad.loopexit.split-lp371 = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad99
-
-lpad99:                                           ; preds = %lpad99.loopexit.us-lcssa, %lpad99.loopexit.us-lcssa.us, %lpad99.loopexit.split-lp
-  %lpad.phi372 = phi { i8*, i32 } [ %lpad.loopexit.split-lp371, %lpad99.loopexit.split-lp ], [ %lpad.us-lcssa.us, %lpad99.loopexit.us-lcssa.us ], [ %lpad.us-lcssa, %lpad99.loopexit.us-lcssa ]
+lpad99:                                           ; preds = %lpad99.loopexit.us-lcssa, %lpad99.loopexit.us-lcssa.us
+  %lpad.phi372 = phi { i8*, i32 } [ %lpad.us-lcssa.us, %lpad99.loopexit.us-lcssa.us ], [ %lpad.us-lcssa, %lpad99.loopexit.us-lcssa ]
   %24 = extractvalue { i8*, i32 } %lpad.phi372, 0
   %25 = extractvalue { i8*, i32 } %lpad.phi372, 1
   sync within %syncreg61, label %ehcleanup202
@@ -427,7 +419,7 @@ lpad172:                                          ; preds = %if.then177
   %42 = landingpad { i8*, i32 }
           catch i8* null
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg132, { i8*, i32 } %42)
-          to label %det.rethrow.unreachable197 unwind label %lpad191.loopexit.split-lp
+          to label %det.rethrow.unreachable197 unwind label %lpad191.loopexit
 
 det.rethrow.unreachable197:                       ; preds = %lpad172
   unreachable
@@ -454,18 +446,13 @@ pfor.inc189:                                      ; preds = %pfor.detach144, %fo
   %exitcond393 = icmp eq i64 %inc190, %smax
   br i1 %exitcond393, label %pfor.cond.cleanup143, label %pfor.detach144, !llvm.loop !151
 
-lpad191.loopexit:                                 ; preds = %pfor.detach144
+lpad191.loopexit:                                 ; preds = %pfor.detach144, %lpad172
   %lpad.loopexit = landingpad { i8*, i32 }
           cleanup
   br label %lpad191
 
-lpad191.loopexit.split-lp:                        ; preds = %lpad172
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad191
-
-lpad191:                                          ; preds = %lpad191.loopexit.split-lp, %lpad191.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad191.loopexit ], [ %lpad.loopexit.split-lp, %lpad191.loopexit.split-lp ]
+lpad191:                                          ; preds = %lpad191.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad191.loopexit ]
   %46 = extractvalue { i8*, i32 } %lpad.phi, 0
   %47 = extractvalue { i8*, i32 } %lpad.phi, 1
   sync within %syncreg132, label %ehcleanup202
@@ -536,15 +523,13 @@ declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture writeonly, i8* nocapture r
 
 ; CHECK-LABEL: define private fastcc void @_Z10sampleSortIiSt4lessIiEiEvPT_T1_T0_.outline_pfor.detach73.ls1(i64 %__begin63.0382.start.ls1
 ; CHECK: lpad84.us-lcssa.ls1:
-; CHECK: br label %lpad84.ls1
-; CHECK: lpad84.ls1:
 ; CHECK-NOT: phi { i8*, i32 }{{.+}}[ {{%lpad.us-lcssa383.us|%lpad.us-lcssa383.us.ls1}}, {{%lpad84.us-lcssa.us|%lpad84.us-lcssa.us.ls1}} ]
+; CHECK: resume
 
 ; CHECK-LABEL: define private fastcc void @_Z10sampleSortIiSt4lessIiEiEvPT_T1_T0_.outline_pfor.detach73.us.ls1(i64 %__begin63.0382.us.start.ls1
 ; CHECK: lpad84.us-lcssa.us.ls1:
-; CHECK: br label %lpad84.ls1
-; CHECK: lpad84.ls1:
 ; CHECK-NOT: phi { i8*, i32 }{{.+}}[ {{%lpad.us-lcssa383|%lpad.us-lcssa383.ls1}}, {{%lpad84.us-lcssa|%lpad84.us-lcssa.ls1}} ]
+; CHECK: resume
 
 
 attributes #0 = { "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="true" "no-nans-fp-math"="true" "no-signed-zeros-fp-math"="true" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="haswell" "target-features"="+aes,+avx,+avx2,+bmi,+bmi2,+cmov,+cx16,+f16c,+fma,+fsgsbase,+fxsr,+lzcnt,+mmx,+movbe,+pclmul,+popcnt,+rdrnd,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave,+xsaveopt,-adx,-avx512bitalg,-avx512bw,-avx512cd,-avx512dq,-avx512er,-avx512f,-avx512ifma,-avx512pf,-avx512vbmi,-avx512vbmi2,-avx512vl,-avx512vnni,-avx512vpopcntdq,-clflushopt,-clwb,-clzero,-fma4,-gfni,-ibt,-lwp,-mwaitx,-pku,-prefetchwt1,-prfchw,-rdseed,-rtm,-sgx,-sha,-shstk,-sse4a,-tbm,-vaes,-vpclmulqdq,-xop,-xsavec,-xsaves" "unsafe-fp-math"="true" "use-soft-float"="false" }
