@@ -557,9 +557,9 @@ lpad:                                             ; preds = %32
   call void @llvm.lifetime.end.p0i8(i64 8, i8* nonnull %35) #20
   call void @__csan_task_exit(i64 %6, i64 %3, i64 %1, i8 0, i64 1)
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %42)
-          to label %unreachable unwind label %lpad7.loopexit.split-lp.csi-split
+          to label %unreachable unwind label %lpad7.loopexit
 
-lpad7.loopexit:                                   ; preds = %pfor.cond
+lpad7.loopexit:                                   ; preds = %pfor.cond, %lpad
   %lpad.loopexit = landingpad { i8*, i32 }
           cleanup
   call void @__csan_after_loop(i64 %24, i8 0, i64 1)
@@ -568,11 +568,6 @@ lpad7.loopexit:                                   ; preds = %pfor.cond
 
 lpad7.loopexit.split-lp.csi-split-lp:             ; preds = %sync.continue
   %lpad.csi-split-lp = landingpad { i8*, i32 }
-          cleanup
-  br label %ehcleanup20
-
-lpad7.loopexit.split-lp.csi-split:                ; preds = %lpad
-  %lpad.csi-split = landingpad { i8*, i32 }
           cleanup
   br label %ehcleanup20
 
@@ -614,8 +609,8 @@ lpad16:                                           ; preds = %cleanup
   call void @__csan_after_call(i64 %45, i64 %44, i8 1, i64 0)
   br label %ehcleanup20
 
-ehcleanup20:                                      ; preds = %lpad7.loopexit.split-lp.csi-split-lp, %lpad7.loopexit.split-lp.csi-split, %lpad7.loopexit, %lpad16
-  %.sink42 = phi { i8*, i32 } [ %54, %lpad16 ], [ %lpad.loopexit, %lpad7.loopexit ], [ %lpad.csi-split-lp, %lpad7.loopexit.split-lp.csi-split-lp ], [ %lpad.csi-split, %lpad7.loopexit.split-lp.csi-split ]
+ehcleanup20:                                      ; preds = %lpad7.loopexit.split-lp.csi-split-lp, %lpad7.loopexit, %lpad16
+  %.sink42 = phi { i8*, i32 } [ %54, %lpad16 ], [ %lpad.loopexit, %lpad7.loopexit ], [ %lpad.csi-split-lp, %lpad7.loopexit.split-lp.csi-split-lp ]
   %55 = bitcast %"class.cilk::reducer_opadd"* %accum to %"class.cilk::reducer"*
   %56 = load i64, i64* @__csi_func_id__ZN4cilk7reducerINS_6op_addIxLb1EEEED2Ev, align 8
   call void @__csan_set_suppression_flag(i64 7, i64 %56)
