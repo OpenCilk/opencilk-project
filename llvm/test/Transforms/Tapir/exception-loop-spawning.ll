@@ -224,22 +224,16 @@ lpad:                                             ; preds = %invoke.cont, %pfor.
   %1 = landingpad { i8*, i32 }
           cleanup
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg5, { i8*, i32 } %1)
-          to label %unreachable unwind label %lpad32.loopexit.split-lp
+          to label %unreachable unwind label %lpad32.loopexit
 
-lpad32.loopexit:                                  ; preds = %pfor.cond17
+lpad32.loopexit:                                  ; preds = %pfor.cond17, %lpad
   %lpad.loopexit = landingpad { i8*, i32 }
           catch i8* bitcast (i8** @_ZTIi to i8*)
           catch i8* null
   br label %lpad32
 
-lpad32.loopexit.split-lp:                         ; preds = %lpad
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          catch i8* bitcast (i8** @_ZTIi to i8*)
-          catch i8* null
-  br label %lpad32
-
-lpad32:                                           ; preds = %lpad32.loopexit.split-lp, %lpad32.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad32.loopexit ], [ %lpad.loopexit.split-lp, %lpad32.loopexit.split-lp ]
+lpad32:                                           ; preds = %lpad32.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad32.loopexit ]
   %2 = extractvalue { i8*, i32 } %lpad.phi, 0
   %3 = extractvalue { i8*, i32 } %lpad.phi, 1
   %4 = tail call i32 @llvm.eh.typeid.for(i8* bitcast (i8** @_ZTIi to i8*)) #10
@@ -381,22 +375,16 @@ lpad:                                             ; preds = %pfor.body
 lpad.body:                                        ; preds = %eh.resume.i, %lpad
   %eh.lpad-body = phi { i8*, i32 } [ %11, %lpad ], [ %lpad.val5.i, %eh.resume.i ]
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %eh.lpad-body)
-          to label %unreachable unwind label %lpad9.loopexit.split-lp
+          to label %unreachable unwind label %lpad9.loopexit
 
-lpad9.loopexit:                                   ; preds = %pfor.cond
+lpad9.loopexit:                                   ; preds = %pfor.cond, %lpad.body
   %lpad.loopexit = landingpad { i8*, i32 }
           catch i8* bitcast (i8** @_ZTIi to i8*)
           catch i8* null
   br label %lpad9
 
-lpad9.loopexit.split-lp:                          ; preds = %lpad.body
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          catch i8* bitcast (i8** @_ZTIi to i8*)
-          catch i8* null
-  br label %lpad9
-
-lpad9:                                            ; preds = %lpad9.loopexit.split-lp, %lpad9.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad9.loopexit ], [ %lpad.loopexit.split-lp, %lpad9.loopexit.split-lp ]
+lpad9:                                            ; preds = %lpad9.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad9.loopexit ]
   %12 = extractvalue { i8*, i32 } %lpad.phi, 0
   %13 = extractvalue { i8*, i32 } %lpad.phi, 1
   %14 = tail call i32 @llvm.eh.typeid.for(i8* bitcast (i8** @_ZTIi to i8*)) #10

@@ -293,33 +293,28 @@ lpad34:                                           ; preds = %invoke.cont37, %pfo
   %39 = landingpad { i8*, i32 }
           catch i8* null
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg18, { i8*, i32 } %39)
-          to label %det.rethrow.unreachable unwind label %lpad45.loopexit.split-lp
+          to label %det.rethrow.unreachable unwind label %lpad45.loopexit
 
 det.rethrow.unreachable:                          ; preds = %lpad34
   unreachable
 
-lpad45.loopexit:                                  ; preds = %pfor.detach29
-  %.lcssa30 = phi i8* [ %30, %pfor.detach29 ]
-  %cond.i.i.i.i240357.lcssa = phi i32* [ %cond.i.i.i.i240357, %pfor.detach29 ]
-  %.lcssa23 = phi i8* [ %31, %pfor.detach29 ]
-  %cond.i.i.i.i198346350356.lcssa = phi i32* [ %cond.i.i.i.i198346350356, %pfor.detach29 ]
-  %worker_matches_count.sroa.13.0..sroa_cast302351355.lcssa = phi i8* [ %worker_matches_count.sroa.13.0..sroa_cast302351355, %pfor.detach29 ]
+lpad45.loopexit:                                  ; preds = %pfor.detach29, %lpad34
+  %.lcssa30 = phi i8* [ %30, %pfor.detach29 ], [ %30, %lpad34 ]
+  %cond.i.i.i.i240357.lcssa = phi i32* [ %cond.i.i.i.i240357, %pfor.detach29 ], [ %cond.i.i.i.i240357, %lpad34 ]
+  %.lcssa23 = phi i8* [ %31, %pfor.detach29 ], [ %31, %lpad34 ]
+  %cond.i.i.i.i198346350356.lcssa = phi i32* [ %cond.i.i.i.i198346350356, %pfor.detach29 ], [ %cond.i.i.i.i198346350356, %lpad34 ]
+  %worker_matches_count.sroa.13.0..sroa_cast302351355.lcssa = phi i8* [ %worker_matches_count.sroa.13.0..sroa_cast302351355, %pfor.detach29 ], [ %worker_matches_count.sroa.13.0..sroa_cast302351355, %lpad34 ]
   %lpad.loopexit = landingpad { i8*, i32 }
           catch i8* null
   br label %lpad45
 
-lpad45.loopexit.split-lp:                         ; preds = %lpad34
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          catch i8* null
-  br label %lpad45
-
-lpad45:                                           ; preds = %lpad45.loopexit.split-lp, %lpad45.loopexit
-  %40 = phi i8* [ %.lcssa30, %lpad45.loopexit ], [ %.lcssa31, %lpad45.loopexit.split-lp ]
-  %cond.i.i.i.i24035729 = phi i32* [ %cond.i.i.i.i240357.lcssa, %lpad45.loopexit ], [ %cond.i.i.i.i240357.lcssa26, %lpad45.loopexit.split-lp ]
-  %41 = phi i8* [ %.lcssa23, %lpad45.loopexit ], [ %.lcssa24, %lpad45.loopexit.split-lp ]
-  %cond.i.i.i.i19834635035622 = phi i32* [ %cond.i.i.i.i198346350356.lcssa, %lpad45.loopexit ], [ %cond.i.i.i.i198346350356.lcssa19, %lpad45.loopexit.split-lp ]
-  %worker_matches_count.sroa.13.0..sroa_cast30235135518 = phi i8* [ %worker_matches_count.sroa.13.0..sroa_cast302351355.lcssa, %lpad45.loopexit ], [ %worker_matches_count.sroa.13.0..sroa_cast302351355.lcssa15, %lpad45.loopexit.split-lp ]
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad45.loopexit ], [ %lpad.loopexit.split-lp, %lpad45.loopexit.split-lp ]
+lpad45:                                           ; preds = %lpad45.loopexit
+  %40 = phi i8* [ %.lcssa30, %lpad45.loopexit ]
+  %cond.i.i.i.i24035729 = phi i32* [ %cond.i.i.i.i240357.lcssa, %lpad45.loopexit ]
+  %41 = phi i8* [ %.lcssa23, %lpad45.loopexit ]
+  %cond.i.i.i.i19834635035622 = phi i32* [ %cond.i.i.i.i198346350356.lcssa, %lpad45.loopexit ]
+  %worker_matches_count.sroa.13.0..sroa_cast30235135518 = phi i8* [ %worker_matches_count.sroa.13.0..sroa_cast302351355.lcssa, %lpad45.loopexit ]
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad45.loopexit ]
   %42 = extractvalue { i8*, i32 } %lpad.phi, 0
   %43 = extractvalue { i8*, i32 } %lpad.phi, 1
   sync within %syncreg18, label %ehcleanup
@@ -592,23 +587,18 @@ ehcleanup71:                                      ; preds = %if.then.i.i.i259, %
   %lpad.val83 = insertvalue { i8*, i32 } undef, i8* %exn.slot11.2, 0
   %lpad.val84 = insertvalue { i8*, i32 } %lpad.val83, i32 %ehselector.slot12.2, 1
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %lpad.val84)
-          to label %det.rethrow.unreachable86 unwind label %lpad80.loopexit.split-lp
+          to label %det.rethrow.unreachable86 unwind label %lpad80.loopexit
 
 det.rethrow.unreachable86:                        ; preds = %ehcleanup71
   unreachable
 
-lpad80.loopexit:                                  ; preds = %pfor.detach
+lpad80.loopexit:                                  ; preds = %pfor.detach, %ehcleanup71
   %lpad.loopexit367 = landingpad { i8*, i32 }
           cleanup
   br label %lpad80
 
-lpad80.loopexit.split-lp:                         ; preds = %ehcleanup71
-  %lpad.loopexit.split-lp368 = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad80
-
-lpad80:                                           ; preds = %lpad80.loopexit.split-lp, %lpad80.loopexit
-  %lpad.phi369 = phi { i8*, i32 } [ %lpad.loopexit367, %lpad80.loopexit ], [ %lpad.loopexit.split-lp368, %lpad80.loopexit.split-lp ]
+lpad80:                                           ; preds = %lpad80.loopexit
+  %lpad.phi369 = phi { i8*, i32 } [ %lpad.loopexit367, %lpad80.loopexit ]
   %104 = extractvalue { i8*, i32 } %lpad.phi369, 0
   %105 = extractvalue { i8*, i32 } %lpad.phi369, 1
   sync within %syncreg, label %ehcleanup123

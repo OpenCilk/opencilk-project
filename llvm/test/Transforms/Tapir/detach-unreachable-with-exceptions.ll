@@ -160,18 +160,28 @@ _ZN16kNearestNeighborI6vertexI8_point2dIdELi1EELi1EE8kNearestEPS3_PS5_i.exit.loo
 .noexc.loopexit.us:                               ; preds = %for.body.i.us
   br label %.noexc.us
 
-lpad5.loopexit.us-lcssa.us:                       ; preds = %pfor.detach.us
+lpad5.loopexit.us-lcssa.us:                       ; preds = %pfor.detach.us, %lpad.loopexit20.us-lcssa.us
   %lpad.us-lcssa.us = landingpad { i8*, i32 }
           cleanup
   br label %lpad5.loopexit
 
 if.then.i.us-lcssa.us:                            ; preds = %pfor.body.us
-  br label %if.then.i
+  br label %if.then.i.us
 
-lpad.loopexit20.us-lcssa.us:                      ; preds = %.noexc.us
+if.then.i.us:                                        ; preds = %if.then.i.us-lcssa.us
+  %call.i.i12.us = call i64 @strlen(i8* getelementptr inbounds ([19 x i8], [19 x i8]* @.str.26, i64 0, i64 0)) #2
+  %call1.i14.us = invoke dereferenceable(272) %"class.std::basic_ostream"* @_ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l(%"class.std::basic_ostream"* nonnull dereferenceable(272) @_ZSt4cout, i8* nonnull getelementptr inbounds ([19 x i8], [19 x i8]* @.str.26, i64 0, i64 0), i64 %call.i.i12.us)
+          to label %call.i5.noexc.us unwind label %lpad.loopexit20.us-lcssa.us
+
+call.i5.noexc.us:                                    ; preds = %if.then.i
+  %call.i.i611.us = invoke dereferenceable(272) %"class.std::basic_ostream"* @_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_(%"class.std::basic_ostream"* dereferenceable(272) @_ZSt4cout)
+          to label %call.i.i6.noexc unwind label %lpad.loopexit20.us-lcssa.us
+
+lpad.loopexit20.us-lcssa.us:                      ; preds = %.noexc.us, %if.then.i.us, %call.i5.noexc.us
   %lpad.us-lcssa25.us = landingpad { i8*, i32 }
           catch i8* null
-  br label %lpad.loopexit20
+  invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %lpad.us-lcssa25.us)
+          to label %det.rethrow.unreachable unwind label %lpad5.loopexit.us-lcssa.us
 
 pfor.cond.cleanup.loopexit.us-lcssa.us:           ; preds = %pfor.inc.us
   br label %pfor.cond.cleanup.loopexit
@@ -291,8 +301,8 @@ lpad.loopexit20.us-lcssa:                         ; preds = %.noexc
           catch i8* null
   br label %lpad.loopexit20
 
-lpad.loopexit20:                                  ; preds = %lpad.loopexit20.us-lcssa.us, %lpad.loopexit20.us-lcssa
-  %25 = phi { i8*, i32 } [ %lpad.us-lcssa25.us, %lpad.loopexit20.us-lcssa.us ], [ %lpad.us-lcssa25, %lpad.loopexit20.us-lcssa ]
+lpad.loopexit20:                                  ; preds = %lpad.loopexit20.us-lcssa
+  %25 = phi { i8*, i32 } [ %lpad.us-lcssa25, %lpad.loopexit20.us-lcssa ]
   br label %lpad
 
 lpad.loopexit.split-lp21:                         ; preds = %call.i5.noexc, %if.then.i
@@ -300,25 +310,25 @@ lpad.loopexit.split-lp21:                         ; preds = %call.i5.noexc, %if.
           catch i8* null
   br label %lpad
 
-; TS: lpad.loopexit.split-lp21:
+; TS: lpad.loopexit20.us-lcssa.us:
 ; TS-NEXT: landingpad
 ; TS-NEXT: cleanup
 ; TS-NEXT: catch i8* null
-; TS: br label %lpad.sd
+; TS: br label %lpad5.loopexit.us-lcssa.us.body
 
 lpad:                                             ; preds = %lpad.loopexit.split-lp21, %lpad.loopexit20
   %lpad.phi24 = phi { i8*, i32 } [ %25, %lpad.loopexit20 ], [ %lpad.loopexit.split-lp23, %lpad.loopexit.split-lp21 ]
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %lpad.phi24)
-          to label %det.rethrow.unreachable unwind label %lpad5.loopexit.split-lp
+          to label %det.rethrow.unreachable unwind label %lpad5.loopexit.us-lcssa
 
-; TS: lpad:
+; TS: lpad.loopexit20.us-lcssa:
 ; TS-NOT: = phi
 ; TS: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg
 
 det.rethrow.unreachable:                          ; preds = %lpad
   unreachable
 
-lpad5.loopexit.us-lcssa:                          ; preds = %pfor.detach
+lpad5.loopexit.us-lcssa:                          ; preds = %pfor.detach, %lpad
   %lpad.us-lcssa = landingpad { i8*, i32 }
           cleanup
   br label %lpad5.loopexit
@@ -327,13 +337,8 @@ lpad5.loopexit:                                   ; preds = %lpad5.loopexit.us-l
   %26 = phi { i8*, i32 } [ %lpad.us-lcssa.us, %lpad5.loopexit.us-lcssa.us ], [ %lpad.us-lcssa, %lpad5.loopexit.us-lcssa ]
   br label %lpad5
 
-lpad5.loopexit.split-lp:                          ; preds = %lpad
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad5
-
-lpad5:                                            ; preds = %lpad5.loopexit.split-lp, %lpad5.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %26, %lpad5.loopexit ], [ %lpad.loopexit.split-lp, %lpad5.loopexit.split-lp ]
+lpad5:                                            ; preds = %lpad5.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %26, %lpad5.loopexit ]
   sync within %syncreg, label %sync.continue9
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
@@ -345,9 +350,6 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 sync.continue9:                                   ; preds = %lpad5
   resume { i8*, i32 } %lpad.phi
 }
-
-; TS: lpad.sd:
-; TS: br label %lpad5.body
 
 ; Function Attrs: uwtable
 declare void @_ZN16kNearestNeighborI6vertexI8_point2dIdELi1EELi1EE3kNN10nearestNghEP9gTreeNodeIS2_7_vect2dIdES3_5nDataIS3_EE(%"struct.kNearestNeighbor<vertex<_point2d<double>, 1>, 1>::kNN"* %this, %class.gTreeNode* %T) local_unnamed_addr #5
