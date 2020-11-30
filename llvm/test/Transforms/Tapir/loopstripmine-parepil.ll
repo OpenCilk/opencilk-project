@@ -105,7 +105,7 @@ pfor.cond.preheader:                              ; preds = %if.else
 ; CHECK-NEXT: br label %pfor.cond.preheader.new.strpm.detachloop
 
 ; CHECK: pfor.cond.preheader.new.strpm.detachloop:
-; CHECK-NEXT: detach within %syncreg, label %pfor.cond.strpm.detachloop.entry, label %pfor.cond.cleanup.strpm-lcssa.loopexit unwind label %lpad37.strpm.detachloop.unwind
+; CHECK-NEXT: detach within %syncreg, label %pfor.cond.strpm.detachloop.entry, label %pfor.cond.cleanup.strpm-lcssa.loopexit unwind label %lpad37.loopexit.strpm.detachloop.unwind
 
 ; CHECK: pfor.cond.strpm.detachloop.entry:
 ; CHECK-NEXT: %[[DETACHLOOPSR:.+]] = call token @llvm.syncregion.start()
@@ -149,11 +149,11 @@ lpad:                                             ; preds = %if.then32
   %12 = landingpad { i8*, i32 }
           catch i8* null, !dbg !3285
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %12)
-          to label %det.rethrow.unreachable unwind label %lpad37.loopexit.split-lp, !dbg !3273
+          to label %det.rethrow.unreachable unwind label %lpad37.loopexit, !dbg !3273
 
 ; CHECK: lpad:
 ; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[DETACHLOOPSR]],
-; CHECK-NEXT: to label %det.rethrow.unreachable unwind label %lpad37.loopexit.split-lp
+; CHECK-NEXT: to label %det.rethrow.unreachable unwind label %lpad37.loopexit.strpm
 
 det.rethrow.unreachable:                          ; preds = %lpad
   unreachable, !dbg !3273
@@ -170,41 +170,35 @@ pfor.inc:                                         ; preds = %pfor.cond, %if.end3
 pfor.cond.cleanup:                                ; preds = %pfor.inc
   sync within %syncreg, label %if.end44, !dbg !3288
 
-lpad37.loopexit:                                  ; preds = %pfor.cond
+lpad37.loopexit:                                  ; preds = %pfor.cond, %lpad
   %lpad.loopexit = landingpad { i8*, i32 }
           cleanup, !dbg !3293
   br label %lpad37, !dbg !3293
 
-; CHECK: lpad37.loopexit:
-; CHECK: br label %lpad37.strpm
-
-lpad37.loopexit.split-lp:                         ; preds = %lpad
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          cleanup, !dbg !3293
-  br label %lpad37, !dbg !3293
-
-; CHECK: lpad37.loopexit.split-lp:
-; CHECK: br label %lpad37.strpm
-
-; CHECK: lpad37.strpm:
-; CHECK-NEXT: %[[DETACHLOOPPHI:.+]] = phi { i8*, i32 } [ %lpad.loopexit.split-lp, %lpad37.loopexit.split-lp ], [ %lpad.loopexit, %lpad37.loopexit ]
+; CHECK: lpad37.loopexit.strpm:
+; CHECK-NEXT: %[[DETACHLOOPPHI:.+]] = landingpad
+; CHECK-NEXT: cleanup
 ; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %[[DETACHLOOPPHI]])
-; CHECK-NEXT: to label %{{.+}} unwind label %lpad37.strpm.detachloop.unwind
+; CHECK-NEXT: to label %{{.+}} unwind label %lpad37.loopexit.strpm.detachloop.unwind
 
-; CHECK: lpad37.strpm.detachloop.unwind:
+; CHECK: lpad37.loopexit.strpm.detachloop.unwind:
 ; CHECK-NEXT: %[[DETACHLOOPLPAD:.+]] = landingpad { i8*, i32 }
-; CHECK: br label %lpad37
+; CHECK: br label %lpad37.loopexit
 
-lpad37:                                           ; preds = %lpad37.loopexit.split-lp, %lpad37.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad37.loopexit ], [ %lpad.loopexit.split-lp, %lpad37.loopexit.split-lp ]
+; CHECK: lpad37.loopexit:
+; CHECK-NEXT: %[[LP37LOOPEXITPHI:.+]] = phi { i8*, i32 } [ %[[DETACHLOOPLPAD]], %lpad37.loopexit.strpm.detachloop.unwind ]
+; CHECK: br label %lpad37.loopexit.body
+
+; CHECK: lpad37.loopexit.body:
+; CHECK-NEXT: %[[EPILPHI:.+]] = phi { i8*, i32 } [ %[[LP37LOOPEXITPHI]], %lpad37.loopexit ], [ %[[EPILLPAD:.+]], %lpad.epil ]
+; CHECK-NEXT: br label %lpad37
+
+lpad37:                                           ; preds = %lpad37.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad37.loopexit ]
   sync within %syncreg, label %sync.continue42, !dbg !3288
 
 ; CHECK: lpad37:
-; CHECK-NEXT: %lpad.phi = phi { i8*, i32 } [ %lpad.strpm.detachloop.unwind, %lpad37.strpm.detachloop.unwind ]
-; CHECK-NEXT: br label %lpad37.body
-
-; CHECK: lpad37.body:
-; CHECK-NEXT: %[[EPILPHI:.+]] = phi { i8*, i32 } [ %lpad.phi, %lpad37 ], [ %[[EPILLPAD:.+]], %lpad.epil ]
+; CHECK-NEXT: %lpad.phi = phi { i8*, i32 } [ %[[EPILPHI]], %lpad37.loopexit.body ]
 ; CHECK-NEXT: sync within %syncreg, label %sync.continue42
 
 sync.continue42:                                  ; preds = %lpad37
