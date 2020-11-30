@@ -78,23 +78,18 @@ lpad:                                             ; preds = %det.achd.3, %det.ac
   %13 = landingpad { i8*, i32 }
           catch i8* null
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %13)
-          to label %det.rethrow.unreachable unwind label %lpad29.loopexit.split-lp
+          to label %det.rethrow.unreachable unwind label %lpad29.loopexit
 
 det.rethrow.unreachable:                          ; preds = %lpad
   unreachable
 
-lpad29.loopexit:                                  ; preds = %cond.end.3, %cond.end.2, %cond.end.1, %cond.end
+lpad29.loopexit:                                  ; preds = %cond.end.3, %cond.end.2, %cond.end.1, %cond.end, %lpad
   %lpad.loopexit = landingpad { i8*, i32 }
           cleanup
   br label %lpad29
 
-lpad29.loopexit.split-lp:                         ; preds = %lpad
-  %lpad.loopexit.split-lp = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad29
-
-lpad29:                                           ; preds = %lpad29.loopexit.split-lp, %lpad29.loopexit
-  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad29.loopexit ], [ %lpad.loopexit.split-lp, %lpad29.loopexit.split-lp ]
+lpad29:                                           ; preds = %lpad29.loopexit
+  %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad29.loopexit ]
   %14 = extractvalue { i8*, i32 } %lpad.phi, 0
   %15 = extractvalue { i8*, i32 } %lpad.phi, 1
   sync within %syncreg, label %eh.resume
@@ -169,23 +164,18 @@ lpad76:                                           ; preds = %det.achd75.3, %det.
   %28 = landingpad { i8*, i32 }
           catch i8* null
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %28)
-          to label %det.rethrow.unreachable87 unwind label %lpad81.loopexit.split-lp
+          to label %det.rethrow.unreachable87 unwind label %lpad81.loopexit
 
 det.rethrow.unreachable87:                        ; preds = %lpad76
   unreachable
 
-lpad81.loopexit:                                  ; preds = %det.cont80.2, %det.cont80.1, %det.cont80, %if.else
+lpad81.loopexit:                                  ; preds = %det.cont80.2, %det.cont80.1, %det.cont80, %if.else, %lpad76
   %lpad.loopexit217 = landingpad { i8*, i32 }
           cleanup
   br label %lpad81
 
-lpad81.loopexit.split-lp:                         ; preds = %lpad76
-  %lpad.loopexit.split-lp218 = landingpad { i8*, i32 }
-          cleanup
-  br label %lpad81
-
-lpad81:                                           ; preds = %lpad81.loopexit.split-lp, %lpad81.loopexit
-  %lpad.phi219 = phi { i8*, i32 } [ %lpad.loopexit217, %lpad81.loopexit ], [ %lpad.loopexit.split-lp218, %lpad81.loopexit.split-lp ]
+lpad81:                                           ; preds = %lpad81.loopexit
+  %lpad.phi219 = phi { i8*, i32 } [ %lpad.loopexit217, %lpad81.loopexit ]
   %29 = extractvalue { i8*, i32 } %lpad.phi219, 0
   %30 = extractvalue { i8*, i32 } %lpad.phi219, 1
   sync within %syncreg, label %eh.resume
@@ -458,21 +448,21 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #4
 declare %class.gTreeNode* @_ZN9gTreeNodeI8_point2dIdE7_vect2dIdE6vertex5nDataIS4_EE7newTreeE4_seqIPS4_ES1_dPS7_i(%struct.vertex** %S.coerce0, i64 %S.coerce1, double %cnt.coerce0, double %cnt.coerce1, double %sz, %class.gTreeNode* %newNodes, i32 %numNewNodes) local_unnamed_addr #7
 
 ; CHECK: task at depth 0: {<task entry><func sp entry>%entry,%if.else<sp exit>
-; CHECK-DAG: {<shared EH><phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
-; CHECK-DAG: {<shared EH><phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK-DAG: {<shared EH><phi sp entry>%lpad<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK-DAG: {<shared EH><phi sp entry>%lpad76<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75.3<sp exit>
-; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad76<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75.2<sp exit>
-; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad76<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75.1<sp exit>
-; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad76<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd75<sp exit>
-; CHECK: {<phi sp entry>%lpad76,%lpad81.loopexit.split-lp<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad76<sp exit>,%det.rethrow.unreachable87<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd.3<sp exit>
-; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd.2<sp exit>
-; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd.1<sp exit>
-; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
 ; CHECK: task at depth 1: {<task entry><task sp entry>%det.achd<sp exit>
-; CHECK: {<phi sp entry>%lpad,%lpad29.loopexit.split-lp<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}
+; CHECK: {<phi sp entry>%lpad<sp exit>,%det.rethrow.unreachable<sp exit><task EH exit>}

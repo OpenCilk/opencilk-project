@@ -1378,7 +1378,7 @@ entry.split.split:
   call void @__csan_load(i64 %37, i8* %38, i32 4, i64 4)
   %.pre80 = load i32, i32* %.pre76, align 4, !tbaa !6
   call void @__csan_detach(i64 %1, i8 0)
-  detach within %syncreg, label %det.achd, label %det.cont unwind label %csi.cleanup89.csi-split-lp
+  detach within %syncreg, label %det.achd, label %det.cont unwind label %csi.cleanup89.csi-split
 
 ; CHECK: %[[PHI:.+]] = phi i64 [ %.pre125, %.thread113 ],
 ; CHECK-NOT: store i64 %[[PHI]],
@@ -1597,6 +1597,7 @@ sync.continue12:                                  ; preds = %_ZZN4pbbs4scanI10ar
 csi.cleanup.csi-split-lp:                         ; preds = %csi.cleanup89
   %lpad.csi-split-lp = landingpad { i8*, i32 }
           cleanup
+  call void @__csan_detach_continue(i64 %9, i64 %1)
   br label %csi.cleanup
 
 csi.cleanup.csi-split:                            ; preds = %sync.continue12
@@ -1614,19 +1615,13 @@ csi.cleanup:                                      ; preds = %csi.cleanup.csi-spl
 csi.cleanup.unreachable:                          ; preds = %csi.cleanup8991, %csi.cleanup89
   unreachable
 
-csi.cleanup89.csi-split-lp:                       ; preds = %29
-  %lpad.csi-split-lp96 = landingpad { i8*, i32 }
-          cleanup
-  call void @__csan_detach_continue(i64 %9, i64 %1)
-  br label %csi.cleanup89
-
-csi.cleanup89.csi-split:                          ; preds = %csi.cleanup8991
+csi.cleanup89.csi-split:                          ; preds = %csi.cleanup8991, %29
   %lpad.csi-split97 = landingpad { i8*, i32 }
           cleanup
   br label %csi.cleanup89
 
-csi.cleanup89:                                    ; preds = %csi.cleanup89.csi-split, %csi.cleanup89.csi-split-lp
-  %lpad.phi98 = phi { i8*, i32 } [ %lpad.csi-split-lp96, %csi.cleanup89.csi-split-lp ], [ %lpad.csi-split97, %csi.cleanup89.csi-split ]
+csi.cleanup89:                                    ; preds = %csi.cleanup89.csi-split
+  %lpad.phi98 = phi { i8*, i32 } [ %lpad.csi-split97, %csi.cleanup89.csi-split ]
   invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %16, { i8*, i32 } %lpad.phi98)
           to label %csi.cleanup.unreachable unwind label %csi.cleanup.csi-split-lp
 
