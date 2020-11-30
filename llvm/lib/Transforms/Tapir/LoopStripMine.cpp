@@ -551,6 +551,13 @@ static void getEHContPredecessors(BasicBlock *BB, Task *T,
     if (T->encloses(Pred))
       Preds.push_back(Pred);
 
+  // If the unwind destination of the detach is the exceptional continuation BB,
+  // add the block that performs the detach and return.
+  if (DI->getUnwindDest() == BB) {
+    Preds.push_back(DI->getParent());
+    return;
+  }
+
   // Get the predecessor that comes from the unwind of the detach.
   BasicBlock *DetUnwind = DI->getUnwindDest();
   while (DetUnwind->getUniqueSuccessor() != BB)
@@ -560,82 +567,90 @@ static void getEHContPredecessors(BasicBlock *BB, Task *T,
 
 // Helper method to nest the exception-handling code of a task with exceptional
 // continuation EHCont within a new parent task.
-static BasicBlock *NestDetachUnwindPredecessors(BasicBlock *EHCont,
-                                                Value *EHContLPad,
-                                                ArrayRef<BasicBlock *> Preds,
-                                                BasicBlock *NewDetachBB,
-                                                const char *Suffix1,
-                                                const char *Suffix2,
-                                                LandingPadInst *OrigLPad,
-                                                Value *SyncReg, Module *M,
-                                                DominatorTree *DT, LoopInfo *LI,
-                                                MemorySSAUpdater *MSSAU,
-                                                bool PreserveLCSSA) {
-  // Split the given Task predecessors of EHCont, which are given in Preds.
-  BasicBlock *InnerUD = SplitBlockPredecessors(EHCont, Preds, Suffix1, DT, LI,
-                                               MSSAU, PreserveLCSSA);
-  // Split the NewDetachBB predecessor of EHCont.
-  BasicBlock *OuterUD = SplitBlockPredecessors(EHCont, {NewDetachBB}, Suffix2,
-                                               DT, LI, MSSAU, PreserveLCSSA);
+static BasicBlock *NestDetachUnwindPredecessors(
+    BasicBlock *EHCont, Value *EHContLPad, ArrayRef<BasicBlock *> Preds,
+    BasicBlock *NewDetachBB, const char *Suffix1, const char *Suffix2,
+    LandingPadInst *OrigLPad, Value *SyncReg, Module *M, DominatorTree *DT,
+    LoopInfo *LI, MemorySSAUpdater *MSSAU, bool PreserveLCSSA) {
+  BasicBlock *InnerUD, *OuterUD;
+  Value *InnerUDLPad;
+  Type *OrigLPadTy = OrigLPad->getType();
+  if (EHCont->isLandingPad()) {
+    SmallVector<BasicBlock *, 2> NewBBs;
+    SplitLandingPadPredecessors(EHCont, Preds, Suffix1, Suffix2, NewBBs, DT, LI,
+                                MSSAU, PreserveLCSSA);
+    InnerUD = NewBBs[0];
+    OuterUD = NewBBs[1];
+    InnerUDLPad = InnerUD->getLandingPadInst();
 
-  // Create a new landing pad for the outer detach by cloning the landing pad
-  // from the old detach-unwind destination.
-  Instruction *Clone = OrigLPad->clone();
-  Clone->setName(Twine("lpad") + Suffix2);
-  OuterUD->getInstList().insert(OuterUD->getFirstInsertionPt(), Clone);
+    // Remove InnerUD from the PHI nodes in EHCont.
+    for (PHINode &PN : EHCont->phis())
+      PN.removeIncomingValue(InnerUD);
+  } else {
+    // Split the given Task predecessors of EHCont, which are given in Preds.
+    InnerUD = SplitBlockPredecessors(EHCont, Preds, Suffix1, DT, LI, MSSAU,
+                                     PreserveLCSSA);
+    // Split the NewDetachBB predecessor of EHCont.
+    OuterUD = SplitBlockPredecessors(EHCont, {NewDetachBB}, Suffix2, DT, LI,
+                                     MSSAU, PreserveLCSSA);
 
-  // Update the PHI nodes in EHCont to accommodate OuterUD.  If the PHI node
-  // corresponds to the EHCont landingpad value, set its incoming value from
-  // OuterUD to be the new landingpad.  For all other PHI nodes, use the
-  // incoming value associated with InnerUD.
-  Value *OuterUDTmpVal = nullptr;
-  for (PHINode &PN : EHCont->phis()) {
-    if (&PN == EHContLPad) {
-      int OuterUDIdx = PN.getBasicBlockIndex(OuterUD);
-      OuterUDTmpVal = PN.getIncomingValue(OuterUDIdx);
-      PN.setIncomingValue(OuterUDIdx, Clone);
-    } else
-      PN.setIncomingValue(PN.getBasicBlockIndex(OuterUD),
-                          PN.getIncomingValueForBlock(InnerUD));
-  }
+    // Create a new landing pad for the outer detach by cloning the landing pad
+    // from the old detach-unwind destination.
+    Instruction *Clone = OrigLPad->clone();
+    Clone->setName(Twine("lpad") + Suffix2);
+    OuterUD->getInstList().insert(OuterUD->getFirstInsertionPt(), Clone);
 
-  if (Instruction *OuterUDTmpInst = dyn_cast<Instruction>(OuterUDTmpVal)) {
-    // Remove the temporary value for the new detach's unwind.
-    assert(OuterUDTmpInst->hasNUses(0) &&
-           "Unexpected uses of a detach-unwind temporary value.");
-    OuterUDTmpInst->eraseFromParent();
-  }
+    // Update the PHI nodes in EHCont to accommodate OuterUD.  If the PHI node
+    // corresponds to the EHCont landingpad value, set its incoming value from
+    // OuterUD to be the new landingpad.  For all other PHI nodes, use the
+    // incoming value associated with InnerUD.
+    Value *OuterUDTmpVal = nullptr;
+    for (PHINode &PN : EHCont->phis()) {
+      if (&PN == EHContLPad) {
+        int OuterUDIdx = PN.getBasicBlockIndex(OuterUD);
+        OuterUDTmpVal = PN.getIncomingValue(OuterUDIdx);
+        PN.setIncomingValue(OuterUDIdx, Clone);
+      } else
+        PN.setIncomingValue(PN.getBasicBlockIndex(OuterUD),
+                            PN.getIncomingValueForBlock(InnerUD));
+    }
 
-  // Remove InnerUD from the PHI nodes in EHCont.  Record the value of the
-  // EHCont landingpad that comes from InnerUD.
-  Value *InnerUDLPad = EHContLPad;
-  for (PHINode &PN : EHCont->phis()) {
-    if (&PN == EHContLPad)
-      InnerUDLPad = PN.getIncomingValueForBlock(InnerUD);
-    PN.removeIncomingValue(InnerUD);
+    if (Instruction *OuterUDTmpInst = dyn_cast<Instruction>(OuterUDTmpVal)) {
+      // Remove the temporary value for the new detach's unwind.
+      assert(OuterUDTmpInst->hasNUses(0) &&
+             "Unexpected uses of a detach-unwind temporary value.");
+      OuterUDTmpInst->eraseFromParent();
+    }
+
+    // Remove InnerUD from the PHI nodes in EHCont.  Record the value of the
+    // EHCont landingpad that comes from InnerUD.
+    InnerUDLPad = EHContLPad;
+    for (PHINode &PN : EHCont->phis()) {
+      if (&PN == EHContLPad)
+        InnerUDLPad = PN.getIncomingValueForBlock(InnerUD);
+      PN.removeIncomingValue(InnerUD);
+    }
   }
 
   // Replace the termination of InnerUD with a detached rethrow.  Start by
   // creating a block for the unreachable destination of the detached rethrow.
-  BasicBlock *NewUnreachable = SplitBlock(InnerUD, InnerUD->getTerminator(), DT,
-                                          LI);
+  BasicBlock *NewUnreachable =
+      SplitBlock(InnerUD, InnerUD->getTerminator(), DT, LI);
   NewUnreachable->setName(InnerUD->getName() + ".unreachable");
 
   // Insert a detached rethrow to the end of InnerUD.  NewUnreachable is the
   // normal destination of this detached rethrow, and OuterUD is the unwind
   // destination.
   ReplaceInstWithInst(
-          InnerUD->getTerminator(),
-          InvokeInst::Create(
-              Intrinsic::getDeclaration(
-                  M, Intrinsic::detached_rethrow, { OrigLPad->getType() }),
-              NewUnreachable, OuterUD, { SyncReg, InnerUDLPad }));
+      InnerUD->getTerminator(),
+      InvokeInst::Create(Intrinsic::getDeclaration(
+                             M, Intrinsic::detached_rethrow, {OrigLPadTy}),
+                         NewUnreachable, OuterUD, {SyncReg, InnerUDLPad}));
 
   // Terminate NewUnreachable with an unreachable.
   IRBuilder<> B(NewUnreachable->getTerminator());
   Instruction *UnreachableTerm = cast<Instruction>(B.CreateUnreachable());
-  UnreachableTerm->setDebugLoc(
-      NewUnreachable->getTerminator()->getDebugLoc());
+  UnreachableTerm->setDebugLoc(NewUnreachable->getTerminator()->getDebugLoc());
   NewUnreachable->getTerminator()->eraseFromParent();
 
   // Inform the dominator tree of the deleted edge
