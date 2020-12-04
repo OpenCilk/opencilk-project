@@ -876,7 +876,7 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
   }
 
   // Add Cilk attributes
-  if (D && (getLangOpts().getCilk() != LangOptions::Cilk_none)) {
+  if (D && getLangOpts().getCilk() != LangOptions::Cilk_none) {
     if (D->getAttr<StrandPureAttr>())
       Fn->setStrandPure();
     if (D->getAttr<StealableAttr>())
