@@ -914,7 +914,7 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
     Fn->addFnAttr("patchable-function", "prologue-short-redirect");
 
   // Add Cilk attributes
-  if (D && (getLangOpts().getCilk() != LangOptions::Cilk_none)) {
+  if (D && getLangOpts().getCilk() != LangOptions::Cilk_none) {
     if (D->getAttr<StrandPureAttr>())
       Fn->setStrandPure();
     if (D->getAttr<StealableAttr>())
