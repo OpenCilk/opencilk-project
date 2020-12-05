@@ -1213,7 +1213,7 @@ bool llvm::isNoAliasCall(const Value *V) {
   return false;
 }
 
-bool llvm::isNoAliasCallInSameSpindle(const Value *V) {
+bool llvm::isNoAliasCallIfInSameSpindle(const Value *V) {
   if (const auto *Call = dyn_cast<CallBase>(V))
     return Call->hasRetAttr(Attribute::StrandNoAlias);
   return isNoAliasCall(V);
@@ -1237,10 +1237,10 @@ bool llvm::isIdentifiedObject(const Value *V) {
   return false;
 }
 
-bool llvm::isIdentifiedObjectInSameSpindle(const Value *V) {
+bool llvm::isIdentifiedObjectIfInSameSpindle(const Value *V) {
   if (isIdentifiedObject(V))
     return true;
-  if (isNoAliasCallInSameSpindle(V))
+  if (isNoAliasCallIfInSameSpindle(V))
     return true;
   return false;
 }

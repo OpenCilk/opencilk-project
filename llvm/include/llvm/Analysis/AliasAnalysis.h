@@ -1188,7 +1188,7 @@ bool isNoAliasCall(const Value *V);
 /// Return true if this pointer is returned by a noalias function or, if one
 /// assumes the query pertains to operations in the same spindle, a
 /// strand_noalias function.
-bool isNoAliasCallInSameSpindle(const Value *V);
+bool isNoAliasCallIfInSameSpindle(const Value *V);
 
 /// Return true if this pointer refers to a distinct and identifiable object.
 /// This returns true for:
@@ -1205,7 +1205,7 @@ bool isIdentifiedObject(const Value *V);
 ///    Every value for which isIdentifiedObject(V) returns true
 ///    StrandNoAlias returns
 ///
-bool isIdentifiedObjectInSameSpindle(const Value *V);
+bool isIdentifiedObjectIfInSameSpindle(const Value *V);
 
 /// Return true if V is umabigously identified at the function-level.
 /// Different IdentifiedFunctionLocals can't alias.

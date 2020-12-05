@@ -1537,8 +1537,8 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
   if (O1 != O2) {
     // If V1/V2 point to two different objects, we know that we have no alias.
     if (AAQI.AssumeSameSpindle) {
-      if (isIdentifiedObjectInSameSpindle(O1) &&
-          isIdentifiedObjectInSameSpindle(O2))
+      if (isIdentifiedObjectIfInSameSpindle(O1) &&
+          isIdentifiedObjectIfInSameSpindle(O2))
         return NoAlias;
     } else {
       if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
