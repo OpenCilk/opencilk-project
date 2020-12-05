@@ -367,23 +367,29 @@ Function *llvm::CreateHelper(
       AttributeList::ReturnIndex,
       AttributeFuncs::typeIncompatible(NewFunc->getReturnType()));
 
-  // Remove any attributes in the caller invalidated by outlining.
+  // Update vector-related attributes in the caller and new function
   if (VectorArg && OldFunc->hasFnAttribute("min-legal-vector-width")) {
     uint64_t CallerVectorWidth;
     OldFunc->getFnAttribute("min-legal-vector-width")
         .getValueAsString()
         .getAsInteger(0, CallerVectorWidth);
-    if (std::numeric_limits<uint64_t>::max() == MaxVectorArgWidth)
+    if (std::numeric_limits<uint64_t>::max() == MaxVectorArgWidth) {
       // MaxVectorArgWidth is not a finite value.  Give up and remove the
       // min-legal-vector-width attribute, so OldFunc wil be treated
       // conservatively henceforth.
       OldFunc->removeFnAttr("min-legal-vector-width");
-    else if (MaxVectorArgWidth > CallerVectorWidth)
+      // Update the min-legal-vector-width in the new function as well
+      NewFunc->removeFnAttr("min-legal-vector-width");
+    } else if (MaxVectorArgWidth > CallerVectorWidth) {
       // If MaxVectorArgWidth is a finite value and larger than the
-      // min-legal-vector-width of OldFunc, then set the min-legal-vector-width
-      // of OldFunc to match MaxVectorArgWidth.
+      // min-legal-vector-width of OldFunc, then set the
+      // min-legal-vector-width of OldFunc to match MaxVectorArgWidth.
       OldFunc->addFnAttr("min-legal-vector-width",
                          llvm::utostr(MaxVectorArgWidth));
+      // Update the min-legal-vector-width in the new function
+      NewFunc->addFnAttr("min-legal-vector-width",
+                         llvm::utostr(MaxVectorArgWidth));
+    }
   }
 
   // Clone the metadata from the old function into the new.
