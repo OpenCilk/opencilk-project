@@ -156,14 +156,10 @@ cleanup:                                          ; preds = %pfor.cond.cleanup, 
 ; CHECK: <8 x i64> %{{.+}}, i32* %{{.+}})
 
 ; CHECK: define {{.*}}void @_Z14vectorlooptestPjll.outline_pfor.cond.strpm.outer.ls1(
-; CHECK: [[ATTRIBUTE2:#.+]] {
+; CHECK: [[ATTRIBUTE]] {
 
 ; CHECK: attributes [[ATTRIBUTE]] = {
 ; CHECK-NOT: "min-legal-vector-width"="0"
-; CHECK: }
-
-; CHECK: attributes [[ATTRIBUTE2]] = {
-; CHECK: "min-legal-vector-width"="0"
 ; CHECK: }
 
 
