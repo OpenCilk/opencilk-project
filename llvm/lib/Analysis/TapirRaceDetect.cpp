@@ -986,18 +986,19 @@ bool AccessPtrAnalysis::PointerCapturedBefore(const Value *Ptr,
                                               const Instruction *I,
                                               unsigned MaxUsesToExplore =
                                               MaxUsesToExploreCapture) const {
-  auto CaptureQuery = std::make_pair(Ptr, I);
+  const Value *StrippedPtr = Ptr->stripPointerCasts();
+  auto CaptureQuery = std::make_pair(StrippedPtr, I);
   if (MayBeCapturedCache.count(CaptureQuery))
     return MayBeCapturedCache[CaptureQuery];
 
   bool Result = false;
-  if (isa<GlobalValue>(Ptr))
+  if (isa<GlobalValue>(StrippedPtr))
     // We assume that globals are captured.
     //
     // TODO: Possibly refine this check for private or internal globals.
     Result = true;
   else
-    Result = PointerMayBeCapturedBefore(Ptr, false, false, I, &DT, true,
+    Result = PointerMayBeCapturedBefore(StrippedPtr, false, false, I, &DT, true,
                                         nullptr, MaxUsesToExplore);
   MayBeCapturedCache[CaptureQuery] = Result;
   return Result;
