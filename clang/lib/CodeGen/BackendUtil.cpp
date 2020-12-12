@@ -703,7 +703,8 @@ getInstrProfOptions(const CodeGenOptions &CodeGenOpts,
 
   // TODO: Surface the option to emit atomic profile counter increments at
   // the driver level.
-  Options.Atomic = LangOpts.Sanitize.has(SanitizerKind::Thread);
+  Options.Atomic = LangOpts.Sanitize.has(SanitizerKind::Thread) |
+                       (LangOpts.getCilk() != LangOptions::Cilk_none);
   return Options;
 }
 
