@@ -125,6 +125,9 @@ public:
     BinaryOperatorNE,
     // The preceding values are available since PGO_HASH_V2.
 
+    // Cilk statements.  These values are also available with PGO_HASH_V1.
+    CilkForStmt,
+
     // Keep this last.  It's for the static assert that follows.
     LastHashType
   };
@@ -266,6 +269,7 @@ struct MapRegionCounters : public RecursiveASTVisitor<MapRegionCounters> {
   DEFINE_NESTABLE_TRAVERSAL(ObjCForCollectionStmt)
   DEFINE_NESTABLE_TRAVERSAL(CXXTryStmt)
   DEFINE_NESTABLE_TRAVERSAL(CXXCatchStmt)
+  DEFINE_NESTABLE_TRAVERSAL(CilkForStmt)
 
   /// Get version \p HashVersion of the PGO hash for \p S.
   PGOHash::HashType getHashType(PGOHashVersion HashVersion, const Stmt *S) {
@@ -326,6 +330,8 @@ struct MapRegionCounters : public RecursiveASTVisitor<MapRegionCounters> {
       }
       break;
     }
+    case Stmt::CilkForStmtClass:
+      return PGOHash::CilkForStmt;
     }
 
     if (HashVersion >= PGO_HASH_V2) {
@@ -733,6 +739,53 @@ struct ComputeRegionCounts : public ConstStmtVisitor<ComputeRegionCounts> {
     CountMap[E->getRHS()] = RHSCount;
     Visit(E->getRHS());
     setCount(ParentCount + RHSCount - CurrentCount);
+    RecordNextStmtCount = true;
+  }
+
+  void VisitCilkForStmt(const CilkForStmt *S) {
+    RecordStmtCount(S);
+    if (S->getInit())
+      Visit(S->getInit());
+    if (S->getLimitStmt())
+      Visit(S->getLimitStmt());
+    if (S->getBeginStmt())
+      Visit(S->getBeginStmt());
+    if (S->getEndStmt())
+      Visit(S->getEndStmt());
+    if (S->getLoopVarDecl())
+      Visit(S->getLoopVarDecl());
+
+    uint64_t ParentCount = CurrentCount;
+
+    BreakContinueStack.push_back(BreakContinue());
+    // Visit the body region first. (This is basically the same as a while
+    // loop; see further comments in VisitWhileStmt.)
+    uint64_t BodyCount = setCount(PGO.getRegionCount(S));
+    CountMap[S->getBody()] = BodyCount;
+    Visit(S->getBody());
+    uint64_t BackedgeCount = CurrentCount;
+    BreakContinue BC = BreakContinueStack.pop_back_val();
+
+    // The increment is essentially part of the body but it needs to include
+    // the count for all the continue statements.
+    if (S->getInc()) {
+      uint64_t IncCount = setCount(BackedgeCount + BC.ContinueCount);
+      CountMap[S->getInc()] = IncCount;
+      Visit(S->getInc());
+    }
+
+    // ...then go back and propagate counts through the condition.
+    uint64_t CondCount =
+        setCount(ParentCount + BackedgeCount + BC.ContinueCount);
+    if (S->getInitCond()) {
+      CountMap[S->getInitCond()] = ParentCount;
+      Visit(S->getInitCond());
+    }
+    if (S->getCond()) {
+      CountMap[S->getCond()] = CondCount;
+      Visit(S->getCond());
+    }
+    setCount(BC.BreakCount + CondCount - BodyCount);
     RecordNextStmtCount = true;
   }
 };
