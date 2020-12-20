@@ -472,8 +472,13 @@ bool TapirToTargetImpl::run() {
   }
   }
 
+  // Quit early if there are no functions in this module to lower.
   if (WorkList.empty())
     return false;
+
+  // There are functions in this module to lower.  Prepare the module for Tapir
+  // lowering.
+  Target->prepareModule();
 
   bool Changed = false;
   while (!WorkList.empty()) {

@@ -1677,8 +1677,8 @@ struct LoopSpawningTI : public FunctionPass {
 
     LLVM_DEBUG(dbgs() << "LoopSpawningTI on function " << F.getName() << "\n");
     TapirTarget *Target = getTapirTargetFromID(M, TargetID);
-    bool Changed = LoopSpawningImpl(F, DT, LI, TI, SE, AC, TTI, Target,
-                                    ORE).run();
+    bool Changed =
+        LoopSpawningImpl(F, DT, LI, TI, SE, AC, TTI, Target, ORE).run();
     delete Target;
     return Changed;
   }
