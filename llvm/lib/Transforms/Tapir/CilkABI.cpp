@@ -110,7 +110,9 @@ void CilkABI::addHelperAttributes(Function &Helper) {
   Helper.setLinkage(GlobalValue::PrivateLinkage);
 }
 
-CilkABI::CilkABI(Module &M) : TapirTarget(M) {
+CilkABI::CilkABI(Module &M) : TapirTarget(M) {}
+
+void CilkABI::prepareModule() {
   LLVMContext &C = M.getContext();
   Type *VoidPtrTy = Type::getInt8PtrTy(C);
   Type *Int64Ty = Type::getInt64Ty(C);
@@ -1757,8 +1759,8 @@ static inline void inlineCilkFunctions(
 }
 
 void CilkABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                 bool OutliningTapirLoops) {
-  if (OutliningTapirLoops)
+                                 bool ProcessingTapirLoops) {
+  if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
 
@@ -1769,8 +1771,8 @@ void CilkABI::preProcessFunction(Function &F, TaskInfo &TI,
   }
 }
 
-void CilkABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  if (OutliningTapirLoops)
+void CilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
+  if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
 
@@ -1783,8 +1785,8 @@ void CilkABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
 
 void CilkABI::postProcessHelper(Function &F) {}
 
-LoopOutlineProcessor *CilkABI::getLoopOutlineProcessor(
-    const TapirLoopInfo *TL) const {
+LoopOutlineProcessor *
+CilkABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) const {
   if (UseRuntimeCilkFor)
     return new RuntimeCilkFor(M);
   return nullptr;
