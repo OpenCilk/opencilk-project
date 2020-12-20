@@ -1,5 +1,0 @@
-*.o
-# Logs from llvm crash dumps
-*.o-*
-*.S
-*.ll
