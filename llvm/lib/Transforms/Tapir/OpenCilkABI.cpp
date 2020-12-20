@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
@@ -24,38 +25,13 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Transforms/IPO/Internalize.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
-
-#include "llvm/Transforms/IPO/Internalize.h"
-
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Mangler.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Linker/Linker.h"
-#include "llvm/Object/ObjectFile.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
-#include "llvm/Transforms/IPO/Internalize.h"
-#include <stddef.h>
-#include <string.h>
-#include <map>
-#include <mutex>  // NOLINT(build/c++11): only using std::call_once, not mutex.
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
 
 using namespace llvm;
 
@@ -64,9 +40,12 @@ using namespace llvm;
 extern cl::opt<bool> DebugABICalls;
 extern cl::opt<bool> UseExternalABIFunctions;
 
-static cl::opt<bool> UseOpenCilkRuntimeBC("use-opencilk-runtime-bc", cl::init(false),
-    cl::desc("Use the bitcode file for opencilk runtime."), cl::Hidden);
-static cl::opt<std::string> OpenCilkRuntimeBCPath("opencilk-runtime-bc-path", cl::init(""),
+static cl::opt<bool>
+    UseOpenCilkRuntimeBC("use-opencilk-runtime-bc", cl::init(false),
+                         cl::desc("Use the bitcode file for opencilk runtime."),
+                         cl::Hidden);
+static cl::opt<std::string> OpenCilkRuntimeBCPath(
+    "opencilk-runtime-bc-path", cl::init(""),
     cl::desc("Path to the bitcode file for the opencilk runtime"), cl::Hidden);
 
 enum {
@@ -100,51 +79,49 @@ enum {
 
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
 
-OpenCilkABI::OpenCilkABI(Module &M)
-  : TapirTarget(M)
-{
+OpenCilkABI::OpenCilkABI(Module &M) : TapirTarget(M) {}
+
+void OpenCilkABI::prepareModule() {
   LLVMContext &C = M.getContext();
   Type *VoidPtrTy = Type::getInt8PtrTy(C);
   Type *Int32Ty = Type::getInt32Ty(C);
 
-  // NOTE(TFK): Removing the check for struct.__cilkrts_stack_frame in the conditional below 
-  //            can cause an infinite loop. I am unsure exactly why this infinite loop occurs.
-  //            However, I think it makes sense, independent of this "bug", to only link to 
-  //            the opencilk runtime bitcode once-per-module. Ideally, there is a more elegant
-  //            way to perform this check other than looking for a specific structure definition. 
-  if(UseOpenCilkRuntimeBC.getValue() && (M.getTypeByName("struct.__cilkrts_stack_frame") == nullptr ||
-     M.getTypeByName("struct.__cilkrts_stack_frame")->isOpaque())) {
-    llvm::errs() << "Using custom BC path \n"; 
-    llvm::SMDiagnostic smd;
+  if (UseOpenCilkRuntimeBC.getValue()) {
+    LLVM_DEBUG(dbgs() << "Using external bitcode for OpenCilk ABI.\n");
+    llvm::SMDiagnostic SMD;
 
-    // NOTE(TFK): The behavior I observe is that the invocation of llvm::parseIRFile 
-    //            imports global values like structure definitions into the current module
-    //            because it is using the current module's context "C".
-    //            llvm::parseIRFile, however, does not import function definitions (and
-    //            perhaps not even declarations?) into the module. Therefore, we need to
-    //            additionally run linkModules.
-    auto external_module = llvm::parseIRFile(OpenCilkRuntimeBCPath.getValue(), smd, C);
+    // Parse the bitcode file.  This call imports structure definitions, but not
+    // function definitions.
+    std::unique_ptr<Module> ExternalModule =
+        parseIRFile(OpenCilkRuntimeBCPath.getValue(), SMD, C);
 
-    // NOTE(TFK): This links the functions in external_module (the source) into the current module
-    //            M (the destination). Because the needed functions, such as cilkrts_enter_frame,
-    //            are not yet declared when OpenCilkABI is called we use llvm::Linker::Flags::None
-    //            so that all functions in external_module are imported.
-    //            Using llvm::Linker::Flags::LinkOnlyNeeded will not import the needed functions unless
-    //            we declare those functions in this module in advance of linking.
-    bool result = llvm::Linker::linkModules(M, std::move(external_module), llvm::Linker::Flags::None,
-    [](llvm::Module& M, const llvm::StringSet<>& GVS) {
-      llvm::errs() << "Linking with bitcode file at " << OpenCilkRuntimeBCPath << "\n";
-      llvm::internalizeModule(M, 
-          [&GVS](const llvm::GlobalValue& GV) {
+    // Strip any debug info from the external module.  For convenience, this
+    // Tapir target synthesizes some helper functions, like
+    // __cilk_parent_epilogue, that contain calls to these functions, but don't
+    // necessarily have debug info.  As a result, debug info in the external
+    // module causes failures during subsequent inlining.
+    StripDebugInfo(*ExternalModule);
+
+    // Link the external module into the current module, copying over global
+    // values.
+    //
+    // TODO: Consider restructuring the import process to use
+    // Linker::Flags::LinkOnlyNeeded to copy over only the necessary contents
+    // from the external module.
+    bool Fail = Linker::linkModules(
+        M, std::move(ExternalModule), Linker::Flags::None,
+        [](Module &M, const StringSet<> &GVS) {
+          LLVM_DEBUG(dbgs() << "Linking with bitcode file "
+                            << OpenCilkRuntimeBCPath << "\n");
+          internalizeModule(M, [&GVS](const GlobalValue &GV) {
             return !GV.hasName() || GVS.count(GV.getName()) == 0;
           });
-      // NOTE(TFK): This prints the functions that are imported into the current module.
-      for (auto x = GVS.keys().begin(); x != GVS.keys().end(); ++x) {
-        llvm::errs() << *x << "\n";
-      }
-    });
-    assert(!result && "An error occurred when linking to the opencilk runtime bitcode module.\n");
-    llvm::errs() << "After link  modules \n"; 
+          LLVM_DEBUG({
+            for (StringRef GVName : GVS.keys())
+              dbgs() << GVName << "\n";
+          });
+        });
+    assert(!Fail && "Failed to link OpenCilk runtime bitcode module.\n");
   }
 
   // Get or create local definitions of Cilk RTS structure types.
@@ -433,7 +410,7 @@ static Value *LoadSTyField(
   return L;
 }
 
-/// Emit inline assembly code to save the floating point state, for x86 Only.
+/// Emit inline assembly code to save the floating point state, for x86 only.
 void OpenCilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
   LLVMContext &C = B.getContext();
   if (StackFrameFieldMXCSR >= 0) {
@@ -1291,36 +1268,35 @@ void OpenCilkABI::InsertDetach(Function &F, Instruction *DetachPt) {
 }
 
 CallInst *OpenCilkABI::InsertStackFramePush(Function &F,
-                                         Instruction *TaskFrameCreate,
-                                         bool Helper) {
+                                            Instruction *TaskFrameCreate,
+                                            bool Helper) {
   AllocaInst *SF = cast<AllocaInst>(GetOrCreateCilkStackFrame(F));
 
   BasicBlock::iterator InsertPt = ++SF->getIterator();
-  IRBuilder<> IRB(&(F.getEntryBlock()), InsertPt);
+  IRBuilder<> B(&(F.getEntryBlock()), InsertPt);
   if (TaskFrameCreate)
-    IRB.SetInsertPoint(TaskFrameCreate);
+    B.SetInsertPoint(TaskFrameCreate);
 
-  Value *Args[1] = { SF };
+  Value *Args[1] = {SF};
   if (Helper)
-    return IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
+    return B.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
   else
-    return IRB.CreateCall(CILKRTS_FUNC(enter_frame), Args);
+    return B.CreateCall(CILKRTS_FUNC(enter_frame), Args);
 }
 
 void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
-                                   bool InsertPauseFrame, bool Helper) {
+                                      bool InsertPauseFrame, bool Helper) {
   Value *SF = GetOrCreateCilkStackFrame(F);
-  SmallPtrSet<ReturnInst*, 8> Returns;
-  SmallPtrSet<ResumeInst*, 8> Resumes;
+  SmallPtrSet<ReturnInst *, 8> Returns;
+  SmallPtrSet<ResumeInst *, 8> Resumes;
 
   // Add eh cleanup that returns control to the runtime
   EscapeEnumerator EE(F, "cilkrabi_cleanup", PromoteCallsToInvokes);
   while (IRBuilder<> *Builder = EE.Next()) {
-    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
+    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint()))
       Resumes.insert(RI);
-    } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint())) {
+    else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint()))
       Returns.insert(RI);
-    }
   }
 
   for (ReturnInst *RI : Returns) {
@@ -1333,15 +1309,15 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   }
   for (ResumeInst *RI : Resumes) {
     if (InsertPauseFrame) {
-      Value *Exn = ExtractValueInst::Create(RI->getValue(), { 0 }, "", RI);
+      Value *Exn = ExtractValueInst::Create(RI->getValue(), {0}, "", RI);
       CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
       // If throwing an exception, store the exception object and selector value
       // in the closure, call setjmp, and call pause_frame.
       CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
       // CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
-    // } else {
-    //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-    //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+      // } else {
+      //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
+      //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
     }
   }
 }
@@ -1356,7 +1332,7 @@ void OpenCilkABI::MarkSpawner(Function &F) {
     Function *Personality = cast<Function>(
         M.getOrInsertFunction("__cilk_personality_v0",
                               FunctionType::get(Type::getInt32Ty(C), true))
-        .getCallee());
+            .getCallee());
     F.setPersonalityFn(Personality);
   }
 
@@ -1411,7 +1387,7 @@ void OpenCilkABI::lowerSync(SyncInst &SI) {
   BasicBlock *SyncCont = SI.getSuccessor(0);
   BasicBlock *SyncUnwindDest = nullptr;
   if (InvokeInst *II =
-      dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
+          dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
     if (const Function *Called = II->getCalledFunction()) {
       if (Intrinsic::sync_unwind == Called->getIntrinsicID()) {
         SyncUnwind = II;
@@ -1425,14 +1401,14 @@ void OpenCilkABI::lowerSync(SyncInst &SI) {
   if (!SyncUnwindDest) {
     if (Fn.doesNotThrow())
       CB = CallInst::Create(GetCilkSyncNoThrowFn(), Args, "",
-                            /*insert before*/&SI);
+                            /*insert before*/ &SI);
     else
-      CB = CallInst::Create(GetCilkSyncFn(), Args, "", /*insert before*/&SI);
+      CB = CallInst::Create(GetCilkSyncFn(), Args, "", /*insert before*/ &SI);
 
     BranchInst::Create(SyncCont, CB->getParent());
   } else {
     CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, SyncUnwindDest, Args, "",
-                            /*insert before*/&SI);
+                            /*insert before*/ &SI);
     for (PHINode &PN : SyncCont->phis())
       PN.addIncoming(PN.getIncomingValueForBlock(SyncUnwind->getParent()),
                      SI.getParent());
@@ -1451,28 +1427,28 @@ void OpenCilkABI::lowerSync(SyncInst &SI) {
 }
 
 void OpenCilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                                      Instruction *TaskFrameCreate,
-                                      bool IsSpawner) {
+                                         Instruction *TaskFrameCreate,
+                                         bool IsSpawner) {
   // If the outlined task F itself performs spawns, set up F to support stealing
   // continuations.
   if (IsSpawner)
     MarkSpawner(F);
 
   CallInst *EnterFrame =
-      InsertStackFramePush(F, TaskFrameCreate, /*Helper*/false);
+      InsertStackFramePush(F, TaskFrameCreate, /*Helper*/ false);
   InsertDetach(F, (DetachPt ? DetachPt : &*(++EnterFrame->getIterator())));
 }
 
 void OpenCilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                                       Instruction *TaskFrameCreate,
-                                       bool IsSpawner) {
+                                          Instruction *TaskFrameCreate,
+                                          bool IsSpawner) {
   // Because F is a spawned task, we want to insert landingpads for all calls
   // that can throw, so we can pop the stackframe correctly if they do throw.
   // In particular, popping the stackframe of a spawned task may discover that
   // the parent was stolen, in which case we want to save the exception for
   // later reduction.
-  InsertStackFramePop(F, /*PromoteCallsToInvokes*/true,
-                      /*InsertPauseFrame*/true, /*Helper*/true);
+  InsertStackFramePop(F, /*PromoteCallsToInvokes*/ true,
+                      /*InsertPauseFrame*/ true, /*Helper*/ true);
 
   // TODO: If F is itself a spawner, see if we need to ensure that the Cilk
   // personality function does not pop an already-popped frame.  We might be
@@ -1560,8 +1536,8 @@ static inline void inlineCilkFunctions(
 }
 
 void OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                  bool OutliningTapirLoops) {
-  if (OutliningTapirLoops)
+                                     bool ProcessingTapirLoops) {
+  if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
 
@@ -1569,8 +1545,8 @@ void OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
     F.setName("cilk_main");
 }
 
-void OpenCilkABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  if (OutliningTapirLoops)
+void OpenCilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
+  if (ProcessingTapirLoops)
     // Don't do any postprocessing when outlining Tapir loops.
     return;
 
