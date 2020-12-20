@@ -92,6 +92,7 @@ class OpenCilkABI : public TapirTarget {
 public:
   OpenCilkABI(Module &M);
   ~OpenCilkABI() { DetachCtxToStackFrame.clear(); }
+  void prepareModule() override final;
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
 
@@ -101,9 +102,9 @@ public:
   void addHelperAttributes(Function &F) override final;
 
   void preProcessFunction(Function &F, TaskInfo &TI,
-                          bool OutliningTapirLoops) override final;
-  void postProcessFunction(Function &F, bool OutliningTapirLoops)
-    override final;
+                          bool ProcessingTapirLoops) override final;
+  void postProcessFunction(Function &F,
+                           bool ProcessingTapirLoops) override final;
   void postProcessHelper(Function &F) override final;
 
   void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
@@ -114,12 +115,12 @@ public:
                                bool IsSpawner) override final;
   void preProcessRootSpawner(Function &F) override final;
   void postProcessRootSpawner(Function &F) override final;
-  void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT)
-    override final;
+  void processSubTaskCall(TaskOutlineInfo &TOI,
+                          DominatorTree &DT) override final;
 
-  LoopOutlineProcessor *getLoopOutlineProcessor(const TapirLoopInfo *TL) const
-    override final;
+  LoopOutlineProcessor *
+  getLoopOutlineProcessor(const TapirLoopInfo *TL) const override final;
 };
-}  // end of llvm namespace
+} // namespace llvm
 
 #endif
