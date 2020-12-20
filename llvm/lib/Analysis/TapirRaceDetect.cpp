@@ -891,7 +891,7 @@ bool AccessPtrAnalysis::checkDependence(std::unique_ptr<Dependence> D,
   if (!I1Spindle->isSharedEH() && !I2Spindle->isSharedEH()) {
     if (!CommonLoop->contains(CommonTask->getEntry())) {
       const Loop *CommonTaskLoop = LI.getLoopFor(CommonTask->getEntry());
-      assert(!CommonTaskLoop || CommonTaskLoop->contains(CommonLoop) &&
+      assert((!CommonTaskLoop || CommonTaskLoop->contains(CommonLoop)) &&
              "Loop for common task does not contain common loop.");
       CommonLoop = CommonTaskLoop;
     }
@@ -1100,7 +1100,7 @@ bool AccessPtrAnalysis::checkOpaqueAccesses(GeneralAccess &GA1,
   if (!I1Spindle->isSharedEH() && !I2Spindle->isSharedEH()) {
     if (!CommonLoop->contains(CommonTask->getEntry())) {
       const Loop *CommonTaskLoop = LI.getLoopFor(CommonTask->getEntry());
-      assert(!CommonTaskLoop || CommonTaskLoop->contains(CommonLoop) &&
+      assert((!CommonTaskLoop || CommonTaskLoop->contains(CommonLoop)) &&
              "Loop for common task does not contain common loop.");
       CommonLoop = CommonTaskLoop;
     }
