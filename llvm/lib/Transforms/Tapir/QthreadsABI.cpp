@@ -301,8 +301,8 @@ void QthreadsABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 }
 
 void QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                     bool OutliningTapirLoops) {
-  if (OutliningTapirLoops)
+                                     bool ProcessingTapirLoops) {
+  if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
 
@@ -336,8 +336,8 @@ void QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
   }
 }
 
-void QthreadsABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  if (OutliningTapirLoops)
+void QthreadsABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
+  if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
 
