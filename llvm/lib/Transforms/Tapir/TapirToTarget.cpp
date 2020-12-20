@@ -301,7 +301,7 @@ bool TapirToTargetImpl::processRootTask(
 
     // Process each call to a subtask.
     for (Spindle *TF : TI.getRootTask()->taskframe_roots())
-      if (Task *SubT = TF->getTaskFromTaskFrame())
+      if (TF->getTaskFromTaskFrame())
         Target->processSubTaskCall(TFToOutline[TF], DT);
 
     Target->postProcessRootSpawner(F);
@@ -324,7 +324,7 @@ bool TapirToTargetImpl::processSpawnerTaskFrame(
 
   // Process each call to a subtask.
   for (Spindle *SubTF : TF->subtaskframes())
-    if (Task *SubT = SubTF->getTaskFromTaskFrame())
+    if (SubTF->getTaskFromTaskFrame())
       Target->processSubTaskCall(TFToOutline[SubTF], DT);
 
   Target->postProcessRootSpawner(F);
@@ -350,7 +350,7 @@ bool TapirToTargetImpl::processOutlinedTask(
                                  !T->isSerial());
   // Process each call to a subtask.
   for (Spindle *SubTF : TF->subtaskframes())
-    if (Task *SubT = SubTF->getTaskFromTaskFrame())
+    if (SubTF->getTaskFromTaskFrame())
       Target->processSubTaskCall(TFToOutline[SubTF], DT);
 
   Target->postProcessOutlinedTask(F, DetachPt, TaskFrameCreate,
