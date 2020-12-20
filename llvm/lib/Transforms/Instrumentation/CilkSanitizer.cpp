@@ -1484,7 +1484,7 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAnyMemIntrinsics(
   bool Result = false;
   for (Instruction *I : MemIntrinsics) {
     bool LocalResult = false;
-    if (auto *MT = dyn_cast<AnyMemTransferInst>(I)) {
+    if (isa<AnyMemTransferInst>(I)) {
       LocalResult |= CilkSanImpl.instrumentAnyMemIntrinAcc(I, /*Src*/ 1);
       LocalResult |= CilkSanImpl.instrumentAnyMemIntrinAcc(I, /*Dst*/ 0);
     } else {
