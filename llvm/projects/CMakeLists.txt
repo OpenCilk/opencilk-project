@@ -13,7 +13,8 @@ foreach(entry ${entries})
        (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/parallel-libs) AND
        (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/openmp) AND
        (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/debuginfo-tests) AND
-       (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/cheetah))
+       (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/cheetah) AND
+       (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/cilktools))
       get_filename_component(entry_name "${entry}" NAME)
       add_llvm_external_project(${entry_name})
     endif()
@@ -30,6 +31,7 @@ if(${LLVM_BUILD_RUNTIME})
   if(NOT MSVC OR LLVM_FORCE_BUILD_RUNTIME)
     # Add the projects in reverse order of their dependencies so that the
     # dependent projects can see the target names of their dependencies.
+    add_llvm_external_project(cilktools)
     add_llvm_external_project(cheetah)
     add_llvm_external_project(libunwind)
     add_llvm_external_project(pstl)
