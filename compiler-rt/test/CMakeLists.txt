@@ -105,9 +105,6 @@ if(COMPILER_RT_CAN_EXECUTE_TESTS)
   if(COMPILER_RT_BUILD_CRT)
     add_subdirectory(crt)
   endif()
-  if(COMPILER_RT_HAS_CSI)
-    add_subdirectory(csi)
-  endif()
   # ShadowCallStack does not yet provide a runtime with compiler-rt, the tests
   # include their own minimal runtime
   add_subdirectory(shadowcallstack)
