@@ -200,17 +200,20 @@ protected:
   Module &DestM;
 
   TapirTarget(Module &M, Module &DestM) : M(M), DestM(DestM) {}
+
 public:
   // Enumeration of ways arguments can be passed to outlined functions.
-  enum class ArgStructMode
-    {
-     None,   // Pass arguments directly.
-     Static, // Statically allocate a structure to store arguments.
-     Dynamic // Dynamically allocate a structure to store arguments.
-    };
+  enum class ArgStructMode {
+    None,   // Pass arguments directly.
+    Static, // Statically allocate a structure to store arguments.
+    Dynamic // Dynamically allocate a structure to store arguments.
+  };
 
   TapirTarget(Module &M) : M(M), DestM(M) {}
   virtual ~TapirTarget() {}
+
+  // Prepare the module for final Tapir lowering.
+  virtual void prepareModule() {}
 
   /// Lower a call to the tapir.loop.grainsize intrinsic into a grainsize
   /// (coarsening) value.
@@ -235,7 +238,7 @@ public:
   /// Process Function F before any function outlining is performed.  This
   /// routine should not modify the CFG structure.
   virtual void preProcessFunction(Function &F, TaskInfo &TI,
-                                  bool OutliningTapirLoops = false) = 0;
+                                  bool ProcessingTapirLoops = false) = 0;
 
   /// Returns an ArgStructMode enum value describing how inputs to a task should
   /// be passed to the task, e.g., directly as arguments to the outlined
@@ -279,15 +282,15 @@ public:
 
   // Process Function F at the end of the lowering process.
   virtual void postProcessFunction(Function &F,
-                                   bool OutliningTapirLoops = false) = 0;
+                                   bool ProcessingTapirLoops = false) = 0;
 
   // Process a generated helper Function F produced via outlining, at the end of
   // the lowering process.
   virtual void postProcessHelper(Function &F) = 0;
 
   // Get the LoopOutlineProcessor associated with this Tapir target.
-  virtual LoopOutlineProcessor *getLoopOutlineProcessor(
-      const TapirLoopInfo *TL) const {
+  virtual LoopOutlineProcessor *
+  getLoopOutlineProcessor(const TapirLoopInfo *TL) const {
     return nullptr;
   }
 };

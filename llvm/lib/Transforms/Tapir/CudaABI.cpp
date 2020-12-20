@@ -43,33 +43,25 @@ void CudaABI::lowerSync(SyncInst &SI) {
 }
 
 void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                 bool OutliningTapirLoops) {
-}
+                                 bool ProcessingTapirLoops) {}
 
-void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-}
+void CudaABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {}
 
-void CudaABI::postProcessHelper(Function &F) {
-}
+void CudaABI::postProcessHelper(Function &F) {}
 
 void CudaABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                      Instruction *TaskFrameCreate,
-                                     bool IsSpawner) {
-}
+                                     bool IsSpawner) {}
 
 void CudaABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                       Instruction *TaskFrameCreate,
-                                      bool IsSpawner) {
-}
+                                      bool IsSpawner) {}
 
-void CudaABI::preProcessRootSpawner(Function &F) {
-}
+void CudaABI::preProcessRootSpawner(Function &F) {}
 
-void CudaABI::postProcessRootSpawner(Function &F) {
-}
+void CudaABI::postProcessRootSpawner(Function &F) {}
 
-void CudaABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
-}
+void CudaABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {}
 
 LoopOutlineProcessor *CudaABI::getLoopOutlineProcessor(
     const TapirLoopInfo *TL) const {
