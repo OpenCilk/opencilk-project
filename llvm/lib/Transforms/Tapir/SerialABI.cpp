@@ -1,9 +1,8 @@
 //===- SerialABI.cpp - Replace Tapir with serial projection ---------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -34,8 +33,8 @@ void SerialABI::lowerSync(SyncInst &SI) {
 }
 
 void SerialABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                   bool OutliningTapirLoops) {
-  if (OutliningTapirLoops)
+                                   bool ProcessingTapirLoops) {
+  if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
 
