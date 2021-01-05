@@ -399,9 +399,9 @@ static void ConnectEpilog(TapirLoopInfo &TL, Value *EpilStartIter,
 static Loop *
 CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
                 const bool UseEpilogRemainder, const bool UnrollRemainder,
-                BasicBlock *InsertTop,
-                BasicBlock *InsertBot, BasicBlock *Preheader,
-                std::vector<BasicBlock *> &NewBlocks, LoopBlocksDFS &LoopBlocks,
+                BasicBlock *InsertTop, BasicBlock *InsertBot,
+                BasicBlock *Preheader, std::vector<BasicBlock *> &NewBlocks,
+                LoopBlocksDFS &LoopBlocks,
                 std::vector<BasicBlock *> &ExtraTaskBlocks,
                 ValueToValueMapTy &VMap, DominatorTree *DT, LoopInfo *LI) {
   StringRef suffix = UseEpilogRemainder ? "epil" : "prol";
@@ -851,6 +851,8 @@ Loop *llvm::StripMineLoop(
     // the number of iterations that remain to be run in the original loop is a
     // multiple Count == (1 << Log2(Count)) because Log2(Count) <= BEWidth (we
     // explicitly check this above).
+    if (TL.isInclusiveRange())
+      ModVal = B.CreateAdd(ModVal, ConstantInt::get(ModVal->getType(), 1));
   } else {
     // As (BECount + 1) can potentially unsigned overflow we count
     // (BECount % Count) + 1 which is overflow safe as BECount % Count < Count.
@@ -865,9 +867,9 @@ Loop *llvm::StripMineLoop(
                           ConstantInt::get(BECount->getType(), Count),
                           "xtraiter");
   }
-  Value *BranchVal = B.CreateICmpULT(BECount,
-                                     ConstantInt::get(BECount->getType(),
-                                                      Count - 1));
+  Value *BranchVal = B.CreateICmpULT(
+      BECount, ConstantInt::get(BECount->getType(),
+                                TL.isInclusiveRange() ? Count : Count - 1));
   BasicBlock *RemainderLoopBB = NewExit;
   BasicBlock *StripminedLoopBB = NewPreheader;
   // Branch to either remainder (extra iterations) loop or stripmined loop.
@@ -932,10 +934,10 @@ Loop *llvm::StripMineLoop(
   // iterations. This function adds the appropriate CFG connections.
   BasicBlock *InsertBot = LatchExit;
   BasicBlock *InsertTop = EpilogPreheader;
-  *RemainderLoop = CloneLoopBlocks(
-      L, ModVal, CreateRemainderLoop, true, UnrollRemainder,
-      InsertTop, InsertBot,
-      NewPreheader, NewBlocks, LoopBlocks, ExtraTaskBlocks, VMap, DT, LI);
+  *RemainderLoop =
+      CloneLoopBlocks(L, ModVal, CreateRemainderLoop, true, UnrollRemainder,
+                      InsertTop, InsertBot, NewPreheader, NewBlocks, LoopBlocks,
+                      ExtraTaskBlocks, VMap, DT, LI);
 
   // Insert the cloned blocks into the function.
   F->getBasicBlockList().splice(InsertBot->getIterator(),
