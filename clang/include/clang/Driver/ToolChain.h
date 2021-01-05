@@ -607,6 +607,11 @@ public:
   /// program devirtualization and CFI santiizers.
   virtual bool canSplitThinLTOUnit() const { return true; }
 
+  /// AddOpenCilkBitcodeABI - Add compiler arguments for linking against the
+  /// OpenCilk runtime ABI bitcode file.
+  virtual void AddOpenCilkBitcodeABI(const llvm::opt::ArgList &Args,
+                                     llvm::opt::ArgStringList &CmdArgs) const;
+
   /// AddTapirRuntimeLibArgs - Add the specific linker arguments to use for the
   /// given Tapir runtime library type.
   virtual void AddTapirRuntimeLibArgs(const llvm::opt::ArgList &Args,
