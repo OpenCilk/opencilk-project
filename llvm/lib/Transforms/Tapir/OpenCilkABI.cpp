@@ -41,7 +41,7 @@ extern cl::opt<bool> DebugABICalls;
 extern cl::opt<bool> UseExternalABIFunctions;
 
 static cl::opt<bool>
-    UseOpenCilkRuntimeBC("use-opencilk-runtime-bc", cl::init(false),
+    UseOpenCilkRuntimeBC("use-opencilk-runtime-bc", cl::init(true),
                          cl::desc("Use the bitcode file for opencilk runtime."),
                          cl::Hidden);
 static cl::opt<std::string> OpenCilkRuntimeBCPath(
