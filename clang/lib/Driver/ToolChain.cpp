@@ -1329,6 +1329,20 @@ static void addRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
   }
 }
 
+void ToolChain::AddOpenCilkBitcodeABI(const ArgList &Args,
+                                      ArgStringList &CmdArgs) const {
+  if (auto RuntimePath = getRuntimePath()) {
+    SmallString<128> P;
+    P.assign(*RuntimePath);
+    llvm::sys::path::append(P, "libopencilk-abi.bc");
+    if (getVFS().exists(P)) {
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back(Args.MakeArgString(("-opencilk-runtime-bc-path=" +
+                                            P)));
+    }
+  }
+}
+
 void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                                        ArgStringList &CmdArgs) const {
   TapirTargetID TapirTarget = parseTapirTarget(Args);
