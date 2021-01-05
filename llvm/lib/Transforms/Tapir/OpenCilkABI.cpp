@@ -1541,8 +1541,6 @@ void OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
     // Don't do any preprocessing when outlining Tapir loops.
     return;
 
-  if (F.getName() == "main")
-    F.setName("cilk_main");
 }
 
 void OpenCilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
