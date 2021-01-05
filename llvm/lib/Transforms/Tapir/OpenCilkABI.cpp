@@ -1435,7 +1435,7 @@ void OpenCilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
     MarkSpawner(F);
 
   CallInst *EnterFrame =
-      InsertStackFramePush(F, TaskFrameCreate, /*Helper*/ false);
+      InsertStackFramePush(F, TaskFrameCreate, /*Helper*/ true);
   InsertDetach(F, (DetachPt ? DetachPt : &*(++EnterFrame->getIterator())));
 }
 
