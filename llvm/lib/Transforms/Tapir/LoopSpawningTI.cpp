@@ -995,6 +995,9 @@ void LoopSpawningImpl::getTapirLoopTaskBlocks(
             ReattachBlocks.insert(B);
           if (isDetachedRethrow(B->getTerminator()))
             DetachedRethrowBlocks.insert(B);
+          if (isTaskFrameResume(B->getTerminator()))
+            UnreachableExits.insert(
+                cast<InvokeInst>(B->getTerminator())->getNormalDest());
         } else if (isDetachedRethrow(B->getTerminator()) ||
                    isTaskFrameResume(B->getTerminator())) {
           UnreachableExits.insert(
