@@ -1,7 +1,7 @@
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -functionattrs -tapir2target -S -o - | FileCheck %s
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -functionattrs -tapir2target -always-inline -S -o - | FileCheck %s
-; RUN: opt < %s -passes="loop-spawning,function(simplify-cfg),cgscc(function-attrs),tapir2target" -S -o - | FileCheck %s
-; RUN: opt < %s -passes="loop-spawning,function(simplify-cfg),cgscc(function-attrs),tapir2target,always-inline" -S -o - | FileCheck %s
+; RUN: opt < %s -loop-spawning-ti -simplifycfg -functionattrs -tapir2target -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
+; RUN: opt < %s -loop-spawning-ti -simplifycfg -functionattrs -tapir2target -always-inline -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
+; RUN: opt < %s -passes="loop-spawning,function(simplify-cfg),cgscc(function-attrs),tapir2target" -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
+; RUN: opt < %s -passes="loop-spawning,function(simplify-cfg),cgscc(function-attrs),tapir2target,always-inline" -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
