@@ -108,6 +108,13 @@ public:
   const SCEV *getBackedgeTakenCount(PredicatedScalarEvolution &PSE) const;
   const SCEV *getExitCount(const SCEV *BackedgeTakenCount,
                            PredicatedScalarEvolution &PSE) const;
+  // Return a non-overflowing value representing the trip count.  For the
+  // typical case of a loop over a non-inclusive range (e.g., i \in [0,n),
+  // excluding n), this value is the backedge count plus 1.  But to avoid
+  // overflow conditions, for a loop over an inclusive range (e.g., i \in [0,n],
+  // including n), this value is simply the backedge count.  Passes are expected
+  // to use isInclusiveRange() to determine when they need to handle loops over
+  // inclusive ranges as a special case.
   Value *getOrCreateTripCount(PredicatedScalarEvolution &PSE,
                               const char *PassName,
                               OptimizationRemarkEmitter *ORE);
