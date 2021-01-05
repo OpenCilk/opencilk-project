@@ -2,15 +2,15 @@
 ; functions that can be stolen with the "stealable" attribute.
 ;
 ; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=cilk -simplifycfg -instcombine -S | FileCheck %s --check-prefix=LOWERING
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=opencilk -simplifycfg -instcombine -S | FileCheck %s --check-prefix=LOWERING
-; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg,instcombine),tapir2target,function(simplify-cfg,instcombine)' -tapir-target=opencilk -instcombine -S | FileCheck %s --check-prefix=LOWERING
+; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -simplifycfg -instcombine -S | FileCheck %s --check-prefix=LOWERING
+; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg,instcombine),tapir2target,function(simplify-cfg,instcombine)' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -instcombine -S | FileCheck %s --check-prefix=LOWERING
 ;
 ; Check that the X86 assembly produced for stealable functions does
 ; not index stack variables using %rsp.
 ;
 ; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=cilk -simplifycfg -instcombine | llc -O3 -mtriple=x86_64-unknown-linux-gnu | FileCheck %s --check-prefix=ASM
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=opencilk -simplifycfg -instcombine | llc -O3 -mtriple=x86_64-unknown-linux-gnu | FileCheck %s --check-prefix=ASM
-; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg,instcombine),tapir2target,function(simplify-cfg,instcombine)' -tapir-target=opencilk | llc -O3 -mtriple=x86_64-unknown-linux-gnu | FileCheck %s --check-prefix=ASM
+; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -simplifycfg -instcombine | llc -O3 -mtriple=x86_64-unknown-linux-gnu | FileCheck %s --check-prefix=ASM
+; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg,instcombine),tapir2target,function(simplify-cfg,instcombine)' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc | llc -O3 -mtriple=x86_64-unknown-linux-gnu | FileCheck %s --check-prefix=ASM
 
 %class._point3d = type { double, double, double }
 %struct.vertex.29 = type { i32, %class._point3d, [1 x %struct.vertex.29*] }
