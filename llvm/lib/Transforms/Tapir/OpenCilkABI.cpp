@@ -25,7 +25,6 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Transforms/IPO/Internalize.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -40,13 +39,13 @@ using namespace llvm;
 extern cl::opt<bool> DebugABICalls;
 extern cl::opt<bool> UseExternalABIFunctions;
 
-static cl::opt<bool>
-    UseOpenCilkRuntimeBC("use-opencilk-runtime-bc", cl::init(true),
-                         cl::desc("Use the bitcode file for opencilk runtime."),
-                         cl::Hidden);
+static cl::opt<bool> UseOpenCilkRuntimeBC(
+    "use-opencilk-runtime-bc", cl::init(true),
+    cl::desc("Use a bitcode file for the OpenCilk runtime ABI"), cl::Hidden);
 static cl::opt<std::string> OpenCilkRuntimeBCPath(
     "opencilk-runtime-bc-path", cl::init(""),
-    cl::desc("Path to the bitcode file for the opencilk runtime"), cl::Hidden);
+    cl::desc("Path to the bitcode file for the OpenCilk runtime ABI"),
+    cl::Hidden);
 
 enum {
   __CILKRTS_ABI_VERSION_OPENCILK = 3
@@ -86,9 +85,12 @@ void OpenCilkABI::prepareModule() {
   Type *VoidPtrTy = Type::getInt8PtrTy(C);
   Type *Int32Ty = Type::getInt32Ty(C);
 
-  if (UseOpenCilkRuntimeBC.getValue()) {
-    LLVM_DEBUG(dbgs() << "Using external bitcode for OpenCilk ABI.\n");
-    llvm::SMDiagnostic SMD;
+  if (UseOpenCilkRuntimeBC) {
+    assert("" != OpenCilkRuntimeBCPath &&
+           "Missing path to OpenCilk runtime bitcode file.");
+    LLVM_DEBUG(dbgs() << "Using external bitcode file for OpenCilk ABI: "
+                      << OpenCilkRuntimeBCPath << "\n");
+    SMDiagnostic SMD;
 
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
@@ -108,19 +110,15 @@ void OpenCilkABI::prepareModule() {
     // TODO: Consider restructuring the import process to use
     // Linker::Flags::LinkOnlyNeeded to copy over only the necessary contents
     // from the external module.
-    bool Fail = Linker::linkModules(
-        M, std::move(ExternalModule), Linker::Flags::None,
-        [](Module &M, const StringSet<> &GVS) {
-          LLVM_DEBUG(dbgs() << "Linking with bitcode file "
-                            << OpenCilkRuntimeBCPath << "\n");
-          internalizeModule(M, [&GVS](const GlobalValue &GV) {
-            return !GV.hasName() || GVS.count(GV.getName()) == 0;
-          });
-          LLVM_DEBUG({
-            for (StringRef GVName : GVS.keys())
-              dbgs() << GVName << "\n";
-          });
-        });
+    bool Fail =
+        Linker::linkModules(M, std::move(ExternalModule), Linker::Flags::None,
+                            [](Module &M, const StringSet<> &GVS) {
+                              LLVM_DEBUG({
+                                for (StringRef GVName : GVS.keys())
+                                  dbgs() << "Linking global value " << GVName
+                                         << "\n";
+                              });
+                            });
     assert(!Fail && "Failed to link OpenCilk runtime bitcode module.\n");
   }
 
