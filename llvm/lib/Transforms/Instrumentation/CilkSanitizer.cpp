@@ -3339,6 +3339,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
       : cast<LoadInst>(I)->getAlignment();
   CsiLoadStoreProperty Prop;
   Prop.setAlignment(Alignment);
+  Prop.setIsAtomic(I->isAtomic());
   if (IsWrite) {
     // Instrument store
     uint64_t LocalId = StoreFED.add(*I);
@@ -3393,6 +3394,7 @@ bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
   if (!(InstrumentationSet & SHADOWMEMORY))
     return true;
 
+  Prop.setIsAtomic(true);
   uint64_t LocalId = StoreFED.add(*I);
   uint64_t StoreObjId = StoreObj.add(*I, lookupUnderlyingObject(Addr));
   assert(LocalId == StoreObjId &&
