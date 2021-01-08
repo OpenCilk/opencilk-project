@@ -1038,15 +1038,12 @@ bool AccessPtrAnalysis::checkOpaqueAccesses(GeneralAccess &GA1,
   // Get information about the non-opaque access.
   const Value *Ptr;
   Instruction *NonOpaque;
-  bool IsWrite;
   if (GA1.Loc) {
     Ptr = GA1.getPtr();
     NonOpaque = GA1.I;
-    IsWrite = GA1.isMod();
   } else { // GA2.Loc
     Ptr = GA2.getPtr();
     NonOpaque = GA2.I;
-    IsWrite = GA2.isMod();
   }
 
   // One access is opaque, while the other has a pointer.  For the opaque access
@@ -1135,62 +1132,9 @@ bool AccessPtrAnalysis::checkOpaqueAccesses(GeneralAccess &GA1,
     return false;
   }
 
-  // Get the whole loop stack to check above the common loop.
-  SmallVector<const Loop *, 4> LoopsToCheck;
-  const Loop *CurrLoop = CommonLoop;
-  while (CurrLoop) {
-    LoopsToCheck.push_back(CurrLoop);
-    CurrLoop = CurrLoop->getParentLoop();
-  }
-
-  // Check the loop stack from the top down until a loop is found where the
-  // dependence might cross parallel tasks.
-  unsigned MinLoopDepthToCheck = 1;
-  while (!LoopsToCheck.empty()) {
-    const Loop *CurrLoop = LoopsToCheck.pop_back_val();
-    // If we're not yet at the minimum loop depth of the underlying object, go
-    // deeper.
-    if (MinLoopDepthToCheck < MinObjDepth) {
-      ++MinLoopDepthToCheck;
-      continue;
-    }
-
-    // Check the maybe-parallel tasks for the spindle containing the loop
-    // header.
-    const Spindle *CurrSpindle = TI.getSpindleFor(CurrLoop->getHeader());
-    bool MPTEnclosesDst = false;
-    for (const Task *MPT : MPTasks.TaskList[CurrSpindle]) {
-      if (TI.encloses(MPT, B2)) {
-        MPTEnclosesDst = true;
-        break;
-      }
-    }
-
-    // If Dst is found in a maybe-parallel task, then the minimum loop depth has
-    // been found.
-    if (MPTEnclosesDst)
-      break;
-    // Otherwise go deeper.
-    ++MinLoopDepthToCheck;
-  }
-
   // The opaque access acts like a dependence across all iterations of any loops
   // containing the accesses.
   return true;
-
-  // if (const CallBase *Call1 = dyn_cast<CallBase>(GA1.I))
-  //   if (const CallBase *Call2 = dyn_cast<CallBase>(GA2.I))
-  //     return isModSet(AA->getModRefInfo(Call1, Call2));
-
-  // assert((GA1.Loc || GA2.Loc) &&
-  //        "Non-call general accesses lack memory locations.");
-
-  // // TODO: Fix this.  When one instruction is an ordinary load or store, it may
-  // // appear to opaquely access a GA with no pointer, when in fact its accessing
-  // // the pointer argument in a non-racing manner.
-  // if (GA1.Loc)
-  //   return isModSet(AA->getModRefInfo(GA2.I, GA1.Loc));
-  // return isModSet(AA->getModRefInfo(GA1.I, GA2.Loc));
 }
 
 static void setObjectMRForRace(RaceInfo::ObjectMRTy &ObjectMRForRace,
