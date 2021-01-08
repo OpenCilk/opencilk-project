@@ -408,22 +408,6 @@ static Value *LoadSTyField(
   return L;
 }
 
-/// Emit inline assembly code to save the floating point state, for x86 only.
-void OpenCilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
-  LLVMContext &C = B.getContext();
-  if (StackFrameFieldMXCSR >= 0) {
-    FunctionType *FTy =
-      FunctionType::get(Type::getVoidTy(C),
-			{PointerType::getUnqual(Type::getInt32Ty(C))},
-			false);
-    Value *Asm = InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
-    Value *Args[1] = {
-      GEP(B, SF, StackFrameFieldMXCSR),
-    };
-    B.CreateCall(Asm, Args);
-  }
-}
-
 /// Helper to find a function with the given name, creating it if it doesn't
 /// already exist. Returns false if the function was inserted, indicating that
 /// the body of the function has yet to be defined.
@@ -446,9 +430,7 @@ CallInst *OpenCilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   LLVMContext &Ctx = M.getContext();
 
   // We always want to save the floating point state too
-  Triple T(M.getTargetTriple());
-  if (T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64)
-    EmitSaveFloatingPointState(B, SF);
+  B.CreateCall(CILKRTS_FUNC(save_fp_ctrl_state), SF);
 
   Type *Int32Ty = Type::getInt32Ty(Ctx);
   Type *Int8PtrTy = Type::getInt8PtrTy(Ctx);
@@ -579,6 +561,7 @@ Function *OpenCilkABI::Get__cilkrts_detach() {
     Fn->setDoesNotThrow();
     if (!DebugABICalls && !UseExternalABIFunctions)
       Fn->addFnAttr(Attribute::AlwaysInline);
+    return Fn;
   }
 
   // Create the body of __cilkrts_detach.
@@ -635,6 +618,43 @@ Function *OpenCilkABI::Get__cilkrts_detach() {
   Fn->setDoesNotThrow();
   if (!DebugABICalls && !UseExternalABIFunctions)
     Fn->addFnAttr(Attribute::AlwaysInline);
+
+  return Fn;
+}
+
+// Call system-dependent function to save floating-point state
+Function *OpenCilkABI::Get__cilkrts_save_fp_ctrl_state() {
+  LLVMContext &Ctx = M.getContext();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  Function *Fn = nullptr;
+  if (GetOrCreateFunction(M, "__cilkrts_save_fp_ctrl_state",
+                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
+                          Fn)) {
+    Fn->setLinkage(Function::AvailableExternallyLinkage);
+    Fn->setDoesNotThrow();
+    if (!DebugABICalls && !UseExternalABIFunctions)
+      Fn->addFnAttr(Attribute::AlwaysInline);
+    return Fn;
+  }
+
+  Function::arg_iterator Args = Fn->arg_begin();
+  Value *SF = &*Args;
+
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
+  IRBuilder<> B(Entry);
+
+  if (StackFrameFieldMXCSR >= 0) {
+    FunctionType *FTy = FunctionType::get(
+        VoidTy, {PointerType::getUnqual(Type::getInt32Ty(Ctx))}, false);
+    Value *Asm = InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
+    Value *Args[1] = {
+        GEP(B, SF, StackFrameFieldMXCSR),
+    };
+    B.CreateCall(Asm, Args);
+  }
+
+  B.CreateRetVoid();
 
   return Fn;
 }
@@ -959,7 +979,7 @@ Function *OpenCilkABI::Get__cilkrts_enter_frame() {
       Fn->addFnAttr(Attribute::AlwaysInline);
     return Fn;
   }
-  //assert(false && "We should've used the existing enter_frame function here...\n");
+
   // Create the body of __cilkrts_enter_frame.
   const DataLayout &DL = M.getDataLayout();
 

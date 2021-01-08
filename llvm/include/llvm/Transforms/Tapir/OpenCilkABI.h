@@ -65,6 +65,7 @@ class OpenCilkABI : public TapirTarget {
   Function *Get__cilkrts_enter_frame();
   Function *Get__cilkrts_enter_frame_fast();
   Function *Get__cilkrts_detach();
+  Function *Get__cilkrts_save_fp_ctrl_state();
   Function *Get__cilkrts_pop_frame();
 
   // Helper functions for implementing the Cilk ABI protocol
@@ -72,7 +73,6 @@ class OpenCilkABI : public TapirTarget {
   Function *GetCilkSyncNoThrowFn();
   Function *GetCilkPauseFrameFn();
   Function *GetCilkParentEpilogueFn();
-  void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
 
   AllocaInst *CreateStackFrame(Function &F);
   Value *GetOrCreateCilkStackFrame(Function &F);
