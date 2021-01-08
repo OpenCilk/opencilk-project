@@ -803,6 +803,7 @@ public:
                         IntegerType::get(C, PropBits.IsConstant),
                         IntegerType::get(C, PropBits.IsOnStack),
                         IntegerType::get(C, PropBits.MayBeCaptured),
+                        IntegerType::get(C, PropBits.IsAtomic),
                         IntegerType::get(C, PropBits.LoadReadBeforeWriteInBB),
                         IntegerType::get(C, PropBits.Padding)));
   }
@@ -844,6 +845,8 @@ public:
   void setIsOnStack(bool v) { PropValue.Fields.IsOnStack = v; }
   /// Set the value of the MayBeCaptured property.
   void setMayBeCaptured(bool v) { PropValue.Fields.MayBeCaptured = v; }
+  /// Set the value of the IsAtomic property.
+  void setIsAtomic(bool v) { PropValue.Fields.IsAtomic = v; }
   /// Set the value of the LoadReadBeforeWriteInBB property.
   void setLoadReadBeforeWriteInBB(bool v) {
     PropValue.Fields.LoadReadBeforeWriteInBB = v;
@@ -858,8 +861,9 @@ private:
       unsigned IsConstant : 1;
       unsigned IsOnStack : 1;
       unsigned MayBeCaptured : 1;
+      unsigned IsAtomic : 1;
       unsigned LoadReadBeforeWriteInBB : 1;
-      uint64_t Padding : 53;
+      uint64_t Padding : 50;
     } Fields;
     uint64_t Bits;
   } Property;
@@ -873,13 +877,14 @@ private:
     int IsConstant;
     int IsOnStack;
     int MayBeCaptured;
+    int IsAtomic;
     int LoadReadBeforeWriteInBB;
     int Padding;
   } PropertyBits;
 
   /// The number of bits representing each property.
   static constexpr PropertyBits PropBits = {
-      8, 1, 1, 1, 1, 1, (64 - 8 - 1 - 1 - 1 - 1 - 1)};
+      8, 1, 1, 1, 1, 1, 1, (64 - 8 - 1 - 1 - 1 - 1 - 1 - 1)};
 };
 
 class CsiAllocaProperty : public CsiProperty {
