@@ -132,6 +132,7 @@ static cl::opt<unsigned> InstrumentationSet(
 static const unsigned SERIESPARALLEL = 0x1;
 static const unsigned SHADOWMEMORY = 0x2;
 
+static const char *const CsanRtUnitInitName = "__csanrt_unit_init";
 static const char *const CsiUnitObjTableName = "__csi_unit_obj_table";
 static const char *const CsiUnitObjTableArrayName = "__csi_unit_obj_tables";
 
@@ -776,15 +777,16 @@ CallInst *CilkSanitizerImpl::createRTUnitInitCall(IRBuilder<> &IRB) {
   StructType *UnitObjTableType =
       getUnitObjTableType(C, ObjectTable::getPointerType(C));
 
-  // Lookup __csirt_unit_init
+  // Lookup __csanrt_unit_init
   SmallVector<Type *, 4> InitArgTypes({IRB.getInt8PtrTy(),
                                        PointerType::get(UnitFedTableType, 0),
                                        PointerType::get(UnitObjTableType, 0),
                                        InitCallsiteToFunction->getType()});
   FunctionType *InitFunctionTy =
       FunctionType::get(IRB.getVoidTy(), InitArgTypes, false);
-  RTUnitInit = M.getOrInsertFunction(CsiRtUnitInitName, InitFunctionTy);
-  assert(RTUnitInit);
+  RTUnitInit = M.getOrInsertFunction(CsanRtUnitInitName, InitFunctionTy);
+  assert(isa<Function>(RTUnitInit.getCallee()) &&
+         "Failed to get or insert __csanrt_unit_init function");
 
   ArrayType *UnitFedTableArrayType =
       ArrayType::get(UnitFedTableType, UnitFedTables.size());
@@ -803,7 +805,7 @@ CallInst *CilkSanitizerImpl::createRTUnitInitCall(IRBuilder<> &IRB) {
   Constant *Zero = ConstantInt::get(IRB.getInt32Ty(), 0);
   Value *GepArgs[] = {Zero, Zero};
 
-  // Insert call to __csirt_unit_init
+  // Insert call to __csanrt_unit_init
   return IRB.CreateCall(
       RTUnitInit,
       {IRB.CreateGlobalStringPtr(M.getName()),
