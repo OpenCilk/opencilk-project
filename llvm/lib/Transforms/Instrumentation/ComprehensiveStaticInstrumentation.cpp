@@ -2007,6 +2007,8 @@ CallInst *CSIImpl::createRTUnitInitCall(IRBuilder<> &IRB) {
   FunctionType *InitFunctionTy =
       FunctionType::get(IRB.getVoidTy(), InitArgTypes, false);
   RTUnitInit = M.getOrInsertFunction(CsiRtUnitInitName, InitFunctionTy);
+  assert(isa<Function>(RTUnitInit.getCallee()) &&
+         "Failed to get or insert __csirt_unit_init function");
 
   ArrayType *UnitFedTableArrayType =
       ArrayType::get(UnitFedTableType, UnitFedTables.size());
@@ -2056,8 +2058,8 @@ void CSIImpl::finalizeCsi() {
     appendToGlobalCtors(M, Ctor, CsiUnitCtorPriority);
 
     CallGraphNode *CNCtor = CG->getOrInsertFunction(Ctor);
-    CallGraphNode *CNFunc = CG->getOrInsertFunction(
-        cast<Function>(RTUnitInit.getCallee()));
+    CallGraphNode *CNFunc =
+        CG->getOrInsertFunction(cast<Function>(RTUnitInit.getCallee()));
     CNCtor->addCalledFunction(Call, CNFunc);
   }
 }
