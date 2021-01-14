@@ -112,7 +112,7 @@ static cl::opt<unsigned>
         cl::Hidden,
         cl::desc("Maximum number of uses to explore for a capture query."));
 
-static cl::opt<bool> MAAPChecks("cilksan-maap-checks", cl::init(false),
+static cl::opt<bool> MAAPChecks("cilksan-maap-checks", cl::init(true),
                                 cl::Hidden,
                                 cl::desc("Enable or disable MAAP checks."));
 
@@ -126,11 +126,12 @@ static cl::opt<bool>
         cl::desc("Ignore the 'sanitize_cilk' attribute when choosing what to "
                  "instrument."));
 
-static cl::opt<unsigned> InstrumentationSet(
-    "cilksan-instrumentation-set", cl::init(3), cl::Hidden,
-    cl::desc("Specify the set of instrumentation hooks to insert."));
 static const unsigned SERIESPARALLEL = 0x1;
 static const unsigned SHADOWMEMORY = 0x2;
+static cl::opt<unsigned> InstrumentationSet(
+    "cilksan-instrumentation-set", cl::init(SERIESPARALLEL | SHADOWMEMORY),
+    cl::Hidden,
+    cl::desc("Specify the set of instrumentation hooks to insert."));
 
 static const char *const CsanRtUnitInitName = "__csanrt_unit_init";
 static const char *const CsiUnitObjTableName = "__csi_unit_obj_table";
