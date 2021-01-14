@@ -488,11 +488,12 @@ bool llvm::isLibFreeFunction(const Function *F, const LibFunc TLIFn) {
 }
 
 /// isFreeCall - Returns non-null if the value is a call to the builtin free()
-const CallInst *llvm::isFreeCall(const Value *I, const TargetLibraryInfo *TLI) {
+const CallInst *llvm::isFreeCall(const Value *I, const TargetLibraryInfo *TLI,
+                                 bool IgnoreBuiltinAttr) {
   bool IsNoBuiltinCall;
   const Function *Callee =
       getCalledFunction(I, /*LookThroughBitCast=*/false, IsNoBuiltinCall);
-  if (Callee == nullptr || IsNoBuiltinCall)
+  if (Callee == nullptr || (IsNoBuiltinCall && !IgnoreBuiltinAttr))
     return nullptr;
 
   StringRef FnName = Callee->getName();

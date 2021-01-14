@@ -1427,24 +1427,19 @@ void CSIImpl::instrumentAlloca(Instruction *I) {
   insertHookCall(&*Iter, CsiAfterAlloca, {CsiId, Addr, SizeVal, PropVal});
 }
 
-void CSIImpl::getAllocFnArgs(const Instruction *I,
+bool CSIImpl::getAllocFnArgs(const Instruction *I,
                              SmallVectorImpl<Value *> &AllocFnArgs,
                              Type *SizeTy, Type *AddrTy,
                              const TargetLibraryInfo &TLI) {
-  const Function *Called = nullptr;
-  if (const CallInst *CI = dyn_cast<CallInst>(I))
-    Called = CI->getCalledFunction();
-  else if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
-    Called = II->getCalledFunction();
-
+  const Function *Called = dyn_cast<CallBase>(I)->getCalledFunction();
   LibFunc F;
   bool FoundLibFunc = TLI.getLibFunc(*Called, F);
   if (!FoundLibFunc)
-    return;
+    return false;
 
   switch (F) {
   default:
-    return;
+    return false;
   case LibFunc_malloc:
   case LibFunc_valloc:
   case LibFunc_Znwj:
@@ -1474,7 +1469,7 @@ void CSIImpl::getAllocFnArgs(const Instruction *I,
     AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
     // Old pointer = NULL
     AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-    return;
+    return true;
   }
   case LibFunc_ZnwjSt11align_val_t:
   case LibFunc_ZnwmSt11align_val_t:
@@ -1502,7 +1497,7 @@ void CSIImpl::getAllocFnArgs(const Instruction *I,
       // Old pointer = NULL
       AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
     }
-    return;
+    return true;
   }
   case LibFunc_calloc: {
     const CallInst *CI = cast<CallInst>(I);
@@ -1514,7 +1509,7 @@ void CSIImpl::getAllocFnArgs(const Instruction *I,
     AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
     // Old pointer = NULL
     AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-    return;
+    return true;
   }
   case LibFunc_realloc:
   case LibFunc_reallocf: {
@@ -1527,7 +1522,7 @@ void CSIImpl::getAllocFnArgs(const Instruction *I,
     AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
     // Old pointer
     AllocFnArgs.push_back(CI->getArgOperand(0));
-    return;
+    return true;
   }
   case LibFunc_aligned_alloc: {
     const CallInst *CI = cast<CallInst>(I);
@@ -1539,7 +1534,7 @@ void CSIImpl::getAllocFnArgs(const Instruction *I,
     AllocFnArgs.push_back(CI->getArgOperand(0));
     // Old pointer = NULL
     AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-    return;
+    return true;
   }
   }
 }

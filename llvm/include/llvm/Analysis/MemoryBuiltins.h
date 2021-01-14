@@ -176,10 +176,13 @@ inline CallInst *extractCallocCall(Value *I, const TargetLibraryInfo *TLI) {
 bool isLibFreeFunction(const Function *F, const LibFunc TLIFn);
 
 /// isFreeCall - Returns non-null if the value is a call to the builtin free()
-const CallInst *isFreeCall(const Value *I, const TargetLibraryInfo *TLI);
+const CallInst *isFreeCall(const Value *I, const TargetLibraryInfo *TLI,
+                           bool IgnoreBuiltinAttr = false);
 
-inline CallInst *isFreeCall(Value *I, const TargetLibraryInfo *TLI) {
-  return const_cast<CallInst*>(isFreeCall((const Value*)I, TLI));
+inline CallInst *isFreeCall(Value *I, const TargetLibraryInfo *TLI,
+                            bool IgnoreBuiltinAttr = false) {
+  return const_cast<CallInst *>(
+      isFreeCall((const Value *)I, TLI, IgnoreBuiltinAttr));
 }
 
 //===----------------------------------------------------------------------===//
