@@ -1021,7 +1021,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
                                                FnAttrs, RetType);
   }
 
-  Type *MAAPTy = IRB.getInt64Ty();
+  Type *MAAPTy = IRB.getInt8Ty();
   {
     AttributeList FnAttrs;
     FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
@@ -1741,7 +1741,7 @@ unsigned CilkSanitizerImpl::Instrumentor::RaceTypeToFlagVal(
 }
 
 static Value *getMAAPIRValue(IRBuilder<> &IRB, unsigned MV) {
-  return IRB.getInt64(MV);
+  return IRB.getInt8(MV);
 }
 
 // Insert per-argument MAAPs for this function
