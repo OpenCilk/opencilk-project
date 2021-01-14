@@ -1589,6 +1589,19 @@ bool IRTranslator::translateKnownIntrinsic(const CallInst &CI, Intrinsic::ID ID,
       .addMetadata(cast<MDNode>(cast<MetadataAsValue>(Arg)->getMetadata()));
     return true;
   }
+  case Intrinsic::syncregion_start:
+    // Lower the starting point of a Tapir sync region to a no-op.
+  case Intrinsic::taskframe_load_guard:
+    // Discard any taskframe.load.guards.
+  case Intrinsic::taskframe_create:
+    // Discard any taskframe.creates.
+  case Intrinsic::taskframe_use:
+    // Discard any taskframe.uses.
+  case Intrinsic::taskframe_end:
+    // Discard any taskframe.ends.
+  case Intrinsic::sync_unwind:
+    // Discard any sync.unwinds.
+    return true;
   }
   return false;
 }
