@@ -577,7 +577,7 @@ static void GetGeneralAccesses(
 
     // If we find a free call and we assume malloc is safe, don't worry about
     // opaque accesses by that free call.
-    if (AssumeSafeMalloc && isFreeCall(Call, TLI))
+    if (AssumeSafeMalloc && getFreedOperand(Call, TLI))
       return;
 
     if (!Call->onlyAccessesArgMemory())
@@ -1968,7 +1968,7 @@ void AccessPtrAnalysis::processAccessPtrs(
         if (const CallBase *Call = dyn_cast<CallBase>(GA.I)) {
           if (!Call->onlyAccessesArgMemory() &&
               !(AssumeSafeMalloc && (isAllocationFn(Call, TLI) ||
-                                     isFreeCall(Call, TLI)))) {
+                                     getFreedOperand(Call, TLI)))) {
             LLVM_DEBUG(dbgs() << "Setting opaque race:\n" << "  GA.I: "
                        << *GA.I << "\n"
                        << "  no explicit racer\n");
