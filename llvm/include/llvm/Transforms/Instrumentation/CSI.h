@@ -1066,7 +1066,7 @@ public:
   static bool isVtableAccess(Instruction *I);
   static bool addrPointsToConstantData(Value *Addr);
   static bool isAtomic(Instruction *I);
-  static void getAllocFnArgs(const Instruction *I,
+  static bool getAllocFnArgs(const Instruction *I,
                              SmallVectorImpl<Value *> &AllocFnArgs,
                              Type *SizeTy, Type *AddrTy,
                              const TargetLibraryInfo &TLI);
@@ -1232,6 +1232,9 @@ protected:
     ZnwmSt11align_val_tRKSt9nothrow_t,
     ZnajSt11align_val_tRKSt9nothrow_t,
     ZnamSt11align_val_tRKSt9nothrow_t,
+    posix_memalign,
+    strdup,
+    strndup,
     LAST_ALLOCFNTY
   };
 
@@ -1243,8 +1246,8 @@ protected:
       return AllocFnTy::malloc;
     case LibFunc_valloc:
       return AllocFnTy::valloc;
-      // aligned_alloc(align_val_t, size_t)
     case LibFunc_aligned_alloc:
+      // aligned_alloc(align_val_t, size_t)
       return AllocFnTy::aligned_alloc;
     case LibFunc_calloc:
       return AllocFnTy::calloc;
@@ -1324,6 +1327,15 @@ protected:
     case LibFunc_ZnamSt11align_val_tRKSt9nothrow_t:
       // new[](unsigned long, align_val_t, nothrow)
       return AllocFnTy::ZnamSt11align_val_tRKSt9nothrow_t;
+    case LibFunc_posix_memalign:
+      // posix_memalign(void **, size_t, size_t)
+      return AllocFnTy::posix_memalign;
+    case LibFunc_strdup:
+      // strdup(const char *)
+      return AllocFnTy::strdup;
+    case LibFunc_strndup:
+      // strdup(const char *, size_t)
+      return AllocFnTy::strndup;
     }
   }
 
