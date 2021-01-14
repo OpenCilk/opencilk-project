@@ -1558,7 +1558,6 @@ void OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
-
 }
 
 void OpenCilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
