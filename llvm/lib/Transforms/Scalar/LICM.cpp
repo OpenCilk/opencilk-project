@@ -1798,16 +1798,35 @@ static bool isSafeToExecuteUnconditionally(Instruction &Inst,
                                            const TaskInfo *TI,
                                            OptimizationRemarkEmitter *ORE,
                                            const Instruction *CtxI) {
+  if (CtxI) {
+    // Check for a load from a thread_local variable in a different spindle as
+    // CtxI.  Loads from such variables are not safe to execute unconditionally
+    // outside of parallel loops.
+    if (LoadInst *LI = dyn_cast<LoadInst>(&Inst)) {
+      const DataLayout &DL = Inst.getModule()->getDataLayout();
+      if (GlobalValue *GV = dyn_cast<GlobalValue>(
+              GetUnderlyingObject(LI->getPointerOperand(), DL))) {
+        if (GV->isThreadLocal() && TI->getSpindleFor(Inst.getParent()) !=
+                                       TI->getSpindleFor(CtxI->getParent()))
+          return false;
+      }
+    }
+  }
+
   if (isSafeToSpeculativelyExecute(&Inst, CtxI, DT))
     return true;
 
-  if (CtxI)
+  if (CtxI) {
+    // Check for a call to a strand-pure function.  Such a call is safe to
+    // execute unconditionally if CtxI and Inst belong to the same spindle.
     if (const CallBase *CB = dyn_cast<CallBase>(&Inst)) {
       const Function *Callee = CB->getCalledFunction();
       if (Callee && Callee->isStrandPure())
-        return (TI->getSpindleFor(Inst.getParent()) ==
-                TI->getSpindleFor(CtxI->getParent()));
+        if (TI->getSpindleFor(Inst.getParent()) !=
+            TI->getSpindleFor(CtxI->getParent()))
+          return false;
     }
+  }
 
   bool GuaranteedToExecute =
       SafetyInfo->isGuaranteedToExecute(Inst, DT, TI, CurLoop);
