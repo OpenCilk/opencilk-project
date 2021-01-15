@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_BASIC_LANGOPTIONS_H
 #define LLVM_CLANG_BASIC_LANGOPTIONS_H
 
+#include "clang/Basic/Cilk.h"
 #include "clang/Basic/CommentOptions.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/LangStandard.h"
@@ -513,6 +514,9 @@ public:
   /// The plaform-specific path separator is the backslash(\) for Windows and
   /// forward slash (/) elsewhere.
   bool UseTargetPathSeparator = false;
+
+  /// Set of enabled Cilk options.
+  CilkOptionSet CilkOptions;
 
   LangOptions();
 
