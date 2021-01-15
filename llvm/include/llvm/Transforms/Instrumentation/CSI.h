@@ -1088,6 +1088,9 @@ public:
 
   static bool spawnsTapirLoopBody(DetachInst *DI, LoopInfo &LI, TaskInfo &TI);
 
+  static BasicBlock::iterator
+  getFirstInsertionPtInDetachedBlock(BasicBlock *Detached);
+
 protected:
   /// Initialize the CSI pass.
   void initializeCsi();
