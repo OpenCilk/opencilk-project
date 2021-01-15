@@ -1307,32 +1307,95 @@ llvm::opt::DerivedArgList *ToolChain::TranslateXarchArgs(
   return nullptr;
 }
 
-static void addRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
-                              ArgStringList &CmdArgs,
-                              const llvm::Triple &Triple) {
+void ToolChain::AddOpenCilkIncludeDir(const ArgList &Args,
+                                      ArgStringList &CmdArgs) const {
+  if (!Args.hasArg(options::OPT_opencilk_resource_dir_EQ))
+    return;
+
+  const Arg *A = Args.getLastArg(options::OPT_opencilk_resource_dir_EQ);
+  SmallString<128> P;
+
+  // Check for an include directory.
+  P.assign(A->getValue());
+  llvm::sys::path::append(P, "include");
+  if (getVFS().exists(P)) {
+    CmdArgs.push_back("-internal-isystem");
+    CmdArgs.push_back(Args.MakeArgString(P.str()));
+  } else {
+    D.Diag(diag::err_drv_opencilk_resource_dir_missing_include)
+        << A->getAsString(Args);
+  }
+}
+
+Optional<std::string>
+ToolChain::getOpenCilkRuntimePath(const ArgList &Args) const {
+  if (!Args.hasArg(options::OPT_opencilk_resource_dir_EQ))
+    return getRuntimePath();
+
+  SmallString<128> P;
+  // If -opencilk-resource-dir= is specified, try to use that directory, and
+  // raise an error if that fails.
+  const Arg *A = Args.getLastArg(options::OPT_opencilk_resource_dir_EQ);
+
+  // First try the triple passed to driver as --target=<triple>.
+  P.assign(A->getValue());
+  llvm::sys::path::append(P, "lib", D.getTargetTriple());
+  if (getVFS().exists(P))
+    return llvm::Optional<std::string>(P.str());
+
+  // Second try the normalized triple.
+  P.assign(A->getValue());
+  llvm::sys::path::append(P, "lib", Triple.str());
+  if (getVFS().exists(P))
+    return llvm::Optional<std::string>(P.str());
+
+  // Third try excluding the triple.
+  P.assign(A->getValue());
+  llvm::sys::path::append(P, "lib");
+  if (getVFS().exists(P))
+    return llvm::Optional<std::string>(P.str());
+
+  return None;
+}
+
+static void addOpenCilkRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
+                                      ArgStringList &CmdArgs,
+                                      const llvm::Triple &Triple) {
   // Allow the -fno-rtlib-add-rpath flag to prevent adding this default
   // directory to the runpath.
   if (!Args.hasFlag(options::OPT_frtlib_add_rpath,
                     options::OPT_fno_rtlib_add_rpath, true))
     return;
 
-  if (auto CandidateRPath = TC.getRuntimePath()) {
+  if (auto CandidateRPath = TC.getOpenCilkRuntimePath(Args)) {
     if (TC.getVFS().exists(*CandidateRPath)) {
       CmdArgs.push_back("-L");
       CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
       CmdArgs.push_back("-rpath");
       CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
-      // TODO: Check the portability of the --enable-new-dtags flag.
       if (Triple.isOSBinFormatELF())
         CmdArgs.push_back("--enable-new-dtags");
     }
   }
 }
 
-void ToolChain::AddOpenCilkBitcodeABI(const ArgList &Args,
+void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
                                       ArgStringList &CmdArgs) const {
+  // If --opencilk-abi-bitcode= is specified, use that specified path.
+  if (Args.hasArg(options::OPT_opencilk_abi_bitcode_EQ)) {
+    const Arg *A = Args.getLastArg(options::OPT_opencilk_abi_bitcode_EQ);
+    SmallString<128> P(A->getValue());
+    if (getVFS().exists(P)) {
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back(Args.MakeArgString(("-opencilk-runtime-bc-path=" + P)));
+      return;
+    }
+    getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
+        << A->getAsString(Args);
+  }
+
   SmallString<128> OpenCilkABIBCFilename("libopencilk-abi.bc");
-  if (auto RuntimePath = getRuntimePath()) {
+  if (auto RuntimePath = getOpenCilkRuntimePath(Args)) {
     SmallString<128> P;
     P.assign(*RuntimePath);
     llvm::sys::path::append(P, OpenCilkABIBCFilename);
@@ -1377,8 +1440,8 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     CmdArgs.push_back("-lopencilk");
 
     // Add to the executable's runpath the default directory containing OpenCilk
-    // runtime, when the runtime is compiled as an integrated component.
-    addRuntimeRunPath(*this, Args, CmdArgs, Triple);
+    // runtime.
+    addOpenCilkRuntimeRunPath(*this, Args, CmdArgs, Triple);
     if (OnlyStaticOpenCilk)
       CmdArgs.push_back("-Bdynamic");
     CmdArgs.push_back("-lpthread");

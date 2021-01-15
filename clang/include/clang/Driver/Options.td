@@ -1970,12 +1970,17 @@ def fretain_comments_from_system_headers : Flag<["-"], "fretain-comments-from-sy
 
 def ftapir_EQ : Joined<["-"], "ftapir=">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Choose the backend parallel runtime for Tapir instructions">,
-  Values<"none,serial,cilk,cilkr,cheetah,cuda,opencilk,openmp,qthreads">;
+  Values<"none,serial,cilk,cheetah,cuda,opencilk,openmp,qthreads">;
 def fcilkplus : Flag<["-"], "fcilkplus">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Enable Cilk Plus extensions">;
 def fopencilk : Flag<["-"], "fopencilk">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Enable OpenCilk extensions">;
 def static_libopencilk : Flag<["-"], "static-libopencilk">;
+def opencilk_resource_dir_EQ : Joined<["--"], "opencilk-resource-dir=">,
+  Flags<[DriverOption]>,
+  HelpText<"The directory that holds OpenCilk resource files">;
+def opencilk_abi_bitcode_EQ : Joined<["--"], "opencilk-abi-bitcode=">,
+  Flags<[CC1Option]>, HelpText<"Path to OpenCilk ABI bitcode file">;
 
 def fmudflapth : Flag<["-"], "fmudflapth">, Group<f_Group>;
 def fmudflap : Flag<["-"], "fmudflap">, Group<f_Group>;

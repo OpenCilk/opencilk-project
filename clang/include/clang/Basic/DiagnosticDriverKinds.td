@@ -256,6 +256,10 @@ def err_drv_cilk_unsupported: Error<
   "Cilk not yet supported for this target">;
 def err_drv_opencilk_missing_abi_bitcode: Error<
   "Cannot find OpenCilk runtime ABI bitcode file: %0">;
+def err_drv_opencilk_resource_dir_missing_include: Error<
+  "No include directory in OpenCilk resource directory: %0">;
+def err_drv_opencilk_resource_dir_missing_lib: Error<
+  "No lib directory in OpenCilk resource directory: %0">;
 def err_drv_emit_llvm_link : Error<
    "-emit-llvm cannot be used when linking">;
 def err_drv_optimization_remark_pattern : Error<

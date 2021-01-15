@@ -5495,7 +5495,18 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 	D.Diag(diag::err_drv_cilk_unsupported);
 	break;
       }
-      getToolChain().AddOpenCilkBitcodeABI(Args, CmdArgs);
+
+      // If an OpenCilk resource directory is specified, check that it is valid.
+      if (Args.hasArgNoClaim(options::OPT_opencilk_resource_dir_EQ)) {
+        if (!getToolChain().getOpenCilkRuntimePath(Args)) {
+          D.Diag(diag::err_drv_opencilk_resource_dir_missing_lib)
+              << Args.getLastArgNoClaim(options::OPT_opencilk_resource_dir_EQ)
+                     ->getAsString(Args);
+        }
+      }
+
+      // Add the OpenCilk ABI bitcode file.
+      getToolChain().AddOpenCilkABIBitcode(Args, CmdArgs);
     }
   }
 

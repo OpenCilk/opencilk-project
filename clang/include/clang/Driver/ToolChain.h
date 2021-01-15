@@ -674,9 +674,17 @@ public:
     return llvm::DenormalMode::getIEEE();
   }
 
+  /// Check the specified OpenCilk resource directory is valid.
+  virtual void AddOpenCilkIncludeDir(const llvm::opt::ArgList &Args,
+                                     llvm::opt::ArgStringList &CmdArgs) const;
+
+  /// Get the OpenCilk library path if it exists.
+  virtual Optional<std::string>
+  getOpenCilkRuntimePath(const llvm::opt::ArgList &Args) const;
+
   /// AddOpenCilkBitcodeABI - Add compiler arguments for linking against the
   /// OpenCilk runtime ABI bitcode file.
-  virtual void AddOpenCilkBitcodeABI(const llvm::opt::ArgList &Args,
+  virtual void AddOpenCilkABIBitcode(const llvm::opt::ArgList &Args,
                                      llvm::opt::ArgStringList &CmdArgs) const;
 
   /// AddTapirRuntimeLibArgs - Add the specific linker arguments to use for the
