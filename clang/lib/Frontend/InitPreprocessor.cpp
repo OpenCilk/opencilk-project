@@ -1111,6 +1111,10 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     break;
   }
 
+  // Add macro to indicate whether pedigrees are enabled.
+  if (LangOpts.CilkOptions.has(CilkOption::CilkOpt_Pedigrees))
+    Builder.defineMacro("__cilk_pedigrees__");
+
   // Add macro to indicate that the program is compiled with Cilksan enabled.
   if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
     Builder.defineMacro("__cilksan__");

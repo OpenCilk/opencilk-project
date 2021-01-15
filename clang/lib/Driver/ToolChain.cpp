@@ -1395,6 +1395,10 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
   }
 
   SmallString<128> OpenCilkABIBCFilename("libopencilk-abi.bc");
+  // If pedigrees are enabled, use the pedigree-enabled ABI bitcode instead.
+  if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
+    OpenCilkABIBCFilename.assign("libopencilk-pedigrees-abi.bc");
+
   if (auto RuntimePath = getOpenCilkRuntimePath(Args)) {
     SmallString<128> P;
     P.assign(*RuntimePath);
@@ -1427,6 +1431,10 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                                   !Args.hasArg(options::OPT_static);
     if (OnlyStaticOpenCilk)
       CmdArgs.push_back("-Bstatic");
+
+    // If pedigrees are enabled, link the OpenCilk pedigree library.
+    if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
+      CmdArgs.push_back("-lpedigrees");
 
     // Link the correct Cilk personality fn
     if (getDriver().CCCIsCXX())

@@ -1981,6 +1981,8 @@ def opencilk_resource_dir_EQ : Joined<["--"], "opencilk-resource-dir=">,
   HelpText<"The directory that holds OpenCilk resource files">;
 def opencilk_abi_bitcode_EQ : Joined<["--"], "opencilk-abi-bitcode=">,
   Flags<[CC1Option]>, HelpText<"Path to OpenCilk ABI bitcode file">;
+def fopencilk_enable_pedigrees : Flag<["-"], "fopencilk-enable-pedigrees">,
+  Flags<[CC1Option]>, HelpText<"Enable OpenCilk pedigrees">;
 
 def fmudflapth : Flag<["-"], "fmudflapth">, Group<f_Group>;
 def fmudflap : Flag<["-"], "fmudflap">, Group<f_Group>;

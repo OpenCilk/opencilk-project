@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_BASIC_LANGOPTIONS_H
 #define LLVM_CLANG_BASIC_LANGOPTIONS_H
 
+#include "clang/Basic/Cilk.h"
 #include "clang/Basic/CommentOptions.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/LangStandard.h"
@@ -360,6 +361,9 @@ public:
   /// Indicates whether the front-end is explicitly told that the
   /// input is a header file (i.e. -x c-header).
   bool IsHeaderFile = false;
+
+  /// Set of enabled Cilk options.
+  CilkOptionSet CilkOptions;
 
   LangOptions();
 

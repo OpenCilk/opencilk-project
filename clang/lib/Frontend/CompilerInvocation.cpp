@@ -2394,6 +2394,8 @@ void CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Diags.Report(diag::err_drv_double_cilk);
     }
     Opts.setCilk(LangOptions::Cilk_opencilk);
+    if (Args.hasArg(OPT_fopencilk_enable_pedigrees))
+      Opts.CilkOptions.set(CilkOpt_Pedigrees, true);
   } else if (CilkPlus) {
     Opts.setCilk(LangOptions::Cilk_plus);
   }
