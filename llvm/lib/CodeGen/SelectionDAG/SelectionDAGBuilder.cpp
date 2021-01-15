@@ -7067,19 +7067,19 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     return;
   case Intrinsic::taskframe_load_guard:
     // Discard any taskframe.load.guards.
-    break;
+    return;
   case Intrinsic::taskframe_create:
     // Discard any taskframe.creates.
-    break;
+    return;
   case Intrinsic::taskframe_use:
     // Discard any taskframe.uses.
-    break;
+    return;
   case Intrinsic::taskframe_end:
     // Discard any taskframe.ends.
-    break;
+    return;
   case Intrinsic::sync_unwind:
     // Discard any sync.unwinds.
-    break;
+    return;
   }
 }
 
