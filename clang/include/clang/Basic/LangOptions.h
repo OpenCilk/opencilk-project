@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_BASIC_LANGOPTIONS_H
 #define LLVM_CLANG_BASIC_LANGOPTIONS_H
 
+#include "clang/Basic/Cilk.h"
 #include "clang/Basic/CommentOptions.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/LangStandard.h"
@@ -558,6 +559,9 @@ public:
   // This exists so that we can override the macro value and test our incomplete
   // implementation on real-world examples.
   std::string OpenACCMacroOverride;
+
+  /// Set of enabled Cilk options.
+  CilkOptionSet CilkOptions;
 
   LangOptions();
 
