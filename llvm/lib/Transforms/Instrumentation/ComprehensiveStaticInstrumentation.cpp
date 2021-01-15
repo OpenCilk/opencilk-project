@@ -1217,6 +1217,15 @@ static void getTaskExits(DetachInst *DI,
   }
 }
 
+BasicBlock::iterator
+CSIImpl::getFirstInsertionPtInDetachedBlock(BasicBlock *Detached) {
+  for (Instruction &I : *Detached)
+    if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+      if (Intrinsic::taskframe_use == II->getIntrinsicID())
+        return ++(II->getIterator());
+  return Detached->getFirstInsertionPt();
+}
+
 void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
                                LoopInfo &LI,
                                const DenseMap<Value *, Value *> &TrackVars) {

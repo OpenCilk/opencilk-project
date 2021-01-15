@@ -4100,7 +4100,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   // Instrument the entry and exit points of the detached task.
   {
     // Instrument the entry point of the detached task.
-    IRBuilder<> IRB(&*DetachedBlock->getFirstInsertionPt());
+    IRBuilder<> IRB(&*getFirstInsertionPtInDetachedBlock(DetachedBlock));
     uint64_t LocalID = TaskFED.add(*DetachedBlock);
     Value *TaskID = TaskFED.localToGlobalId(LocalID, IDBuilder);
     CsiTaskProperty Prop;
