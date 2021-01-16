@@ -750,11 +750,12 @@ bool MachineBlockPlacement::shouldTailDuplicate(MachineBasicBlock *BB) {
   // Blocks with single successors don't create additional fallthrough
   // opportunities. Don't duplicate them. TODO: When conditional exits are
   // analyzable, allow them to be duplicated.
-  bool IsSimple = TailDup.isSimpleBB(BB);
-
   if (BB->succ_size() == 1)
     return false;
-  return TailDup.shouldTailDuplicate(IsSimple, *BB);
+
+  BlockDesc Desc = TailDup.getBlockDesc(BB);
+
+  return TailDup.shouldTailDuplicate(Desc, *BB);
 }
 
 /// Compare 2 BlockFrequency's with a small penalty for \p A.
@@ -3064,7 +3065,7 @@ bool MachineBlockPlacement::maybeTailDuplicateBlock(
       function_ref<void(MachineBasicBlock*)>(RemovalCallback);
 
   SmallVector<MachineBasicBlock *, 8> DuplicatedPreds;
-  bool IsSimple = TailDup.isSimpleBB(BB);
+  BlockDesc Desc = TailDup.getBlockDesc(BB);
   SmallVector<MachineBasicBlock *, 8> CandidatePreds;
   SmallVectorImpl<MachineBasicBlock *> *CandidatePtr = nullptr;
   if (F->getFunction().hasProfileData()) {
@@ -3075,7 +3076,7 @@ bool MachineBlockPlacement::maybeTailDuplicateBlock(
     if (CandidatePreds.size() < BB->pred_size())
       CandidatePtr = &CandidatePreds;
   }
-  TailDup.tailDuplicateAndUpdate(IsSimple, BB, LPred, &DuplicatedPreds,
+  TailDup.tailDuplicateAndUpdate(Desc, BB, LPred, &DuplicatedPreds,
                                  &RemovalCallbackRef, CandidatePtr);
 
   // Update UnscheduledPredecessors to reflect tail-duplication.
