@@ -339,6 +339,8 @@ public:
 
   unsigned removeBranch(MachineBasicBlock &MBB,
                         int *BytesRemoved = nullptr) const override;
+  unsigned removeBranchAndFlags(MachineBasicBlock &MBB,
+                                int *BytesRemoved = nullptr) const override;
   unsigned insertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                         MachineBasicBlock *FBB, ArrayRef<MachineOperand> Cond,
                         const DebugLoc &DL,
@@ -516,6 +518,10 @@ public:
                             Register SrcReg2, int CmpMask, int CmpValue,
                             const MachineRegisterInfo *MRI) const override;
 
+  Optional<BlockBRNZ> isZeroTest(MachineBasicBlock &MBB) const override;
+  bool isSetConstant(const MachineInstr &MI, Register &Reg,
+                     int64_t &Value) const override;
+
   /// optimizeLoadInstr - Try to remove the load by folding it to a register
   /// operand at the use. We fold the load instructions if and only if the
   /// def and use are in the same BB. We only look at one load and see
@@ -584,6 +590,9 @@ protected:
   isCopyInstrImpl(const MachineInstr &MI) const override;
 
 private:
+  unsigned removeBranchImpl(MachineBasicBlock &MBB, int *BytesRemoved,
+                            bool DeleteFlags) const;
+
   /// This is a helper for convertToThreeAddress for 8 and 16-bit instructions.
   /// We use 32-bit LEA to form 3-address code by promoting to a 32-bit
   /// super-register and then truncating back down to a 8/16-bit sub-register.

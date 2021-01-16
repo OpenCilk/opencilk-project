@@ -90,6 +90,21 @@ struct ExtAddrMode {
   int64_t Displacement;
 };
 
+struct BlockBRNZ {
+  // If true, the registers below are dead
+  bool IsKill = false;
+  // The register (or set of registers feeding into a PHI) that
+  // is tested against zero to determine the branch.
+  SmallVector<Register, 4> Regs;
+  MachineBasicBlock *Zero = nullptr; // Target if register is zero
+  MachineBasicBlock *Nonzero = nullptr; // Target if register is not zero
+};
+
+struct BlockDesc {
+  bool IsSimple = false;
+  Optional<BlockBRNZ> BRNZ;
+};
+
 //---------------------------------------------------------------------------
 ///
 /// TargetInstrInfo - Interface to description of machine instruction set
@@ -665,6 +680,13 @@ public:
   virtual unsigned removeBranch(MachineBasicBlock &MBB,
                                 int *BytesRemoved = nullptr) const {
     llvm_unreachable("Target didn't implement TargetInstrInfo::removeBranch!");
+  }
+
+  /// Remove the branches at the end of the block and any compare
+  /// instructions used only by the branches.
+  virtual unsigned removeBranchAndFlags(MachineBasicBlock &MBB,
+                                        int *BytesRemoved = nullptr) const {
+    return removeBranch(MBB, BytesRemoved);
   }
 
   /// Insert branch code into the end of the specified MachineBasicBlock. The
@@ -1514,6 +1536,19 @@ public:
     return false;
   }
   virtual bool optimizeCondBranch(MachineInstr &MI) const { return false; }
+
+  /// Return a descriptor if this block branches depending on whether a register
+  /// is nonzero.
+  virtual Optional<BlockBRNZ> isZeroTest(MachineBasicBlock &MBB) const {
+    return Optional<BlockBRNZ>();
+  }
+
+  /// If this instruction sets a register to a constant integer value,
+  /// return true, the register, and the value.
+  virtual bool isSetConstant(const MachineInstr &MI, Register &Reg,
+                             int64_t &Value) const {
+    return false;
+  }
 
   /// Try to remove the load by folding it to a register operand at the use.
   /// We fold the load instructions if and only if the

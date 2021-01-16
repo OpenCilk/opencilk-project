@@ -3222,22 +3222,68 @@ bool X86InstrInfo::analyzeBranchPredicate(MachineBasicBlock &MBB,
 
 unsigned X86InstrInfo::removeBranch(MachineBasicBlock &MBB,
                                     int *BytesRemoved) const {
+  return removeBranchImpl(MBB, BytesRemoved, false);
+}
+
+unsigned X86InstrInfo::removeBranchAndFlags(MachineBasicBlock &MBB,
+                                            int *BytesRemoved) const {
+  return removeBranchImpl(MBB, BytesRemoved, true);
+}
+
+unsigned X86InstrInfo::removeBranchImpl(MachineBasicBlock &MBB,
+                                    int *BytesRemoved,
+                                    bool DeleteFlags) const {
   assert(!BytesRemoved && "code size not handled");
 
+  const X86RegisterInfo *TRI = &getRegisterInfo();
   MachineBasicBlock::iterator I = MBB.end();
   unsigned Count = 0;
+  bool FlagsDead = false;
 
   while (I != MBB.begin()) {
     --I;
     if (I->isDebugInstr())
       continue;
-    if (I->getOpcode() != X86::JMP_1 &&
-        X86::getCondFromBranch(*I) == X86::COND_INVALID)
-      break;
-    // Remove the branch.
-    I->eraseFromParent();
-    I = MBB.end();
-    ++Count;
+    if (I->getOpcode() == X86::JMP_1) {
+      // Remove the branch.
+      I->eraseFromParent();
+      I = MBB.end();
+      ++Count;
+      continue;
+    }
+    if (X86::getCondFromBranch(*I) != X86::COND_INVALID) {
+      if (I->killsRegister(X86::EFLAGS, TRI)) {
+        FlagsDead = DeleteFlags;
+      }
+      // Remove the branch.
+      I->eraseFromParent();
+      I = MBB.end();
+      ++Count;
+      continue;
+    }
+    if (!FlagsDead)
+      continue;
+    if (I->hasUnmodeledSideEffects() || I->readsRegister(X86::EFLAGS, TRI)) {
+      FlagsDead = false;
+      continue;
+    }
+    if (I->modifiesRegister(X86::EFLAGS, TRI)) {
+      /* This is like allDefsAreDead but ignores EFLAGS. */
+      for (const MachineOperand &MO : I->operands()) {
+        if (MO.isReg() && MO.getReg().id() != X86::EFLAGS && !MO.isUse() &&
+            !MO.isDead()) {
+          FlagsDead = false;
+          break;
+        }
+      }
+      if (FlagsDead) {
+        FlagsDead = false;
+        I->eraseFromParent();
+        I = MBB.end();
+        ++Count;
+        continue;
+      }
+    }
   }
 
   return Count;
@@ -4408,6 +4454,110 @@ bool X86InstrInfo::optimizeCompareInstr(MachineInstr &CmpInstr, Register SrcReg,
         .setImm(Op.second);
   }
   return true;
+}
+
+Optional<BlockBRNZ> X86InstrInfo::isZeroTest(MachineBasicBlock &MBB) const {
+  const X86RegisterInfo *TRI = &getRegisterInfo();
+  SmallVector<MachineOperand, 4> Cond;
+  MachineBasicBlock *TBB = nullptr, *FBB = nullptr;
+  MachineBasicBlock *Zero = nullptr, *Nonzero = nullptr;
+
+  if (analyzeBranch(MBB, TBB, FBB, Cond, false) || Cond.size() != 1)
+    return Optional<BlockBRNZ>();
+
+  switch (Cond[0].getImm()) {
+  case X86::COND_E:
+    Nonzero = FBB;
+    Zero = TBB;
+    break;
+  case X86::COND_NE:
+    Nonzero = TBB;
+    Zero = FBB;
+    break;
+  default:
+    return Optional<BlockBRNZ>();
+  }
+  MachineBasicBlock::const_reverse_instr_iterator MI = MBB.instr_rbegin();
+  while (MI != MBB.instr_rend() && MI->isUnconditionalBranch())
+    ++MI;
+
+  if (MI == MBB.instr_rend() || !MI->isConditionalBranch())
+    return Optional<BlockBRNZ>();
+
+  BlockBRNZ Desc;
+  Desc.Zero = Zero;
+  Desc.Nonzero = Nonzero;
+
+  // Only handle conditional branches that kill EFLAGS, because
+  // that is the common case.
+  // if (!MI->killsRegister(X86::EFLAGS))
+  //  return false;
+
+  while (++MI != MBB.instr_rend()) {
+    // TEST32rr is the usual instruction to compare against zero.
+    if (MI->getOpcode() == X86::TEST32rr) {
+      const MachineOperand &op = MI->getOperand(0);
+      if (op.getReg() != MI->getOperand(1).getReg())
+        return Optional<BlockBRNZ>();
+      Desc.IsKill = op.isKill();
+      Desc.Regs.push_back(op.getReg());
+      break;
+    }
+    // If EFLAGS is set other than by TEST32rr, fail.
+    // TODO: Possibly also CMP32ri8?
+    if (MI->modifiesRegister(X86::EFLAGS, TRI))
+      return Optional<BlockBRNZ>();
+  }
+  if (Desc.Regs.size() != 1) {
+    return Optional<BlockBRNZ>();
+  }
+  const Register &Reg0 = Desc.Regs[0];
+
+  while (++MI != MBB.instr_rend()) {
+    if (MI->isPHI()) {
+      if (MI->getOperand(0).getReg() == Reg0) {
+	unsigned NumOperands = MI->getNumOperands();
+	for (unsigned I = 1; I < NumOperands; I += 2) {
+	  Desc.Regs.push_back(MI->getOperand(I).getReg());
+	}
+      }
+      // There should be only one PHI setting the register.
+      return Desc;
+    }
+    if (MI->modifiesRegister(Reg0, TRI))
+      return Optional<BlockBRNZ>();
+    if (MI->readsRegister(Reg0, TRI))
+      Desc.IsKill = false;
+  }
+  return Desc;
+}
+
+bool X86InstrInfo::isSetConstant(const MachineInstr &MI, Register &Reg,
+                                 int64_t &Value) const {
+  if (MI.getNumOperands() < 1)
+    return false;
+  const MachineOperand &Op0 = MI.getOperand(0);
+  if (!Op0.isReg())
+    return false;
+  Reg = Op0.getReg();
+  switch (MI.getOpcode()) {
+  case X86::MOV32r0:
+    Value = 0;
+    return true;
+  case X86::MOV32r1:
+    Value = 1;
+    return true;
+  case X86::XOR32rr:
+    if (MI.getOperand(1).getReg() != Reg)
+      return false;
+    Value = 0;
+    return true;
+  case X86::MOV32ri:
+    Value = MI.getOperand(1).getImm();
+    return true;
+  default:
+    return false;
+  }
 }
 
 /// Try to remove the load by folding it to a register
