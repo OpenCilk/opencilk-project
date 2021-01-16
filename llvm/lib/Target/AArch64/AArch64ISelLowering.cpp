@@ -816,6 +816,9 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BITCAST, MVT::f16, Custom);
   setOperationAction(ISD::BITCAST, MVT::bf16, Custom);
 
+  setOperationAction(ISD::EH_SJLJ_SETJMP, MVT::i32, Custom);
+  setOperationAction(ISD::EH_SJLJ_LONGJMP, MVT::Other, Custom);
+
   // Indexed loads and stores are supported.
   for (unsigned im = (unsigned)ISD::PRE_INC;
        im != (unsigned)ISD::LAST_INDEXED_MODE; ++im) {
@@ -1992,6 +1995,8 @@ const char *AArch64TargetLowering::getTargetNodeName(unsigned Opcode) const {
     MAKE_CASE(AArch64ISD::UABD)
     MAKE_CASE(AArch64ISD::SABD)
     MAKE_CASE(AArch64ISD::CALL_RVMARKER)
+    MAKE_CASE(AArch64ISD::EH_SJLJ_SETJMP)
+    MAKE_CASE(AArch64ISD::EH_SJLJ_LONGJMP)
   }
 #undef MAKE_CASE
   return nullptr;
@@ -2084,6 +2089,11 @@ MachineBasicBlock *AArch64TargetLowering::EmitInstrWithCustomInserter(
 
   case AArch64::CATCHRET:
     return EmitLoweredCatchRet(MI, BB);
+
+  case AArch64::AArch64_setjmp_instr:
+    return EmitSetjmp(MI, BB);
+  case AArch64::AArch64_longjmp_instr:
+    return EmitLongjmp(MI, BB);
   }
 }
 
@@ -4445,6 +4455,10 @@ SDValue AArch64TargetLowering::LowerOperation(SDValue Op,
                                /*OverrideNEON=*/true);
   case ISD::CTTZ:
     return LowerCTTZ(Op, DAG);
+  case ISD::EH_SJLJ_SETJMP:
+    return LowerSetjmp(Op, DAG);
+  case ISD::EH_SJLJ_LONGJMP:
+    return LowerLongjmp(Op, DAG);
   }
 }
 
@@ -17263,4 +17277,186 @@ SDValue AArch64TargetLowering::getSVESafeBitCast(EVT VT, SDValue Op,
     Op = DAG.getNode(AArch64ISD::REINTERPRET_CAST, DL, VT, Op);
 
   return Op;
+}
+
+SDValue AArch64TargetLowering::LowerSetjmp(SDValue Op,
+                                           SelectionDAG &DAG) const {
+  return DAG.getNode(AArch64ISD::EH_SJLJ_SETJMP, SDLoc(Op),
+                     DAG.getVTList(MVT::i32, MVT::Other), Op.getOperand(0),
+                     Op.getOperand(1));
+}
+
+SDValue AArch64TargetLowering::LowerLongjmp(SDValue Op,
+                                            SelectionDAG &DAG) const {
+  return DAG.getNode(AArch64ISD::EH_SJLJ_LONGJMP, SDLoc(Op), MVT::Other,
+                     Op.getOperand(0), Op.getOperand(1));
+}
+
+MachineBasicBlock *
+AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
+                                  MachineBasicBlock *MBB) const {
+  MachineFunction *MF = MBB->getParent();
+  const TargetInstrInfo *TII = Subtarget->getInstrInfo();
+  const TargetRegisterInfo *TRI = Subtarget->getRegisterInfo();
+  MachineRegisterInfo &MRI = MF->getRegInfo();
+  DebugLoc DL = MI.getDebugLoc();
+
+  const BasicBlock *BB = MBB->getBasicBlock();
+  MachineFunction::iterator I = ++MBB->getIterator();
+
+  // Memory Reference
+  SmallVector<MachineMemOperand *, 2> MMOs(MI.memoperands_begin(),
+                                           MI.memoperands_end());
+
+  Register DstReg = MI.getOperand(0).getReg();
+  const TargetRegisterClass *RC = MRI.getRegClass(DstReg);
+  assert(TRI->isTypeLegalForClass(*RC, MVT::i32) && "Invalid destination!");
+  (void)TRI;
+  Register mainDstReg = MRI.createVirtualRegister(RC);
+  Register restoreDstReg = MRI.createVirtualRegister(RC);
+  Register AddrReg = MI.getOperand(1).getReg();
+
+  MVT PVT = getPointerTy(MF->getDataLayout());
+  assert(PVT == MVT::i64 && "Invalid Pointer Size!");
+
+  // For v = setjmp(buf), we generate
+  //
+  // thisMBB:
+  //  buf[LabelOffset] = restoreMBB <-- takes address of restoreMBB
+  //  SjLjSetup restoreMBB
+  //
+  // mainMBB:
+  //  v_main = 0
+  //
+  // sinkMBB:
+  //  v = phi(main, restore)
+  //
+  // restoreMBB:
+  //  if base pointer being used, load it from frame
+  //  v_restore = 1
+
+  MachineBasicBlock *thisMBB = MBB;
+  MachineBasicBlock *mainMBB = MF->CreateMachineBasicBlock(BB);
+  MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+  MachineBasicBlock *restoreMBB = MF->CreateMachineBasicBlock(BB);
+  MF->insert(I, mainMBB);
+  MF->insert(I, sinkMBB);
+  MF->push_back(restoreMBB);
+  restoreMBB->setHasAddressTaken();
+
+  MachineInstrBuilder MIB;
+
+  // Transfer the remainder of BB and its successor edges to sinkMBB.
+  sinkMBB->splice(sinkMBB->begin(), MBB,
+                  std::next(MachineBasicBlock::iterator(MI)), MBB->end());
+  sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
+
+  // thisMBB:
+  unsigned LabelReg = 0;
+
+  // TODO: the optimizer isn't using stp for stores which look
+  // like they could be paired, possibly because they are emitted
+  // in order 0-2-1 or possibly because register allocation creates
+  // an unnecesary dependency.
+
+  // Load resume address into register
+  LabelReg = MRI.createVirtualRegister(&AArch64::GPR64RegClass);
+  // ADR should have enough range to span any reasonable function.
+  MIB = BuildMI(*thisMBB, MI, DL, TII->get(AArch64::ADR), LabelReg)
+            .addMBB(restoreMBB);
+  MIB = BuildMI(*thisMBB, MI, DL, TII->get(AArch64::STRXui));
+  MIB.addReg(LabelReg);
+  MIB.addReg(AddrReg);
+  MIB.addImm(1); // scaled by word size
+  MIB.setMemRefs(MMOs);
+
+  // x86 has cf-protection-return check here
+
+  // Add a special terminator instruction
+  MIB = BuildMI(*thisMBB, MI, DL, TII->get(AArch64::EH_SjLj_Setup))
+            .addMBB(restoreMBB);
+  
+  thisMBB->addSuccessor(mainMBB);
+  thisMBB->addSuccessor(restoreMBB);
+
+  // mainMBB:
+  // dst = 0 << 0
+  BuildMI(mainMBB, DL, TII->get(AArch64::MOVZWi), mainDstReg)
+      .addImm(0)
+      .addImm(0);
+  BuildMI(mainMBB, DL, TII->get(AArch64::B)).addMBB(sinkMBB);
+  mainMBB->addSuccessor(sinkMBB);
+
+  // sinkMBB:
+  BuildMI(*sinkMBB, sinkMBB->begin(), DL, TII->get(AArch64::PHI), DstReg)
+      .addReg(mainDstReg)
+      .addMBB(mainMBB)
+      .addReg(restoreDstReg)
+      .addMBB(restoreMBB);
+
+  // restoreMBB:
+  // TODO: restoreMBB has few valid registers on entry.
+  // TODO: x86 checks RegInfo->hasBasePointer(*MF) and loads
+  // RegInfo->getBaseRegister() from RegInfo->getFrameRegister().
+  // dst = 1 << 0
+  BuildMI(restoreMBB, DL, TII->get(AArch64::MOVZWi), restoreDstReg)
+      .addImm(1)
+      .addImm(0);
+  BuildMI(restoreMBB, DL, TII->get(AArch64::B)).addMBB(sinkMBB);
+  restoreMBB->addSuccessor(sinkMBB);
+
+  MI.eraseFromParent();
+  return sinkMBB;
+}
+
+MachineBasicBlock *
+AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
+                                   MachineBasicBlock *MBB) const {
+  MachineFunction *MF = MBB->getParent();
+  MachineRegisterInfo &MRI = MF->getRegInfo();
+  const TargetInstrInfo *TII = Subtarget->getInstrInfo();
+  DebugLoc DL = MI.getDebugLoc();
+  Register PC = MRI.createVirtualRegister(&AArch64::GPR64RegClass);
+  Register AddrReg = MI.getOperand(0).getReg();
+  Register StackReg = MRI.createVirtualRegister(&AArch64::GPR64RegClass);
+  MachineInstrBuilder MIB;
+
+  // The frame pointer is overwritten by the first load so
+  // copy it to a temporary register if necessary.
+  if (AddrReg == AArch64::FP || AddrReg == AArch64::SP) {
+    Register AddrTmp = MRI.createVirtualRegister(&AArch64::GPR64RegClass);
+    MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::ORRXri), AddrTmp);
+    MIB.addReg(AddrReg);
+    MIB.addImm(0);
+    AddrReg = AddrTmp;
+    MI.getOperand(0).ChangeToRegister(AddrTmp, false, false, true);
+  }
+
+#if 1
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::LDPXi));
+  MIB.addReg(AArch64::FP, RegState::Define/* | RegState::Undef*/);
+  MIB.addReg(PC, RegState::Define/* | RegState::Undef*/);
+  MIB.addReg(AddrReg);
+  MIB.addImm(0); // scaled by word size?
+#else
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::LDURXi), AArch64::FP);
+  MIB.addReg(AddrReg);
+  MIB.addImm(0); // scaled by word size?
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::LDURXi), PC);
+  MIB.addReg(AddrReg);
+  MIB.addImm(8); // scaled by word size?
+#endif
+  // Load instructions to SP are silently converted to loads to XZR.
+  // (This is an llvm bug; the emitter should generate an error in this case.)
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::LDURXi), StackReg);
+  MIB.addReg(AddrReg);
+  MIB.addImm(16); // scaled by word size?
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::ADDXri), AArch64::SP);
+  MIB.addReg(StackReg);
+  MIB.addImm(0); // immediate
+  MIB.addImm(0); // shift count
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::BR));
+  MIB.addReg(PC);
+  MI.eraseFromParent();
+  return MBB;
 }

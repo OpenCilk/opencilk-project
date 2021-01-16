@@ -7861,6 +7861,31 @@ let Predicates = [HasLS64] in {
   def : ST64BPattern<int_aarch64_st64bv0, ST64BV0>;
 }
 
+def AArch64eh_sjlj_setjmp : SDNode<"AArch64ISD::EH_SJLJ_SETJMP",
+                            SDTypeProfile<1, 1, [SDTCisInt<0>, SDTCisPtrTy<1>]>,
+                            [SDNPHasChain, SDNPSideEffect]>;
+def AArch64eh_sjlj_longjmp : SDNode<"AArch64ISD::EH_SJLJ_LONGJMP",
+                             SDTypeProfile<0, 1, [SDTCisPtrTy<0>]>,
+                             [SDNPHasChain, SDNPSideEffect]>;
+
+let isCodeGenOnly = 1, usesCustomInserter = 1, hasNoSchedulingInfo = 1 in {
+  def AArch64_setjmp_instr : Pseudo<(outs GPR32:$dst), (ins GPR64:$buf),
+                      [(set GPR32:$dst, (AArch64eh_sjlj_setjmp GPR64:$buf))]>;
+  def AArch64_longjmp_instr : Pseudo<(outs), (ins GPR64:$buf),
+                      [(AArch64eh_sjlj_longjmp GPR64:$buf)]>;
+}
+
+// This instruction is needed to make the longjmp target block reachable.
+def EH_SjLj_Setup : AArch64Inst<PseudoFrm, ""> {
+  let isTerminator = 1;
+  let isCodeGenOnly = 1;
+  let hasNoSchedulingInfo = 1;
+  let AsmString = "#EH_SjLj_Setup\t$dst";
+  dag OutOperandList = (outs);
+  // FIXME: GPR64 is wrong here, but bb and no prefix don't work.
+  dag InOperandList  = (ins GPR64:$dst);
+}
+
 include "AArch64InstrAtomics.td"
 include "AArch64SVEInstrInfo.td"
 
