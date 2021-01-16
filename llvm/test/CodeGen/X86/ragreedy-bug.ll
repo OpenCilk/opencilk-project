@@ -10,14 +10,12 @@
 ; Mem-move
 ; CHECK-NEXT: movl
 ; CHECK-NEXT: andl
-; CHECK-NEXT: testl
 ; CHECK-NEXT: jne
 ; CHECK: cond.true.i.i217
 ; CHECK-NEXT: in Loop
 ; Mem-move
 ; CHECK-NEXT: movl
 ; CHECK-NEXT: andl
-; CHECK-NEXT: testl
 ; CHECK-NEXT: je
 ; CHECK: cond.false.i.i
 ; CHECK: maskrune
