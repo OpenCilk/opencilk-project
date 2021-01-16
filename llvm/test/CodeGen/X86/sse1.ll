@@ -93,9 +93,9 @@ define <4 x float> @vselect(<4 x float>*%p, <4 x i32> %q) {
 ; X64-NEXT:  .LBB1_4:
 ; X64-NEXT:    movss {{.*#+}} xmm2 = mem[0],zero,zero,zero
 ; X64-NEXT:    testl %r8d, %r8d
-; X64-NEXT:    jne .LBB1_8
-; X64-NEXT:  .LBB1_7:
-; X64-NEXT:    movss {{.*#+}} xmm3 = mem[0],zero,zero,zero
+; X64-NEXT:    je .LBB1_7
+; X64-NEXT:  .LBB1_8: # %entry
+; X64-NEXT:    xorps %xmm3, %xmm3
 ; X64-NEXT:    unpcklps {{.*#+}} xmm2 = xmm2[0],xmm3[0],xmm2[1],xmm3[1]
 ; X64-NEXT:    testl %esi, %esi
 ; X64-NEXT:    je .LBB1_10
@@ -107,9 +107,9 @@ define <4 x float> @vselect(<4 x float>*%p, <4 x i32> %q) {
 ; X64-NEXT:  .LBB1_5: # %entry
 ; X64-NEXT:    xorps %xmm2, %xmm2
 ; X64-NEXT:    testl %r8d, %r8d
-; X64-NEXT:    je .LBB1_7
-; X64-NEXT:  .LBB1_8: # %entry
-; X64-NEXT:    xorps %xmm3, %xmm3
+; X64-NEXT:    jne .LBB1_8
+; X64-NEXT:  .LBB1_7:
+; X64-NEXT:    movss {{.*#+}} xmm3 = mem[0],zero,zero,zero
 ; X64-NEXT:    unpcklps {{.*#+}} xmm2 = xmm2[0],xmm3[0],xmm2[1],xmm3[1]
 ; X64-NEXT:    testl %esi, %esi
 ; X64-NEXT:    jne .LBB1_11
