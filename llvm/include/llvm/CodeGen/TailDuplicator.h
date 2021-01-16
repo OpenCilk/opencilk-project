@@ -75,7 +75,8 @@ public:
 
   bool tailDuplicateBlocks();
   static bool isSimpleBB(MachineBasicBlock *TailBB);
-  bool shouldTailDuplicate(bool IsSimple, MachineBasicBlock &TailBB);
+  BlockDesc getBlockDesc(MachineBasicBlock *TailBB);
+  bool shouldTailDuplicate(BlockDesc const &Desc, MachineBasicBlock &TailBB);
 
   /// Returns true if TailBB can successfully be duplicated into PredBB
   bool canTailDuplicate(MachineBasicBlock *TailBB, MachineBasicBlock *PredBB);
@@ -87,7 +88,7 @@ public:
   /// If \p RemovalCallback is non-null. It will be called before MBB is
   /// deleted.
   bool tailDuplicateAndUpdate(
-      bool IsSimple, MachineBasicBlock *MBB,
+      const BlockDesc &Desc, MachineBasicBlock *MBB,
       MachineBasicBlock *ForcedLayoutPred,
       SmallVectorImpl<MachineBasicBlock*> *DuplicatedPreds = nullptr,
       function_ref<void(MachineBasicBlock *)> *RemovalCallback = nullptr);
@@ -114,7 +115,7 @@ private:
                          SmallVectorImpl<MachineBasicBlock *> &TDBBs,
                          const DenseSet<unsigned> &RegsUsedByPhi,
                          SmallVectorImpl<MachineInstr *> &Copies);
-  bool tailDuplicate(bool IsSimple,
+  bool tailDuplicate(const BlockDesc &Desc,
                      MachineBasicBlock *TailBB,
                      MachineBasicBlock *ForcedLayoutPred,
                      SmallVectorImpl<MachineBasicBlock *> &TDBBs,
