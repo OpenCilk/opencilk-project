@@ -708,7 +708,8 @@ void AArch64MCCodeEmitter::encodeInstruction(const MCInst &MI,
     return;
   }
 
-  if (MI.getOpcode() == AArch64::SPACE) {
+  if (MI.getOpcode() == AArch64::SPACE ||
+      MI.getOpcode() == AArch64::EH_SjLj_Setup) {
     // SPACE just increases basic block size, in both cases no actual code.
     return;
   }

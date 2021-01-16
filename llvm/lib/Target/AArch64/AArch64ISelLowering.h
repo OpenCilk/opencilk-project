@@ -454,6 +454,10 @@ enum NodeType : unsigned {
   // chain = MSRR(chain, sysregname, lo64, hi64)
   MSRR,
 
+  // Builtin setjmp and longjmp
+  EH_SJLJ_SETJMP,
+  EH_SJLJ_LONGJMP,
+
   // Strict (exception-raising) floating point comparison
   STRICT_FCMP = ISD::FIRST_TARGET_STRICTFP_OPCODE,
   STRICT_FCMPE,
@@ -1169,6 +1173,8 @@ private:
   SDValue LowerDYNAMIC_STACKALLOC(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue LowerAVG(SDValue Op, SelectionDAG &DAG, unsigned NewOp) const;
+  SDValue LowerSetjmp(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerLongjmp(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue LowerFixedLengthVectorIntDivideToSVE(SDValue Op,
                                                SelectionDAG &DAG) const;
@@ -1310,6 +1316,10 @@ private:
   bool preferScalarizeSplat(SDNode *N) const override;
 
   unsigned getMinimumJumpTableEntries() const override;
+
+  MachineBasicBlock *EmitSetjmp(MachineInstr &MI, MachineBasicBlock *MBB) const;
+  MachineBasicBlock *EmitLongjmp(MachineInstr &MI,
+                                 MachineBasicBlock *MBB) const;
 };
 
 namespace AArch64 {
