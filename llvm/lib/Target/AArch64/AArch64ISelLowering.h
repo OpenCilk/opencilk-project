@@ -405,6 +405,9 @@ enum NodeType : unsigned {
   SSTNT1_PRED,
   SSTNT1_INDEX_PRED,
 
+  EH_SJLJ_SETJMP,
+  EH_SJLJ_LONGJMP,
+
   // Strict (exception-raising) floating point comparison
   STRICT_FCMP = ISD::FIRST_TARGET_STRICTFP_OPCODE,
   STRICT_FCMPE,
@@ -990,6 +993,8 @@ private:
                                          SelectionDAG &DAG) const;
   SDValue LowerSVEStructLoad(unsigned Intrinsic, ArrayRef<SDValue> LoadOps,
                              EVT VT, SelectionDAG &DAG, const SDLoc &DL) const;
+  SDValue LowerSetjmp(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerLongjmp(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue LowerFixedLengthVectorIntDivideToSVE(SDValue Op,
                                                SelectionDAG &DAG) const;
@@ -1117,6 +1122,9 @@ private:
 
   bool isConstantUnsignedBitfieldExtactLegal(unsigned Opc, LLT Ty1,
                                              LLT Ty2) const override;
+  MachineBasicBlock *EmitSetjmp(MachineInstr &MI, MachineBasicBlock *MBB) const;
+  MachineBasicBlock *EmitLongjmp(MachineInstr &MI,
+                                 MachineBasicBlock *MBB) const;
 };
 
 namespace AArch64 {
