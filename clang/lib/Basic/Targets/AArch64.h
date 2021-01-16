@@ -82,6 +82,8 @@ public:
     return false;
   }
 
+  bool hasSjLjLowering() const override { return true; }
+
   void getTargetDefinesARMV81A(const LangOptions &Opts,
                                MacroBuilder &Builder) const;
   void getTargetDefinesARMV82A(const LangOptions &Opts,
