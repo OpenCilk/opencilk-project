@@ -33424,6 +33424,7 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
   MachineFunction *MF = MBB->getParent();
   const TargetInstrInfo *TII = Subtarget.getInstrInfo();
   MachineRegisterInfo &MRI = MF->getRegInfo();
+  const TargetRegisterInfo *TRI = MRI.getTargetRegisterInfo();
 
   // Memory Reference
   SmallVector<MachineMemOperand *, 2> MMOs(MI.memoperands_begin(),
@@ -33454,6 +33455,18 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
   // When CET and shadow stack is enabled, we need to fix the Shadow Stack.
   if (MF->getMMI().getModule()->getModuleFlag("cf-protection-return")) {
     thisMBB = emitLongJmpShadowStackFix(MI, thisMBB);
+  }
+
+  // Copy stack addresses to a temporary register.
+  if (MI.getOperand(0).isFI() || MI.readsRegister(FP, TRI) ||
+      MI.readsRegister(SP, TRI)) {
+    Register AddrTmp = MRI.createVirtualRegister(RC);
+    unsigned LEA = (PVT == MVT::i64) ? X86::LEA64r : X86::LEA32r;
+    MIB = BuildMI(*thisMBB, MI, DL, TII->get(LEA), AddrTmp);
+    for (unsigned i = 0; i < X86::AddrNumOperands; ++i) {
+      MIB.add(MI.getOperand(i));
+    }
+    MI.getOperand(0).ChangeToRegister(AddrTmp, false, false, true);
   }
 
   // Reload FP
