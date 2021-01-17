@@ -407,7 +407,7 @@ static void **ThreadSelfSegbase() {
   // sysarch(AMD64_GET_FSBASE, segbase);
   __asm __volatile("movq %%fs:0, %0" : "=r" (segbase));
 #else
-#error "unsupported CPU arch"
+  segbase = (void **)__builtin_thread_pointer();
 #endif
   return segbase;
 }
