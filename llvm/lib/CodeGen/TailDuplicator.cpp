@@ -887,7 +887,7 @@ bool TailDuplicator::tailDuplicate(const BlockDesc &Desc,
           break;
         }
         for (Register Reg : B.Regs) {
-          if (MI->modifiesRegister(Reg, TRI)) {
+          if (MI->modifiesRegister(Reg, TRI) || MI->killsRegister(Reg, TRI)) {
             goto loop_exit; // double break
           }
           if (MI->readsRegister(Reg, TRI)) {

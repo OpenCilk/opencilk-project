@@ -4552,9 +4552,13 @@ bool X86InstrInfo::isSetConstant(const MachineInstr &MI, Register &Reg,
       return false;
     Value = 0;
     return true;
-  case X86::MOV32ri:
-    Value = MI.getOperand(1).getImm();
+  case X86::MOV32ri: {
+    const MachineOperand &Src = MI.getOperand(1);
+    if (!Src.isImm())
+      return false;
+    Value = Src.getImm();
     return true;
+  }
   default:
     return false;
   }
