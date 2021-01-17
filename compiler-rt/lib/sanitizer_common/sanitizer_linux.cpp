@@ -1451,7 +1451,7 @@ uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
       : "memory");
   return res;
 }
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) && defined(__linux__)
 uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
                     int *parent_tidptr, void *newtls, int *child_tidptr) {
   register long long res __asm__("x0");
@@ -1992,7 +1992,7 @@ SignalContext::WriteFlag SignalContext::GetWriteFlag() const {
   static const uptr FSR_WRITE = 1U << 11;
   uptr fsr = ucontext->uc_mcontext.error_code;
   return fsr & FSR_WRITE ? Write : Read;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) && defined(__linux__)
   static const u64 ESR_ELx_WNR = 1U << 6;
   u64 esr;
   if (!Aarch64GetESR(ucontext, &esr)) return Unknown;
