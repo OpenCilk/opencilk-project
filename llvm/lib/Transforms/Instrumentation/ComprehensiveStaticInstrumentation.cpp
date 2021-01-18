@@ -2176,6 +2176,12 @@ bool CSIImpl::shouldNotInstrumentFunction(Function &F) {
   if (F.hasName() && F.getName() == CsiRtUnitCtorName)
     return true;
 
+  // Don't instrument anything in the startup section or the __StaticInit
+  // section (MacOSX).
+  if (F.getSection() == ".text.startup" ||
+      F.getSection().find("__StaticInit") != std::string::npos)
+    return true;
+
   // Don't instrument functions that will run before or
   // simultaneously with CSI ctors.
   GlobalVariable *GV = M.getGlobalVariable("llvm.global_ctors");
