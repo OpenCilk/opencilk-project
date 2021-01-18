@@ -2006,9 +2006,9 @@ static void PromoteCallsInTasksHelper(
           DetachesToReplace.push_back(DI);
 
       } else {
-        PromoteCallsInTasksHelper(DI->getDetached(), DI->getUnwindDest(),
-                                  Unreachable, CurrentTaskFrame, &Worklist);
-
+        // Because this detach has an unwind destination, Any calls in the
+        // spawned task that may throw should already be invokes.  Hence there
+        // is no need to promote calls in this task.
         if (Visited.insert(DI->getUnwindDest()).second)
           // If the detach-unwind isn't dead, add it to the worklist.
           Worklist.push_back(DI->getUnwindDest());
