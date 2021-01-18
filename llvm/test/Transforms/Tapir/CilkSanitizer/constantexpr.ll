@@ -77,10 +77,10 @@ target triple = "x86_64-unknown-linux-gnu"
 @.str.26 = private unnamed_addr constant [54 x i8] c"--([[:alnum:]][-_[:alnum:]]+)(=(.*))?|-([[:alnum:]]+)\00", align 1
 @_ZN7cxxopts12_GLOBAL__N_116option_specifierB5cxx11E = internal global %"class.std::__cxx11::basic_regex" zeroinitializer, align 8, !dbg !1889
 @.str.28 = private unnamed_addr constant [50 x i8] c"(([[:alnum:]]),)?[ ]*([[:alnum:]][-_[:alnum:]]*)?\00", align 1
-@llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }] [{ i32, void ()*, i8* } { i32 65535, void ()* @_GLOBAL__sub_I_main.cpp, i8* null }]
+@llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }] [{ i32, void ()*, i8* } { i32 65535, void ()* @foo, i8* null }]
 
 ; Function Attrs: sanitize_cilk uwtable
-define internal void @_GLOBAL__sub_I_main.cpp() #3 section ".text.startup" personality i32 (...)* @__gxx_personality_v0 !dbg !123083 {
+define internal void @foo() #3 personality i32 (...)* @__gxx_personality_v0 !dbg !123083 {
 entry:
   %agg.tmp.i.i.i11 = alloca %"class.std::locale", align 8
   %agg.tmp.i.i.i9 = alloca %"class.std::locale", align 8
@@ -450,7 +450,7 @@ __cxx_global_var_init.27.exit:                    ; preds = %__cxx_global_var_in
   ret void
 }
 
-; CHECK: define internal void @_GLOBAL__sub_I_main.cpp()
+; CHECK: define internal void @foo()
 ; CHECK: call void @__csan_func_entry(
 ; CHECK: call void @__csan_large_store(i64 %{{.+}}, i8* bitcast (%union.anon.1* getelementptr inbounds (%"class.std::__cxx11::basic_string", %"class.std::__cxx11::basic_string"* @_ZN7cxxopts12_GLOBAL__N_16LQUOTEB5cxx11E, i64 0, i32 2) to i8*)
 ; CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 bitcast (%union.anon.1* getelementptr inbounds (%"class.std::__cxx11::basic_string", %"class.std::__cxx11::basic_string"* @_ZN7cxxopts12_GLOBAL__N_16LQUOTEB5cxx11E, i64 0, i32 2) to i8*)
