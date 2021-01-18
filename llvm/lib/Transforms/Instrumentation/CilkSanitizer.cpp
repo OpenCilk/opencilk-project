@@ -849,10 +849,13 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   Type *LargeNumBytesType = IntptrTy;
   Type *IDType = IRB.getInt64Ty();
 
+  AttributeList GeneralFnAttrs;
+  GeneralFnAttrs = GeneralFnAttrs.addAttribute(
+      C, AttributeList::FunctionIndex, Attribute::InaccessibleMemOrArgMemOnly);
+  GeneralFnAttrs = GeneralFnAttrs.addAttribute(C, AttributeList::FunctionIndex,
+                                               Attribute::NoUnwind);
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::ReadNone);
     FnAttrs = FnAttrs.addParamAttribute(C, 2, Attribute::NoCapture);
@@ -864,9 +867,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
                                           FuncPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanFuncExit = M.getOrInsertFunction("__csan_func_exit", FnAttrs, RetType,
                                          /* func_exit_id */ IDType,
                                          /* func_id */ IDType,
@@ -874,27 +875,21 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   }
 
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::ReadNone);
     CsanRead = M.getOrInsertFunction("__csan_load", FnAttrs, RetType, IDType,
                                      AddrType, NumBytesType, LoadPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::ReadNone);
     CsanWrite = M.getOrInsertFunction("__csan_store", FnAttrs, RetType, IDType,
                                       AddrType, NumBytesType, StorePropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::ReadNone);
     CsanLargeRead = M.getOrInsertFunction("__csan_large_load", FnAttrs, RetType,
@@ -902,9 +897,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
                                           LoadPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::ReadNone);
     CsanLargeWrite = M.getOrInsertFunction("__csan_large_store", FnAttrs,
@@ -913,35 +906,27 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   }
 
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanBeforeCallsite = M.getOrInsertFunction("__csan_before_call", FnAttrs,
                                                IRB.getVoidTy(), IDType,
                                                /*callee func_id*/ IDType,
                                                IRB.getInt8Ty(), CallPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanAfterCallsite = M.getOrInsertFunction("__csan_after_call", FnAttrs,
                                               IRB.getVoidTy(), IDType, IDType,
                                               IRB.getInt8Ty(), CallPropertyTy);
   }
 
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanDetach = M.getOrInsertFunction("__csan_detach", FnAttrs, RetType,
                                        /* detach_id */ IDType,
                                        /* sync_reg */ IRB.getInt8Ty());
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 2, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 2, Attribute::ReadNone);
     FnAttrs = FnAttrs.addParamAttribute(C, 3, Attribute::NoCapture);
@@ -954,9 +939,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
                                           TaskPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                         Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanTaskExit = M.getOrInsertFunction("__csan_task_exit", FnAttrs, RetType,
                                          /* task_exit_id */ IDType,
                                          /* task_id */ IDType,
@@ -965,26 +948,20 @@ void CilkSanitizerImpl::initializeCsanHooks() {
                                          TaskExitPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanDetachContinue = M.getOrInsertFunction("__csan_detach_continue",
                                                FnAttrs, RetType,
                                                /* detach_continue_id */ IDType,
                                                /* detach_id */ IDType);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanSync = M.getOrInsertFunction("__csan_sync", FnAttrs, RetType, IDType,
                                      /* sync_reg */ IRB.getInt8Ty());
   }
 
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::ReadNone);
     FnAttrs = FnAttrs.addParamAttribute(C, 5, Attribute::NoCapture);
@@ -996,9 +973,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
         /* old ptr */ AddrType, /* property */ AllocFnPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::ReadNone);
     CsanAfterFree = M.getOrInsertFunction("__csan_after_free", FnAttrs, RetType,
@@ -1007,50 +982,38 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   }
 
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanDisableChecking = M.getOrInsertFunction("__cilksan_disable_checking",
                                                 FnAttrs, RetType);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                         Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanEnableChecking = M.getOrInsertFunction("__cilksan_enable_checking",
                                                FnAttrs, RetType);
   }
 
   Type *MAAPTy = IRB.getInt8Ty();
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOrArgMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 0, Attribute::NoCapture);
     GetMAAP = M.getOrInsertFunction("__csan_get_MAAP", FnAttrs, RetType,
                                     PointerType::get(MAAPTy, 0), IDType,
                                     IRB.getInt8Ty());
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     SetMAAP = M.getOrInsertFunction("__csan_set_MAAP", FnAttrs, RetType, MAAPTy,
                                     IDType);
   }
 
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanBeforeLoop = M.getOrInsertFunction(
         "__csan_before_loop", FnAttrs, IRB.getVoidTy(), IDType,
         IRB.getInt64Ty(), LoopPropertyTy);
   }
   {
-    AttributeList FnAttrs;
-    FnAttrs = FnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                   Attribute::InaccessibleMemOnly);
+    AttributeList FnAttrs = GeneralFnAttrs;
     CsanAfterLoop = M.getOrInsertFunction("__csan_after_loop", FnAttrs,
                                           IRB.getVoidTy(), IDType,
                                           IRB.getInt8Ty(), LoopPropertyTy);
@@ -1060,7 +1023,8 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   Function *CsiAfterAllocaFn = cast<Function>(CsiAfterAlloca.getCallee());
   CsiAfterAllocaFn->addParamAttr(1, Attribute::NoCapture);
   CsiAfterAllocaFn->addParamAttr(1, Attribute::ReadNone);
-  CsiAfterAllocaFn->addFnAttr(Attribute::InaccessibleMemOnly);
+  CsiAfterAllocaFn->addFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
+  CsiAfterAllocaFn->setDoesNotThrow();
 }
 
 static BasicBlock *SplitOffPreds(
@@ -3608,7 +3572,9 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
   Type *IDType = IRB.getInt64Ty();
   AttributeList FnAttrs;
   FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::InaccessibleMemOnly);
+                                 Attribute::InaccessibleMemOrArgMemOnly);
+  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
+                                 Attribute::NoUnwind);
 
   // If the intrinsic does not return, insert the hook before the intrinsic.
   if (CB->doesNotReturn()) {
@@ -3775,7 +3741,9 @@ bool CilkSanitizerImpl::instrumentLibCall(Instruction *I,
   Type *IDType = IRB.getInt64Ty();
   AttributeList FnAttrs;
   FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::InaccessibleMemOnly);
+                                 Attribute::InaccessibleMemOrArgMemOnly);
+  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
+                                 Attribute::NoUnwind);
 
   // If the intrinsic does not return, insert the hook before the intrinsic.
   if (CB->doesNotReturn()) {
@@ -4521,7 +4489,9 @@ bool CilkSanitizerImpl::instrumentAllocFnLibCall(Instruction *I,
   Type *IDType = IRB.getInt64Ty();
   AttributeList FnAttrs;
   FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::InaccessibleMemOnly);
+                                 Attribute::InaccessibleMemOrArgMemOnly);
+  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
+                                 Attribute::NoUnwind);
 
   // Synthesize the after hook for this function.
   SmallVector<Type *, 8> AfterHookParamTys({IDType, /*callee func_id*/ IDType,
