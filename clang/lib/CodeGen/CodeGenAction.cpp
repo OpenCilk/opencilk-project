@@ -797,10 +797,10 @@ void BackendConsumer::DiagnosticHandlerImpl(const DiagnosticInfo &DI) {
     ComputeDiagID(Severity, backend_frame_larger_than, DiagID);
     break;
   case DK_Linker:
-    assert(CurLinkModule);
     // FIXME: stop eating the warnings and notes.
     if (Severity != DS_Error)
       return;
+    assert(CurLinkModule);
     DiagID = diag::err_fe_cannot_link_module;
     break;
   case llvm::DK_OptimizationRemark:
