@@ -2950,7 +2950,8 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
 
     // If pedigrees are enabled, link the OpenCilk pedigree library.
     if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
-      AddLinkTapirRuntimeLib(Args, CmdArgs, "pedigrees", RLO, !StaticOpenCilk);
+      AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk-pedigrees", RLO,
+                             !StaticOpenCilk);
 
     // Link the correct Cilk personality fn
     if (getDriver().CCCIsCXX())

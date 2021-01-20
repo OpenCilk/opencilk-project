@@ -1434,7 +1434,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
 
     // If pedigrees are enabled, link the OpenCilk pedigree library.
     if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
-      CmdArgs.push_back("-lpedigrees");
+      CmdArgs.push_back("-lopencilk-pedigrees");
 
     // Link the correct Cilk personality fn
     if (getDriver().CCCIsCXX())
