@@ -5486,11 +5486,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       case llvm::Triple::x86_64:
       case llvm::Triple::arm:
       case llvm::Triple::armeb:
-	break;
       case llvm::Triple::aarch64:
       case llvm::Triple::aarch64_be:
-      case llvm::Triple::aarch64_32:
-	/* ARMv8 is waiting on builtin setjmp/longjmp. */
+	break;
       default:
 	D.Diag(diag::err_drv_cilk_unsupported);
 	break;
