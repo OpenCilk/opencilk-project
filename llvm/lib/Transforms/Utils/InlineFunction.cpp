@@ -2636,7 +2636,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
           Caller->getContext(), "eh.unified.resume.i", Caller);
       // Add a PHI node at the beginning of the block.
       IRBuilder<> Builder(UnifiedResume);
-      PHINode *PN = Builder.CreatePHI(Resumes[0]->getType(), Resumes.size());
+      PHINode *PN =
+          Builder.CreatePHI(Resume->getValue()->getType(), Resumes.size());
       for (ResumeInst *RI : Resumes) {
         // Insert incoming values to the PHI node.
         PN->addIncoming(RI->getValue(), RI->getParent());
