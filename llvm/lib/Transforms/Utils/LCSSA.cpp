@@ -90,6 +90,8 @@ bool llvm::formLCSSAForInstructions(SmallVectorImpl<Instruction *> &Worklist,
   // instructions within the same loops, computing the exit blocks is
   // expensive, and we're not mutating the loop structure.
   SmallDenseMap<Loop*, SmallVector<BasicBlock *,1>> LoopExitBlocks;
+  // Similarly, cache the Loop TaskExits across this loop.
+  SmallDenseMap<Loop*, SmallPtrSet<BasicBlock *,1>> LoopTaskExits;
 
   while (!Worklist.empty()) {
     UsesToRewrite.clear();
@@ -107,6 +109,11 @@ bool llvm::formLCSSAForInstructions(SmallVectorImpl<Instruction *> &Worklist,
     if (ExitBlocks.empty())
       continue;
 
+    if (!LoopTaskExits.count(L))
+      L->getTaskExits(LoopTaskExits[L]);
+    assert(LoopTaskExits.count(L));
+    const SmallPtrSetImpl<BasicBlock *> &TaskExits = LoopTaskExits[L];
+
     for (Use &U : make_early_inc_range(I->uses())) {
       Instruction *User = cast<Instruction>(U.getUser());
       BasicBlock *UserBB = User->getParent();
@@ -123,7 +130,7 @@ bool llvm::formLCSSAForInstructions(SmallVectorImpl<Instruction *> &Worklist,
       if (auto *PN = dyn_cast<PHINode>(User))
         UserBB = PN->getIncomingBlock(U);
 
-      if (InstBB != UserBB && !L->contains(UserBB))
+      if (InstBB != UserBB && !L->contains(UserBB) && !TaskExits.count(UserBB))
         UsesToRewrite.push_back(&U);
     }
 
@@ -181,7 +188,7 @@ bool llvm::formLCSSAForInstructions(SmallVectorImpl<Instruction *> &Worklist,
         // If the exit block has a predecessor not within the loop, arrange for
         // the incoming value use corresponding to that predecessor to be
         // rewritten in terms of a different LCSSA PHI.
-        if (!L->contains(Pred))
+        if (!L->contains(Pred) && !TaskExits.count(Pred))
           UsesToRewrite.push_back(
               &PN->getOperandUse(PN->getOperandNumForIncomingValue(
                   PN->getNumIncomingValues() - 1)));
