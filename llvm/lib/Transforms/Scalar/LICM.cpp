@@ -1567,6 +1567,11 @@ static void splitPredecessorsOfLoopExit(PHINode *PN, DominatorTree *DT,
   CurLoop->getUniqueExitBlocks(ExitBlocks);
   SmallPtrSet<BasicBlock *, 32> ExitBlockSet(ExitBlocks.begin(),
                                              ExitBlocks.end());
+
+  // Get the Tapir task exits for the current loop, in order to check for users
+  // contained in those task exits.
+  SmallPtrSet<BasicBlock *, 4> CurLoopTaskExits;
+  CurLoop->getTaskExits(CurLoopTaskExits);
 #endif
   BasicBlock *ExitBB = PN->getParent();
   assert(ExitBlockSet.count(ExitBB) && "Expect the PHI is in an exit block.");
@@ -1607,8 +1612,15 @@ static void splitPredecessorsOfLoopExit(PHINode *PN, DominatorTree *DT,
   SmallSetVector<BasicBlock *, 8> PredBBs(pred_begin(ExitBB), pred_end(ExitBB));
   while (!PredBBs.empty()) {
     BasicBlock *PredBB = *PredBBs.begin();
-    assert(CurLoop->contains(PredBB) &&
+    assert((CurLoop->contains(PredBB) || CurLoopTaskExits.count(PredBB)) &&
            "Expect all predecessors are in the loop");
+    // Don't split loop-exit predecessor blocks terminated by a detach or
+    // detached.rethrow.
+    if (isa<DetachInst>(PredBB->getTerminator()) ||
+        isDetachedRethrow(PredBB->getTerminator())) {
+      PredBBs.remove(PredBB);
+      continue;
+    }
     if (PN->getBasicBlockIndex(PredBB) >= 0) {
       BasicBlock *NewPred = SplitBlockPredecessors(
           ExitBB, PredBB, ".split.loop.exit", DT, LI, MSSAU, true);
