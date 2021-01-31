@@ -639,16 +639,20 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   BasicBlock *RecurHead, *RecurDet, *RecurCont;
   Value *IterCount;
   PHINode *PrimaryIVStart;
+  Value *Start;
   {
     Instruction *PreheaderOrigFront = &(DACHead->front());
     IRBuilder<> Builder(PreheaderOrigFront);
     // Create branch based on grainsize.
-    //CanonicalIVInput = CanonicalIV->getIncomingValueForBlock(DACHead);
     PrimaryIVStart = Builder.CreatePHI(PrimaryIV->getType(), 2,
                                        PrimaryIV->getName()+".dac");
     PrimaryIVStart->setDebugLoc(PrimaryIV->getDebugLoc());
     PrimaryIVInput->replaceAllUsesWith(PrimaryIVStart);
-    IterCount = Builder.CreateSub(End, PrimaryIVStart, "itercount");
+    Start = PrimaryIVStart;
+    // Extend or truncate start, if necessary.
+    if (PrimaryIVStart->getType() != End->getType())
+      Start = Builder.CreateZExtOrTrunc(PrimaryIVStart, End->getType());
+    IterCount = Builder.CreateSub(End, Start, "itercount");
     Value *IterCountCmp = Builder.CreateICmpUGT(IterCount, Grainsize);
     Instruction *RecurTerm =
       SplitBlockAndInsertIfThen(IterCountCmp, PreheaderOrigFront,
@@ -671,10 +675,8 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   Instruction *MidIter;
   {
     IRBuilder<> Builder(&(RecurHead->front()));
-    MidIter = cast<Instruction>(
-        Builder.CreateAdd(PrimaryIVStart,
-                          Builder.CreateLShr(IterCount, 1, "halfcount"),
-                          "miditer"));
+    Value *HalfCount = Builder.CreateLShr(IterCount, 1, "halfcount");
+    MidIter = cast<Instruction>(Builder.CreateAdd(Start, HalfCount, "miditer"));
     // Copy flags from the increment operation on the primary IV.
     MidIter->copyIRFlags(PrimaryIVInc);
   }
@@ -755,6 +757,14 @@ void DACSpawning::implementDACIterSpawnOnHelper(
                           "miditerplusone"));
     // Copy flags from the increment operation on the primary IV.
     NextIter->copyIRFlags(PrimaryIVInc);
+    // Extend or truncate NextIter, if necessary
+    if (PrimaryIVStart->getType() != NextIter->getType())
+      NextIter = cast<Instruction>(
+          Builder.CreateZExtOrTrunc(NextIter, PrimaryIVStart->getType()));
+  } else if (PrimaryIVStart->getType() != NextIter->getType()) {
+    IRBuilder<> Builder(&(RecurCont->front()));
+    NextIter = cast<Instruction>(
+        Builder.CreateZExtOrTrunc(NextIter, PrimaryIVStart->getType()));
   }
 
   // Finish the phi node in DACHead.
@@ -764,7 +774,6 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   //   ...
   PrimaryIVStart->addIncoming(PrimaryIVInput, Preheader);
   PrimaryIVStart->addIncoming(NextIter, RecurCont);
-  // PrimaryIVStart->addIncoming(MidIterPlusOne, RecurCont);
 
   // Make the recursive DAC call parallel.
   //
