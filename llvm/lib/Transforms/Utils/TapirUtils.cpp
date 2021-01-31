@@ -843,7 +843,7 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
 
   // Update dominator tree.
   if (DT) {
-    if (DT->dominates(Spawner, Continue))
+    if (ReattachDom && DT->dominates(Spawner, Continue))
       DT->changeImmediateDominator(Continue, ReattachDom);
     if (DI->hasUnwindDest())
       DT->deleteEdge(Spawner, Unwind);
