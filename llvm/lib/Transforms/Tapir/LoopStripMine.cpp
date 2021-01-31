@@ -254,6 +254,17 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
     return nullptr;
   }
 
+  // Tapir loops where the loop body does not reattach cannot be stripmined.
+  if (!llvm::any_of(predecessors(LatchBlock), [](const BasicBlock *B) {
+        return isa<ReattachInst>(B->getTerminator());
+      })) {
+    LLVM_DEBUG(dbgs() << "  Can't stripmine: loop body does not reattach.\n");
+    if (ORE)
+      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoReattach", L)
+                << "spawned loop body does not reattach");
+    return nullptr;
+  }
+
   // The current loop-stripmine pass can only stripmine loops with a single
   // latch that's a conditional branch exiting the loop.
   // FIXME: The implementation can be extended to work with more complicated
@@ -1175,6 +1186,7 @@ Loop *llvm::StripMineLoop(
       ReattachDom = DT->findNearestCommonDominator(ReattachDom, I->getParent());
     ReplaceInstWithInst(I, BranchInst::Create(Latch));
   }
+  assert(ReattachDom && "No reattach-dominator block found");
   // Insert a reattach at the end of NewReattB.
   ReplaceInstWithInst(NewReattB->getTerminator(),
                       ReattachInst::Create(NewLatch, NewSyncReg));
@@ -1330,7 +1342,7 @@ Loop *llvm::StripMineLoop(
   // Update all of the old PHI nodes
   B2.SetInsertPoint(NewEntry->getTerminator());
   Instruction *CountVal = cast<Instruction>(
-      B2.CreateMul(ConstantInt::get(PrimaryInduction->getType(), Count),
+      B2.CreateMul(ConstantInt::get(NewIdx->getType(), Count),
                    NewIdx));
   CountVal->copyIRFlags(PrimaryInduction);
   for (auto &InductionEntry : *TL.getInductionVars()) {
