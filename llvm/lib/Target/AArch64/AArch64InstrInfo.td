@@ -7882,8 +7882,7 @@ def EH_SjLj_Setup : AArch64Inst<PseudoFrm, ""> {
   let hasNoSchedulingInfo = 1;
   let AsmString = "#EH_SjLj_Setup\t$dst";
   dag OutOperandList = (outs);
-  // FIXME: GPR64 is wrong here, but bb and no prefix don't work.
-  dag InOperandList  = (ins GPR64:$dst);
+  dag InOperandList  = (ins am_brcond:$dst);
 }
 
 include "AArch64InstrAtomics.td"
