@@ -17378,9 +17378,14 @@ AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
   MIB = BuildMI(*thisMBB, MI, DL, TII->get(AArch64::EH_SjLj_Setup))
             .addMBB(restoreMBB);
   // TODO: This unnecessarily flushes registers on the fallthrough
-  // path even though only restoreMBB loses register state.
+  // path even though only restoreMBB loses register state.  The data
+  // loss needs to be added to the edge.  Putting the register mask in
+  // the destination block is too late because the compiler will put
+  // spills of already-invalid registers before the invalidation note.
   MIB.addRegMask(MRI.getTargetRegisterInfo()->getNoPreservedMask());
-  
+  // For now these successors should not have branch probabilities.
+  // Although mainMBB is much more likely, adding probabilities causes
+  // poor code generation later, in part by suppressing tail duplication.
   thisMBB->addSuccessor(mainMBB);
   thisMBB->addSuccessor(restoreMBB);
 
