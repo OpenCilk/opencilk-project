@@ -604,10 +604,30 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   }
 
   BasicBlock *DACHead = Preheader;
-  if (&(Helper->getEntryBlock()) == Preheader)
+  if (&(Helper->getEntryBlock()) == Preheader) {
     // Split the entry block.  We'll want to create a backedge into
     // the split block later.
-    DACHead = SplitBlock(Preheader, Preheader->getTerminator());
+    DACHead = SplitBlock(Preheader, &Preheader->front());
+
+    // Move any syncregion_start's in DACHead into Preheader.
+    BasicBlock::iterator InsertPoint = Preheader->begin();
+    for (BasicBlock::iterator I = DACHead->begin(), E = DACHead->end();
+         I != E;) {
+      IntrinsicInst *II = dyn_cast<IntrinsicInst>(I++);
+      if (!II)
+        continue;
+      if (Intrinsic::syncregion_start != II->getIntrinsicID())
+        continue;
+
+      while (isa<IntrinsicInst>(I) &&
+             Intrinsic::syncregion_start ==
+                 cast<IntrinsicInst>(I)->getIntrinsicID())
+        ++I;
+
+      Preheader->getInstList().splice(InsertPoint, DACHead->getInstList(),
+                                      II->getIterator(), I);
+    }
+  }
 
   Value *PrimaryIVInput = PrimaryIV->getIncomingValueForBlock(DACHead);
   Value *PrimaryIVInc = PrimaryIV->getIncomingValueForBlock(
@@ -1334,16 +1354,15 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
 
     // Move allocas in cloned detached block to entry of helper function.
     BasicBlock *ClonedTaskEntry = cast<BasicBlock>(VMap[T->getEntry()]);
-    bool ContainsDynamicAllocas =
-      MoveStaticAllocasInBlock(&Helper->getEntryBlock(), ClonedTaskEntry,
-                               TaskEnds);
+    bool ContainsDynamicAllocas = MoveStaticAllocasInBlock(
+        &Helper->getEntryBlock(), ClonedTaskEntry, TaskEnds);
 
     // If this task uses a taskframe, move allocas in cloned taskframe entry to
     // entry of helper function.
     if (Spindle *TFCreate = T->getTaskFrameCreateSpindle()) {
       BasicBlock *ClonedTFEntry = cast<BasicBlock>(VMap[TFCreate->getEntry()]);
-      MoveStaticAllocasInBlock(&Helper->getEntryBlock(), ClonedTFEntry,
-                               TaskEnds);
+      ContainsDynamicAllocas |= MoveStaticAllocasInBlock(
+          &Helper->getEntryBlock(), ClonedTFEntry, TaskEnds);
     }
     // If the cloned loop contained dynamic alloca instructions, wrap the cloned
     // loop with llvm.stacksave/llvm.stackrestore intrinsics.
@@ -1352,12 +1371,12 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
       // Get the two intrinsics we care about.
       Function *StackSave = Intrinsic::getDeclaration(M, Intrinsic::stacksave);
       Function *StackRestore =
-        Intrinsic::getDeclaration(M,Intrinsic::stackrestore);
+          Intrinsic::getDeclaration(M, Intrinsic::stackrestore);
 
       // Insert the llvm.stacksave.
-      CallInst *SavedPtr = IRBuilder<>(&*ClonedTaskEntry,
-                                       ClonedTaskEntry->begin())
-                             .CreateCall(StackSave, {}, "savedstack");
+      CallInst *SavedPtr =
+          IRBuilder<>(&*ClonedTaskEntry, ClonedTaskEntry->begin())
+              .CreateCall(StackSave, {}, "savedstack");
 
       // Insert a call to llvm.stackrestore before the reattaches in the
       // original Tapir loop.
