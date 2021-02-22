@@ -180,19 +180,6 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
     // Outline the task, if necessary, and add the outlined function to the
     // mapping.
 
-    // If task T tracks any exception-handling spindles for its subtasks, remove
-    // any dependencies from those shared-EH spindles to T.
-    for (Spindle *SharedEH : T->shared_eh_spindles()) {
-      // Remove blocks in shared-EH spindles from PHI's in T.
-      for (Spindle::SpindleEdge &SuccEdge : SharedEH->out_edges()) {
-        Spindle *Succ = SuccEdge.first;
-        BasicBlock *Exit = SuccEdge.second;
-        if (Succ->getParentTask() != T || T->containsSharedEH(Succ))
-          continue;
-        Succ->getEntry()->removePredecessor(Exit);
-      }
-    }
-
     ValueToValueMapTy VMap;
     ValueToValueMapTy InputMap;
     TFToOutline[TF] = outlineTask(T, TFInputs[TF], HelperInputs[TF],
