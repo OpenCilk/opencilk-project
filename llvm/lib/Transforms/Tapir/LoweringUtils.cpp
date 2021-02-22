@@ -238,9 +238,9 @@ void llvm::getTaskFrameInputsOutputs(TFValueSetMap &TFInputs,
 
   // Get inputs from child taskframes.
   for (Spindle *SubTF : TF.subtaskframes())
-      for (Value *V : TFInputs[SubTF])
-        if (definedOutsideTaskFrame(V, &TF, TI))
-          TFInputs[&TF].insert(V);
+    for (Value *V : TFInputs[SubTF])
+      if (definedOutsideTaskFrame(V, &TF, TI))
+        TFInputs[&TF].insert(V);
 
   Value *TFCreate = T ? T->getTaskFrameUsed() : TF.getTaskFrameCreate();
   // Get inputs and outputs of the taskframe.
@@ -278,10 +278,19 @@ void llvm::getTaskFrameInputsOutputs(TFValueSetMap &TFInputs,
           // PHI nodes that use the landingpad of a detached-rethrow.  These
           // PHI-node inputs will be rewritten anyway, so skip them.
           if (isa<PHINode>(I))
-            if (Instruction *OP = dyn_cast<Instruction>(*OI))
+            if (Instruction *OP = dyn_cast<Instruction>(*OI)) {
               if (isa<LandingPadInst>(*OP) && T && T->encloses(OP->getParent()))
                 if (isSuccessorOfDetachedRethrow(OP->getParent()))
                   continue;
+              // Also ignore PHI nodes in shared-eh spindles.
+              if (T && S->isSharedEH())
+                continue;
+            }
+
+          // Skip detached-rethrow calls in shared-eh spindles.
+          if (T && S->isSharedEH())
+            if (isDetachedRethrow(&I))
+              continue;
 
           // TODO: Add a test to exclude landingpads from detached-rethrows?
           LLVM_DEBUG({
