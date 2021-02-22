@@ -4381,6 +4381,34 @@ bool CilkSanitizerImpl::getAllocFnArgs(
       AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
       return true;
     }
+  case LibFunc_ZnwjSt11align_val_t:
+  case LibFunc_ZnwmSt11align_val_t:
+  case LibFunc_ZnajSt11align_val_t:
+  case LibFunc_ZnamSt11align_val_t:
+  case LibFunc_ZnwjSt11align_val_tRKSt9nothrow_t:
+  case LibFunc_ZnwmSt11align_val_tRKSt9nothrow_t:
+  case LibFunc_ZnajSt11align_val_tRKSt9nothrow_t:
+  case LibFunc_ZnamSt11align_val_tRKSt9nothrow_t: {
+    if (const CallInst *CI = dyn_cast<CallInst>(I)) {
+      AllocFnArgs.push_back(CI->getArgOperand(0));
+      // Number of elements = 1
+      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
+      // Alignment
+      AllocFnArgs.push_back(CI->getArgOperand(1));
+      // Old pointer = NULL
+      AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
+    } else {
+      const InvokeInst *II = cast<InvokeInst>(I);
+      AllocFnArgs.push_back(II->getArgOperand(0));
+      // Number of elements = 1
+      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
+      // Alignment
+      AllocFnArgs.push_back(II->getArgOperand(1));
+      // Old pointer = NULL
+      AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
+    }
+    return true;
+  }
   case LibFunc_calloc:
     {
       const CallInst *CI = cast<CallInst>(I);
