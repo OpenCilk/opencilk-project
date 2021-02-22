@@ -3481,30 +3481,12 @@ bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
 FunctionCallee CilkSanitizerImpl::getOrInsertSynthesizedHook(StringRef Name,
                                                              FunctionType *T,
                                                              AttributeList AL) {
-  if (M.getNamedValue(Name))
-    // The hook already exists; just return it
-    return M.getOrInsertFunction(Name, T, AL);
-
-  // Create a weak version of the hook.
-  FunctionCallee NewHook = M.getOrInsertFunction(Name, T, AL);
-  Function *NewHookFn = cast<Function>(NewHook.getCallee());
-  NewHookFn->setLinkage(Function::WeakAnyLinkage);
-  BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", NewHookFn);
-  IRBuilder<> IRB(ReturnInst::Create(M.getContext(), Entry));
-
-  // Insert a call to the default library function hook
-  Type *IDType = IRB.getInt64Ty();
-  FunctionType *DefaultHookTy =
-      FunctionType::get(IRB.getVoidTy(),
-                        {/*call_id*/
-                         IDType, /*func_id*/ IDType,
-                         /*MAAP_count*/ IRB.getInt8Ty()},
-                        /*isVarArg*/ false);
-  FunctionCallee DefaultHook =
-      M.getOrInsertFunction("__csan_default_libhook", DefaultHookTy);
-  IRB.CreateCall(DefaultHook, {NewHookFn->getArg(0), NewHookFn->getArg(1),
-                               NewHookFn->getArg(2)});
-  return NewHook;
+  // TODO: Modify this routine to insert a call to a default library hook for
+  // any call to a library function or intrinsic that the Cilksan runtime does
+  // not recognize.  To do this, we may want to modify the CilkSanitizer pass
+  // accept a list of hooks recognized by the Cilksan runtime, e.g., in the form
+  // of a bitcode file.
+  return M.getOrInsertFunction(Name, T, AL);
 }
 
 bool CilkSanitizerImpl::instrumentIntrinsicCall(
