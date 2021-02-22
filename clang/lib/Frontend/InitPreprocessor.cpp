@@ -1116,8 +1116,28 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("__cilk_pedigrees__");
 
   // Add macro to indicate that the program is compiled with Cilksan enabled.
-  if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
+  if (LangOpts.Sanitize.has(SanitizerKind::Cilk)) {
     Builder.defineMacro("__cilksan__");
+
+    // Rename library functions that Cilksan tracks for race detection.
+
+    // Pthread locking routines
+    Builder.defineMacro("pthread_mutex_init", "__csan_pthread_mutex_init");
+    Builder.defineMacro("pthread_mutex_destroy",
+                        "__csan_pthread_mutex_destroy");
+    Builder.defineMacro("pthread_mutex_lock", "__csan_pthread_mutex_lock");
+    Builder.defineMacro("pthread_mutex_trylock",
+                        "__csan_pthread_mutex_trylock");
+    Builder.defineMacro("pthread_mutex_unlock", "__csan_pthread_mutex_unlock");
+
+    // C11 locking routines
+    Builder.defineMacro("mtx_init", "__csan_mtx_init");
+    Builder.defineMacro("mtx_destroy", "__csan_mtx_destroy");
+    Builder.defineMacro("mtx_lock", "__csan_mtx_lock");
+    Builder.defineMacro("mtx_trylock", "__csan_mtx_trylock");
+    Builder.defineMacro("mtx_timedlock", "__csan_mtx_timedlock");
+    Builder.defineMacro("mtx_unlock", "__csan_mtx_unlock");
+  }
 
   // Add macros to indicate that the program is compiled with different Cilk
   // tools.
