@@ -1946,15 +1946,16 @@ static BasicBlock *SplitResume(ResumeInst *RI, Intrinsic::ID TermFunc,
   return NewBB;
 }
 
-static void HandleInlinedResumeInTask(BasicBlock *EntryBlock,
+static void HandleInlinedResumeInTask(BasicBlock *EntryBlock, BasicBlock *Ctx,
                                       ResumeInst *Resume,
                                       BasicBlock *Unreachable) {
   // If the DetachedBlock has no predecessor, then it is the entry of the
   // function.  There's nothing to do in this case, so simply return.
-  if (pred_empty(EntryBlock))
+  if (pred_empty(EntryBlock) && EntryBlock == Ctx)
     return;
 
-  BasicBlock *Parent = EntryBlock->getSinglePredecessor();
+  BasicBlock *Parent =
+      (EntryBlock != Ctx ? Ctx : EntryBlock->getSinglePredecessor());
   Module *M = Parent->getModule();
   if (isTaskFrameCreate(EntryBlock->front())) {
     Value *TaskFrame = &EntryBlock->front();
@@ -1976,10 +1977,15 @@ static void HandleInlinedResumeInTask(BasicBlock *EntryBlock,
     SplitResume(Resume, Intrinsic::taskframe_resume, TaskFrame, Unreachable);
 
     // Recursively handle parent contexts.
-    HandleInlinedResumeInTask(GetDetachedCtx(Parent), Resume, Unreachable);
+    if (EntryBlock != Ctx)
+      HandleInlinedResumeInTask(Ctx, Ctx, Resume, Unreachable);
+    else {
+      BasicBlock *NewCtx = GetDetachedCtx(Parent);
+      HandleInlinedResumeInTask(NewCtx, NewCtx, Resume, Unreachable);
+    }
 
   } else {
-    // BasicBlock *Detacher = EntryBlock->getSinglePredecessor();
+    assert(EntryBlock == Ctx && "Unexpected context for detached entry block.");
     DetachInst *DI = cast<DetachInst>(Parent->getTerminator());
     Value *SyncRegion = DI->getSyncRegion();
 
@@ -2005,7 +2011,8 @@ static void HandleInlinedResumeInTask(BasicBlock *EntryBlock,
     ReplaceInstWithInst(DI, DetachInst::Create(EntryBlock, DI->getContinue(),
                                                NewBB, SyncRegion));
     // Recursively handle parent contexts.
-    HandleInlinedResumeInTask(GetDetachedCtx(Parent), Resume, Unreachable);
+    BasicBlock *NewCtx = GetDetachedCtx(Parent);
+    HandleInlinedResumeInTask(NewCtx, NewCtx, Resume, Unreachable);
   }
 }
 
@@ -2649,7 +2656,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     }
 
     // Handle resumes within the task.
-    HandleInlinedResumeInTask(TFEntryBlock, Resume, UnreachableBlk);
+    HandleInlinedResumeInTask(TFEntryBlock, DetachedCtxEntryBlock, Resume,
+                              UnreachableBlk);
   }
 
   // Update the lexical scopes of the new funclets and callsites.
