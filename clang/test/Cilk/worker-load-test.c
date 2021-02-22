@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %s -fopencilk -mllvm -opencilk-runtime-bc-path=%S/Inputs/libopencilk-abi.bc -O2 -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -fopencilk -mllvm -use-opencilk-runtime-bc=true -mllvm -opencilk-runtime-bc-path=%S/Inputs/libopencilk-abi.bc -O2 -S -emit-llvm -o - | FileCheck %s
 
 typedef int int32_t;
 typedef unsigned char uint8_t;
