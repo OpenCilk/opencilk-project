@@ -802,6 +802,8 @@ Function *llvm::createHelperForTaskFrame(
     for (BasicBlock *Pred : predecessors(S->getEntry())) {
       assert(!endsTaskFrame(Pred, TF->getTaskFrameCreate()) &&
              "Taskframe spindle after taskframe.end");
+      if (isDetachedRethrow(Pred->getTerminator()))
+        SharedEHEntries.insert(S->getEntry());
       if (isSuccessorOfDetachedRethrow(Pred))
         SharedEHEntries.insert(S->getEntry());
     }
