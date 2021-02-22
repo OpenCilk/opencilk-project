@@ -989,7 +989,7 @@ bool AccessPtrAnalysis::PointerCapturedBefore(const Value *Ptr,
                                               const Instruction *I,
                                               unsigned MaxUsesToExplore =
                                               MaxUsesToExploreCapture) const {
-  const Value *StrippedPtr = Ptr->stripPointerCasts();
+  const Value *StrippedPtr = Ptr->stripInBoundsOffsets();
   auto CaptureQuery = std::make_pair(StrippedPtr, I);
   if (MayBeCapturedCache.count(CaptureQuery))
     return MayBeCapturedCache[CaptureQuery];
