@@ -71,7 +71,7 @@ static const char *const CsiDisableInstrumentationName =
 using csi_id_t = int64_t;
 static const csi_id_t CsiUnknownId = -1;
 static const csi_id_t CsiCallsiteUnknownTargetId = CsiUnknownId;
-// See llvm/tools/clang/lib/CodeGen/CodeGenModule.h:
+// See clang/lib/CodeGen/CodeGenModule.h:
 static const int CsiUnitCtorPriority = 0;
 
 /// Maintains a mapping from CSI ID to static data for that ID.
