@@ -1129,6 +1129,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("pthread_mutex_trylock",
                         "__csan_pthread_mutex_trylock");
     Builder.defineMacro("pthread_mutex_unlock", "__csan_pthread_mutex_unlock");
+    Builder.defineMacro("pthread_once", "__csan_pthread_once");
 
     // C11 locking routines
     Builder.defineMacro("mtx_init", "__csan_mtx_init");
@@ -1137,6 +1138,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("mtx_trylock", "__csan_mtx_trylock");
     Builder.defineMacro("mtx_timedlock", "__csan_mtx_timedlock");
     Builder.defineMacro("mtx_unlock", "__csan_mtx_unlock");
+    Builder.defineMacro("call_once", "__csan_call_once");
   }
 
   // Add macros to indicate that the program is compiled with different Cilk
