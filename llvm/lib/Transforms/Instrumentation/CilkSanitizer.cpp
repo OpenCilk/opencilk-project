@@ -1060,6 +1060,7 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
   // Partition the predecessors of the landing pad.
   for (BasicBlock *Pred : predecessors(BB)) {
     if (isa<DetachInst>(Pred->getTerminator()) ||
+        isa<ReattachInst>(Pred->getTerminator()) ||
         isDetachedRethrow(Pred->getTerminator()))
       DetachPreds.push_back(Pred);
     else if (isTaskFrameResume(Pred->getTerminator()))
