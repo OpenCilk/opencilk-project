@@ -536,18 +536,42 @@ BasicBlock *llvm::SplitEdge(BasicBlock *BB, BasicBlock *Succ, DominatorTree *DT,
   // block.
   assert(BB->getTerminator()->getNumSuccessors() == 1 &&
          "Should have a single succ!");
-  BasicBlock *NewBB =
-      SplitBlock(BB, BB->getTerminator(), DT, LI, MSSAU, BBName);
-  if (SyncInst *OldSI = dyn_cast<SyncInst>(NewBB->getTerminator())) {
-    // Make sure the original BB is terminated by the sync.
-    SyncInst *SI = SyncInst::Create(NewBB, OldSI->getSyncRegion(),
-                                    BB->getTerminator());
-    BranchInst::Create(Succ, OldSI);
-    SI->setDebugLoc(OldSI->getDebugLoc());
-    BB->getTerminator()->eraseFromParent();
-    OldSI->eraseFromParent();
+  if (SyncInst *OldSI = dyn_cast<SyncInst>(BB->getTerminator())) {
+    // Insert a new basic block after BB.
+    std::string Name = BBName.str();
+    BasicBlock *NewBB = BasicBlock::Create(
+        BB->getContext(), Name.empty() ? BB->getName() + ".split" : Name,
+        BB->getParent(), BB->getNextNode());
+    // Terminate that block with an unconditional branch to Succ.
+    BranchInst::Create(Succ, NewBB);
+    // Update the successor of the sync instruction to be NewBB.
+    OldSI->setSuccessor(0, NewBB);
+    // Update any PHI ndes in Succ.
+    NewBB->replaceSuccessorsPhiUsesWith(BB, NewBB);
+
+    // The new block lives in whichever loop the old one did. This preserves
+    // LCSSA as well, because we force the split point to be after any PHI
+    // nodes.
+    if (LI)
+      if (Loop *L = LI->getLoopFor(BB))
+        L->addBasicBlockToLoop(NewBB, *LI);
+
+    if (DT)
+      // Old dominates New. New node dominates all other nodes dominated by Old.
+      if (DomTreeNode *OldNode = DT->getNode(BB)) {
+        std::vector<DomTreeNode *> Children(OldNode->begin(), OldNode->end());
+
+        DomTreeNode *NewNode = DT->addNewBlock(NewBB, BB);
+        for (DomTreeNode *I : Children)
+          DT->changeImmediateDominator(I, NewNode);
+      }
+
+    // Note: We don't need to update MSSA in this case, because the sync
+    // instruction remains in the original basic block.
+    return NewBB;
+  } else {
+    return SplitBlock(BB, BB->getTerminator(), DT, LI, MSSAU, BBName);
   }
-  return NewBB;
 }
 
 unsigned
