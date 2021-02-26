@@ -3252,8 +3252,8 @@ unsigned X86InstrInfo::removeBranchImpl(MachineBasicBlock &MBB,
       continue;
     }
     if (X86::getCondFromBranch(*I) != X86::COND_INVALID) {
-      if (I->killsRegister(X86::EFLAGS, TRI)) {
-        FlagsDead = DeleteFlags;
+      if (DeleteFlags && I->killsRegister(X86::EFLAGS, TRI)) {
+        FlagsDead = true;
       }
       // Remove the branch.
       I->eraseFromParent();
