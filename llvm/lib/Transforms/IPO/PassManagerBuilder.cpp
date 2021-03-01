@@ -190,9 +190,8 @@ static cl::opt<bool> DisableTapirOpts(
     "disable-tapir-opts", cl::init(false), cl::Hidden,
     cl::desc("Disable Tapir optimizations by outlining Tapir tasks early"));
 
-static cl::opt<bool>
-    VerifyTapirLowering("verify-tapir-lowering", cl::init(false), cl::Hidden,
-                        cl::desc("Verify IR after Tapir lowering steps"));
+static cl::opt<bool> VerifyTapir("verify-tapir", cl::init(false), cl::Hidden,
+                                 cl::desc("Verify IR after Tapir passes"));
 
 PassManagerBuilder::PassManagerBuilder() {
     TapirTarget = TapirTargetID::None;
@@ -827,7 +826,13 @@ void PassManagerBuilder::populateModulePassManager(
 
   // Stripmine Tapir loops.
   if (LoopStripmine) {
+    if (VerifyTapir)
+      // Verify the IR before loop stripmining
+      MPM.add(createVerifierPass());
     MPM.add(createLoopStripMinePass());
+    if (VerifyTapir)
+      // Verify the IR after loop stripmining
+      MPM.add(createVerifierPass());
     // Cleanup the IR after stripminning.
     MPM.add(createTaskSimplifyPass());
     MPM.add(createLoopSimplifyCFGPass());
@@ -998,7 +1003,7 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createLoopRotatePass(SizeLevel == 2 ? 0 : -1));
     // Outline Tapir loops as needed.
     MPM.add(createLoopSpawningTIPass());
-    if (VerifyTapirLowering)
+    if (VerifyTapir)
       // Verify the IR produced by loop spawning
       MPM.add(createVerifierPass());
 
@@ -1018,7 +1023,7 @@ void PassManagerBuilder::populateModulePassManager(
     // Now lower Tapir to Target runtime calls.
     MPM.add(createTaskCanonicalizePass());
     MPM.add(createLowerTapirToTargetPass());
-    if (VerifyTapirLowering)
+    if (VerifyTapir)
       // Verify the IR produced by Tapir lowering
       MPM.add(createVerifierPass());
     // The lowering pass introduces new functions and may leave cruft around.
