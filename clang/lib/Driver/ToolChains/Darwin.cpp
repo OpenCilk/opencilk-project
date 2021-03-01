@@ -3387,6 +3387,8 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
     SmallString<128> P(A->getValue());
     if (getVFS().exists(P)) {
       CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back(Args.MakeArgString(("-use-opencilk-runtime-bc=true")));
+      CmdArgs.push_back("-mllvm");
       CmdArgs.push_back(Args.MakeArgString(("-opencilk-runtime-bc-path=" + P)));
       return;
     }
@@ -3404,6 +3406,8 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
     P.assign(*RuntimePath);
     llvm::sys::path::append(P, OpenCilkABIBCFilename);
     if (getVFS().exists(P)) {
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back(Args.MakeArgString(("-use-opencilk-runtime-bc=true")));
       CmdArgs.push_back("-mllvm");
       CmdArgs.push_back(Args.MakeArgString(("-opencilk-runtime-bc-path=" + P)));
       return;
