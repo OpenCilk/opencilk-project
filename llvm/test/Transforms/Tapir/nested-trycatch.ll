@@ -1,7 +1,7 @@
-; RUN: opt < %s -simplifycfg -S -o - | FileCheck %s
-; RUN: opt < %s -task-simplify -S -o - | FileCheck %s
-; RUN: opt < %s -passes='simplify-cfg' -S -o - | FileCheck %s
-; RUN: opt < %s -passes='task-simplify' -S -o - | FileCheck %s
+; RUN: opt < %s -simplifycfg -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
+; RUN: opt < %s -task-simplify -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
+; RUN: opt < %s -passes='simplify-cfg' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
+; RUN: opt < %s -passes='task-simplify' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -97,11 +97,15 @@ lpad12.body:                                      ; preds = %lpad4, %lpad12
   %matches34 = icmp eq i32 %5, %6
   br i1 %matches34, label %catch35, label %ehcleanup44
 
-; CHECK: lpad12:
+; CHECK-CFG: lpad12:
+; CHECK-TASK: lpad12.tfsplit:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
 ; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIPKc to i8*)
-; CHECK:   br i1 %matches34, label %catch35, label %ehcleanup44
+; CHECK-TASK: br label %lpad12.body
+
+; CHECK-TASK: lpad12.body:
+; CHECK: br i1 %matches34, label %catch35, label %ehcleanup44
 
 catch35:                                          ; preds = %lpad12.body
   %7 = extractvalue { i8*, i32 } %eh.lpad-body, 0
@@ -153,6 +157,11 @@ sync.continue:                                    ; preds = %try.cont.tfend.tfen
 ehcleanup26:                                      ; preds = %lpad15
   invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %1, { i8*, i32 } %9)
           to label %unreachable unwind label %lpad12
+
+; CHECK: ehcleanup26:
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %1, { i8*, i32 }
+; CHECK-CFG-NEXT: to label %unreachable unwind label %lpad12
+; CHECK-TASK-NEXT: to label %unreachable unwind label %lpad12.tfsplit
 
 ehcleanup44:                                      ; preds = %lpad12.body
   invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %0, { i8*, i32 } %eh.lpad-body)
