@@ -1855,61 +1855,6 @@ bool RTPtrCheckAnalysis::canCheckPtrAtRT(bool ShouldCheckWrap) {
   return CanDoRTIfNeeded;
 }
 
-// This code is borrowed from LoopAccessAnalysis.cpp
-static bool canAnalyzeLoop(Loop *TheLoop, PredicatedScalarEvolution &PSE) {
-  // We need to have a loop header.
-  LLVM_DEBUG(dbgs() << "TapirRD: Found a loop in "
-                    << TheLoop->getHeader()->getParent()->getName() << ": "
-                    << TheLoop->getHeader()->getName() << '\n');
-
-  // We can only analyze innermost loops.
-  if (!TheLoop->empty()) {
-    LLVM_DEBUG(dbgs() << "TapirRD: loop is not the innermost loop\n");
-    // recordAnalysis("NotInnerMostLoop") << "loop is not the innermost loop";
-    return false;
-  }
-
-  // We must have a single backedge.
-  if (TheLoop->getNumBackEdges() != 1) {
-    LLVM_DEBUG(
-        dbgs() << "TapirRD: loop control flow is not understood by analyzer\n");
-    // recordAnalysis("CFGNotUnderstood")
-    //     << "loop control flow is not understood by analyzer";
-    return false;
-  }
-
-  // We must have a single exiting block.
-  if (!TheLoop->getExitingBlock()) {
-    LLVM_DEBUG(
-        dbgs() << "TapirRD: loop control flow is not understood by analyzer\n");
-    // recordAnalysis("CFGNotUnderstood")
-    //     << "loop control flow is not understood by analyzer";
-    return false;
-  }
-
-  // We only handle bottom-tested loops, i.e. loop in which the condition is
-  // checked at the end of each iteration. With that we can assume that all
-  // instructions in the loop are executed the same number of times.
-  if (TheLoop->getExitingBlock() != TheLoop->getLoopLatch()) {
-    LLVM_DEBUG(
-        dbgs() << "TapirRD: loop control flow is not understood by analyzer\n");
-    // recordAnalysis("CFGNotUnderstood")
-    //     << "loop control flow is not understood by analyzer";
-    return false;
-  }
-
-  // ScalarEvolution needs to be able to find the exit count.
-  const SCEV *ExitCount = PSE.getBackedgeTakenCount();
-  if (ExitCount == PSE.getSE()->getCouldNotCompute()) {
-    // recordAnalysis("CantComputeNumberOfIterations")
-    //     << "could not determine number of loop iterations";
-    LLVM_DEBUG(dbgs() << "TapirRD: SCEV could not compute the loop exit count.\n");
-    return false;
-  }
-
-  return true;
-}
-
 void AccessPtrAnalysis::getRTPtrChecks(Loop *L, RaceInfo::ResultTy &Result,
                                        RaceInfo::PtrChecksTy &AllPtrRtChecks) {
   LLVM_DEBUG(dbgs() << "getRTPtrChecks: " << *L << "\n");
@@ -1947,9 +1892,6 @@ void AccessPtrAnalysis::getRTPtrChecks(Loop *L, RaceInfo::ResultTy &Result,
   }
 
   RPCA.processAccesses(AccessToObjs);
-
-  bool CanDoRTIfNeeded = RPCA.canCheckPtrAtRT();
-
   // TODO: Do something with CanDoRTIfNeeded
 }
 
