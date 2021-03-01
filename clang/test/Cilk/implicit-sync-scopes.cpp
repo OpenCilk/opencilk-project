@@ -117,11 +117,19 @@ void spawn_destructor(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B1CLEANUP]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B1CLEANUP]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B1CLEANUP_SPLIT:.+]]
+
+// CHECK-O1: [[B1CLEANUP_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1: br label %[[B1CLEANUP_MERGE:.+]]
 
 // CHECK: [[B1CLEANUP]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
+// CHECK-O1: br label %[[B1CLEANUP_MERGE]]
+// CHECK-O1: [[B1CLEANUP_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(
 // CHECK-O1-NEXT: call void @llvm.lifetime.end.p0i8(
 // CHECK-O1-NEXT: resume
@@ -179,7 +187,12 @@ int trycatch(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
 
 // CHECK: [[CATCHLPAD]]:
 // CHECK-NEXT: landingpad
@@ -341,12 +354,21 @@ int mix_spawn_trycatch(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME2]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE:.+]]
 
 // CHECK: [[CATCHLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE]]
+// CHECK-O1: [[CATCHLPAD_MERGE]]:
 // CHECK: br i1 %{{.+}}, label %[[CATCH:.+]], label %[[EHRESUME:.+]]
 
 // CHECK: [[CATCH]]:
@@ -472,12 +494,21 @@ int mix_spawn_trycatch_destructors(int a) {
 // CHECK-NEXT: cleanup
 // CHECK-NOT: catch
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME2]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE:.+]]
 
 // CHECK: [[CATCHLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE]]
+// CHECK-O1: [[CATCHLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B2]])
 // CHECK: br label %[[CATCHDISPATCH]]
 
@@ -629,7 +660,13 @@ int nested_trycatch(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD2_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
 
 // CHECK: [[CATCHLPAD2]]:
 // CHECK-NEXT: landingpad
@@ -838,12 +875,21 @@ int nested_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B3CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B3CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B3CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B3]])
 // CHECK: br label %[[CATCHDISPATCH2]]
 
@@ -1146,11 +1192,13 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME1]],
-// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B1CLEANUPLPAD:.+]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B1CLEANUPLPAD_SPLIT:.+]]
 
-// CHECK-O1: [[B1CLEANUPLPAD]]:
+// CHECK-O1: [[B1CLEANUPLPAD_SPLIT]]:
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
+// CHECK-O1: br label %[[B1CLEANUP_MERGE:.+]]
+// CHECK-O1: [[B1CLEANUP_MERGE]]:
 // CHECK-O1: br label %[[B1CLEANUP:.+]]
 
 // CHECK-O1: [[B2CONSTRLPAD]]:
@@ -1175,6 +1223,8 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE:.+]]
+// CHECK-O1: [[CATCHLPAD_MERGE]]:
 // CHECK-O1: br label %[[B2CLEANUP:.+]]
 
 // CHECK-O1: detach within %[[PFORSYNCREG]], label %[[PFORBODY:.+]], label %[[PFORINC:.+]] unwind label %[[PFORUNW:.+]]
@@ -1327,11 +1377,19 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B3CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B3CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B3CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B3]])
 // CHECK-O0: br label %[[B1CLEANUP]]
 // CHECK-O1: br label %[[B3LIFETIMEEND]]
@@ -1423,12 +1481,21 @@ int spawn_trycatch(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME2]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE:.+]]
 
 // CHECK: [[CATCHLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE]]
+// CHECK-O1: [[CATCHLPAD_MERGE]]:
 // CHECK-O0: br label %[[CATCHDISPATCH1:.+]]
 
 // CHECK-O0: [[CATCHDISPATCH1]]:
@@ -1499,12 +1566,21 @@ int spawn_trycatch(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME4]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD2_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD2_MERGE:.+]]
 
 // CHECK: [[CATCHLPAD2]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD2_MERGE]]
+// CHECK-O1: [[CATCHLPAD2_MERGE]]:
 // CHECK-O0: br label %[[CATCHDISPATCH2:.+]]
 
 // CHECK-O0: [[CATCHDISPATCH2]]:
@@ -1644,11 +1720,17 @@ int spawn_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME1]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1:.+]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1:.+]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1_SPLIT:.+]]
+
+// CHECK-O1: [[TFUNWIND1_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1: br label %[[TFUNWIND1:.+]]
 
 // CHECK: [[TFUNWIND1]]:
-// CHECK-NEXT: landingpad
-// CHECK-NEXT: cleanup
+// CHECK-O0-NEXT: landingpad
+// CHECK-O0-NEXT: cleanup
 // CHECK: br label %[[EHCLEANUP:.+]]
 
 // CHECK: [[B2CONSTRLPAD]]:
@@ -1667,12 +1749,21 @@ int spawn_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B2CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B2CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B2CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B2CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B2CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B2CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B2CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B2CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B2]])
 // CHECK: br label %[[CATCHDISPATCH1]]
 
@@ -1750,12 +1841,21 @@ int spawn_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME5]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B3CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B3CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B3CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B3]])
 // CHECK: br label %[[CATCHDISPATCH2]]
 
@@ -1817,11 +1917,19 @@ int spawn_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME6]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B4CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B4CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B4CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B4CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1: br label %[[B4CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B4CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
+// CHECK-O1: br label %[[B4CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B4CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B4]])
 // CHECK-O0: br label %[[EHCLEANUP]]
 // CHECK-O1: br label %[[EHCLEANUP2:.+]]
@@ -1925,12 +2033,21 @@ int parfor_trycatch(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME2]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE:.+]]
 
 // CHECK: [[CATCHLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD_MERGE]]
+// CHECK-O1: [[CATCHLPAD_MERGE]]:
 // CHECK-O0: br label %[[CATCHDISPATCH1:.+]]
 
 // CHECK-O0: [[CATCHDISPATCH1]]:
@@ -2002,12 +2119,21 @@ int parfor_trycatch(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD2_SPLIT:.+]]
+
+// CHECK-O1: [[CATCHLPAD2_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD2_MERGE:.+]]
 
 // CHECK: [[CATCHLPAD2]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[CATCHLPAD2_MERGE]]
+// CHECK-O1: [[CATCHLPAD2_MERGE]]:
 // CHECK-O0: br label %[[CATCHDISPATCH2:.+]]
 
 // CHECK-O0: [[CATCHDISPATCH2]]:
@@ -2194,12 +2320,21 @@ int parfor_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME2]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B2CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B2CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B2CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B2CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B2CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B2CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B2CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B2CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B2]])
 // CHECK: br label %[[CATCHDISPATCH1:.+]]
 
@@ -2290,12 +2425,21 @@ int parfor_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B3CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B3CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B3CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-O1: br label %[[B3CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B3CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B3]])
 // CHECK: br label %[[CATCHDISPATCH2:.+]]
 
@@ -2379,11 +2523,19 @@ int parfor_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME4]],
-// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[B4CLEANUPLPAD]]
+// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[B4CLEANUPLPAD]]
+// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[B4CLEANUPLPAD_SPLIT:.+]]
+
+// CHECK-O1: [[B4CLEANUPLPAD_SPLIT]]:
+// CHECK-O1-NEXT: landingpad
+// CHECK-O1-NEXT: cleanup
+// CHECK-O1: br label %[[B4CLEANUPLPAD_MERGE:.+]]
 
 // CHECK: [[B4CLEANUPLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
+// CHECK-O1: br label %[[B4CLEANUPLPAD_MERGE]]
+// CHECK-O1: [[B4CLEANUPLPAD_MERGE]]:
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B4]])
 // CHECK-O0: br label %[[TASKCLEANUP1]]
 // CHECK-O1: br label %[[TASKCLEANUP2]]
