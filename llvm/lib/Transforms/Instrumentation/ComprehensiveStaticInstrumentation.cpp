@@ -2177,7 +2177,7 @@ bool CSIImpl::shouldNotInstrumentFunction(Function &F) {
   GlobalVariable *GV = M.getGlobalVariable("llvm.global_ctors");
   if (GV == nullptr)
     return false;
-  if (!GV->hasInitializer())
+  if (!GV->hasInitializer() || GV->getInitializer()->isNullValue())
     return false;
 
   ConstantArray *CA = cast<ConstantArray>(GV->getInitializer());
