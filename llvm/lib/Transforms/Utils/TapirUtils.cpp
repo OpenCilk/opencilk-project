@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Utils/TapirUtils.h"
+#include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/EHPersonalities.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -1502,6 +1503,7 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
   SmallVector<Instruction *, 32> TFCreateToSplit;
   SmallVector<DetachInst *, 8> DetachesWithTaskFrames;
   SmallVector<Instruction *, 8> TFEndToSplit;
+  SmallVector<Instruction *, 8> TFResumeToSplit;
   SmallVector<BasicBlock *, 8> WorkList;
   SmallPtrSet<BasicBlock *, 32> Visited;
   WorkList.push_back(&F.getEntryBlock());
@@ -1533,7 +1535,11 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
               } else if (Intrinsic::taskframe_end == UI->getIntrinsicID()) {
                 // Record this taskframe.end.
                 TFEndToSplit.push_back(UI);
-                break;
+              }
+            } else if (Instruction *UI = dyn_cast<Instruction>(U)) {
+              if (isTaskFrameResume(UI, II)) {
+                // Record this taskframe.resume.
+                TFResumeToSplit.push_back(UI);
               }
             }
           }
@@ -1569,7 +1575,7 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
       Changed = true;
     }
 
-  // Also split critical continue edges, if we need to.  For example, we need to
+  // Split critical continue edges, if we need to.  For example, we need to
   // split critical continue edges if we're planning to fixup external uses of
   // variables defined in a taskframe.
   //
@@ -1580,6 +1586,16 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
       SplitCriticalEdge(
           DI, 1,
           CriticalEdgeSplittingOptions(DT, nullptr).setSplitDetachContinue());
+      Changed = true;
+    }
+  }
+  // Similarly, split unwind edges from taskframe.resume's.
+  for (Instruction *TFResume : TFResumeToSplit) {
+    InvokeInst *II = cast<InvokeInst>(TFResume);
+    if (DT && isCriticalEdge(II, 1)) {
+      BasicBlock *Unwind = II->getUnwindDest();
+      SplitBlockPredecessors(Unwind, {II->getParent()}, ".tfsplit", DT, nullptr,
+                             nullptr);
       Changed = true;
     }
   }

@@ -545,7 +545,7 @@ det.achd4:                                        ; preds = %invoke.cont
           to label %invoke.cont8 unwind label %lpad5
 ; CHECK: [[CALLHELPER2]]:
 ; CHECK-NEXT: invoke fastcc void @_Z14spawn_tryblocki.outline_det.cont.tf.otd1()
-; CHECK-NEXT: to label %[[CONTINUE2]] unwind label %lpad16
+; CHECK-NEXT: to label %[[CONTINUE2]] unwind label %[[TFLPAD_SPLIT:.+]]
 
 invoke.cont8:                                     ; preds = %det.achd4
   reattach within %syncreg, label %det.cont11
@@ -600,11 +600,14 @@ lpad16:                                           ; preds = %invoke.cont22, %det
   %matches = icmp eq i32 %9, %10
   %11 = tail call i8* @__cxa_begin_catch(i8* %8) #10
   br i1 %matches, label %catch36, label %catch
-; CHECK: {{^lpad16}}:
+; CHECK: [[TFLPAD_SPLIT]]:
 ; CHECK-NEXT: landingpad { i8*, i32 }
 ; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
 ; CHECK-NEXT: catch i8* null
 ; CHECK: call i8* @__cilk_catch_exception(%struct.__cilkrts_stack_frame* %[[CILKSF]],
+; CHECK: br label %lpad16
+
+; CHECK: {{^lpad16}}:
 ; CHECK: br i1 %matches, label %catch36, label %catch
 
 catch36:                                          ; preds = %lpad16

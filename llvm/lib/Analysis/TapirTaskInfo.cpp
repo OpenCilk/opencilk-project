@@ -617,6 +617,16 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
         createSpindleWithEntry(TaskContinue, Spindle::SPType::Phi);
         SpindleCount++;
       }
+
+      // Similarly, create a new Phi spindle for the task unwind.
+      if (DI->hasUnwindDest()) {
+        BasicBlock *TaskUnwind = DI->getUnwindDest();
+        DefiningBlocks.insert(TaskUnwind);
+        if (!getSpindleFor(TaskUnwind)) {
+          createSpindleWithEntry(TaskUnwind, Spindle::SPType::Phi);
+          SpindleCount++;
+        }
+      }
     } else if (isa<SyncInst>(B.getTerminator())) {
       BasicBlock *SPEntry = B.getSingleSuccessor();
       // For sync instructions, we mark the block containing the sync
