@@ -234,17 +234,6 @@ static void setInstrumentationDebugLoc(BasicBlock &Instrumented,
   }
 }
 
-/// Set DebugLoc on the call instruction to a CSI hook, based on the
-/// debug information of the instrumented instruction.
-static void setInstrumentationDebugLoc(Function &Instrumented,
-                                       Instruction *Call) {
-  DISubprogram *Subprog = Instrumented.getSubprogram();
-  if (Subprog) {
-    LLVMContext &C = Instrumented.getParent()->getContext();
-    Call->setDebugLoc(DILocation::get(C, 0, 0, Subprog));
-  }
-}
-
 bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
   if (isa<DbgInfoIntrinsic>(I))
     return true;
