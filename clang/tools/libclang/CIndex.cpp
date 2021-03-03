@@ -5584,6 +5584,8 @@ CXString clang_getCursorKindSpelling(enum CXCursorKind Kind) {
     return cxstring::createRef("CilkSyncStmt");
   case CXCursor_CilkForStmt:
     return cxstring::createRef("CilkForStmt");
+  case CXCursor_CilkForRangeStmt:
+    return cxstring::createRef("CilkForRangeStmt");
   }
 
   llvm_unreachable("Unhandled CXCursorKind");
