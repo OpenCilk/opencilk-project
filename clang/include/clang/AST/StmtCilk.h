@@ -104,10 +104,8 @@ public:
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
 
-  SourceLocation getBeginLoc() const LLVM_READONLY { return getCXXForRangeStmt()->getBeginLoc(); }
-  SourceLocation getEndLoc() const LLVM_READONLY {
-    return getCXXForRangeStmt()->getEndLoc();
-  }
+  SourceLocation getBeginLoc() const LLVM_READONLY;
+  SourceLocation getEndLoc() const LLVM_READONLY;
 
 };
 
