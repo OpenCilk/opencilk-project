@@ -3512,7 +3512,10 @@ StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc, Stmt *In
       First, ColonLoc, Range,
       RParenLoc, Kind);
 
-  return BuildCilkForRangeStmt(ForRangeStmt);
+  if (ForRangeStmt.isInvalid())
+    return ForRangeStmt;
+
+  return BuildCilkForRangeStmt(cast_or_null<CXXForRangeStmt>(ForRangeStmt.get()));
 }
 
 StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
