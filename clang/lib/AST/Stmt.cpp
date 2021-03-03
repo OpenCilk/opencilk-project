@@ -1405,7 +1405,7 @@ void CilkForStmt::setLoopVariable(const ASTContext &C, VarDecl *V) {
 CXXForRangeStmt* CilkForRangeStmt::getCXXForRangeStmt() const {
   return cast_or_null<CXXForRangeStmt>(SubExprs[FORRANGE]);
 }
-SourceLocation CilkForRangeStmt::getBeginLoc() const LLVM_READONLY { return getCXXForRangeStmt()->getBeginLoc(); }
-SourceLocation CilkForRangeStmt::getEndLoc() const LLVM_READONLY {
+SourceLocation CilkForRangeStmt::getBeginLoc() const { return getCXXForRangeStmt()->getBeginLoc(); }
+SourceLocation CilkForRangeStmt::getEndLoc() const {
   return getCXXForRangeStmt()->getEndLoc();
 }

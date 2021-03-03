@@ -103,8 +103,8 @@ public:
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
 
-  SourceLocation getBeginLoc() const;
-  SourceLocation getEndLoc() const;
+  SourceLocation getBeginLoc() const LLVM_READONLY;
+  SourceLocation getEndLoc() const LLVM_READONLY;
 
   // Iterators
   child_range children() {
