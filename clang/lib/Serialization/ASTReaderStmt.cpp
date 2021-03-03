@@ -2793,6 +2793,10 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
       S = new (Context) CilkForStmt(Empty);
       break;
 
+    case STMT_CILKFORRANGE:
+      S = new (Context) CilkForRangeStmt(Empty);
+      break;
+
     case EXPR_PREDEFINED:
       S = PredefinedExpr::CreateEmpty(
           Context,
