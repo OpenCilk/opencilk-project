@@ -98,9 +98,7 @@ public:
     return T->getStmtClass() == CilkForRangeStmtClass;
   }
 
-  CXXForRangeStmt* getCXXForRangeStmt() const {
-    return cast_or_null<CXXForRangeStmt>(SubExprs[FORRANGE]);
-  }
+  CXXForRangeStmt* getCXXForRangeStmt() const;
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
 
