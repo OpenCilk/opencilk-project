@@ -320,10 +320,10 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
      ExprResult CorrectedRange =
          Actions.CorrectDelayedTyposInExpr(ForRangeInfo.RangeExpr.get());
     // TODO(arvid): uncomment this
-//     ForRangeStmt = Actions.ActIsRangeBasedForOnCXXForRangeStmt(
-//         getCurScope(), ForLoc, CoawaitLoc, FirstPart.get(),
-//         ForRangeInit.ColonLoc, CorrectedRange.get(),
-//         T.getCloseLocation(), Sema::BFRK_Build);
+     ForRangeStmt = Actions.ActOnCilkForRangeStmt(
+         getCurScope(), ForLoc, FirstPart.get(),
+         ForRangeInfo.LoopVar.get(), ForRangeInfo.ColonLoc, CorrectedRange.get(),
+         T.getCloseLocation(), Sema::BFRK_Build);
 
 
   // Similarly, we need to do the semantic analysis for a for-range
@@ -381,8 +381,8 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   //                                             Body.get());
 
   // TODO(arvid): uncomment this
-//   if (ForRangeInfo.ParsedForRangeDecl())
-//     return Actions.FinishCXXForRangeStmt(ForRangeStmt.get(), Body.get());
+   if (ForRangeInfo.ParsedForRangeDecl())
+     return Actions.FinishCilkForRangeStmt(ForRangeStmt.get(), Body.get());
 
   return Actions.ActOnCilkForStmt(ForLoc, T.getOpenLocation(), FirstPart.get(),
                                   nullptr, Sema::ConditionResult(), nullptr,
