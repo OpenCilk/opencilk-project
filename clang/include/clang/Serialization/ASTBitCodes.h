@@ -1877,6 +1877,7 @@ namespace serialization {
       EXPR_CILKSPAWN,
       STMT_CILKSYNC,
       STMT_CILKFOR,
+      STMT_CILKFORRANGE,
     };
 
     /// The kinds of designators that can occur in a

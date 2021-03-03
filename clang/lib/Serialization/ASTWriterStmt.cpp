@@ -2025,6 +2025,12 @@ void ASTStmtWriter::VisitCilkForStmt(CilkForStmt *S) {
   Code = serialization::STMT_CILKFOR;
 }
 
+void ASTStmtWriter::VisitCilkForRangeStmt(CilkForRangeStmt *S) {
+  VisitStmt(S);
+  Record.AddStmt(S->getCXXForRangeStmt());
+  Code = serialization::STMT_CILKFORRANGE;
+}
+
 //===----------------------------------------------------------------------===//
 // Microsoft Expressions and Statements.
 //===----------------------------------------------------------------------===//

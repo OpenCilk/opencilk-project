@@ -2573,6 +2573,11 @@ void ASTStmtReader::VisitCilkForStmt(CilkForStmt *S) {
   S->setRParenLoc(readSourceLocation());
 }
 
+void ASTStmtReader::VisitCilkForRangeStmt(CilkForRangeStmt *S) {
+  VisitStmt(S);
+  S->setForRange(Record.readSubStmt());
+}
+
 //===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//

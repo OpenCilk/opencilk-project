@@ -84,6 +84,28 @@ public:
   }
 };
 
+class CilkForRangeStmt : public Stmt {
+  enum { FORRANGE, END };
+  Stmt* SubExprs[END];
+
+public:
+  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange);
+
+  /// \brief Build an empty for range statement.
+  explicit CilkForRangeStmt(EmptyShell Empty) : Stmt(CilkForRangeStmtClass, Empty) { }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == CilkForRangeStmtClass;
+  }
+
+  CXXForRangeStmt* getCXXForRangeStmt() {
+    return cast_or_null<CXXForRangeStmt>(SubExprs[FORRANGE]);
+  }
+
+  void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
+
+};
+
 /// CilkForStmt - This represents a '_Cilk_for(init;cond;inc)' stmt.
 class CilkForStmt : public Stmt {
   SourceLocation CilkForLoc;

@@ -3508,7 +3508,7 @@ StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc, Stmt *In
   // we wrap the for range!
   SourceLocation EmptyCoawaitLoc;
   StmtResult ForRangeStmt = this->ActOnCXXForRangeStmt(
-      getCurScope(), ForLoc, EmptyCoawaitLoc, InitStmt,
+      S, ForLoc, EmptyCoawaitLoc, InitStmt,
       First, ColonLoc, Range,
       RParenLoc, Kind);
 
