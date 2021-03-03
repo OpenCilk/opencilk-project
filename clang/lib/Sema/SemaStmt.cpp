@@ -3498,7 +3498,12 @@ static void SearchForReturnInStmt(Sema &Self, Stmt *S) {
 
 // TODO: add comment
 StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
-  return this->FinishCXXForRangeStmt(S, B);
+  CilkForRangeStmt *CilkForRange = cast<CilkForRangeStmt>(S);
+  StmtResult ForRange = FinishCXXForRangeStmt(CilkForRange->getCXXForRangeStmt(), B);
+  if (ForRange.isInvalid())
+    return StmtError();
+  CilkForRange->setForRange(ForRange.get());
+  return CilkForRange;
 }
 
 StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc, Stmt *InitStmt,
@@ -3507,12 +3512,19 @@ StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc, Stmt *In
                                       BuildForRangeKind Kind) {
   // we wrap the for range!
   SourceLocation EmptyCoawaitLoc;
-  StmtResult ForRangeStmt = this->ActOnCXXForRangeStmt(
+  StmtResult ForRangeStmt = ActOnCXXForRangeStmt(
       S, ForLoc, EmptyCoawaitLoc, InitStmt,
       First, ColonLoc, Range,
       RParenLoc, Kind);
 
-  return ForRangeStmt;
+  if (ForRangeStmt.isInvalid())
+    return ForRangeStmt;
+
+  return BuildCilkForRangeStmt(cast_or_null<CXXForRangeStmt>(ForRangeStmt.get()));
+}
+
+StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
+  return new (Context) CilkForRangeStmt(Context, ForRange);
 }
 
 

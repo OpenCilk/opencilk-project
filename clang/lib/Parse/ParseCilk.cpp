@@ -316,7 +316,7 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
 
   // TODO: Extend _Cilk_for to support these.
   if (ForRangeInfo.ParsedForRangeDecl()) {
-    Diag(ForLoc, diag::err_cilk_for_forrange_loop_not_supported);
+    Diag(ForLoc, diag::warn_cilk_for_forrange_loop_experimental);
      ExprResult CorrectedRange =
          Actions.CorrectDelayedTyposInExpr(ForRangeInfo.RangeExpr.get());
     // TODO(arvid): uncomment this

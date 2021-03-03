@@ -1401,3 +1401,11 @@ void CilkForStmt::setLoopVariable(const ASTContext &C, VarDecl *V) {
   SubExprs[LOOPVAR] = new (C) DeclStmt(DeclGroupRef(V), VarRange.getBegin(),
                                        VarRange.getEnd());
 }
+
+CXXForRangeStmt* CilkForRangeStmt::getCXXForRangeStmt() const {
+  return cast_or_null<CXXForRangeStmt>(SubExprs[FORRANGE]);
+}
+SourceLocation CilkForRangeStmt::getBeginLoc() const { return getCXXForRangeStmt()->getBeginLoc(); }
+SourceLocation CilkForRangeStmt::getEndLoc() const {
+  return getCXXForRangeStmt()->getEndLoc();
+}
