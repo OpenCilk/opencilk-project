@@ -14,6 +14,7 @@
 #define LLVM_CLANG_AST_STMTCILK_H
 
 #include "clang/AST/Stmt.h"
+#include "clang/AST/StmtCXX.h"
 #include "clang/Basic/SourceLocation.h"
 
 namespace clang {
@@ -102,8 +103,13 @@ public:
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
 
-  SourceLocation getBeginLoc() const LLVM_READONLY;
-  SourceLocation getEndLoc() const LLVM_READONLY;
+  SourceLocation getBeginLoc() const;
+  SourceLocation getEndLoc() const;
+
+  // Iterators
+  child_range children() {
+    return child_range(&SubExprs[0], &SubExprs[END]);
+  }
 
 };
 
