@@ -3496,6 +3496,26 @@ static void SearchForReturnInStmt(Sema &Self, Stmt *S) {
   }
 }
 
+// TODO: add comment
+StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
+  return this->FinishCXXForRangeStmt(S, B);
+}
+
+StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc, Stmt *InitStmt,
+                                      Stmt *First, SourceLocation ColonLoc,
+                                      Expr *Range, SourceLocation RParenLoc,
+                                      BuildForRangeKind Kind) {
+  // we wrap the for range!
+  SourceLocation EmptyCoawaitLoc;
+  StmtResult ForRangeStmt = this->ActOnCXXForRangeStmt(
+      getCurScope(), ForLoc, EmptyCoawaitLoc, InitStmt,
+      First, ColonLoc, Range,
+      RParenLoc, Kind);
+
+  return ForRangeStmt;
+}
+
+
 StmtResult
 Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
                        Stmt *First, DeclStmt *Limit, ConditionResult InitCond,
