@@ -1370,10 +1370,10 @@ public:
 
   // Builds a new Cilk for range statement.
   // TODO: this feels very hacky
-  StmtResult RebuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
+  StmtResult RebuildCilkForRangeStmt(Stmt *ForRange) {
     // we don't reconstruct the for range into its constituent parts,
     // but rather let the ForRange handle it for us
-    return getSema().BuildCilkForRangeStmt(ForRange);
+    return getSema().BuildCilkForRangeStmt(cast_or_null<CXXForRangeStmt>(ForRange));
   }
 
   /// Build a new goto statement.
@@ -13872,7 +13872,7 @@ TreeTransform<Derived>::TransformCilkForStmt(CilkForStmt *S) {
 template<typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformCilkForRangeStmt(CilkForRangeStmt *S) {
-  CXXForRangeStmt ForRange = getDerived().TransformStmt(S->getCXXForRangeStmt());
+  StmtResult ForRange = getDerived().TransformStmt(S->getCXXForRangeStmt());
   if (ForRange.isInvalid())
     return StmtError();
 
