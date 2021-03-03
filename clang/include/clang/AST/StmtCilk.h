@@ -98,11 +98,16 @@ public:
     return T->getStmtClass() == CilkForRangeStmtClass;
   }
 
-  CXXForRangeStmt* getCXXForRangeStmt() {
+  CXXForRangeStmt* getCXXForRangeStmt() const {
     return cast_or_null<CXXForRangeStmt>(SubExprs[FORRANGE]);
   }
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return getCXXForRangeStmt()->getBeginLoc(); }
+  SourceLocation getEndLoc() const LLVM_READONLY {
+    return getCXXForRangeStmt()->getEndLoc();
+  }
 
 };
 
