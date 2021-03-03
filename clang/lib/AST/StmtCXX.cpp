@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/StmtCXX.h"
-
+#include "clang/AST/Stmt.h"
+#include "clang/AST/StmtCilk.h"
 #include "clang/AST/ASTContext.h"
 
 using namespace clang;
@@ -124,4 +125,10 @@ CoroutineBodyStmt::CoroutineBodyStmt(CoroutineBodyStmt::CtorArgs const &Args)
       Args.ReturnStmtOnAllocFailure;
   std::copy(Args.ParamMoves.begin(), Args.ParamMoves.end(),
             const_cast<Stmt **>(getParamMoves().data()));
+}
+
+CilkForRangeStmt::CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange)
+  : Stmt(CilkForRangeStmtClass)
+{
+  SubExprs[FORRANGE] = ForRange;
 }
