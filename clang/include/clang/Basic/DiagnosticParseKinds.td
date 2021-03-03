@@ -1221,8 +1221,6 @@ def err_cilk_for_missing_increment: Error<
   "missing loop increment expression in '_Cilk_for'">;
 def err_cilk_for_missing_semi: Error<
   "expected ';' in '_Cilk_for'">;
-def err_cilk_for_forrange_loop_not_supported: Error<
-  "'_Cilk_for' not supported on for-range loops">;
 def err_cilk_for_foreach_loop_not_supported: Error<
   "'_Cilk_for' not supported on for-each loops">;
 def err_pragma_cilk_invalid_option : Error<
@@ -1234,6 +1232,9 @@ def warn_cilk_for_following_grainsize: Warning<
   InGroup<SourceUsesCilkPlus>;
 def warn_pragma_cilk_grainsize_equals: Warning<
   "'#pragma cilk grainsize' no longer requires '='">,
+  InGroup<SourceUsesCilkPlus>;
+def warn_cilk_for_forrange_loop_experimental: Warning<
+  "'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!">,
   InGroup<SourceUsesCilkPlus>;
 
 // OpenMP support.
