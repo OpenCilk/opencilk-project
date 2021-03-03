@@ -1368,6 +1368,14 @@ public:
                                       RParenLoc, Body, LoopVar);
   }
 
+  // Builds a new Cilk for range statement.
+  // TODO: this feels very hacky
+  StmtResult RebuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
+    // we don't reconstruct the for range into its constituent parts,
+    // but rather let the ForRange handle it for us
+    return getSema().BuildCilkForRangeStmt(ForRange);
+  }
+
   /// Build a new goto statement.
   ///
   /// By default, performs semantic analysis to build the new statement.
@@ -13859,6 +13867,16 @@ TreeTransform<Derived>::TransformCilkForStmt(CilkForStmt *S) {
       S->getCilkForLoc(), S->getLParenLoc(), Init.get(), Limit.get(),
       InitCond, Begin.get(), End.get(), Cond, FullInc, S->getRParenLoc(),
       LoopVar, Body.get());
+}
+
+template<typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformCilkForRangeStmt(CilkForRangeStmt *S) {
+  CXXForRangeStmt ForRange = getDerived().TransformStmt(S->getCXXForRangeStmt());
+  if (ForRange.isInvalid())
+    return StmtError();
+
+  return getDerived().RebuildCilkForRangeStmt(ForRange.get());
 }
 
 } // end namespace clang

@@ -12098,6 +12098,7 @@ public:
                                    SourceLocation ColonLoc, Expr *Range,
                                    SourceLocation RParenLoc,
                                    BuildForRangeKind Kind);
+  StmtResult BuildCilkForRangeStmt(CXXForRangeStmt *S);
   StmtResult FinishCilkForRangeStmt(Stmt *S, Stmt *B);
 };
 

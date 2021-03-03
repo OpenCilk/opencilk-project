@@ -3507,12 +3507,16 @@ StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc, Stmt *In
                                       BuildForRangeKind Kind) {
   // we wrap the for range!
   SourceLocation EmptyCoawaitLoc;
-  StmtResult ForRangeStmt = this->ActOnCXXForRangeStmt(
+  StmtResult ForRangeStmt = ActOnCXXForRangeStmt(
       S, ForLoc, EmptyCoawaitLoc, InitStmt,
       First, ColonLoc, Range,
       RParenLoc, Kind);
 
-  return ForRangeStmt;
+  return BuildCilkForRangeStmt(ForRangeStmt);
+}
+
+StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
+  return new (Context) CilkForRangeStmt(Context, ForRange);
 }
 
 
