@@ -910,6 +910,7 @@ POST_SYSCALL(statfs)(long res, const void *path, void *buf) {
   }
 }
 
+#if !SANITIZER_MAC
 PRE_SYSCALL(statfs64)(const void *path, long sz, void *buf) {
   if (path)
     PRE_READ(path, __sanitizer::internal_strlen((const char *)path) + 1);
@@ -921,6 +922,7 @@ POST_SYSCALL(statfs64)(long res, const void *path, long sz, void *buf) {
       POST_WRITE(buf, struct_statfs64_sz);
   }
 }
+#endif
 
 PRE_SYSCALL(fstatfs)(long fd, void *buf) {}
 
@@ -931,6 +933,7 @@ POST_SYSCALL(fstatfs)(long res, long fd, void *buf) {
   }
 }
 
+#if !SANITIZER_MAC
 PRE_SYSCALL(fstatfs64)(long fd, long sz, void *buf) {}
 
 POST_SYSCALL(fstatfs64)(long res, long fd, long sz, void *buf) {
@@ -939,6 +942,7 @@ POST_SYSCALL(fstatfs64)(long res, long fd, long sz, void *buf) {
       POST_WRITE(buf, struct_statfs64_sz);
   }
 }
+#endif
 #  endif  // !SANITIZER_ANDROID
 
 PRE_SYSCALL(lstat)(const void *filename, void *statbuf) {
