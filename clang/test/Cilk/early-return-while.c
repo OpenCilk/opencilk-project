@@ -2,15 +2,28 @@
 // expected-no-diagnostics
 
 void bar();
+int baz(int);
 
 void foo(int p) {
-  _Cilk_spawn bar();
-  if (p)
-    return;
+  while (p) {
+    if (baz(p))
+      return;
+    _Cilk_spawn bar();
+    --p;
+  }
   bar();
 }
 
 // CHECK-LABEL: define {{.*}}void @foo(
+
+// CHECK: br i1 %{{.+}}, label %[[WHILE_BODY:.+]], label %[[WHILE_END:.+]]
+
+// CHECK: [[WHILE_BODY]]:
+// CHECK: br i1 %{{.+}}, label %[[THEN:.+]], label %[[END:.+]]
+
+// CHECK: [[THEN]]:
+// CHECK-NEXT: br label %[[RETURN:.+]]
+
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -18,15 +31,13 @@ void foo(int p) {
 // CHECK: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
 // CHECK: [[CONTINUE]]:
-// CHECK: br i1 %{{.+}}, label %[[THEN:.+]], label %[[END:.+]]
+// CHECK: br
 
-// CHECK: [[THEN]]:
+// CHECK: [[WHILE_END]]:
+// CHECK-NEXT: call void {{.*}}@bar()
+// CHECK-NEXT: br label %[[RETURN]]
+
+// CHECK: [[RETURN]]:
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
-// CHECK: [[END]]:
-// CHECK-NEXT: call void {{.*}}@bar()
-
-// CHECK: sync within %[[SYNCREG]]
-
 // CHECK: ret void
-
