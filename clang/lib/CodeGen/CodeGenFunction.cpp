@@ -384,7 +384,8 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
 
     PopCleanupBlocks(PrologueCleanupDepth, {}, CompilingCilk);
     SyncEmitted = true;
-  } else if (CompilingCilk && Builder.GetInsertBlock()) {
+  } else if (CompilingCilk && Builder.GetInsertBlock() &&
+             ReturnBlock.getBlock()->use_empty()) {
     // If we're compiling Cilk, emit an implicit sync for the function.
     EmitImplicitSyncCleanup();
     SyncEmitted = true;
