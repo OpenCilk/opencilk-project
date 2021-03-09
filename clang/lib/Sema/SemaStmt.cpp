@@ -3765,9 +3765,9 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   AddInitializerToDecl(LoopVar, NewLoopVarInit.get(), /*DirectInit=*/false);
 
   return new (Context) CilkForStmt(
-      Context, NewInit.get(), cast<DeclStmt>(LimitDecl.get()), InitCond.get(),
+      NewInit.get(), cast<DeclStmt>(LimitDecl.get()), InitCond.get(),
       cast<DeclStmt>(BeginStmt.get()), cast<DeclStmt>(EndStmt.get()),
-      NewCond.get(), NewInc.get(), LoopVar, Body, CilkForLoc, LParenLoc,
+      NewCond.get(), NewInc.get(), LoopVarDS, Body, CilkForLoc, LParenLoc,
       RParenLoc);
 }
 
@@ -3890,7 +3890,7 @@ Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
                        Stmt *First, DeclStmt *Limit, ConditionResult InitCond,
                        DeclStmt *Begin, DeclStmt *End, ConditionResult Second,
                        FullExprArg Third, SourceLocation RParenLoc, Stmt *Body,
-                       VarDecl *LoopVar) {
+                       DeclStmt *LoopVar) {
   CheckCilkForInit(*this, First);
 
   // if (!getLangOpts().CPlusPlus) {
@@ -3952,10 +3952,9 @@ Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
   setFunctionHasBranchProtectedScope();
 
   if (LoopVar)
-    return new (Context) CilkForStmt(Context, First, Limit,
-                                     InitCond.get().second, Begin, End,
-                                     Condition, Increment, LoopVar, Body,
-                                     CilkForLoc, LParenLoc, RParenLoc);
+    return new (Context)
+        CilkForStmt(First, Limit, InitCond.get().second, Begin, End, Condition,
+                    Increment, LoopVar, Body, CilkForLoc, LParenLoc, RParenLoc);
 
   // Attempt to process this loop as a simple _Cilk_for loop.
   StmtResult SimpleCilkFor =
@@ -3980,14 +3979,12 @@ Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
     return NewInit;
 
   if (!NewInit.isUnset())
-    return new (Context) CilkForStmt(Context, NewInit.get(), nullptr,
-                                     nullptr, nullptr, nullptr,
-                                     Condition, Increment, nullptr, Body,
-                                     CilkForLoc, LParenLoc, RParenLoc);
-  return new (Context) CilkForStmt(Context, First, nullptr,
-                                   nullptr, nullptr, nullptr,
-                                   Condition, Increment, nullptr, Body,
-                                   CilkForLoc, LParenLoc, RParenLoc);
+    return new (Context) CilkForStmt(NewInit.get(), nullptr, nullptr, nullptr,
+                                     nullptr, Condition, Increment, nullptr,
+                                     Body, CilkForLoc, LParenLoc, RParenLoc);
+  return new (Context)
+      CilkForStmt(First, nullptr, nullptr, nullptr, nullptr, Condition,
+                  Increment, nullptr, Body, CilkForLoc, LParenLoc, RParenLoc);
 }
 
 /// Determine whether the given expression might be move-eligible or

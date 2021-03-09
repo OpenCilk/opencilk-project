@@ -26,11 +26,9 @@ class CilkSpawnExpr : public Expr {
 public:
   CilkSpawnExpr(SourceLocation SpawnLoc, Expr *SpawnedExpr)
       : Expr(CilkSpawnExprClass, SpawnedExpr->getType(),
-             SpawnedExpr->getValueKind(), SpawnedExpr->getObjectKind(),
-             SpawnedExpr->isTypeDependent(), SpawnedExpr->isValueDependent(),
-             SpawnedExpr->isInstantiationDependent(),
-             SpawnedExpr->containsUnexpandedParameterPack()),
+             SpawnedExpr->getValueKind(), SpawnedExpr->getObjectKind()),
         SpawnedExpr(SpawnedExpr), SpawnLoc(SpawnLoc) {
+    setDependence(computeDependence(this));
   }
 
   explicit CilkSpawnExpr(EmptyShell Empty)

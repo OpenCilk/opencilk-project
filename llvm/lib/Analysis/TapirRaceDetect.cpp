@@ -1002,7 +1002,7 @@ bool AccessPtrAnalysis::PointerCapturedBefore(const Value *Ptr,
     Result = true;
   else
     Result = PointerMayBeCapturedBefore(StrippedPtr, false, false, I, &DT, true,
-                                        nullptr, MaxUsesToExplore);
+                                        MaxUsesToExplore);
   MayBeCapturedCache[CaptureQuery] = Result;
   return Result;
 }

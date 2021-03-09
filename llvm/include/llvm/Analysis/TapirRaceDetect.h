@@ -262,7 +262,7 @@ public:
 
   void print(raw_ostream &) const;
 
-  AliasAnalysis *getAA() const { return DI.getAA(); }
+  AAResults *getAA() const { return DI.getAA(); }
   ScalarEvolution *getSE() const { return &SE; }
 
 private:

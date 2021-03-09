@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/LoopStripMinePass.h"
+#include "llvm/ADT/PriorityWorklist.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -261,9 +262,13 @@ static bool tryToStripMineLoop(
   // be allowed to run in parallel when S >= 2 * d.  We check for this case and
   // encode the result in ParallelEpilog.
   Instruction *DetachI = L->getHeader()->getTerminator();
-  bool ParallelEpilog = AllowParallelEpilog &&
-    ((SMP.Count < SMP.DefaultCoarseningFactor) ||
-     (LoopCost >= static_cast<unsigned>(2 * TTI.getUserCost(DetachI))));
+  bool ParallelEpilog =
+      AllowParallelEpilog &&
+      ((SMP.Count < SMP.DefaultCoarseningFactor) ||
+       (LoopCost >=
+        static_cast<unsigned>(
+            2 * TTI.getUserCost(DetachI,
+                                TargetTransformInfo::TCK_SizeAndLatency))));
 
   // Some parallel runtimes, such as Cilk, require nested parallel tasks to be
   // synchronized.
@@ -277,7 +282,7 @@ static bool tryToStripMineLoop(
   // Stripmine the loop
   Loop *RemainderLoop = nullptr;
   Loop *NewLoop = StripMineLoop(L, SMP.Count, SMP.AllowExpensiveTripCount,
-                                SMP.UnrollRemainder, LI, &SE, &DT, &AC, TI,
+                                SMP.UnrollRemainder, LI, &SE, &DT, TTI, &AC, TI,
                                 &ORE, PreserveLCSSA, ParallelEpilog,
                                 NeedNestedSync, &RemainderLoop);
   if (!NewLoop)
@@ -367,30 +372,6 @@ Pass *llvm::createLoopStripMinePass(int Count) {
       Count == -1 ? None : Optional<unsigned>(Count));
 }
 
-template <typename RangeT>
-static SmallVector<Loop *, 8> appendLoopsToWorklist(RangeT &&Loops) {
-  SmallVector<Loop *, 8> Worklist;
-  // We use an internal worklist to build up the preorder traversal without
-  // recursion.
-  SmallVector<Loop *, 4> PreOrderLoops, PreOrderWorklist;
-
-  for (Loop *RootL : Loops) {
-    assert(PreOrderLoops.empty() && "Must start with an empty preorder walk.");
-    assert(PreOrderWorklist.empty() &&
-           "Must start with an empty preorder walk worklist.");
-    PreOrderWorklist.push_back(RootL);
-    do {
-      Loop *L = PreOrderWorklist.pop_back_val();
-      PreOrderWorklist.append(L->begin(), L->end());
-      PreOrderLoops.push_back(L);
-    } while (!PreOrderWorklist.empty());
-
-    Worklist.append(PreOrderLoops.begin(), PreOrderLoops.end());
-    PreOrderLoops.clear();
-  }
-  return Worklist;
-}
-
 PreservedAnalyses LoopStripMinePass::run(Function &F,
                                          FunctionAnalysisManager &AM) {
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
@@ -424,7 +405,8 @@ PreservedAnalyses LoopStripMinePass::run(Function &F,
     Changed |= formLCSSARecursively(*L, DT, &LI, &SE);
   }
 
-  SmallVector<Loop *, 8> Worklist = appendLoopsToWorklist(LI);
+  SmallPriorityWorklist<Loop *, 4> Worklist;
+  appendLoopsToWorklist(LI, Worklist);
 
   while (!Worklist.empty()) {
     // Because the LoopInfo stores the loops in RPO, we walk the worklist from
@@ -441,7 +423,7 @@ PreservedAnalyses LoopStripMinePass::run(Function &F,
     // // bloating it further.
     // if (PSI && PSI->hasHugeWorkingSetSize())
     //   AllowPeeling = false;
-    std::string LoopName = L.getName();
+    std::string LoopName = std::string(L.getName());
     bool LoopChanged =
       tryToStripMineLoop(&L, DT, &LI, SE, TTI, AC, &TI, ORE, &TLI,
                          /*PreserveLCSSA*/ true, /*Count*/ None);

@@ -157,7 +157,7 @@ pair<pair<point2d *, point2d *>, pair<point2d *, point2d *> > find_minmax_xy(poi
 // CHECK-LABEL: @_Z14find_minmax_xyP8_point2dIdEl(
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]:
-// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmax_e1,
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret {{.*}}%minmax_e1,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
 _seq<point2d> hullP(point2d* P, intT n, point2d *Ptmp) {
@@ -235,17 +235,17 @@ _seq<point2d> hullP(point2d* P, intT n, point2d *Ptmp) {
 
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]:
-// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy1,
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret {{.*}}%minmaxxy1,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED2:.+]], label %[[CONTINUE2:.+]]
 // CHECK: [[DETACHED2]]:
-// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy2,
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret {{.*}}%minmaxxy2,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
 
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]]
 // CHECK: [[DETACHED3]]:
-// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret %minmaxxy3,
+// CHECK: call void @_Z14find_minmax_xyP8_point2dIdEl(%struct.pair* sret {{.*}}%minmaxxy3,
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
 
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]]
