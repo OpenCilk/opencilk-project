@@ -817,3 +817,273 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   if (TempInvokeDest->use_empty())
     delete TempInvokeDest;
 }
+
+void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
+                                      ArrayRef<const Attr *> ForAttrs) {
+  JumpDest LoopExit = getJumpDestInCurrentScope("pfor.end");
+
+  PushSyncRegion();
+  llvm::Instruction *SyncRegion = EmitSyncRegionStart();
+  CurSyncRegion->setSyncRegionStart(SyncRegion);
+
+  llvm::BasicBlock *TempInvokeDest = createBasicBlock("temp.invoke.dest");
+
+  LexicalScope ForScope(*this, S.getSourceRange());
+
+  const CXXForRangeStmt &ForRange = *S.getCXXForRangeStmt();
+
+  // Evaluate the first part before the loop.
+  if (ForRange.getInit())
+    EmitStmt(ForRange.getInit());
+
+  llvm::BasicBlock *ExitBlock = LoopExit.getBlock();
+
+  EmitStmt(ForRange.getRangeStmt());
+  EmitStmt(ForRange.getBeginStmt());
+  EmitStmt(ForRange.getEndStmt());
+
+  // Start the loop with a block that tests the condition.  If there's an
+  // increment, the continue scope will be overwritten later.
+  JumpDest Continue = getJumpDestInCurrentScope("pfor.cond");
+  llvm::BasicBlock *CondBlock = Continue.getBlock();
+  EmitBlock(CondBlock);
+
+  LoopStack.setSpawnStrategy(LoopAttributes::DAC);
+  const SourceRange &R = S.getSourceRange();
+  LoopStack.push(CondBlock, CGM.getContext(), ForAttrs,
+                 SourceLocToDebugLoc(R.getBegin()),
+                 SourceLocToDebugLoc(R.getEnd()));
+
+  const Expr *Inc = ForRange.getInc();
+  assert(Inc && "_Cilk_for range loop has no increment");
+  Continue = getJumpDestInCurrentScope("pfor.inc");
+
+  // Ensure that the _Cilk_for loop iterations are synced on exit from the loop.
+  EHStack.pushCleanup<ImplicitSyncCleanup>(NormalCleanup, SyncRegion);
+
+  // Create a cleanup scope for the condition variable cleanups.
+  LexicalScope ConditionScope(*this, S.getSourceRange());
+
+  // Variables to store the old alloca insert point.
+  llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt;
+  // Variables to store the old EH state.
+  llvm::BasicBlock *OldEHResumeBlock;
+  llvm::Value *OldExceptionSlot;
+  llvm::AllocaInst *OldEHSelectorSlot;
+  Address OldNormalCleanupDest = Address::invalid();
+
+  const VarDecl *LoopVar = ForRange.getLoopVariable();
+  RValue LoopVarInitRV;
+  llvm::BasicBlock *DetachBlock;
+  llvm::BasicBlock *ForBodyEntry;
+  llvm::BasicBlock *ForBody;
+  llvm::DetachInst *Detach;
+  {
+    // FIXME: Figure out if there is a way to support condition variables in
+    // Cilk.
+    //
+    // // If the for statement has a condition scope, emit the local variable
+    // // declaration.
+    // if (S.getConditionVariable()) {
+    //   EmitAutoVarDecl(*S.getConditionVariable());
+    // }
+
+    // If there are any cleanups between here and the loop-exit scope,
+    // create a block to stage a loop exit along.
+    if (ForScope.requiresCleanups())
+      ExitBlock = createBasicBlock("pfor.cond.cleanup");
+
+    // As long as the condition is true, iterate the loop.
+    DetachBlock = createBasicBlock("pfor.detach");
+    // Emit extra entry block for detached body, to ensure that this detached
+    // entry block has just one predecessor.
+    ForBodyEntry = createBasicBlock("pfor.body.entry");
+    ForBody = createBasicBlock("pfor.body");
+
+    EmitBranch(DetachBlock);
+
+    EmitBlockAfterUses(DetachBlock);
+
+    // Get the value of the loop variable initialization before we emit the
+    // detach.
+    if (LoopVar)
+      LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
+
+    Detach = Builder.CreateDetach(ForBodyEntry, Continue.getBlock(),
+                                  SyncRegion);
+    // Save the old alloca insert point.
+    OldAllocaInsertPt = AllocaInsertPt;
+    // Save the old EH state.
+    OldEHResumeBlock = EHResumeBlock;
+    OldExceptionSlot = ExceptionSlot;
+    OldEHSelectorSlot = EHSelectorSlot;
+    OldNormalCleanupDest = NormalCleanupDest;
+
+    // Create a new alloca insert point.
+    llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
+    AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "", ForBodyEntry);
+
+    // Push a cleanup to make sure any exceptional exit from the loop is
+    // terminated by a detached.rethrow.
+    EHStack.pushCleanup<CallDetRethrow>(
+        static_cast<CleanupKind>(EHCleanup | LifetimeMarker | TaskExit),
+        SyncRegion, TempInvokeDest);
+
+    // Set up nested EH state.
+    EHResumeBlock = nullptr;
+    ExceptionSlot = nullptr;
+    EHSelectorSlot = nullptr;
+    NormalCleanupDest = Address::invalid();
+
+    EmitBlock(ForBodyEntry);
+  }
+
+  RunCleanupsScope DetachCleanupsScope(*this);
+
+  // Set up a nested sync region for the loop body, and ensure it has an
+  // implicit sync.
+  PushSyncRegion()->addImplicitSync();
+
+  // Store the blocks to use for break and continue.
+  JumpDest Preattach = getJumpDestInCurrentScope("pfor.preattach");
+  BreakContinueStack.push_back(BreakContinue(Preattach, Preattach));
+
+  // Inside the detached block, create the loop variable, setting its value to
+  // the saved initialization value.
+  if (LoopVar) {
+    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
+    QualType type = LoopVar->getType();
+    Address Loc = LVEmission.getObjectAddress(*this);
+    LValue LV = MakeAddrLValue(Loc, type);
+    LV.setNonGC(true);
+    EmitStoreThroughLValue(LoopVarInitRV, LV, true);
+    EmitAutoVarCleanups(LVEmission);
+  }
+
+  Builder.CreateBr(ForBody);
+
+  EmitBlock(ForBody);
+
+  incrementProfileCounter(&S);
+
+  {
+    // Create a separate cleanup scope for the body, in case it is not
+    // a compound statement.
+    RunCleanupsScope BodyScope(*this);
+
+    SyncedScopeRAII SyncedScp(*this);
+    if (isa<CompoundStmt>(ForRange.getBody()))
+      ScopeIsSynced = true;
+    EmitStmt(ForRange.getBody());
+
+    if (HaveInsertPoint())
+      Builder.CreateBr(Preattach.getBlock());
+  }
+
+  // Finish detached body and emit the reattach.
+  {
+    EmitBlock(Preattach.getBlock());
+    // The design of the exception-handling mechanism means we need to cleanup
+    // the scope before popping the sync region.
+    DetachCleanupsScope.ForceCleanup();
+    PopSyncRegion();
+    // Pop the detached.rethrow cleanup.
+    PopCleanupBlock();
+    Builder.CreateReattach(Continue.getBlock(), SyncRegion);
+  }
+
+  // Restore CGF state after detached region.
+  llvm::BasicBlock *NestedEHResumeBlock;
+  {
+    // Restore the alloca insertion point.
+    llvm::Instruction *Ptr = AllocaInsertPt;
+    AllocaInsertPt = OldAllocaInsertPt;
+    Ptr->eraseFromParent();
+
+    // Restore the EH state.
+    NestedEHResumeBlock = EHResumeBlock;
+    EHResumeBlock = OldEHResumeBlock;
+    ExceptionSlot = OldExceptionSlot;
+    EHSelectorSlot = OldEHSelectorSlot;
+    NormalCleanupDest = OldNormalCleanupDest;
+  }
+
+  // An invocation of the detached.rethrow intrinsic marks the end of an
+  // exceptional return from the parallel-loop body.  That invoke needs a valid
+  // landinpad as its unwind destination.  We create that unwind destination
+  // here.
+  llvm::BasicBlock *InvokeDest = nullptr;
+  if (!TempInvokeDest->use_empty()) {
+    InvokeDest = getInvokeDest();
+    if (InvokeDest)
+      TempInvokeDest->replaceAllUsesWith(InvokeDest);
+    else {
+      InvokeDest = TempInvokeDest;
+      EmitTrivialLandingPad(*this, TempInvokeDest);
+    }
+  }
+
+  // If invocations in the parallel task led to the creation of EHResumeBlock,
+  // we need to create for outside the task.  In particular, the new
+  // EHResumeBlock must use an ExceptionSlot and EHSelectorSlot allocated
+  // outside of the task.
+  if (NestedEHResumeBlock) {
+    if (!NestedEHResumeBlock->use_empty()) {
+      // Translate the nested EHResumeBlock into an appropriate EHResumeBlock in
+      // the outer scope.
+      NestedEHResumeBlock->replaceAllUsesWith(
+          getEHResumeBlock(
+              isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
+    }
+    delete NestedEHResumeBlock;
+  }
+
+  // Emit the increment next.
+  EmitBlockAfterUses(Continue.getBlock());
+  EmitStmt(Inc);
+
+  {
+    // If the detached-rethrow handler is used, add an unwind destination to the
+    // detach.
+    if (InvokeDest) {
+      CGBuilderTy::InsertPoint SavedIP = Builder.saveIP();
+      Builder.SetInsertPoint(DetachBlock);
+      // Create the new detach instruction.
+      llvm::DetachInst *NewDetach = Builder.CreateDetach(
+          ForBodyEntry, Continue.getBlock(), InvokeDest,
+          SyncRegion);
+      // Remove the old detach.
+      Detach->eraseFromParent();
+      Detach = NewDetach;
+      Builder.restoreIP(SavedIP);
+    }
+  }
+
+  BreakContinueStack.pop_back();
+
+  ConditionScope.ForceCleanup();
+
+  EmitStopPoint(&S);
+
+  // C99 6.8.5p2/p4: The first substatement is executed if the expression
+  // compares unequal to 0.  The condition must be a scalar type.
+  llvm::Value *BoolCondVal = EvaluateExprAsBool(ForRange.getCond());
+  Builder.CreateCondBr(
+      BoolCondVal, CondBlock, ExitBlock,
+      createProfileWeightsForLoop(ForRange.getCond(), getProfileCount(ForRange.getBody())));
+
+  if (ExitBlock != LoopExit.getBlock()) {
+    EmitBlock(ExitBlock);
+    EmitBranchThroughCleanup(LoopExit);
+  }
+
+  ForScope.ForceCleanup();
+
+  LoopStack.pop();
+  // Emit the fall-through block.
+  EmitBlock(LoopExit.getBlock(), true);
+  PopSyncRegion();
+
+  if (TempInvokeDest->use_empty())
+    delete TempInvokeDest;
+}
