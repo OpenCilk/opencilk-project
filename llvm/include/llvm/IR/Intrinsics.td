@@ -1293,7 +1293,7 @@ def int_taskframe_resume : Intrinsic<[], [llvm_token_ty, llvm_any_ty],
 // locations stored in spawned subtasks.
 def int_taskframe_load_guard
     : Intrinsic<[], [llvm_anyptr_ty],
-                [IntrArgMemOnly, IntrWillReturn, NoCapture<0>]>;
+                [IntrArgMemOnly, IntrWillReturn, NoCapture<ArgIndex<0>>]>;
 
 // Marker for the end of a spawned task along exception-handling
 // unwind paths.

@@ -955,8 +955,8 @@ bool TailDuplicator::tailDuplicate(const BlockDesc &Desc,
     }
 
     // Clone the contents of TailBB into PredBB.
-    DenseMap<unsigned, RegSubRegPair> LocalVRMap;
-    SmallVector<std::pair<unsigned, RegSubRegPair>, 4> CopyInfos;
+    DenseMap<Register, RegSubRegPair> LocalVRMap;
+    SmallVector<std::pair<Register, RegSubRegPair>, 4> CopyInfos;
     for (MachineBasicBlock::iterator I = TailBB->begin(), E = TailBB->end();
          I != E; /* empty */) {
       MachineInstr *MI = &*I;

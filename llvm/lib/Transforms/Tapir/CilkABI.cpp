@@ -19,7 +19,6 @@
 #include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpander.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
@@ -32,6 +31,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
@@ -280,8 +280,8 @@ static Value *GEP(IRBuilder<> &B, Value *Base, int Field) {
   return B.CreateConstInBoundsGEP2_32(nullptr, Base, 0, Field);
 }
 
-static unsigned GetAlignment(const DataLayout &DL, StructType *STy, int Field) {
-  return DL.getPrefTypeAlignment(STy->getElementType(Field));
+static Align GetAlignment(const DataLayout &DL, StructType *STy, int Field) {
+  return DL.getPrefTypeAlign(STy->getElementType(Field));
 }
 
 static void StoreSTyField(IRBuilder<> &B, const DataLayout &DL, StructType *STy,
@@ -312,10 +312,11 @@ void CilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
                        PointerType::getUnqual(Type::getInt16Ty(C))},
                       false);
 
-  Value *Asm = InlineAsm::get(FTy,
-                              "stmxcsr $0\n\t" "fnstcw $1",
-                              "*m,*m,~{dirflag},~{fpsr},~{flags}",
-                              /*sideeffects*/ true);
+  InlineAsm *Asm = InlineAsm::get(FTy,
+                                  "stmxcsr $0\n\t"
+                                  "fnstcw $1",
+                                  "*m,*m,~{dirflag},~{fpsr},~{flags}",
+                                  /*sideeffects*/ true);
 
   Value *Args[2] = {
     GEP(B, SF, StackFrameFields::mxcsr),
@@ -376,7 +377,7 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   Buf = B.CreateBitCast(Buf, Int8PtrTy);
 
   // Call LLVM's EH setjmp, which is lightweight.
-  Value* F = Intrinsic::getDeclaration(&M, Intrinsic::eh_sjlj_setjmp);
+  Function *F = Intrinsic::getDeclaration(&M, Intrinsic::eh_sjlj_setjmp);
 
   CallInst *SetjmpCall = B.CreateCall(F, Buf);
   SetjmpCall->setCanReturnTwice();
@@ -696,13 +697,12 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
                                  AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
-    unsigned RankAlignment = GetAlignment(DL, PedigreeTy,
-                                          PedigreeFields::rank);
-    B.CreateAlignedStore(B.CreateAdd(
-                             B.CreateAlignedLoad(Rank, RankAlignment),
-                             ConstantInt::get(
-                                 Rank->getType()->getPointerElementType(), 1)),
-                         Rank, RankAlignment);
+    Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
+    B.CreateAlignedStore(
+        B.CreateAdd(
+            B.CreateAlignedLoad(Rank, RankAlignment),
+            ConstantInt::get(Rank->getType()->getPointerElementType(), 1)),
+        Rank, RankAlignment);
     // if (instrument)
     //   // cilk_sync_end
     //   B.CreateCall(CILK_CSI_FUNC(sync_end, M), SF);
@@ -822,13 +822,12 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
                                  AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
-    unsigned RankAlignment = GetAlignment(DL, PedigreeTy,
-                                          PedigreeFields::rank);
-    B.CreateAlignedStore(B.CreateAdd(
-                             B.CreateAlignedLoad(Rank, RankAlignment),
-                             ConstantInt::get(
-                                 Rank->getType()->getPointerElementType(), 1)),
-                         Rank, RankAlignment);
+    Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
+    B.CreateAlignedStore(
+        B.CreateAdd(
+            B.CreateAlignedLoad(Rank, RankAlignment),
+            ConstantInt::get(Rank->getType()->getPointerElementType(), 1)),
+        Rank, RankAlignment);
     // if (instrument)
     //   // cilk_sync_end
     //   B.CreateCall(CILK_CSI_FUNC(sync_end, M), SF);
@@ -981,13 +980,12 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
                                  AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
-    unsigned RankAlignment = GetAlignment(DL, PedigreeTy,
-                                          PedigreeFields::rank);
-    B.CreateAlignedStore(B.CreateAdd(
-                             B.CreateAlignedLoad(Rank, RankAlignment),
-                             ConstantInt::get(
-                                 Rank->getType()->getPointerElementType(), 1)),
-                         Rank, RankAlignment);
+    Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
+    B.CreateAlignedStore(
+        B.CreateAdd(
+            B.CreateAlignedLoad(Rank, RankAlignment),
+            ConstantInt::get(Rank->getType()->getPointerElementType(), 1)),
+        Rank, RankAlignment);
 
     B.CreateRet(ExnPN);
   }
@@ -1753,7 +1751,7 @@ static inline void inlineCilkFunctions(
     Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
   for (CallBase *CB : CallsToInline) {
     InlineFunctionInfo IFI;
-    InlineFunction(CB, IFI);
+    InlineFunction(*CB, IFI);
   }
   CallsToInline.clear();
 }

@@ -1467,7 +1467,7 @@ void LoopUnswitch::unswitchNontrivialCondition(
 
   // Split all of the edges from inside the loop to their exit blocks.  Update
   // the appropriate Phi nodes as we do so.
-  SplitExitEdges(L, ExitBlocks);
+  splitExitEdges(L, ExitBlocks);
 
   // The exit blocks may have been changed due to edge splitting, recompute.
   ExitBlocks.clear();

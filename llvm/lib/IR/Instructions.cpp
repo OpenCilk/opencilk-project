@@ -1203,7 +1203,7 @@ void DetachInst::init(Value *SyncRegion, BasicBlock *Detached,
   Op<-2>() = Detached;
   Op<-3>() = Continue;
   if (Unwind) {
-    setInstructionSubclassData(getSubclassDataFromInstruction() | 1);
+    setSubclassData<UnwindDestField>(true);
     Op<-4>() = Unwind;
   }
 #ifndef NDEBUG
@@ -1254,7 +1254,8 @@ DetachInst::DetachInst(const DetachInst &DI)
                   OperandTraits<DetachInst>::op_end(this) -
                   DI.getNumOperands(),
                   DI.getNumOperands()) {
-  setInstructionSubclassData(DI.getSubclassDataFromInstruction());
+  setSubclassData<Instruction::OpaqueField>(
+      DI.getSubclassData<Instruction::OpaqueField>());
   Op<-1>() = DI.Op<-1>();
   Op<-2>() = DI.Op<-2>();
   Op<-3>() = DI.Op<-3>();

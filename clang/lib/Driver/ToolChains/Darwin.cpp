@@ -2821,7 +2821,7 @@ DarwinClang::getOpenCilkRuntimePath(const ArgList &Args) const {
   if (!Args.hasArg(options::OPT_opencilk_resource_dir_EQ)) {
     SmallString<128> Dir(getDriver().ResourceDir);
     llvm::sys::path::append(Dir, "lib",  "darwin");
-    return llvm::Optional<std::string>(Dir.str());
+    return llvm::Optional<std::string>(std::string(Dir.str()));
   }
 
   SmallString<128> P;
@@ -2833,13 +2833,13 @@ DarwinClang::getOpenCilkRuntimePath(const ArgList &Args) const {
   P.assign(A->getValue());
   llvm::sys::path::append(P, "lib", "darwin");
   if (getVFS().exists(P))
-    return llvm::Optional<std::string>(P.str());
+    return llvm::Optional<std::string>(std::string(P.str()));
 
   // Second try the lib subdirectory
   P.assign(A->getValue());
   llvm::sys::path::append(P, "lib");
   if (getVFS().exists(P))
-    return llvm::Optional<std::string>(P.str());
+    return llvm::Optional<std::string>(std::string(P.str()));
 
   return None;
 }

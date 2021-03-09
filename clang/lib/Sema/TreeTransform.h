@@ -1393,12 +1393,11 @@ public:
                                 Sema::ConditionResult InitCond, Stmt *Begin,
                                 Stmt *End,  Sema::ConditionResult Cond,
                                 Sema::FullExprArg Inc, SourceLocation RParenLoc,
-                                VarDecl *LoopVar, Stmt *Body) {
-    return getSema().ActOnCilkForStmt(ForLoc, LParenLoc, Init,
-                                      cast_or_null<DeclStmt>(Limit), InitCond,
-                                      cast_or_null<DeclStmt>(Begin),
-                                      cast_or_null<DeclStmt>(End), Cond, Inc,
-                                      RParenLoc, Body, LoopVar);
+                                Stmt *LoopVar, Stmt *Body) {
+    return getSema().ActOnCilkForStmt(
+        ForLoc, LParenLoc, Init, cast_or_null<DeclStmt>(Limit), InitCond,
+        cast_or_null<DeclStmt>(Begin), cast_or_null<DeclStmt>(End), Cond, Inc,
+        RParenLoc, Body, cast_or_null<DeclStmt>(LoopVar));
   }
 
   /// Build a new goto statement.
@@ -14576,11 +14575,10 @@ TreeTransform<Derived>::TransformCilkForStmt(CilkForStmt *S) {
     return StmtError();
 
   // Transform the extracted loop-variable declaration
-  VarDecl *LoopVar = nullptr;
-  if (VarDecl *LV = S->getLoopVariable()) {
-    LoopVar = dyn_cast<VarDecl>(
-        getDerived().TransformDefinition(LV->getLocation(), LV));
-    if (!LoopVar)
+  StmtResult LoopVar;
+  if (DeclStmt *LV = S->getLoopVarStmt()) {
+    LoopVar = getDerived().TransformStmt(LV);
+    if (LoopVar.isInvalid())
       return StmtError();
   }
 
@@ -14598,14 +14596,14 @@ TreeTransform<Derived>::TransformCilkForStmt(CilkForStmt *S) {
       End.get() == S->getEndStmt() &&
       Cond.get() == std::make_pair((clang::VarDecl*)nullptr, S->getCond()) &&
       Inc.get() == S->getInc() &&
-      LoopVar == S->getLoopVariable() &&
+      LoopVar.get() == S->getLoopVarStmt() &&
       Body.get() == S->getBody())
     return S;
 
   return getDerived().RebuildCilkForStmt(
       S->getCilkForLoc(), S->getLParenLoc(), Init.get(), Limit.get(),
       InitCond, Begin.get(), End.get(), Cond, FullInc, S->getRParenLoc(),
-      LoopVar, Body.get());
+      LoopVar.get(), Body.get());
 }
 
 } // end namespace clang

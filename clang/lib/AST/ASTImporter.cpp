@@ -6491,30 +6491,25 @@ ExpectedStmt ASTNodeImporter::VisitCilkSyncStmt(CilkSyncStmt *S) {
 }
 
 ExpectedStmt ASTNodeImporter::VisitCilkForStmt(CilkForStmt *S) {
-  auto Imp = importSeq(
-      S->getInit(), S->getLimitStmt(), S->getInitCond(), S->getBeginStmt(),
-      S->getEndStmt(), S->getCond(), /*S->getConditionVariable(),*/ S->getInc(),
-      S->getLoopVariable(), S->getBody(), S->getCilkForLoc(), S->getLParenLoc(),
-      S->getRParenLoc());
-  if (!Imp)
-    return Imp.takeError();
-
-  Stmt *ToInit;
-  DeclStmt *ToLimitStmt, *ToBeginStmt, *ToEndStmt;
-  Expr *ToInitCond, *ToCond, *ToInc;
-  // VarDecl *ToConditionVariable;
-  VarDecl *ToLoopVariable;
-  Stmt *ToBody;
-  SourceLocation ToCilkForLoc, ToLParenLoc, ToRParenLoc;
-  std::tie(
-      ToInit, ToLimitStmt, ToInitCond, ToBeginStmt, ToEndStmt, ToCond,
-      /*ToConditionVariable,*/ ToInc, ToLoopVariable, ToBody,
-      ToCilkForLoc, ToLParenLoc, ToRParenLoc) = *Imp;
+  Error Err = Error::success();
+  auto ToInit = importChecked(Err, S->getInit());
+  auto ToLimitStmt = importChecked(Err, S->getLimitStmt());
+  auto ToInitCond = importChecked(Err, S->getInitCond());
+  auto ToBeginStmt = importChecked(Err, S->getBeginStmt());
+  auto ToEndStmt = importChecked(Err, S->getEndStmt());
+  auto ToCond = importChecked(Err, S->getCond());
+  auto ToInc = importChecked(Err, S->getInc());
+  auto ToLoopVarStmt = importChecked(Err, S->getLoopVarStmt());
+  auto ToBody = importChecked(Err, S->getBody());
+  auto ToCilkForLoc = importChecked(Err, S->getCilkForLoc());
+  auto ToLParenLoc = importChecked(Err, S->getLParenLoc());
+  auto ToRParenLoc = importChecked(Err, S->getRParenLoc());
+  if (Err)
+    return std::move(Err);
 
   return new (Importer.getToContext()) CilkForStmt(
-      Importer.getToContext(), ToInit, ToLimitStmt, ToInitCond, ToBeginStmt,
-      ToEndStmt, ToCond, /*ToConditionVariable,*/ ToInc,
-      ToLoopVariable, ToBody, ToCilkForLoc, ToLParenLoc, ToRParenLoc);
+      ToInit, ToLimitStmt, ToInitCond, ToBeginStmt, ToEndStmt, ToCond, ToInc,
+      ToLoopVarStmt, ToBody, ToCilkForLoc, ToLParenLoc, ToRParenLoc);
 }
 
 //----------------------------------------------------------------------------

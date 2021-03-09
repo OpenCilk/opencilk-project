@@ -2555,12 +2555,12 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     // Insert the llvm.taskframe.create.
     TFCreate = IRBuilder<>(&*FirstNewBlock, FirstNewBlock->begin())
                    .CreateCall(TFCreateFn, {}, "tf.i");
-    TFCreate->setDebugLoc(TheCall->getDebugLoc());
+    TFCreate->setDebugLoc(CB.getDebugLoc());
     TFEntryBlock = &*FirstNewBlock;
 
     // If we're inlining an invoke, insert a taskframe.resume at the unwind
     // destination of the invoke.
-    if (auto *II = dyn_cast<InvokeInst>(TheCall)) {
+    if (auto *II = dyn_cast<InvokeInst>(&CB)) {
       BasicBlock *UnwindEdge = II->getUnwindDest();
       // Create the normal return for the detached rethrow.
       BasicBlock *UnreachableBlk = BasicBlock::Create(

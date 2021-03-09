@@ -4746,15 +4746,12 @@ public:
   StmtResult LiftCilkForLoopLimit(SourceLocation CilkForLoc,
                                   Stmt *First, Expr **Second);
   StmtResult ActOnCilkForStmt(SourceLocation CilkForLoc,
-                              SourceLocation LParenLoc,
-                              Stmt *Init, DeclStmt *Limit,
-                              ConditionResult InitCond,
+                              SourceLocation LParenLoc, Stmt *Init,
+                              DeclStmt *Limit, ConditionResult InitCond,
                               DeclStmt *Begin, DeclStmt *End,
-                              ConditionResult second,
-                              FullExprArg third,
-                              SourceLocation RParenLoc,
-                              Stmt *Body,
-                              VarDecl *LoopVar = nullptr);
+                              ConditionResult second, FullExprArg third,
+                              SourceLocation RParenLoc, Stmt *Body,
+                              DeclStmt *LoopVar = nullptr);
 
   StmtResult BuildCilkForStmt(SourceLocation CilkForLoc,
                               SourceLocation LParenLoc,

@@ -2598,10 +2598,13 @@ void ASTStmtReader::VisitCilkSyncStmt(CilkSyncStmt *S) {
 void ASTStmtReader::VisitCilkForStmt(CilkForStmt *S) {
   VisitStmt(S);
   S->setInit(Record.readSubStmt());
+  S->setLimitStmt(Record.readSubStmt());
+  S->setInitCond(Record.readSubExpr());
+  S->setBeginStmt(Record.readSubStmt());
+  S->setEndStmt(Record.readSubStmt());
   S->setCond(Record.readSubExpr());
-  // S->setConditionVariable(Record.getContext(), readDeclAs<VarDecl>());
   S->setInc(Record.readSubExpr());
-  S->setLoopVariable(Record.getContext(), readDeclAs<VarDecl>());
+  S->setLoopVarStmt(Record.readSubStmt());
   S->setBody(Record.readSubStmt());
   S->setCilkForLoc(readSourceLocation());
   S->setLParenLoc(readSourceLocation());

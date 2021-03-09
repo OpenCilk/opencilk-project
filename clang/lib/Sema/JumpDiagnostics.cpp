@@ -629,7 +629,7 @@ void JumpScopeChecker::BuildScopeInformation(Stmt *S,
     }
 
     // Cannot jump into the loop-variable declaration
-    if (VarDecl *LV = CF->getLoopVariable()) {
+    if (DeclStmt *LV = CF->getLoopVarStmt()) {
       NewParentScope = Scopes.size();
       Scopes.push_back(GotoScope(ParentScope,
                                  diag::note_protected_by_cilk_for,

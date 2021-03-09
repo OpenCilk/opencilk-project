@@ -752,8 +752,8 @@ struct ComputeRegionCounts : public ConstStmtVisitor<ComputeRegionCounts> {
       Visit(S->getBeginStmt());
     if (S->getEndStmt())
       Visit(S->getEndStmt());
-    if (S->getLoopVarDecl())
-      Visit(S->getLoopVarDecl());
+    if (S->getLoopVarStmt())
+      Visit(S->getLoopVarStmt());
 
     uint64_t ParentCount = CurrentCount;
 

@@ -155,9 +155,21 @@
 ; CHECK-O: Starting {{.*}}Function pass manager run.
 ; CHECK-O: Running pass: Float2IntPass on main
 ; CHECK-O: Running pass: LowerConstantIntrinsicsPass on main
+; CHECK-O: Running pass: LoopStripMinePass on main
+; CHECK-O: Running analysis: ScalarEvolutionAnalysis on main
+; CHECK-O: Running analysis: LoopAnalysis on main
+; CHECK-O: Running analysis: TaskAnalysis on main
+; CHECK-O: Running pass: TaskSimplifyPass on main
+; CHECK-O: Running pass: FunctionToLoopPassAdaptor
+; CHECK-O: Running pass: EarlyCSEPass on main
+; CHECK-O: Running analysis: MemorySSAAnalysis on main
+; CHECK-O: Running analysis: AAManager on main
+; CHECK-O: Running analysis: BasicAA on main
+; CHECK-O: Running pass: JumpThreadingPass on main
+; CHECK-O: Running analysis: LazyValueAnalysis on main
+; CHECK-O: Running pass: FunctionToLoopPassAdaptor<{{.*}}LoopRotatePass> on main
 ; CHECK-O: Starting {{.*}}Function pass manager run.
 ; CHECK-O: Running pass: LoopSimplifyPass on main
-; CHECK-O: Running analysis: LoopAnalysis on main
 ; CHECK-O: Running pass: LCSSAPass on main
 ; CHECK-O: Finished {{.*}}Function pass manager run.
 ; CHECK-O: Running analysis: MemorySSAAnalysis on main

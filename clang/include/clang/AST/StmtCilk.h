@@ -92,10 +92,10 @@ class CilkForStmt : public Stmt {
   SourceLocation LParenLoc, RParenLoc;
 
 public:
-  CilkForStmt(const ASTContext &C, Stmt *Init, DeclStmt *Limit, Expr *InitCond,
-              DeclStmt *Begin, DeclStmt *End, Expr *Cond, Expr *Inc,
-              VarDecl *LoopVar, Stmt *Body, SourceLocation CFL,
-              SourceLocation LP, SourceLocation RP);
+  CilkForStmt(Stmt *Init, DeclStmt *Limit, Expr *InitCond, DeclStmt *Begin,
+              DeclStmt *End, Expr *Cond, Expr *Inc, DeclStmt *LoopVar,
+              Stmt *Body, SourceLocation CFL, SourceLocation LP,
+              SourceLocation RP);
 
   /// \brief Build an empty for statement.
   explicit CilkForStmt(EmptyShell Empty) : Stmt(CilkForStmtClass, Empty) { }
@@ -119,8 +119,6 @@ public:
   //   return reinterpret_cast<DeclStmt*>(SubExprs[CONDVAR]);
   // }
 
-  VarDecl *getLoopVariable() const;
-  void setLoopVariable(const ASTContext &C, VarDecl *V);
   DeclStmt *getLimitStmt() {
     return cast_or_null<DeclStmt>(SubExprs[LIMIT]);
   }
@@ -131,6 +129,9 @@ public:
   DeclStmt *getEndStmt() { return cast_or_null<DeclStmt>(SubExprs[ENDSTMT]); }
   Expr *getCond() { return reinterpret_cast<Expr*>(SubExprs[COND]); }
   Expr *getInc()  { return reinterpret_cast<Expr*>(SubExprs[INC]); }
+  DeclStmt *getLoopVarStmt() {
+    return cast_or_null<DeclStmt>(SubExprs[LOOPVAR]);
+  }
   Stmt *getBody() { return SubExprs[BODY]; }
 
   const Stmt *getInit() const { return SubExprs[INIT]; }
@@ -148,8 +149,8 @@ public:
   }
   const Expr *getCond() const { return reinterpret_cast<Expr*>(SubExprs[COND]);}
   const Expr *getInc()  const { return reinterpret_cast<Expr*>(SubExprs[INC]); }
-  const DeclStmt *getLoopVarDecl() const {
-    return reinterpret_cast<DeclStmt*>(SubExprs[LOOPVAR]);
+  const DeclStmt *getLoopVarStmt() const {
+    return cast_or_null<DeclStmt>(SubExprs[LOOPVAR]);
   }
   const Stmt *getBody() const { return SubExprs[BODY]; }
 
@@ -160,6 +161,7 @@ public:
   void setEndStmt(Stmt *S) { SubExprs[ENDSTMT] = S; }
   void setCond(Expr *E) { SubExprs[COND] = reinterpret_cast<Stmt*>(E); }
   void setInc(Expr *E) { SubExprs[INC] = reinterpret_cast<Stmt*>(E); }
+  void setLoopVarStmt(Stmt *S) { SubExprs[LOOPVAR] = S; }
   void setBody(Stmt *S) { SubExprs[BODY] = S; }
 
   SourceLocation getCilkForLoc() const { return CilkForLoc; }

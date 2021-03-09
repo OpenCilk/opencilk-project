@@ -1341,19 +1341,19 @@ ToolChain::getOpenCilkRuntimePath(const ArgList &Args) const {
   P.assign(A->getValue());
   llvm::sys::path::append(P, "lib", D.getTargetTriple());
   if (getVFS().exists(P))
-    return llvm::Optional<std::string>(P.str());
+    return llvm::Optional<std::string>(std::string(P.str()));
 
   // Second try the normalized triple.
   P.assign(A->getValue());
   llvm::sys::path::append(P, "lib", Triple.str());
   if (getVFS().exists(P))
-    return llvm::Optional<std::string>(P.str());
+    return llvm::Optional<std::string>(std::string(P.str()));
 
   // Third try excluding the triple.
   P.assign(A->getValue());
   llvm::sys::path::append(P, "lib");
   if (getVFS().exists(P))
-    return llvm::Optional<std::string>(P.str());
+    return llvm::Optional<std::string>(std::string(P.str()));
 
   return None;
 }

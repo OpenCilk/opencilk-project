@@ -388,10 +388,6 @@ bool llvm::inferLibFuncAttributes(Function &F, const TargetLibraryInfo &TLI) {
     Changed |= setRetDoesNotAlias(F);
     Changed |= setWillReturn(F);
     return Changed;
-  case LibFunc_aligned_alloc:
-    Changed |= setDoesNotThrow(F);
-    Changed |= setRetDoesNotAlias(F);
-    return Changed;
   case LibFunc_memcmp:
     Changed |= setOnlyAccessesArgMemory(F);
     Changed |= setOnlyReadsMemory(F);

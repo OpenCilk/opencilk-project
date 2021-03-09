@@ -254,10 +254,7 @@
 ; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Simplify loop CFG
-; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Induction Variable Simplification
-; CHECK-NEXT:       Memory SSA
-; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Loop Invariant Code Motion
 ; CHECK-NEXT:       Early CSE
 ; CHECK-NEXT:       Lazy Value Information Analysis
