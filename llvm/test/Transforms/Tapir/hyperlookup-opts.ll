@@ -198,9 +198,7 @@ _ZN4cilk7reducerINS_6op_addIxLb1EEEED2Ev.exit:    ; preds = %cond.end.i.i
 
 ; CHECK: [[MIDDLE_BLOCK]]:
 ; CHECK: add <2 x i64>
-; CHECK: shufflevector <2 x i64>
-; CHECK: add <2 x i64>
-; CHECK: %[[RESULT:.+]] = extractelement <2 x i64>
+; CHECK: %[[RESULT:.+]] = call i64 @llvm.experimental.vector.reduce.add.v2i64(<2 x i64>
 ; CHECK: store i64 %[[RESULT]], i64* %[[VIEW]]
 ; CHECK: reattach within %syncreg
 

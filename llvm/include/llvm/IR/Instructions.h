@@ -4770,6 +4770,8 @@ private:
 /// DetachInst - Detach instruction
 ///
 class DetachInst : public Instruction {
+  using UnwindDestField = BoolBitfieldElementT<0>;
+
   /// Ops list - The operands are ordered:
   ///  SyncRegion, Detached, Continue[, Unwind]
   DetachInst(const DetachInst &DI);
@@ -4855,7 +4857,7 @@ public:
 
   BasicBlock *getDetached() const { return getSuccessor(0); }
   BasicBlock *getContinue() const { return getSuccessor(1); }
-  bool hasUnwindDest() const { return getSubclassDataFromInstruction() & 1; }
+  bool hasUnwindDest() const { return getSubclassData<UnwindDestField>(); }
   BasicBlock *getUnwindDest() const {
     if (hasUnwindDest())
       return getSuccessor(2);

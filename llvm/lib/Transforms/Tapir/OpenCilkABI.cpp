@@ -385,8 +385,8 @@ static Value *GEP(IRBuilder<> &B, Value *Base, int field) {
   return B.CreateConstInBoundsGEP2_32(nullptr, Base, 0, field);
 }
 
-static unsigned GetAlignment(const DataLayout &DL, StructType *STy, int field) {
-  return DL.getPrefTypeAlignment(STy->getElementType(field));
+static Align GetAlignment(const DataLayout &DL, StructType *STy, int field) {
+  return DL.getPrefTypeAlign(STy->getElementType(field));
 }
 
 static void StoreSTyField(IRBuilder<> &B, const DataLayout &DL, StructType *STy,
@@ -457,7 +457,7 @@ CallInst *OpenCilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   Buf = B.CreateBitCast(Buf, Int8PtrTy);
 
   // Call LLVM's EH setjmp, which is lightweight.
-  Value* F = Intrinsic::getDeclaration(&M, Intrinsic::eh_sjlj_setjmp);
+  Function *F = Intrinsic::getDeclaration(&M, Intrinsic::eh_sjlj_setjmp);
 
   CallInst *SetjmpCall = B.CreateCall(F, Buf);
   SetjmpCall->setCanReturnTwice();
@@ -647,7 +647,8 @@ Function *OpenCilkABI::Get__cilkrts_save_fp_ctrl_state() {
   if (StackFrameFieldMXCSR >= 0) {
     FunctionType *FTy = FunctionType::get(
         VoidTy, {PointerType::getUnqual(Type::getInt32Ty(Ctx))}, false);
-    Value *Asm = InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
+    InlineAsm *Asm =
+        InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
     Value *Args[1] = {
         GEP(B, SF, StackFrameFieldMXCSR),
     };
@@ -1548,7 +1549,7 @@ static inline void inlineCilkFunctions(
     Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
   for (CallBase *CB : CallsToInline) {
     InlineFunctionInfo IFI;
-    InlineFunction(CB, IFI);
+    InlineFunction(*CB, IFI);
   }
   CallsToInline.clear();
 }

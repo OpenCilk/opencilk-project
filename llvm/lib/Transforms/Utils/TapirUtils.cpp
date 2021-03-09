@@ -268,10 +268,6 @@ bool llvm::MoveStaticAllocasInBlock(
     Entry->getInstList().splice(
         InsertPoint, Block->getInstList(), AI->getIterator(), I);
   }
-  // Move any dbg.declares describing the allocas into the entry basic block.
-  DIBuilder DIB(*F->getParent());
-  for (auto &AI : StaticAllocas)
-    replaceDbgDeclareForAlloca(AI, AI, DIB, DIExpression::ApplyOffset, 0);
 
   // Move any syncregion_start's into the entry basic block.
   for (BasicBlock::iterator I = Block->begin(), E = Block->end(); I != E;) {
@@ -1877,7 +1873,7 @@ static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
     // instructions require no special handling.
     CallInst *CI = dyn_cast<CallInst>(I);
 
-    if (!CI || isa<InlineAsm>(CI->getCalledValue()))
+    if (!CI || CI->isInlineAsm())
       continue;
 
     // Stop the search early if we encounter a taskframe.create or a
@@ -1916,7 +1912,7 @@ static Instruction *GetTaskFrameInstructionInBlock(BasicBlock *BB,
     // instructions require no special handling.
     CallInst *CI = dyn_cast<CallInst>(I);
 
-    if (!CI || isa<InlineAsm>(CI->getCalledValue()))
+    if (!CI || CI->isInlineAsm())
       continue;
 
     // Stop the search early if we encounter a taskframe.create or a
