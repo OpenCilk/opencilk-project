@@ -44,6 +44,7 @@ class Loop;
 class LoopInfo;
 class Module;
 class ProfileSummaryInfo;
+class ResumeInst;
 class ReturnInst;
 class DomTreeUpdater;
 

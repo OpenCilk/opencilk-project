@@ -629,6 +629,7 @@ MachineSinking::GetAllSortedSuccessors(MachineInstr &MI, MachineBasicBlock *MBB,
         // Skip MBBs already added to the AllSuccs vector above.
         !MBB->isSuccessor(DTChild->getBlock()))
       AllSuccs0.insert(DTChild->getBlock());
+  }
 
   // Scan the set of successor blocks and remove any successors that succeed
   // a setjmp.

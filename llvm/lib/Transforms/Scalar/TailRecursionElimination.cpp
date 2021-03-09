@@ -770,7 +770,7 @@ bool TailRecursionEliminator::foldReturnAndProcessPred(
     SyncInst *SI = SyncPreds.pop_back_val();
     BasicBlock *Pred = SI->getParent();
     if (CallInst *CI =
-        findTRECandidate(SI, CannotTailCallElimCallsMarkedTail, TTI)) {
+        findTRECandidate(SI, CannotTailCallElimCallsMarkedTail)) {
       // Check that all instructions between the candidate tail call and the
       // sync can be moved above the call.  In particular, we disallow
       // accumulator recursion elimination for tail calls before a sync.
@@ -807,15 +807,13 @@ bool TailRecursionEliminator::foldReturnAndProcessPred(
       if (!BB->hasAddressTaken() && pred_begin(BB) == pred_end(BB))
         DTU.deleteBB(BB);
 
-      bool EliminatedTail =
-        eliminateRecursiveTailCall(CI, RI, OldEntry, TailCallsAreMarkedTail,
-                                   ArgumentPHIs, AA, ORE, DTU);
+      bool EliminatedTail = eliminateCall(CI);
 
       // If a recursive tail was eliminated, fix up the syncs and sync region in
       // the CFG.
       if (EliminatedTail) {
         // Move the sync region start to the new entry block.
-        BasicBlock *NewEntry = &OldEntry->getParent()->getEntryBlock();
+        BasicBlock *NewEntry = &OldEntryBlock->getParent()->getEntryBlock();
         cast<Instruction>(SyncRegion)->moveBefore(&*(NewEntry->begin()));
         // Insert syncs before relevant return blocks.
         for (BasicBlock *RetBlock : ReturnBlocksToSync) {
@@ -825,7 +823,7 @@ bool TailRecursionEliminator::foldReturnAndProcessPred(
           ReplaceInstWithInst(RetBlock->getTerminator(),
                               SyncInst::Create(NewRetBlock, SyncRegion));
 
-          if (!OldEntry->getParent()->doesNotThrow())
+          if (!OldEntryBlock->getParent()->doesNotThrow())
             CallInst::Create(Intrinsic::getDeclaration(RetBlock->getModule(),
                                                        Intrinsic::sync_unwind),
                              { SyncRegion }, "", NewRetBlock->getTerminator());

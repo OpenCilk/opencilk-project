@@ -4156,8 +4156,7 @@ const SCEV *DependenceInfo::getSplitIteration(const Dependence &Dep,
   return nullptr;
 }
 
-static
-Value *getGeneralAccessPointerOperand(GeneralAccess *A) {
+static Value *getGeneralAccessPointerOperand(GeneralAccess *A) {
   return const_cast<Value *>(A->Loc->Ptr);
 }
 
@@ -4200,9 +4199,9 @@ bool DependenceInfo::tryDelinearize(GeneralAccess *SrcA, GeneralAccess *DstA,
 
   SmallVector<const SCEV *, 4> SrcSubscripts, DstSubscripts;
 
-  if (!tryDelinearizeFixedSize(Src, Dst, SrcAccessFn, DstAccessFn,
+  if (!tryDelinearizeFixedSize(SrcA, DstA, SrcAccessFn, DstAccessFn,
                                SrcSubscripts, DstSubscripts) &&
-      !tryDelinearizeParametricSize(Src, Dst, SrcAccessFn, DstAccessFn,
+      !tryDelinearizeParametricSize(SrcA, DstA, SrcAccessFn, DstAccessFn,
                                     SrcSubscripts, DstSubscripts))
     return false;
 
@@ -4231,7 +4230,7 @@ bool DependenceInfo::tryDelinearize(GeneralAccess *SrcA, GeneralAccess *DstA,
 }
 
 bool DependenceInfo::tryDelinearizeFixedSize(
-    GeneralAccess *SrcA, GeneralAccess *DstA,, const SCEV *SrcAccessFn,
+    GeneralAccess *SrcA, GeneralAccess *DstA, const SCEV *SrcAccessFn,
     const SCEV *DstAccessFn, SmallVectorImpl<const SCEV *> &SrcSubscripts,
     SmallVectorImpl<const SCEV *> &DstSubscripts) {
 
@@ -4245,8 +4244,8 @@ bool DependenceInfo::tryDelinearizeFixedSize(
   if (!DisableDelinearizationChecks)
     return false;
 
-  Value *SrcPtr = getPointerOperand(SrcA);
-  Value *DstPtr = getPointerOperand(DstA);
+  Value *SrcPtr = getGeneralAccessPointerOperand(SrcA);
+  Value *DstPtr = getGeneralAccessPointerOperand(DstA);
   const SCEVUnknown *SrcBase =
       dyn_cast<SCEVUnknown>(SE->getPointerBase(SrcAccessFn));
   const SCEVUnknown *DstBase =
@@ -4306,8 +4305,8 @@ bool DependenceInfo::tryDelinearizeParametricSize(
     const SCEV *DstAccessFn, SmallVectorImpl<const SCEV *> &SrcSubscripts,
     SmallVectorImpl<const SCEV *> &DstSubscripts) {
 
-  Value *SrcPtr = getPointerOperand(SrcA);
-  Value *DstPtr = getPointerOperand(DstA);
+  Value *SrcPtr = getGeneralAccessPointerOperand(SrcA);
+  Value *DstPtr = getGeneralAccessPointerOperand(DstA);
   const SCEVUnknown *SrcBase =
       dyn_cast<SCEVUnknown>(SE->getPointerBase(SrcAccessFn));
   const SCEVUnknown *DstBase =

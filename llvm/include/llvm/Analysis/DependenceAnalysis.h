@@ -40,6 +40,8 @@
 #define LLVM_ANALYSIS_DEPENDENCEANALYSIS_H
 
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
@@ -373,7 +375,7 @@ namespace llvm {
 
     Function *getFunction() const { return F; }
 
-    AliasAnalysis *getAA() const { return AA; }
+    AAResults *getAA() const { return AA; }
 
     /// depends - Tests for a dependence between the general accesses SrcA and
     /// DstA.  Returns NULL if no dependence; otherwise, returns a Dependence

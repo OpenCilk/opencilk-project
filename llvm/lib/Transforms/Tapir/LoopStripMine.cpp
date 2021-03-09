@@ -18,7 +18,6 @@
 #include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpander.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/IR/BasicBlock.h"
@@ -34,6 +33,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/SimplifyIndVar.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/UnrollLoop.h"
@@ -102,11 +102,12 @@ static bool isEpilogProfitable(const Loop *L) {
 /// simplify/dce pass of the instructions.
 void llvm::simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
                                       ScalarEvolution *SE, DominatorTree *DT,
+                                      const TargetTransformInfo &TTI,
                                       AssumptionCache *AC) {
   // Simplify any new induction variables in the stripmined loop.
   if (SE && SimplifyIVs) {
     SmallVector<WeakTrackingVH, 16> DeadInsts;
-    simplifyLoopIVs(L, SE, DT, LI, DeadInsts);
+    simplifyLoopIVs(L, SE, DT, LI, &TTI, DeadInsts);
 
     // Aggressively clean up dead instructions that simplifyLoopIVs already
     // identified. Any remaining should be cleaned up below.
@@ -209,7 +210,10 @@ bool llvm::computeStripMineCount(
   // Solving for G yeilds G >= d/(\eps * S).  Substituting in \eps = 1/C for a
   // given coarsening factor C gives the equation below.
   Instruction *DetachI = L->getHeader()->getTerminator();
-  SMP.Count = SMP.DefaultCoarseningFactor * TTI.getUserCost(DetachI) / LoopCost;
+  SMP.Count =
+      SMP.DefaultCoarseningFactor *
+      TTI.getUserCost(DetachI, TargetTransformInfo::TCK_SizeAndLatency) /
+      LoopCost;
 
   return false;
 }
@@ -313,8 +317,8 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
   // Don't stripmine loops with the convergent attribute.
   for (auto &BB : L->blocks())
     for (auto &I : *BB)
-      if (auto CS = CallSite(&I))
-        if (CS.isConvergent()) {
+      if (CallBase *CB = dyn_cast<CallBase>(&I))
+        if (CB->isConvergent()) {
           LLVM_DEBUG(
               dbgs() << "  Won't stripmine loop: contains convergent "
               "attribute.\n");
@@ -671,12 +675,13 @@ static BasicBlock *NestDetachUnwindPredecessors(
   return OuterUD;
 }
 
-Loop *llvm::StripMineLoop(
-    Loop *L, unsigned Count, bool AllowExpensiveTripCount,
-    bool UnrollRemainder, LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
-    AssumptionCache *AC, TaskInfo *TI, OptimizationRemarkEmitter *ORE,
-    bool PreserveLCSSA, bool ParallelEpilog, bool NeedNestedSync,
-    Loop **RemainderLoop) {
+Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
+                          bool UnrollRemainder, LoopInfo *LI,
+                          ScalarEvolution *SE, DominatorTree *DT,
+                          const TargetTransformInfo &TTI, AssumptionCache *AC,
+                          TaskInfo *TI, OptimizationRemarkEmitter *ORE,
+                          bool PreserveLCSSA, bool ParallelEpilog,
+                          bool NeedNestedSync, Loop **RemainderLoop) {
   Task *T = getTapirLoopForStripMining(L, *TI, ORE);
   if (!T)
     return nullptr;
@@ -773,7 +778,8 @@ Loop *llvm::StripMineLoop(
   const DataLayout &DL = Header->getModule()->getDataLayout();
   SCEVExpander Expander(*SE, DL, "loop-stripmine");
   if (!AllowExpensiveTripCount &&
-      Expander.isHighCostExpansion(TripCountSC, L, PreheaderBR)) {
+      Expander.isHighCostExpansion(TripCountSC, L, SCEVCheapExpansionBudget,
+                                   &TTI, PreheaderBR)) {
     LLVM_DEBUG(dbgs() << "High cost for expanding trip count scev!\n");
     return nullptr;
   }
@@ -1433,10 +1439,11 @@ Loop *llvm::StripMineLoop(
 
   // At this point, the code is well formed.  We now simplify the new loops,
   // doing constant propagation and dead code elimination as we go.
-  simplifyLoopAfterStripMine(L, /*SimplifyIVs*/ true, LI, SE, DT, AC);
-  simplifyLoopAfterStripMine(NewLoop, /*SimplifyIVs*/ true, LI, SE, DT, AC);
-  simplifyLoopAfterStripMine(*RemainderLoop, /*SimplifyIVs*/ true, LI, SE, DT,
+  simplifyLoopAfterStripMine(L, /*SimplifyIVs*/ true, LI, SE, DT, TTI, AC);
+  simplifyLoopAfterStripMine(NewLoop, /*SimplifyIVs*/ true, LI, SE, DT, TTI,
                              AC);
+  simplifyLoopAfterStripMine(*RemainderLoop, /*SimplifyIVs*/ true, LI, SE, DT,
+                             TTI, AC);
 
 #ifndef NDEBUG
   DT->verify();
