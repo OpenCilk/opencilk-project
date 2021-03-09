@@ -1284,9 +1284,6 @@ bool TargetLibraryInfoImpl::isValidProtoForLibFunc(const FunctionType &FTy,
   case LibFunc_ZnamSt11align_val_tRKSt9nothrow_t:
     return (NumParams == 3 && FTy.getReturnType()->isPointerTy());
 
-  case LibFunc_aligned_alloc:
-    return (NumParams == 2 && FTy.getReturnType()->isPointerTy());
-
   // void operator delete[](void*);
   case LibFunc_ZdaPv:
   // void operator delete(void*);

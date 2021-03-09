@@ -564,6 +564,7 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
 
   // Hoisting of scalars and load expressions.
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   FPM.addPass(InstCombinePass());
 
   FPM.addPass(LibCallsShrinkWrapPass());
@@ -571,6 +572,7 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
   invokePeepholeEPCallbacks(FPM, Level);
 
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
 
   // Form canonically associated expression trees, and simplify the trees using
   // basic mathematical properties. For example, this will form (nearly)
@@ -638,6 +640,7 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
                                               EnableMSSALoopDependency,
                                               /*UseBlockFrequencyInfo=*/true));
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   FPM.addPass(InstCombinePass());
   if (EnableLoopFlatten)
     FPM.addPass(createFunctionToLoopPassAdaptor(LoopFlattenPass()));
@@ -678,6 +681,7 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
   // TODO: Investigate if this is too expensive.
   FPM.addPass(ADCEPass());
   FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(TaskSimplifyPass());
   FPM.addPass(InstCombinePass());
   invokePeepholeEPCallbacks(FPM, Level);
 
@@ -1422,7 +1426,8 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // function passes.
 
   // Stripmine Tapir loops, if pass is enabled.
-  if (PTO.LoopStripmine && Level != O1 && !isOptimizingForSize(Level)) {
+  if (PTO.LoopStripmine && Level != OptimizationLevel::O1 &&
+      !Level.isOptimizingForSize()) {
     OptimizePM.addPass(LoopStripMinePass());
     // Cleanup tasks after stripmining loops.
     OptimizePM.addPass(TaskSimplifyPass());
@@ -1538,7 +1543,7 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   LoopPassManager LPM1(DebugLogging), LPM2(DebugLogging);
 
   // Rotate Loop - disable header duplication at -Oz
-  LPM1.addPass(LoopRotatePass(Level != Oz));
+  LPM1.addPass(LoopRotatePass(Level != OptimizationLevel::Oz));
   LPM2.addPass(IndVarSimplifyPass());
 
   FunctionPassManager FPM(DebugLogging);
@@ -1624,18 +1629,27 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   // Begin a postorder CGSCC pipeline to clean up and perform function inlining
   // after Tapir lowering.
-  CGSCCPassManager PostLowerCGPipeline(DebugLogging);
+  InlineParams IP = getInlineParamsFromOptLevel(OptimizationLevel::O0);
+  ModuleInlinerWrapperPass PostLowerMIWP(IP, DebugLogging, UseInlineAdvisor,
+                                         MaxDevirtIterations);
 
-  // Run the always-inliner pass.
-  InlineParams IP = getInlineParamsFromOptLevel(PassBuilder::O0);
-  PostLowerCGPipeline.addPass(InlinerPass(IP));
+  // Require the GlobalsAA analysis for the module so we can query it within
+  // the CGSCC pipeline.
+  PostLowerMIWP.addRequiredModuleAnalysis<GlobalsAA>();
+
+  // Require the ProfileSummaryAnalysis for the module so we can query it within
+  // the inliner pass.
+  PostLowerMIWP.addRequiredModuleAnalysis<ProfileSummaryAnalysis>();
+
+  // Now begin the postoder CGSCC pipeline.
+  CGSCCPassManager &PostLowerCGPipeline = PostLowerMIWP.getPM();
 
   // Now deduce any function attributes based in the current code.
   PostLowerCGPipeline.addPass(PostOrderFunctionAttrsPass());
 
   // When at O3 add argument promotion to the pass pipeline.
   // FIXME: It isn't at all clear why this should be limited to O3.
-  if (Level == O3)
+  if (Level == OptimizationLevel::O3)
     PostLowerCGPipeline.addPass(ArgumentPromotionPass());
 
   // Lastly, add the core function simplification pipeline nested inside the

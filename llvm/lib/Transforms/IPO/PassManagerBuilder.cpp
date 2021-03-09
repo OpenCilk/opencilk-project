@@ -988,7 +988,7 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createEarlyCSEPass());
     MPM.add(createJumpThreadingPass());         // Thread jumps
     MPM.add(createCorrelatedValuePropagationPass());
-    addInstructionCombiningPass(MPM);
+    MPM.add(createInstructionCombiningPass());
   }
 
   addExtensionsToPM(EP_VectorizerStart, MPM);
@@ -1102,7 +1102,7 @@ void PassManagerBuilder::populateModulePassManager(
 
     MPM.add(createDeadArgEliminationPass()); // Dead argument elimination
 
-    addInstructionCombiningPass(MPM); // Clean up after IPCP & DAE
+    MPM.add(createInstructionCombiningPass()); // Clean up after IPCP & DAE
     MPM.add(createCFGSimplificationPass()); // Clean up after IPCP & DAE
 
     if (MergeFunctions)

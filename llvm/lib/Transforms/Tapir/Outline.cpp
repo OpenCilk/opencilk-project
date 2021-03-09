@@ -519,11 +519,10 @@ void llvm::AddAlignmentAssumptions(
     // If the argument already has an alignment attribute, skip it.
     if (Arg->getParamAlignment()) continue;
     // Get any known alignment information for this argument's value.
-    unsigned Alignment = getKnownAlignment(ArgVal, DL, CallSite, AC, DT);
+    Align Alignment = getKnownAlignment(ArgVal, DL, CallSite, AC, DT);
     // If we have alignment data, add it as an attribute to the outlined
     // function's parameter.
-    if (Alignment)
-      Arg->addAttr(
-          Attribute::getWithAlignment(Arg->getContext(), Align(Alignment)));
+    if (Alignment >= 1)
+      Arg->addAttr(Attribute::getWithAlignment(Arg->getContext(), Alignment));
   }
 }

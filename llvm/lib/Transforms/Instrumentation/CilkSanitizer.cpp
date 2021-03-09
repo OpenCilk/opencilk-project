@@ -28,7 +28,6 @@
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpander.h"
 #include "llvm/Analysis/TapirRaceDetect.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -51,6 +50,7 @@
 #include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/PromoteMemToReg.h"
+#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 
 using namespace llvm;
@@ -2024,7 +2024,7 @@ Value *CilkSanitizerImpl::Instrumentor::getNoAliasMAAPValue(
     Instruction *I, IRBuilder<> &IRB, unsigned OperandNum,
     MemoryLocation Loc, const RaceInfo::RaceData &RD, const Value *Obj,
     Value *ObjNoAliasFlag) {
-  AliasAnalysis *AA = RI.getAA();
+  AAResults *AA = RI.getAA();
 
   for (const RaceInfo::RaceData &OtherRD : RI.getRaceData(I)) {
     // Skip checking other accesses that don't involve a pointer
@@ -2092,7 +2092,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
                                                      MAAPValue DefaultMV,
                                                      bool CheckArgs) {
   Function *F = I->getFunction();
-  AliasAnalysis *AA = RI.getAA();
+  AAResults *AA = RI.getAA();
   MemoryLocation Loc = getMemoryLocation(I, OperandNum, TLI);
   Value *MV = getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAccess));
   Value *DefaultMAAP = getMAAPIRValue(IRB, static_cast<unsigned>(DefaultMV));
@@ -2309,7 +2309,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
                                                      unsigned OperandNum) {
   Function *F = I->getFunction();
   bool LocalRace = RI.mightRaceLocally(I);
-  AliasAnalysis *AA = RI.getAA();
+  AAResults *AA = RI.getAA();
   MemoryLocation Loc = getMemoryLocation(I, OperandNum, TLI);
   Value *MAAPChk = IRB.getTrue();
   // Check the recorded race data for I.
@@ -3091,7 +3091,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   TaskInfo &TI = GetTaskInfo(F);
   RaceInfo &RI = GetRaceInfo(F);
 
-  ICFLoopSafetyInfo SafetyInfo(DT);
+  ICFLoopSafetyInfo SafetyInfo;
 
   ScalarEvolution &SE = *(RI.getSE());
 
@@ -3102,6 +3102,8 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
     // get loop for BB
     Loop *L = LI.getLoopFor(&BB);
+    if (L)
+      SafetyInfo.computeLoopSafetyInfo(L);
 
     // Record the memory accesses in the basic block
     for (Instruction &Inst : BB) {
