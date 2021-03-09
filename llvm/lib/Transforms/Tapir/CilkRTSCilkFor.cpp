@@ -133,16 +133,16 @@ void RuntimeCilkFor::processOutlinedLoopCall(TapirLoopInfo &TL,
   Function *Outlined = TOI.Outline;
   Instruction *ReplStart = TOI.ReplStart;
   Instruction *ReplCall = TOI.ReplCall;
-  CallSite CS(ReplCall);
+  CallBase *CB = cast<CallBase>(ReplCall);
   BasicBlock *CallCont = TOI.ReplRet;
   BasicBlock *UnwindDest = TOI.ReplUnwind;
   Function *Parent = ReplCall->getFunction();
   Module &M = *Parent->getParent();
   unsigned IVArgIndex = getIVArgIndex(*Parent, TOI.InputSet);
   Type *PrimaryIVTy =
-      CS.getArgOperand(IVArgIndex)->getType();
-  Value *TripCount = CS.getArgOperand(IVArgIndex + 1);
-  Value *GrainsizeVal = CS.getArgOperand(IVArgIndex + 2);
+      CB->getArgOperand(IVArgIndex)->getType();
+  Value *TripCount = CB->getArgOperand(IVArgIndex + 1);
+  Value *GrainsizeVal = CB->getArgOperand(IVArgIndex + 2);
 
   // Get the correct CilkForABI call.
   FunctionCallee CilkForABI;
@@ -177,7 +177,7 @@ void RuntimeCilkFor::processOutlinedLoopCall(TapirLoopInfo &TL,
                         false));
   Value *OutlinedFnPtr = B.CreatePointerBitCastOrAddrSpaceCast(Outlined,
                                                                FPtrTy);
-  AllocaInst *ArgStruct = cast<AllocaInst>(CS.getArgOperand(0));
+  AllocaInst *ArgStruct = cast<AllocaInst>(CB->getArgOperand(0));
   Value *ArgStructPtr = B.CreateBitCast(ArgStruct, Type::getInt8PtrTy(C));
   if (UnwindDest) {
     InvokeInst *Invoke = InvokeInst::Create(CilkForABI, CallCont, UnwindDest,

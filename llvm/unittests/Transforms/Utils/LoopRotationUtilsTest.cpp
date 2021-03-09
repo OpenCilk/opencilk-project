@@ -87,7 +87,7 @@ deopt.exit:
 
   bool ret = LoopRotation(L, &LI, &TTI,
                           &AC, &DT,
-                          &SE, nullptr,
+                          &SE, nullptr, nullptr,
                           SQ, true, -1, false);
   EXPECT_TRUE(ret);
 }
@@ -158,7 +158,7 @@ deopt.exit:
 
   bool ret = LoopRotation(L, &LI, &TTI,
                           &AC, &DT,
-                          &SE, nullptr,
+                          &SE, nullptr, nullptr,
                           SQ, true, -1, false);
   /// LoopRotation should properly report "true" as we still perform the first rotation
   /// so we do change the IR.

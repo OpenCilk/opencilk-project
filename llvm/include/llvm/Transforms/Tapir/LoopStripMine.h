@@ -29,6 +29,7 @@ using NewLoopsMap = SmallDenseMap<const Loop *, Loop *, 4>;
 
 void simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
                                 ScalarEvolution *SE, DominatorTree *DT,
+                                const TargetTransformInfo &TTI,
                                 AssumptionCache *AC);
 
 TargetTransformInfo::StripMiningPreferences gatherStripMiningPreferences(
@@ -39,12 +40,13 @@ bool computeStripMineCount(Loop *L, const TargetTransformInfo &TTI,
                            int64_t LoopCost,
                            TargetTransformInfo::StripMiningPreferences &UP);
 
-Loop *StripMineLoop(
-    Loop *L, unsigned Count, bool AllowExpensiveTripCount,
-    bool UnrollRemainder, LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
-    AssumptionCache *AC, TaskInfo *TI, OptimizationRemarkEmitter *ORE,
-    bool PreserveLCSSA, bool ParallelEpilog, bool NeedNestedSync,
-    Loop **Remainderloop = nullptr);
+Loop *StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
+                    bool UnrollRemainder, LoopInfo *LI, ScalarEvolution *SE,
+                    DominatorTree *DT, const TargetTransformInfo &TTI,
+                    AssumptionCache *AC, TaskInfo *TI,
+                    OptimizationRemarkEmitter *ORE, bool PreserveLCSSA,
+                    bool ParallelEpilog, bool NeedNestedSync,
+                    Loop **Remainderloop = nullptr);
 
 } // end namespace llvm
 

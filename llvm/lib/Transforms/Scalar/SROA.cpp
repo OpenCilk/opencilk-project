@@ -5153,8 +5153,7 @@ PreservedAnalyses SROAPass::runImpl(Function &F, DomTreeUpdater &RunDTU,
          I != E; ++I) {
       if (AllocaInst *AI = dyn_cast<AllocaInst>(I)) {
         if (isa<ScalableVectorType>(AI->getAllocatedType())) {
-          if (isAllocaPromotable(AI) &&
-              isAllocaParallelPromotable(AI, *DT))
+          if (isAllocaPromotable(AI) && TI->isAllocaParallelPromotable(AI))
             PromotableAllocas.push_back(AI);
         } else {
           Worklist.insert(AI);

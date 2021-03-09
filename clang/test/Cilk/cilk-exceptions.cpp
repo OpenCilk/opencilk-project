@@ -80,7 +80,7 @@ void parallelfor_noexcept(int n) {
 // CHECK-LABEL: @_Z18parallelfor_excepti(
 // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]] unwind label %[[DUNWIND:.+]]
-// CHECK: call i8* @_Znwm(i64 1)
+// CHECK: call {{.*}}i8* @_Znwm(i64 1)
 // CHECK: invoke void @_ZN3FooC1Ev(
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[TASKLPAD:.+]]
 // CHECK: [[INVOKECONT2]]:
@@ -121,7 +121,7 @@ void parallelfor_tryblock(int n) {
 
       // CHECK: detach within %[[SYNCREG2]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[CATCH]]
       // CHECK: [[DETACHED]]:
-      // CHECK: %[[OBJ:.+]] = invoke i8* @_Znwm(i64 1)
+      // CHECK: %[[OBJ:.+]] = invoke {{.*}}i8* @_Znwm(i64 1)
       // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
       // CHECK: [[INVOKECONT1]]
       // CHECK: invoke void @_ZN3FooC1Ev(%class.Foo*
@@ -165,7 +165,7 @@ void parallelfor_tryblock_inline(int n) {
     {
       // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
       // CHECK: [[DETACHED]]:
-      // CHECK: invoke i8* @_Znwm(
+      // CHECK: invoke {{.*}}i8* @_Znwm(
       // CHECK: invoke void @_ZN3FooC1Ev(
       // CHECK: invoke i32 @_Z3barP3Foo(
       // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
@@ -423,7 +423,7 @@ void spawn_block_destructor(int n) {
 void spawn_throw_inline(int n) {
   // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
   // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
-  // CHECK: call i8* @_Znwm(
+  // CHECK: call {{.*}}i8* @_Znwm(
   // CHECK: invoke void @_ZN3FooC1Ev(
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
   // CHECK: [[DETACHED]]:

@@ -548,7 +548,7 @@ void PassManagerBuilder::populateModulePassManager(
 
     MPM.add(createDeadArgEliminationPass()); // Dead argument elimination
 
-    addInstructionCombiningPass(MPM); // Clean up after IPCP & DAE
+    MPM.add(createInstructionCombiningPass()); // Clean up after IPCP & DAE
     MPM.add(createCFGSimplificationPass()); // Clean up after IPCP & DAE
 
     if (MergeFunctions)

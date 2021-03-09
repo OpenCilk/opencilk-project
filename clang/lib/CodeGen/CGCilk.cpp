@@ -580,7 +580,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
 
   LoopStack.setSpawnStrategy(LoopAttributes::DAC);
   const SourceRange &R = S.getSourceRange();
-  LoopStack.push(CondBlock, CGM.getContext(), ForAttrs,
+  LoopStack.push(CondBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
@@ -602,7 +602,9 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   llvm::AllocaInst *OldEHSelectorSlot;
   Address OldNormalCleanupDest = Address::invalid();
 
-  const VarDecl *LoopVar = S.getLoopVariable();
+  const DeclStmt *LoopVar = S.getLoopVarStmt();
+  const VarDecl *LoopVarDecl =
+      LoopVar ? cast<VarDecl>(LoopVar->getSingleDecl()) : nullptr;
   RValue LoopVarInitRV;
   llvm::BasicBlock *DetachBlock;
   llvm::BasicBlock *ForBodyEntry;
@@ -637,7 +639,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     // Get the value of the loop variable initialization before we emit the
     // detach.
     if (LoopVar)
-      LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
+      LoopVarInitRV = EmitAnyExprToTemp(LoopVarDecl->getInit());
 
     Detach = Builder.CreateDetach(ForBodyEntry, Continue.getBlock(),
                                   SyncRegion);
@@ -681,8 +683,8 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   // Inside the detached block, create the loop variable, setting its value to
   // the saved initialization value.
   if (LoopVar) {
-    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
-    QualType type = LoopVar->getType();
+    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVarDecl);
+    QualType type = LoopVarDecl->getType();
     Address Loc = LVEmission.getObjectAddress(*this);
     LValue LV = MakeAddrLValue(Loc, type);
     LV.setNonGC(true);

@@ -36,10 +36,10 @@ if.else:                                          ; preds = %entry
   %lnot.ext19 = zext i1 %lnot18 to i32
   br i1 %tobool, label %if.else15, label %if.then1
 ; CHECK: if.else:
-; CHECK: %tobool = icmp ne i32 %reverse, 0
+; CHECK: %[[TOBOOL:.+]] = icmp {{.*}}i32 %reverse, 0
 ; CHECK: [[SETJMP:%[a-zA-Z0-9._]+]] = call i32 @llvm.eh.sjlj.setjmp
 ; CHECK: [[SETJMPBOOL:%[a-zA-Z0-9._]+]] = icmp eq i32 [[SETJMP]], 0
-; CHECK-NOT: br i1 %tobool
+; CHECK-NOT: br i1 %[[TOBOOL]]
 ; CHECK: br i1 [[SETJMPBOOL]]
 
 if.then1:                                         ; preds = %if.else
