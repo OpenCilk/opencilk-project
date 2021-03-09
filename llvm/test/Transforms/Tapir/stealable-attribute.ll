@@ -3,7 +3,7 @@
 ;
 ; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=cilk -simplifycfg -instcombine -S | FileCheck %s --check-prefix=LOWERING
 ; RUN: opt < %s -loop-spawning-ti -simplifycfg -instcombine -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -simplifycfg -instcombine -S | FileCheck %s --check-prefix=LOWERING
-; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg,instcombine),tapir2target,function(simplify-cfg,instcombine)' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -instcombine -S | FileCheck %s --check-prefix=LOWERING
+; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg,instcombine),tapir2target,function(simplify-cfg,instcombine)' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s --check-prefix=LOWERING
 ;
 ; Check that the X86 assembly produced for stealable functions does
 ; not index stack variables using %rsp.

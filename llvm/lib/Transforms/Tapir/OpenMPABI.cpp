@@ -484,7 +484,7 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
           Context, {IRBuilder.getInt32(0), IRBuilder.getInt32(argc)});
       auto *DataAddr = IRBuilder.CreateAlignedLoad(
           DataAddrEP,
-          DL.getTypeAllocSize(DataAddrEP->getType()->getPointerElementType()));
+          DL.getPrefTypeAlign(DataAddrEP->getType()->getPointerElementType()));
       valmap.insert(std::pair<Value*,Value*>(&arg,DataAddr));
       argc++;
     }
@@ -520,7 +520,7 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
             {CallerIRBuilder.getInt32(0), CallerIRBuilder.getInt32(i)});
         CallerIRBuilder.CreateAlignedStore(
             LoadedCapturedArgs[i], AggCapturedElemPtr,
-            DL.getTypeAllocSize(LoadedCapturedArgs[i]->getType()));
+            DL.getPrefTypeAlign(LoadedCapturedArgs[i]->getType()));
       }
 
   std::vector<Value *> TaskArgs =

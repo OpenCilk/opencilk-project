@@ -22,7 +22,6 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpander.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -46,6 +45,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 
 using namespace llvm;
@@ -2072,7 +2072,7 @@ void llvm::CSIImpl::linkInToolFromBitcode(const std::string &bitcodePath) {
       report_fatal_error(error.getMessage());
     }
 
-    std::vector<std::string> functions;
+    std::vector<StringRef> functions;
 
     for (Function &F : *toolModule) {
       if (!F.isDeclaration() && F.hasName()) {
@@ -2080,7 +2080,7 @@ void llvm::CSIImpl::linkInToolFromBitcode(const std::string &bitcodePath) {
       }
     }
 
-    std::vector<std::string> globalVariables;
+    std::vector<StringRef> globalVariables;
 
     std::vector<GlobalValue *> toRemove;
     for (GlobalValue &val : toolModule->getGlobalList()) {

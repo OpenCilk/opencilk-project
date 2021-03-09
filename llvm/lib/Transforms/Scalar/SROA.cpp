@@ -5341,7 +5341,7 @@ std::pair<bool /*Changed*/, bool /*CFGChanged*/> SROA::runSROA(Function &F) {
          I != E; ++I) {
       if (AllocaInst *AI = dyn_cast<AllocaInst>(I)) {
         if (DL.getTypeAllocSize(AI->getAllocatedType()).isScalable() &&
-            isAllocaPromotable(AI) && isAllocaParallelPromotable(AI, *DT))
+            isAllocaPromotable(AI) && TI->isAllocaParallelPromotable(AI))
           PromotableAllocas.push_back(AI);
         else
           Worklist.insert(AI);

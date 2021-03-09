@@ -17,6 +17,7 @@
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"

@@ -2838,9 +2838,8 @@ fusion.4.loop_inc.dim.0.ls1:                      ; preds = %fusion.4.loop_body.
 ; CHECK: .Lcluster_25__XlaCompiledKernel_true__XlaNumConstantArgs_1__XlaNumResourceArgs_0_.42.outline_fusion.4.loop_detach.dim.0.ls1,@function
 ; CHECK: stmxcsr
 ; CHECK: movq %rbp
-; CHECK: movq %rsp
 ; CHECK-NOT: testl
-; CHECK: %bb.10
+; CHECK: %bb.16
 ; CHECK: subq $672, %rsp
 ; CHECK: callq .Lcluster_25__XlaCompiledKernel_true__XlaNumConstantArgs_1__XlaNumResourceArgs_0_.42.outline_fusion.4.loop_detach.dim.0.ls1.outline_.split.otd1
 
