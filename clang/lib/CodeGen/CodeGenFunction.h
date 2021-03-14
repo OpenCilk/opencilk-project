@@ -3441,6 +3441,8 @@ public:
   void EmitCilkSyncStmt(const CilkSyncStmt &S);
   void EmitCilkForStmt(const CilkForStmt &S,
                        ArrayRef<const Attr *> Attrs = None);
+  void EmitCilkForRangeStmt(const CilkForRangeStmt &S,
+                       ArrayRef<const Attr *> Attrs = None);
   LValue EmitCilkSpawnExprLValue(const CilkSpawnExpr *E);
 
   void EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S);
@@ -4934,8 +4936,6 @@ private:
   llvm::Value *EmitX86CpuSupports(uint64_t Mask);
   llvm::Value *EmitX86CpuInit();
   llvm::Value *FormResolverCondition(const MultiVersionResolverOption &RO);
-  void EmitCilkForRangeStmt(const CilkForRangeStmt &S,
-                            ArrayRef<const Attr *> ForAttrs);
 };
 
 inline DominatingLLVMValue::saved_type

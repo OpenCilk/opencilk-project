@@ -3524,7 +3524,47 @@ StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc, Stmt *In
 }
 
 StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
-  return new (Context) CilkForRangeStmt(Context, ForRange);
+  Scope *S = getCurScope();
+
+  // buld up the difference type
+  // create an end - begin stmt
+  // that will be the loop var stmt
+  VarDecl *BeginVar = cast<VarDecl>(ForRange->getBeginStmt()->getSingleDecl());
+  QualType BeginType = BeginVar->getType();
+  const QualType BeginRefNonRefType = BeginType.getNonReferenceType();
+  ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
+                              VK_LValue, ForRange->getColonLoc());
+
+  VarDecl *EndVar = cast<VarDecl>(ForRange->getEndStmt()->getSingleDecl());
+  QualType EndType = EndVar->getType();
+  const QualType EndRefNonRefType = EndType.getNonReferenceType();
+  ExprResult EndRef = BuildDeclRefExpr(EndVar, EndRefNonRefType,
+                              VK_LValue, ForRange->getColonLoc());
+  ExprResult LoopBoundExpr = ActOnBinOp(S, ForRange->getColonLoc(), tok::minus, EndRef.get(), BeginRef.get());
+  if (!LoopBoundExpr.isInvalid()) {
+    // give warning about for range only supporting random access!
+    Diag(ForRange->getForLoc(), diag::err_cilk_for_range_begin_minus_end);
+    return StmtError();
+  }
+
+// TODO: different loc???
+  SourceLocation RangeLoc = ForRange->getBeginLoc();
+  VarDecl *LoopVar = BuildForRangeVarDecl(*this, RangeLoc, LoopBoundExpr.get()->getType(), std::string("__cilk_loopvar"));
+  AddInitializerToDecl(LoopVar, ActOnIntegerConstant(RangeLoc, 0).get(),
+                       /*DirectInit=*/false);
+  FinalizeDeclaration(LoopVar);
+  CurContext->addHiddenDecl(LoopVar);
+
+  ExprResult LoopVarRef = BuildDeclRefExpr(LoopVar, LoopVar->getType(), VK_LValue,
+                                         RangeLoc);
+  ExprResult Cond;
+  Cond = ActOnBinOp(S, RangeLoc, tok::exclaimequal, LoopVarRef.get(),
+                         LoopBoundExpr.get());
+  if (Cond.isInvalid())
+    return StmtError();
+  
+
+  return new (Context) CilkForRangeStmt(Context, ForRange, LoopVar, Cond);
 }
 
 

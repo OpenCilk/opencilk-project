@@ -838,6 +838,12 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
   llvm::BasicBlock *ExitBlock = LoopExit.getBlock();
 
+  // TODO: emit difference variable instead of beginstmt and endstmt
+  // plan: 
+  // 1. add difference variable and emit it, check
+  // 2. make loop condition depend on the difference variable instead, check
+  // 3. finally, don't mutate beginstmt and instead do begin=begin+inductionvar
+
   EmitStmt(ForRange.getRangeStmt());
   EmitStmt(ForRange.getBeginStmt());
   EmitStmt(ForRange.getEndStmt());
