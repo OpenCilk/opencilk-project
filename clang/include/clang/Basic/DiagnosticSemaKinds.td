@@ -9523,8 +9523,8 @@ def err_jump_out_of_cilk_for : Error<
 
 // Cilk For Range errors
 
-def err_cilk_for_range_begin_minus_end : Error<
-  "Cannot determine length with '__begin - __end'. Please use a random access iterator.">;
+def err_cilk_for_range_end_minus_begin : Error<
+  "Cannot determine length with '__end - __begin'. Please use a random access iterator.">;
 } 
 // end of Cilk category
 
