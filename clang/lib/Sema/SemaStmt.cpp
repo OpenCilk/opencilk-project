@@ -3499,10 +3499,33 @@ static void SearchForReturnInStmt(Sema &Self, Stmt *S) {
 // TODO: add comment
 StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
   CilkForRangeStmt *CilkForRange = cast<CilkForRangeStmt>(S);
+
   StmtResult ForRange = FinishCXXForRangeStmt(CilkForRange->getCXXForRangeStmt(), B);
   if (ForRange.isInvalid())
     return StmtError();
   CilkForRange->setForRange(ForRange.get());
+
+  CXXForRangeStmt *CXXForRange = cast<CXXForRangeStmt>(ForRange.get());
+
+  VarDecl *BeginVar = cast<VarDecl>(CXXForRange->getBeginStmt()->getSingleDecl());
+  QualType BeginType = BeginVar->getType();
+  const QualType BeginRefNonRefType = BeginType.getNonReferenceType();
+  ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
+                                         VK_LValue, CXXForRange->getColonLoc());
+
+  VarDecl *LoopIndex = CilkForRange->getLoopIndex();
+  QualType LoopIndexType = LoopIndex->getType();
+  const QualType LoopIndexRefNonRefType = LoopIndexType.getNonReferenceType();
+  ExprResult LoopIndexRef = BuildDeclRefExpr(BeginVar, LoopIndexRefNonRefType,
+                                         VK_LValue, CXXForRange->getColonLoc());
+
+
+  VarDecl *LoopVar = CXXForRange->getLoopVariable();
+  SourceLocation LoopVarLoc = LoopVar->getBeginLoc();
+  ExprResult NewLoopVarInit =
+      ActOnBinOp(getCurScope(), LoopVarLoc, tok::plus, BeginRef.get(), LoopIndexRef.get());
+  AddInitializerToDecl(LoopVar, NewLoopVarInit.get(), /*DirectInit=*/false);
+
   return CilkForRange;
 }
 
@@ -3549,22 +3572,22 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
 
 // TODO: different loc???
   SourceLocation RangeLoc = ForRange->getBeginLoc();
-  VarDecl *LoopVar = BuildForRangeVarDecl(*this, RangeLoc, LoopBoundExpr.get()->getType(), std::string("__cilk_loopvar"));
-  AddInitializerToDecl(LoopVar, ActOnIntegerConstant(RangeLoc, 0).get(),
+  VarDecl *LoopIndex = BuildForRangeVarDecl(*this, RangeLoc, LoopBoundExpr.get()->getType(), std::string("__cilk_loopindex"));
+  AddInitializerToDecl(LoopIndex, ActOnIntegerConstant(RangeLoc, 0).get(),
                        /*DirectInit=*/false);
-  FinalizeDeclaration(LoopVar);
-  CurContext->addHiddenDecl(LoopVar);
+  FinalizeDeclaration(LoopIndex);
+  CurContext->addHiddenDecl(LoopIndex);
 
-  ExprResult LoopVarRef = BuildDeclRefExpr(LoopVar, LoopVar->getType(), VK_LValue,
+  ExprResult LoopIndexRef = BuildDeclRefExpr(LoopIndex, LoopIndex->getType(), VK_LValue,
                                          RangeLoc);
   ExprResult Cond;
-  Cond = ActOnBinOp(S, RangeLoc, tok::exclaimequal, LoopVarRef.get(),
+  Cond = ActOnBinOp(S, RangeLoc, tok::exclaimequal, LoopIndexRef.get(),
                          LoopBoundExpr.get());
   if (Cond.isInvalid())
     return StmtError();
 
 
-  return new (Context) CilkForRangeStmt(Context, ForRange, LoopVar, Cond.get());
+  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndexRef, Cond.get());
 }
 
 

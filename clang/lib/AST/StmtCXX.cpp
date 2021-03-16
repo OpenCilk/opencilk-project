@@ -128,29 +128,29 @@ CoroutineBodyStmt::CoroutineBodyStmt(CoroutineBodyStmt::CtorArgs const &Args)
 }
 
 CilkForRangeStmt::CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange,
-                                   VarDecl *LoopVar, Expr *Cond)
+                                   VarDecl *LoopIndex, Expr *Cond)
   : Stmt(CilkForRangeStmtClass)
 {
   SubExprs[FORRANGE] = ForRange;
-  setLoopVariable(C, LoopVar);
+  setLoopIndex(C, LoopIndex);
   SubExprs[COND] = Cond;
 }
-VarDecl *CilkForRangeStmt::getLoopVariable() const {
-  if (!SubExprs[LOOPVAR])
+VarDecl *CilkForRangeStmt::getLoopIndex() const {
+  if (!SubExprs[LOOPINDEX])
     return nullptr;
 
-  DeclStmt *DS = cast<DeclStmt>(SubExprs[LOOPVAR]);
+  DeclStmt *DS = cast<DeclStmt>(SubExprs[LOOPINDEX]);
   return cast<VarDecl>(DS->getSingleDecl());
 }
 
-void CilkForRangeStmt::setLoopVariable(const ASTContext &C, VarDecl *V) {
+void CilkForRangeStmt::setLoopIndex(const ASTContext &C, VarDecl *V) {
   if (!V) {
-    SubExprs[LOOPVAR] = nullptr;
+    SubExprs[LOOPINDEX] = nullptr;
     return;
   }
 
   SourceRange VarRange = V->getSourceRange();
-  SubExprs[LOOPVAR] = new (C) DeclStmt(DeclGroupRef(V), VarRange.getBegin(),
+  SubExprs[LOOPINDEX] = new (C) DeclStmt(DeclGroupRef(V), VarRange.getBegin(),
                                        VarRange.getEnd());
 }
 
