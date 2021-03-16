@@ -135,7 +135,7 @@ CilkForRangeStmt::CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRang
   setLoopVariable(C, LoopVar);
   SubExprs[COND] = Cond;
 }
-VarDecl *CilkForStmt::getLoopVariable() const {
+VarDecl *CilkForRangeStmt::getLoopVariable() const {
   if (!SubExprs[LOOPVAR])
     return nullptr;
 
@@ -143,7 +143,7 @@ VarDecl *CilkForStmt::getLoopVariable() const {
   return cast<VarDecl>(DS->getSingleDecl());
 }
 
-void CilkForStmt::setLoopVariable(const ASTContext &C, VarDecl *V) {
+void CilkForRangeStmt::setLoopVariable(const ASTContext &C, VarDecl *V) {
   if (!V) {
     SubExprs[LOOPVAR] = nullptr;
     return;
