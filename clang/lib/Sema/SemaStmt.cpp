@@ -3586,8 +3586,14 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (Cond.isInvalid())
     return StmtError();
 
+  // Create a new increment operation on the new beginning variable, and add it
+  // to the existing increment operation.
+  SourceLocation IncLoc = RangeLoc;
+  ExprResult NewInc = ActOnUnaryOp(S, IncLoc, tok::plusplus, LoopIndexRef.get());
+  if (NewInc.isInvalid())
+    return StmtError();
 
-  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndexRef, Cond.get());
+  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndex, Cond.get(), NewInc.get());
 }
 
 
