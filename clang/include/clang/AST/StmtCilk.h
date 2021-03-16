@@ -90,7 +90,7 @@ class CilkForRangeStmt : public Stmt {
   Stmt* SubExprs[END];
 
 public:
-  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange, VarDecl *LoopVar);
+  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange, VarDecl *LoopVar, Expr *Cond);
 
   /// \brief Build an empty for range statement.
   explicit CilkForRangeStmt(EmptyShell Empty) : Stmt(CilkForRangeStmtClass, Empty) { }
