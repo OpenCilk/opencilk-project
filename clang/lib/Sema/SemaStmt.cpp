@@ -3562,9 +3562,9 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
                          LoopBoundExpr.get());
   if (Cond.isInvalid())
     return StmtError();
-  
 
-  return new (Context) CilkForRangeStmt(Context, ForRange, LoopVar, Cond);
+
+  return new (Context) CilkForRangeStmt(Context, ForRange, LoopVar, Cond.get());
 }
 
 
