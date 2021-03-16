@@ -3541,9 +3541,9 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   ExprResult EndRef = BuildDeclRefExpr(EndVar, EndRefNonRefType,
                               VK_LValue, ForRange->getColonLoc());
   ExprResult LoopBoundExpr = ActOnBinOp(S, ForRange->getColonLoc(), tok::minus, EndRef.get(), BeginRef.get());
-  if (!LoopBoundExpr.isInvalid()) {
+  if (LoopBoundExpr.isInvalid()) {
     // give warning about for range only supporting random access!
-    Diag(ForRange->getForLoc(), diag::err_cilk_for_range_begin_minus_end);
+    Diag(ForRange->getForLoc(), diag::err_cilk_for_range_end_minus_begin);
     return StmtError();
   }
 
