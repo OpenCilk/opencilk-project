@@ -3524,7 +3524,15 @@ StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
   SourceLocation LoopVarLoc = LoopVar->getBeginLoc();
   ExprResult NewLoopVarInit =
       ActOnBinOp(getCurScope(), LoopVarLoc, tok::plus, BeginRef.get(), LoopIndexRef.get());
-  AddInitializerToDecl(LoopVar, NewLoopVarInit.get(), /*DirectInit=*/false);
+
+  ExprResult DerefExpr = ActOnUnaryOp(S, LoopVarLoc, tok::star, NewLoopVarInit.get());
+  if (DerefExpr.isInvalid()) {
+    Diag(LoopVarLoc, diag::note_for_range_invalid_iterator)
+        << LoopVarLoc << 1 << NewLoopVarInit.get()->getType();
+    return StmtError();
+  }
+
+  AddInitializerToDecl(LoopVar, DerefExpr.get(), /*DirectInit=*/false);
 
   return CilkForRange;
 }
