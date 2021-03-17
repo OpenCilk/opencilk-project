@@ -3516,7 +3516,7 @@ StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
   VarDecl *LoopIndex = CilkForRange->getLoopIndex();
   QualType LoopIndexType = LoopIndex->getType();
   const QualType LoopIndexRefNonRefType = LoopIndexType.getNonReferenceType();
-  ExprResult LoopIndexRef = BuildDeclRefExpr(BeginVar, LoopIndexRefNonRefType,
+  ExprResult LoopIndexRef = BuildDeclRefExpr(LoopIndex, LoopIndexRefNonRefType,
                                          VK_LValue, CXXForRange->getColonLoc());
 
 
