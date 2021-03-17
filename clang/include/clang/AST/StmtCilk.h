@@ -112,6 +112,8 @@ public:
   Expr *getCond() { return reinterpret_cast<Expr*>(SubExprs[COND]); }
   Expr *getInc()  { return reinterpret_cast<Expr*>(SubExprs[INC]); }
 
+  const Expr *getCond() const { return reinterpret_cast<Expr*>(SubExprs[COND]);}
+  const Expr *getInc()  const { return reinterpret_cast<Expr*>(SubExprs[INC]); }
   const DeclStmt *getLoopIndexStmt() const {
     return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
   }

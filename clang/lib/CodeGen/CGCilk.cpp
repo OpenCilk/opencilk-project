@@ -861,7 +861,7 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
-  const Expr *Inc = ForRange.getInc();
+  const Expr *Inc = S.getInc();
   assert(Inc && "_Cilk_for range loop has no increment");
   Continue = getJumpDestInCurrentScope("pfor.inc");
 
@@ -1077,10 +1077,10 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
   // C99 6.8.5p2/p4: The first substatement is executed if the expression
   // compares unequal to 0.  The condition must be a scalar type.
-  llvm::Value *BoolCondVal = EvaluateExprAsBool(ForRange.getCond());
+  llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
   Builder.CreateCondBr(
       BoolCondVal, CondBlock, ExitBlock,
-      createProfileWeightsForLoop(ForRange.getCond(), getProfileCount(ForRange.getBody())));
+      createProfileWeightsForLoop(S.getCond(), getProfileCount(ForRange.getBody())));
 
   if (ExitBlock != LoopExit.getBlock()) {
     EmitBlock(ExitBlock);
