@@ -128,13 +128,14 @@ CoroutineBodyStmt::CoroutineBodyStmt(CoroutineBodyStmt::CtorArgs const &Args)
 }
 
 CilkForRangeStmt::CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange,
-                                   VarDecl *LoopIndex, Expr *Cond, Expr *Inc)
+                                   VarDecl *LoopIndex, Expr *Cond, Expr *Inc, DeclStmt *LoopIndexStmt)
   : Stmt(CilkForRangeStmtClass)
 {
   SubExprs[FORRANGE] = ForRange;
   setLoopIndex(C, LoopIndex);
   SubExprs[COND] = Cond;
   SubExprs[INC] = Inc;
+  SubExprs[LOOPINDEXSTMT] = LoopIndexStmt;
 }
 VarDecl *CilkForRangeStmt::getLoopIndex() const {
   if (!SubExprs[LOOPINDEX])

@@ -3586,6 +3586,12 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   FinalizeDeclaration(LoopIndex);
   CurContext->addHiddenDecl(LoopIndex);
 
+  DeclGroupPtrTy LoopIndexGroup =
+      BuildDeclaratorGroup(MutableArrayRef<Decl *>((Decl **)&LoopIndex, 1));
+  StmtResult LoopIndexStmt = ActOnDeclStmt(LoopIndexGroup, RangeLoc, RangeLoc);
+  if (LoopIndexStmt.isInvalid())
+    return StmtError();
+
   ExprResult LoopIndexRef = BuildDeclRefExpr(LoopIndex, LoopIndex->getType(), VK_LValue,
                                          RangeLoc);
   ExprResult Cond;
@@ -3601,7 +3607,7 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (NewInc.isInvalid())
     return StmtError();
 
-  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndex, Cond.get(), NewInc.get());
+  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndexStmt.get(), Cond.get(), NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
 }
 
 
