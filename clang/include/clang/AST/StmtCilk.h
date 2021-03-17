@@ -112,6 +112,10 @@ public:
   Expr *getCond() { return reinterpret_cast<Expr*>(SubExprs[COND]); }
   Expr *getInc()  { return reinterpret_cast<Expr*>(SubExprs[INC]); }
 
+  const DeclStmt *getLoopIndexStmt() const {
+    return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
+  }
+
   SourceLocation getBeginLoc() const LLVM_READONLY;
   SourceLocation getEndLoc() const LLVM_READONLY;
 
