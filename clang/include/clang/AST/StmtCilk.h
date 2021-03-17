@@ -86,11 +86,11 @@ public:
 };
 
 class CilkForRangeStmt : public Stmt {
-  enum { FORRANGE, LOOPINDEX, COND, INC, END };
+  enum { FORRANGE, LOOPINDEX, LOOPINDEXSTMT, COND, INC, END };
   Stmt* SubExprs[END];
 
 public:
-  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange, VarDecl *LoopIndex, Expr *Cond, Expr *Inc);
+  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange, VarDecl *LoopIndex, Expr *Cond, Expr *Inc, DeclStmt *LoopIndexStmt);
 
   /// \brief Build an empty for range statement.
   explicit CilkForRangeStmt(EmptyShell Empty) : Stmt(CilkForRangeStmtClass, Empty) { }
@@ -103,6 +103,9 @@ public:
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
 
+  DeclStmt *getLoopIndexStmt() {
+    return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
+  }
   VarDecl *getLoopIndex() const;
   void setLoopIndex(const ASTContext &C, VarDecl *V);
 
