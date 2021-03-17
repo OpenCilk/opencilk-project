@@ -912,8 +912,11 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
     // Get the value of the loop variable initialization before we emit the
     // detach.
-    if (LoopVar)
+    if (LoopVar) {
+      LoopVar->dump();
+      LoopVar->dumpColor();
       LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
+    }
 
     Detach = Builder.CreateDetach(ForBodyEntry, Continue.getBlock(),
                                   SyncRegion);
