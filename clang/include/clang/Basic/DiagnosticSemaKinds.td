@@ -9487,6 +9487,7 @@ def note_cilk_for_loop_control_var_declared_here: Note<
 def warn_empty_cilk_for_body : Warning<
   "Cilk for loop has empty body">, InGroup<EmptyBody>;
 
+
 def note_constant_stride: Note<
   "constant stride is %0">;
 def warn_cilk_for_cond_user_defined_conv: Warning<
@@ -9519,7 +9520,13 @@ def note_exits_cilk_for : Note<
   "jump exits the scope of a '_Cilk_for'">;
 def err_jump_out_of_cilk_for : Error<
   "cannot jump out of '_Cilk_for' statement">;
-} // end of Cilk category
+
+// Cilk For Range errors
+
+def err_cilk_for_range_end_minus_begin : Error<
+  "Cannot determine length with '__end - __begin'. Please use a random access iterator.">;
+} 
+// end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {
 // OpenMP support.
@@ -10509,5 +10516,4 @@ def warn_sycl_kernel_num_of_function_params : Warning<
 def warn_sycl_kernel_return_type : Warning<
   "function template with 'sycl_kernel' attribute must have a 'void' return type">,
   InGroup<IgnoredAttributes>;
-
 } // end of sema component.
