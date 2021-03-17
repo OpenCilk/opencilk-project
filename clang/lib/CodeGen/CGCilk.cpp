@@ -914,8 +914,6 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
     // Get the value of the loop variable initialization before we emit the
     // detach.
     if (LoopVar) {
-      LoopVar->dump();
-      LoopVar->dumpColor();
       LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
     }
 
