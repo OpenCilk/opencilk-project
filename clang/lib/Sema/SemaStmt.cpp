@@ -3607,7 +3607,7 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (NewInc.isInvalid())
     return StmtError();
 
-  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndexStmt.get(), Cond.get(), NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
+  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndex, Cond.get(), NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
 }
 
 
