@@ -105,7 +105,7 @@ static cl::opt<bool>
               cl::desc("Allow MemorySSA to assume the program is "
                        "data-race free."));
 
-static cl::opt<bool> RequireTI("require-taskinfo-memoryssa", cl::init(false),
+static cl::opt<bool> RequireTI("require-taskinfo-memoryssa", cl::init(true),
                                cl::Hidden,
                                cl::desc("Require TaskInfo for MemorySSA."));
 
@@ -2388,7 +2388,8 @@ bool MemorySSAAnalysis::Result::invalidate(
   auto PAC = PA.getChecker<MemorySSAAnalysis>();
   return !(PAC.preserved() || PAC.preservedSet<AllAnalysesOn<Function>>()) ||
          Inv.invalidate<AAManager>(F, PA) ||
-         Inv.invalidate<DominatorTreeAnalysis>(F, PA);
+         Inv.invalidate<DominatorTreeAnalysis>(F, PA) ||
+         Inv.invalidate<TaskAnalysis>(F, PA);
 }
 
 PreservedAnalyses MemorySSAPrinterPass::run(Function &F,
@@ -2427,15 +2428,14 @@ void MemorySSAWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
   // TODO: Add TaskInfoWrapperPass to lib/Analysis/LoopPass.cpp to make this
   // work?
   if (RequireTI || EnableDRF)
-    AU.addRequired<TaskInfoWrapperPass>();
+    AU.addRequiredTransitive<TaskInfoWrapperPass>();
 }
 
 bool MemorySSAWrapperPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   auto &AA = getAnalysis<AAResultsWrapperPass>().getAAResults();
-  auto *TIWP = getAnalysisIfAvailable<TaskInfoWrapperPass>();
-  TaskInfo *TI = TIWP ? &TIWP->getTaskInfo() : nullptr;
-  MSSA.reset(new MemorySSA(F, &AA, &DT, TI));
+  auto &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
+  MSSA.reset(new MemorySSA(F, &AA, &DT, &TI));
   return false;
 }
 

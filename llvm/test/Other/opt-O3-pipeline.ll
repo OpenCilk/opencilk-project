@@ -245,13 +245,13 @@
 ; CHECK-NEXT:       Dominator Tree Construction
 ; CHECK-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:       Function Alias Analysis Results
+; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Memory SSA
 ; CHECK-NEXT:       Natural Loop Information
 ; CHECK-NEXT:       Canonicalize natural loops
 ; CHECK-NEXT:       LCSSA Verifier
 ; CHECK-NEXT:       Loop-Closed SSA Form Pass
 ; CHECK-NEXT:       Scalar Evolution Analysis
-; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Simplify loop CFG
 ; CHECK-NEXT:         Induction Variable Simplification
@@ -311,6 +311,7 @@
 ; CHECK-NEXT:       Dominator Tree Construction
 ; CHECK-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:       Function Alias Analysis Results
+; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Memory SSA
 ; CHECK-NEXT:       Early CSE w/ MemorySSA
 ; CHECK-NEXT:       Natural Loop Information
@@ -328,7 +329,6 @@
 ; CHECK-NEXT:       LCSSA Verifier
 ; CHECK-NEXT:       Loop-Closed SSA Form Pass
 ; CHECK-NEXT:       Scalar Evolution Analysis
-; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Unroll loops
 ; CHECK-NEXT:       Lazy Branch Probability Analysis
