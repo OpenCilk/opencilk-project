@@ -2209,6 +2209,14 @@ bool JumpThreadingPass::maybethreadThroughTwoBasicBlocks(BasicBlock *BB,
     return false;
   }
 
+  // Similarly, disregard cases where PredPredBB is terminated by a Tapir
+  // instruction.
+  if (isa<DetachInst>(PredPredBB->getTerminator()) ||
+      isa<ReattachInst>(PredPredBB->getTerminator()) ||
+      isDetachedRethrow(PredPredBB->getTerminator()) ||
+      isTaskFrameResume(PredPredBB->getTerminator()))
+    return false;
+
   BasicBlock *SuccBB = CondBr->getSuccessor(PredPredBB == ZeroPred);
 
   // If threading to the same block as we come from, we would infinite loop.
