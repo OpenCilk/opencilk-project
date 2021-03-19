@@ -220,7 +220,7 @@ static bool removeUselessSyncs(Function &F, DomTreeUpdater *DTU) {
           if (DetachInst *DI = dyn_cast<DetachInst>(PT)) {
             if (DI->getDetached() == PBB)
               continue;
-            else // DI->getContinue() == PBB
+            else if (DI->getSyncRegion() == Sync->getSyncRegion())
               // This detach reaches the sync through the continuation edge.
               ReachingDetach = true;
           }
@@ -233,16 +233,11 @@ static bool removeUselessSyncs(Function &F, DomTreeUpdater *DTU) {
             continue;
 
           // For a predecessor terminated by a sync instruction, check the sync
-          // region it belongs to.  If the sync belongs to a different sync
-          // region, add the block that starts that region.  Otherwise, ignore
-          // the predecessor.
-          if (SyncInst *SI = dyn_cast<SyncInst>(PT)) {
-            if (SI->getSyncRegion() != Sync->getSyncRegion())
-              for (User *U : SI->getSyncRegion()->users())
-                if (isa<DetachInst>(U))
-                  WorkList.push_back(cast<Instruction>(U)->getParent());
-            continue;
-          }
+          // region it belongs to.  If the sync belongs to the same sync region,
+          // ignore the predecessor.
+          if (SyncInst *SI = dyn_cast<SyncInst>(PT))
+            if (SI->getSyncRegion() == Sync->getSyncRegion())
+              continue;
 
           WorkList.push_back(Pred);
         }
