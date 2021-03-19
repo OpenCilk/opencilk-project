@@ -57,6 +57,7 @@
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -800,6 +801,7 @@ namespace {
       AU.addPreserved<BranchProbabilityInfoWrapperPass>();
       if (EnableMSSALoopDependency)
         AU.addPreserved<MemorySSAWrapperPass>();
+      AU.addPreserved<TaskInfoWrapperPass>();
     }
 
     /// verifyAnalysis() - Verify LoopSimplifyForm's guarantees.
@@ -829,6 +831,8 @@ bool LoopSimplify::runOnFunction(Function &F) {
   DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   auto *SEWP = getAnalysisIfAvailable<ScalarEvolutionWrapperPass>();
   ScalarEvolution *SE = SEWP ? &SEWP->getSE() : nullptr;
+  auto *TIWP = getAnalysisIfAvailable<TaskInfoWrapperPass>();
+  TaskInfo *TI = TIWP ? &TIWP->getTaskInfo() : nullptr;
   AssumptionCache *AC =
       &getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
   MemorySSA *MSSA = nullptr;
@@ -854,6 +858,12 @@ bool LoopSimplify::runOnFunction(Function &F) {
     assert(InLCSSA && "LCSSA is broken after loop-simplify.");
   }
 #endif
+  if (Changed && TI)
+    // Update TaskInfo manually using the updated DT.
+    //
+    // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+    // Optimize this routine in the future.
+    TI->recalculate(F, *DT);
   return Changed;
 }
 
@@ -863,6 +873,7 @@ PreservedAnalyses LoopSimplifyPass::run(Function &F,
   LoopInfo *LI = &AM.getResult<LoopAnalysis>(F);
   DominatorTree *DT = &AM.getResult<DominatorTreeAnalysis>(F);
   ScalarEvolution *SE = AM.getCachedResult<ScalarEvolutionAnalysis>(F);
+  TaskInfo *TI = AM.getCachedResult<TaskAnalysis>(F);
   AssumptionCache *AC = &AM.getResult<AssumptionAnalysis>(F);
   auto *MSSAAnalysis = AM.getCachedResult<MemorySSAAnalysis>(F);
   std::unique_ptr<MemorySSAUpdater> MSSAU;
@@ -881,6 +892,13 @@ PreservedAnalyses LoopSimplifyPass::run(Function &F,
   if (!Changed)
     return PreservedAnalyses::all();
 
+  if (Changed && TI)
+    // Update TaskInfo manually using the updated DT.
+    //
+    // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+    // Optimize this routine in the future.
+    TI->recalculate(F, *DT);
+
   PreservedAnalyses PA;
   PA.preserve<DominatorTreeAnalysis>();
   PA.preserve<LoopAnalysis>();
@@ -891,6 +909,7 @@ PreservedAnalyses LoopSimplifyPass::run(Function &F,
   PA.preserve<DependenceAnalysis>();
   if (MSSAAnalysis)
     PA.preserve<MemorySSAAnalysis>();
+  PA.preserve<TaskAnalysis>();
   // BPI maps conditional terminators to probabilities, LoopSimplify can insert
   // blocks, but it does so only by splitting existing blocks and edges. This
   // results in the interesting property that all new terminators inserted are
