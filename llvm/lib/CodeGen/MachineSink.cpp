@@ -613,8 +613,8 @@ MachineSinking::GetAllSortedSuccessors(MachineInstr &MI, MachineBasicBlock *MBB,
   if (Succs != AllSuccessors.end())
     return Succs->second;
 
-  SmallPtrSet<MachineBasicBlock *, 4> AllSuccs0(MBB->succ_begin(),
-                                                MBB->succ_end());
+  SmallVector<MachineBasicBlock *, 4> AllSuccs(MBB->succ_begin(),
+                                               MBB->succ_end());
 
   // Handle cases where sinking can happen but where the sink point isn't a
   // successor. For example:
@@ -628,41 +628,8 @@ MachineSinking::GetAllSortedSuccessors(MachineInstr &MI, MachineBasicBlock *MBB,
     if (DTChild->getIDom()->getBlock() == MI.getParent() &&
         // Skip MBBs already added to the AllSuccs vector above.
         !MBB->isSuccessor(DTChild->getBlock()))
-      AllSuccs0.insert(DTChild->getBlock());
+      AllSuccs.push_back(DTChild->getBlock());
   }
-
-  // Scan the set of successor blocks and remove any successors that succeed
-  // a setjmp.
-  bool Unstable = true;
-  while (Unstable) {
-    Unstable = false;
-    SmallPtrSet<MachineBasicBlock*, 10> toRemove;
-    for (MachineBasicBlock *MBB : AllSuccs0) {
-      if (toRemove.count(MBB) == 0 && MBB->hasAddressTaken()) {
-        // Enqueue MBB for removal.
-        toRemove.insert(MBB);
-        // Scan the successors of MBB and enqueue them for removal as well.
-        SmallVector<MachineBasicBlock *, 10> Queue;
-        Queue.push_back(MBB);
-        while (!Queue.empty()) {
-          MachineBasicBlock *BB = Queue.pop_back_val();
-          for (MachineBasicBlock *Succ : BB->successors()) {
-            if (toRemove.count(Succ) > 0 || AllSuccs0.count(Succ) == 0)
-              continue;
-            toRemove.insert(Succ);
-            Queue.push_back(Succ);
-          }
-        }
-        Unstable = true;
-      }
-    }
-    // Remove the successors we found.
-    for (MachineBasicBlock *BB : toRemove)
-      AllSuccs0.erase(BB);
-  }
-
-  SmallVector<MachineBasicBlock *, 4> AllSuccs(AllSuccs0.begin(),
-                                               AllSuccs0.end());
 
   // Sort Successors according to their loop depth or block frequency info.
   llvm::stable_sort(
