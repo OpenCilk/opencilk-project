@@ -211,6 +211,11 @@ namespace {
     /// live interval update is costly.
     void lateLiveIntervalUpdate();
 
+    /// Return true if the live interval from coalescing SrcLI and DstLI crosses
+    /// a basic-block edge that may be produced by a setjmp.
+    bool coalescedLiveIntervalMayCrossSetjmp(LiveInterval &SrcLI,
+                                             LiveInterval &DstLI);
+
     /// Attempt to join intervals corresponding to SrcReg/DstReg, which are the
     /// src/dst of the copy instruction CopyMI.  This returns true if the copy
     /// was successfully coalesced away. If it is not currently possible to
@@ -1802,6 +1807,45 @@ bool RegisterCoalescer::canJoinPhys(const CoalescerPair &CP) {
   return false;
 }
 
+// Helper function to check if MBB contains a terminator that might correspond
+// with EH_SjLj_Setup.
+static bool blockMayContainSetjmpSetup(const MachineBasicBlock *MBB,
+                                       const MachineBasicBlock *Succ) {
+  for (const MachineInstr &MI : MBB->terminators())
+    // It seems hard to check for EH_SjLj_Setup directly, since that instruction
+    // seems to be target-dependent.  Instead we simply check if the terminator
+    // has unmodeled side effects.
+    if (MI.hasUnmodeledSideEffects() &&
+        llvm::any_of(MI.operands(), [&](const MachineOperand &Op) {
+          return Op.isMBB() && Op.getMBB() == Succ;
+        }))
+      return true;
+  return false;
+}
+
+bool RegisterCoalescer::coalescedLiveIntervalMayCrossSetjmp(
+    LiveInterval &SrcLI, LiveInterval &DstLI) {
+  for (MachineFunction::iterator I = MF->begin(), E = MF->end(); I != E; ++I) {
+    MachineBasicBlock *MBB = &*I;
+    // If MBB's address is taken, then it might be the destination of a longjmp.
+    // Check if Src or Dst are live into the block.
+    if (MBB->hasAddressTaken() &&
+        (LIS->isLiveInToMBB(SrcLI, MBB) || LIS->isLiveInToMBB(DstLI, MBB))) {
+      // Check the predecessors of MBB for a terminator that might be a
+      // EH_SjLj_Setup, and check if Src and Dest are live out of that
+      // predecessor.
+      for (MachineBasicBlock *Pred : MBB->predecessors())
+        if (blockMayContainSetjmpSetup(Pred, MBB) &&
+            (LIS->isLiveOutOfMBB(SrcLI, Pred) ||
+             LIS->isLiveOutOfMBB(DstLI, Pred)))
+          // Guess that the coalesced liveness range would cross this edge from
+          // the setjmp.
+          return true;
+    }
+  }
+  return false;
+}
+
 bool RegisterCoalescer::joinCopy(MachineInstr *CopyMI, bool &Again) {
   Again = false;
   LLVM_DEBUG(dbgs() << LIS->getInstructionIndex(*CopyMI) << '\t' << *CopyMI);
@@ -1820,6 +1864,13 @@ bool RegisterCoalescer::joinCopy(MachineInstr *CopyMI, bool &Again) {
     if (CP.isFlipped()) {
       std::swap(SrcIdx, DstIdx);
       std::swap(SrcRC, DstRC);
+    }
+    if (MF->exposesReturnsTwice() &&
+        coalescedLiveIntervalMayCrossSetjmp(LIS->getInterval(CP.getSrcReg()),
+                                            LIS->getInterval(CP.getDstReg()))) {
+      LLVM_DEBUG(
+          dbgs() << "\tNot coalescing: liveness ranges may cross setjmp.\n");
+      return false;
     }
     if (!TRI->shouldCoalesce(CopyMI, SrcRC, SrcIdx, DstRC, DstIdx,
                              CP.getNewRC(), *LIS)) {
@@ -3884,7 +3935,7 @@ bool RegisterCoalescer::runOnMachineFunction(MachineFunction &fn) {
   //
   // TODO: Could specifically disable coalescing registers live across setjmp
   // calls
-  if (fn.exposesReturnsTwice()) {
+  if (fn.exposesOpaqueReturnsTwice()) {
     LLVM_DEBUG(
         dbgs() << "* Skipped as it exposes funcions that returns twice.\n");
     return false;
