@@ -300,6 +300,13 @@ class MachineFunction {
   /// about the control flow of such functions.
   bool ExposesReturnsTwice = false;
 
+  /// ExposesOpaqueReturnsTwice - True if the function calls setjmp or related
+  /// functions with attribute "returns twice", other than LLVM's builtin
+  /// setjmp, but doesn't have the attribute itself.
+  /// This is used to limit optimizations which cannot reason
+  /// about the control flow of such functions.
+  bool ExposesOpaqueReturnsTwice = false;
+
   /// True if the function includes any inline assembly.
   bool HasInlineAsm = false;
 
@@ -617,6 +624,19 @@ public:
   /// a "returns twice" function.
   void setExposesReturnsTwice(bool B) {
     ExposesReturnsTwice = B;
+  }
+
+  /// exposesReturnsTwice - Returns true if the function calls a function with
+  /// attribute "returns twice" other than LLVM's builtin setjmp without having
+  /// the attribute itself.
+  bool exposesOpaqueReturnsTwice() const {
+    return ExposesOpaqueReturnsTwice;
+  }
+
+  /// setExposesOpaqueReturnsTwice - Set a flag that indicates if there's a call
+  /// to a "returns twice" function other than LLVM's builtin setjmp.
+  void setExposesOpaqueReturnsTwice(bool B) {
+    ExposesOpaqueReturnsTwice = B;
   }
 
   /// Returns true if the function contains any inline assembly.
