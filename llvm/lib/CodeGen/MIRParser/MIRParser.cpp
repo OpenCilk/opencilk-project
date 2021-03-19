@@ -410,6 +410,7 @@ MIRParserImpl::initializeMachineFunction(const yaml::MachineFunction &YamlMF,
 
   MF.setAlignment(YamlMF.Alignment.valueOrOne());
   MF.setExposesReturnsTwice(YamlMF.ExposesReturnsTwice);
+  MF.setExposesOpaqueReturnsTwice(YamlMF.ExposesOpaqueReturnsTwice);
   MF.setHasWinCFI(YamlMF.HasWinCFI);
 
   if (YamlMF.Legalized)
