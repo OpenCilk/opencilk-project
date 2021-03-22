@@ -895,7 +895,11 @@ bool tools::addCilktoolRuntime(const ToolChain &TC, const ArgList &Args,
                                ArgStringList &CmdArgs) {
   if (Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ)) {
     StringRef Val = A->getValue();
-    CmdArgs.push_back(TC.getCompilerRTArgString(Args, Val));
+    bool Shared = Args.hasArg(options::OPT_shared) ||
+                  Args.hasFlag(options::OPT_shared_libcilktool,
+                               options::OPT_static_libcilktool, false);
+    CmdArgs.push_back(TC.getCompilerRTArgString(
+        Args, Val, Shared ? ToolChain::FT_Shared : ToolChain::FT_Static));
     // Link in the C++ standard library
     TC.AddCXXStdlibLibArgs(Args, CmdArgs);
     return true;
