@@ -1262,8 +1262,12 @@ void DarwinClang::AddCilktoolRTLibs(const ArgList &Args,
                                     ArgStringList &CmdArgs) const {
   if (Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ)) {
     StringRef Val = A->getValue();
-    auto RLO = RuntimeLinkOptions(RLO_AlwaysLink);
-    AddLinkRuntimeLib(Args, CmdArgs, Val, RLO);
+    bool Shared = Args.hasArg(options::OPT_shared) ||
+                  Args.hasFlag(options::OPT_shared_libcilktool,
+                               options::OPT_static_libcilktool, false);
+    auto RLO =
+        RuntimeLinkOptions(RLO_AlwaysLink | (Shared ? RLO_AddRPath : 0U));
+    AddLinkRuntimeLib(Args, CmdArgs, Val, RLO, Shared);
     // Link in the C++ standard library
     AddCXXStdlibLibArgs(Args, CmdArgs);
   }

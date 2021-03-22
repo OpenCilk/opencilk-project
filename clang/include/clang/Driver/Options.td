@@ -1560,6 +1560,10 @@ def fcsi_EQ : Joined<["-"], "fcsi=">, Group<f_clang_Group>,
 def fcilktool_EQ : Joined<["-"], "fcilktool=">, Group<f_clang_Group>,
                    MetaVarName<"<check>">,
                    HelpText<"Turn on the designated Cilk tool">;
+def shared_libcilktool : Flag<["-"], "shared-libcilktool">,
+  HelpText<"Dynamically link the cilktool runtime">;
+def static_libcilktool : Flag<["-"], "static-libcilktool">,
+  HelpText<"Statically link the cilktool runtime">;
 
 } // end -f[no-]sanitize* flags
 
