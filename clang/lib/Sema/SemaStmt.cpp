@@ -3571,16 +3571,26 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   const QualType EndRefNonRefType = EndType.getNonReferenceType();
   ExprResult EndRef = BuildDeclRefExpr(EndVar, EndRefNonRefType,
                               VK_LValue, ForRange->getColonLoc());
-  ExprResult LoopBoundExpr = ActOnBinOp(S, ForRange->getColonLoc(), tok::minus, EndRef.get(), BeginRef.get());
-  if (LoopBoundExpr.isInvalid()) {
+  ExprResult LimitExpr = ActOnBinOp(S, ForRange->getColonLoc(), tok::minus, EndRef.get(), BeginRef.get());
+  if (LimitExpr.isInvalid()) {
     // give warning about for range only supporting random access!
     Diag(ForRange->getForLoc(), diag::err_cilk_for_range_end_minus_begin);
     return StmtError();
   }
-
-// TODO: different loc???
   SourceLocation RangeLoc = ForRange->getBeginLoc();
-  VarDecl *LoopIndex = BuildForRangeVarDecl(*this, RangeLoc, LoopBoundExpr.get()->getType(), std::string("__cilk_loopindex"));
+  VarDecl *Limit = BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(), std::string("__cilk_looplimit"));
+  AddInitializerToDecl(Limit, LimitExpr.get(),
+      /*DirectInit=*/false);
+  FinalizeDeclaration(Limit);
+  CurContext->addHiddenDecl(Limit);
+
+  DeclGroupPtrTy LimitGroup =
+      BuildDeclaratorGroup(MutableArrayRef<Decl *>((Decl **)&Limit, 1));
+  StmtResult LimitStmt = ActOnDeclStmt(LimitGroup, RangeLoc, RangeLoc);
+  if (LimitStmt.isInvalid())
+    return StmtError();
+
+  VarDecl *LoopIndex = BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(), std::string("__cilk_loopindex"));
   AddInitializerToDecl(LoopIndex, ActOnIntegerConstant(RangeLoc, 0).get(),
                        /*DirectInit=*/false);
   FinalizeDeclaration(LoopIndex);
@@ -3592,11 +3602,13 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (LoopIndexStmt.isInvalid())
     return StmtError();
 
-  ExprResult LoopIndexRef = BuildDeclRefExpr(LoopIndex, LoopIndex->getType(), VK_LValue,
+  ExprResult LimitRef = BuildDeclRefExpr(Limit, Limit->getType(), VK_LValue,
                                          RangeLoc);
+  ExprResult LoopIndexRef = BuildDeclRefExpr(LoopIndex, LoopIndex->getType(), VK_LValue,
+                                             RangeLoc);
   ExprResult Cond;
   Cond = ActOnBinOp(S, RangeLoc, tok::exclaimequal, LoopIndexRef.get(),
-                         LoopBoundExpr.get());
+                    LimitRef.get());
   if (Cond.isInvalid())
     return StmtError();
 
@@ -3607,7 +3619,7 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (NewInc.isInvalid())
     return StmtError();
 
-  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndex, Cond.get(), NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
+  return new (Context) CilkForRangeStmt(Context, ForRange, LoopIndex, cast<DeclStmt>(LimitStmt.get()), Cond.get(), NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
 }
 
 
