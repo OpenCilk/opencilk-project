@@ -166,8 +166,7 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
     EmitCilkForStmt(cast<CilkForStmt>(*S), Attrs);
     break;
   case Stmt::CilkForRangeStmtClass:
-    // TODO(cilkforrange): emit the right thing here!
-    EmitCXXForRangeStmt(*cast<CilkForRangeStmt>(*S).getCXXForRangeStmt(), Attrs);
+    EmitCilkForRangeStmt(cast<CilkForRangeStmt>(*S), Attrs);
     break;
   case Stmt::ObjCAtTryStmtClass:
     EmitObjCAtTryStmt(cast<ObjCAtTryStmt>(*S));

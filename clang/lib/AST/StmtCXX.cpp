@@ -127,8 +127,40 @@ CoroutineBodyStmt::CoroutineBodyStmt(CoroutineBodyStmt::CtorArgs const &Args)
             const_cast<Stmt **>(getParamMoves().data()));
 }
 
-CilkForRangeStmt::CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange)
+CilkForRangeStmt::CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange,
+                                   VarDecl *LoopIndex, DeclStmt *Limit, Expr *Cond, Expr *Inc, DeclStmt *LoopIndexStmt)
   : Stmt(CilkForRangeStmtClass)
 {
   SubExprs[FORRANGE] = ForRange;
+  setLoopIndex(C, LoopIndex);
+  SubExprs[COND] = Cond;
+  SubExprs[INC] = Inc;
+  SubExprs[LOOPINDEXSTMT] = LoopIndexStmt;
+  SubExprs[LIMIT] = Limit;
+}
+VarDecl *CilkForRangeStmt::getLoopIndex() const {
+  if (!SubExprs[LOOPINDEX])
+    return nullptr;
+
+  DeclStmt *DS = cast<DeclStmt>(SubExprs[LOOPINDEX]);
+  return cast<VarDecl>(DS->getSingleDecl());
+}
+
+void CilkForRangeStmt::setLoopIndex(const ASTContext &C, VarDecl *V) {
+  if (!V) {
+    SubExprs[LOOPINDEX] = nullptr;
+    return;
+  }
+
+  SourceRange VarRange = V->getSourceRange();
+  SubExprs[LOOPINDEX] = new (C) DeclStmt(DeclGroupRef(V), VarRange.getBegin(),
+                                       VarRange.getEnd());
+}
+
+CXXForRangeStmt* CilkForRangeStmt::getCXXForRangeStmt() const {
+  return cast_or_null<CXXForRangeStmt>(SubExprs[FORRANGE]);
+}
+SourceLocation CilkForRangeStmt::getBeginLoc() const { return getCXXForRangeStmt()->getBeginLoc(); }
+SourceLocation CilkForRangeStmt::getEndLoc() const {
+  return getCXXForRangeStmt()->getEndLoc();
 }
