@@ -848,6 +848,7 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   EmitStmt(ForRange.getBeginStmt());
   EmitStmt(ForRange.getEndStmt());
   EmitStmt(S.getLoopIndexStmt());
+  EmitStmt(S.getLimitStmt());
 
   // Start the loop with a block that tests the condition.  If there's an
   // increment, the continue scope will be overwritten later.
