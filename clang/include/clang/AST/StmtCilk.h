@@ -85,21 +85,31 @@ public:
   }
 };
 
+/// CilkForRangeStmt - This represents a '_Cilk_for(range-declarator :
+/// range-expression)' or 'for (init-statement range-declarator :
+/// range-expression)'.) based on a CXXForRangeStmt which is a C++0x
+/// [stmt.ranged]'s ranged for stmt
+///
+/// This is stored as a FORRANGE stmt embedded inside a CILKFORRANGE with some
+/// other necessary semantic compenents.
 class CilkForRangeStmt : public Stmt {
   enum { FORRANGE, LOOPINDEX, LOOPINDEXSTMT, LIMIT, COND, INC, END };
-  Stmt* SubExprs[END];
+  Stmt *SubExprs[END];
 
 public:
-  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange, VarDecl *LoopIndex, DeclStmt *Limit, Expr *Cond, Expr *Inc, DeclStmt *LoopIndexStmt);
+  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange,
+                   VarDecl *LoopIndex, DeclStmt *Limit, Expr *Cond, Expr *Inc,
+                   DeclStmt *LoopIndexStmt);
 
   /// \brief Build an empty for range statement.
-  explicit CilkForRangeStmt(EmptyShell Empty) : Stmt(CilkForRangeStmtClass, Empty) { }
+  explicit CilkForRangeStmt(EmptyShell Empty)
+      : Stmt(CilkForRangeStmtClass, Empty) {}
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == CilkForRangeStmtClass;
   }
 
-  CXXForRangeStmt* getCXXForRangeStmt() const;
+  CXXForRangeStmt *getCXXForRangeStmt() const;
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
 
@@ -109,14 +119,14 @@ public:
   VarDecl *getLoopIndex() const;
   void setLoopIndex(const ASTContext &C, VarDecl *V);
 
-  Expr *getCond() { return reinterpret_cast<Expr*>(SubExprs[COND]); }
-  Expr *getInc()  { return reinterpret_cast<Expr*>(SubExprs[INC]); }
-  DeclStmt *getLimitStmt() {
-    return cast_or_null<DeclStmt>(SubExprs[LIMIT]);
-  }
+  Expr *getCond() { return reinterpret_cast<Expr *>(SubExprs[COND]); }
+  Expr *getInc() { return reinterpret_cast<Expr *>(SubExprs[INC]); }
+  DeclStmt *getLimitStmt() { return cast_or_null<DeclStmt>(SubExprs[LIMIT]); }
 
-  const Expr *getCond() const { return reinterpret_cast<Expr*>(SubExprs[COND]);}
-  const Expr *getInc()  const { return reinterpret_cast<Expr*>(SubExprs[INC]); }
+  const Expr *getCond() const {
+    return reinterpret_cast<Expr *>(SubExprs[COND]);
+  }
+  const Expr *getInc() const { return reinterpret_cast<Expr *>(SubExprs[INC]); }
   const DeclStmt *getLoopIndexStmt() const {
     return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
   }
@@ -128,10 +138,7 @@ public:
   SourceLocation getEndLoc() const LLVM_READONLY;
 
   // Iterators
-  child_range children() {
-    return child_range(&SubExprs[0], &SubExprs[END]);
-  }
-
+  child_range children() { return child_range(&SubExprs[0], &SubExprs[END]); }
 };
 
 /// CilkForStmt - This represents a '_Cilk_for(init;cond;inc)' stmt.
