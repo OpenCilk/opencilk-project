@@ -86,11 +86,11 @@ public:
 };
 
 class CilkForRangeStmt : public Stmt {
-  enum { FORRANGE, LOOPINDEX, LOOPINDEXSTMT, COND, INC, END };
+  enum { FORRANGE, LOOPINDEX, LOOPINDEXSTMT, LIMIT, COND, INC, END };
   Stmt* SubExprs[END];
 
 public:
-  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange, VarDecl *LoopIndex, Expr *Cond, Expr *Inc, DeclStmt *LoopIndexStmt);
+  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange, VarDecl *LoopIndex, DeclStmt *Limit, Expr *Cond, Expr *Inc, DeclStmt *LoopIndexStmt);
 
   /// \brief Build an empty for range statement.
   explicit CilkForRangeStmt(EmptyShell Empty) : Stmt(CilkForRangeStmtClass, Empty) { }
@@ -111,9 +111,17 @@ public:
 
   Expr *getCond() { return reinterpret_cast<Expr*>(SubExprs[COND]); }
   Expr *getInc()  { return reinterpret_cast<Expr*>(SubExprs[INC]); }
+  DeclStmt *getLimitStmt() {
+    return cast_or_null<DeclStmt>(SubExprs[LIMIT]);
+  }
 
+  const Expr *getCond() const { return reinterpret_cast<Expr*>(SubExprs[COND]);}
+  const Expr *getInc()  const { return reinterpret_cast<Expr*>(SubExprs[INC]); }
   const DeclStmt *getLoopIndexStmt() const {
     return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
+  }
+  const DeclStmt *getLimitStmt() const {
+    return cast_or_null<DeclStmt>(SubExprs[LIMIT]);
   }
 
   SourceLocation getBeginLoc() const LLVM_READONLY;
