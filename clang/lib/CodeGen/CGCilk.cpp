@@ -818,10 +818,12 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     delete TempInvokeDest;
 }
 
-void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
-                                      ArrayRef<const Attr *> ForAttrs) {
+void 
+CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
+                                           ArrayRef<const Attr *> ForAttrs) {
   JumpDest LoopExit = getJumpDestInCurrentScope("pfor.end");
 
+  // Setup the sync region
   PushSyncRegion();
   llvm::Instruction *SyncRegion = EmitSyncRegionStart();
   CurSyncRegion->setSyncRegionStart(SyncRegion);
@@ -830,6 +832,7 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
   LexicalScope ForScope(*this, S.getSourceRange());
 
+  // Get the ForRange stmt which has all the important semantics.
   const CXXForRangeStmt &ForRange = *S.getCXXForRangeStmt();
 
   // Evaluate the first part before the loop.
@@ -838,10 +841,9 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
   llvm::BasicBlock *ExitBlock = LoopExit.getBlock();
 
-  // TODO: emit difference variable instead of beginstmt and endstmt
-  // plan: 
-  // 1. add difference variable and emit it, check
-  // 2. make loop condition depend on the difference variable instead, check
+  // We will now emit a difference variable instead of beginstmt and endstmt
+  // 1. add difference variable and emit it
+  // 2. make loop condition depend on the difference variable instead
   // 3. finally, don't mutate beginstmt and instead do begin=begin+inductionvar
 
   EmitStmt(ForRange.getRangeStmt());
@@ -918,8 +920,8 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
       LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
     }
 
-    Detach = Builder.CreateDetach(ForBodyEntry, Continue.getBlock(),
-                                  SyncRegion);
+    Detach =
+        Builder.CreateDetach(ForBodyEntry, Continue.getBlock(), SyncRegion);
     // Save the old alloca insert point.
     OldAllocaInsertPt = AllocaInsertPt;
     // Save the old EH state.
@@ -1040,9 +1042,8 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
     if (!NestedEHResumeBlock->use_empty()) {
       // Translate the nested EHResumeBlock into an appropriate EHResumeBlock in
       // the outer scope.
-      NestedEHResumeBlock->replaceAllUsesWith(
-          getEHResumeBlock(
-              isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
+      NestedEHResumeBlock->replaceAllUsesWith(getEHResumeBlock(
+          isa<llvm::ResumeInst>(NestedEHResumeBlock->getTerminator())));
     }
     delete NestedEHResumeBlock;
   }
@@ -1059,8 +1060,7 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
       Builder.SetInsertPoint(DetachBlock);
       // Create the new detach instruction.
       llvm::DetachInst *NewDetach = Builder.CreateDetach(
-          ForBodyEntry, Continue.getBlock(), InvokeDest,
-          SyncRegion);
+          ForBodyEntry, Continue.getBlock(), InvokeDest, SyncRegion);
       // Remove the old detach.
       Detach->eraseFromParent();
       Detach = NewDetach;
@@ -1077,9 +1077,9 @@ void CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   // C99 6.8.5p2/p4: The first substatement is executed if the expression
   // compares unequal to 0.  The condition must be a scalar type.
   llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
-  Builder.CreateCondBr(
-      BoolCondVal, CondBlock, ExitBlock,
-      createProfileWeightsForLoop(S.getCond(), getProfileCount(ForRange.getBody())));
+  Builder.CreateCondBr(BoolCondVal, CondBlock, ExitBlock,
+                       createProfileWeightsForLoop(
+                           S.getCond(), getProfileCount(ForRange.getBody())));
 
   if (ExitBlock != LoopExit.getBlock()) {
     EmitBlock(ExitBlock);
