@@ -78,6 +78,23 @@ enum {
 
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
 
+/// Helper to find a function with the given name, creating it if it doesn't
+/// already exist. Returns false if the function was inserted, indicating that
+/// the body of the function has yet to be defined.
+static bool GetOrCreateFunction(Module &M, const StringRef FnName,
+                                FunctionType *FTy, Function *&Fn) {
+  // If the function already exists then let the caller know.
+  if ((Fn = M.getFunction(FnName)))
+    return true;
+
+  // Otherwise we have to create it.
+  Fn = cast<Function>(M.getOrInsertFunction(FnName, FTy).getCallee());
+
+  // Let the caller know that the function is incomplete and the body still
+  // needs to be added.
+  return false;
+}
+
 OpenCilkABI::OpenCilkABI(Module &M) : TapirTarget(M) {}
 
 void OpenCilkABI::prepareModule() {
@@ -130,6 +147,30 @@ void OpenCilkABI::prepareModule() {
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
   ArrayType *ContextTy = ArrayType::get(VoidPtrTy, 5);
+  if (UseOpenCilkRuntimeBC) {
+    Type *VoidTy = Type::getVoidTy(C);
+    FunctionType *CilkRTSFnTy =
+        FunctionType::get(VoidTy, {StackFramePtrTy}, false);
+    SmallVector<std::pair<StringRef, FunctionType *>, 5> CilkRTSFunctions({
+        std::make_pair("__cilkrts_enter_frame", CilkRTSFnTy),
+        std::make_pair("__cilkrts_enter_frame_fast", CilkRTSFnTy),
+        std::make_pair("__cilkrts_detach", CilkRTSFnTy),
+        std::make_pair("__cilkrts_pop_frame", CilkRTSFnTy),
+        std::make_pair("__cilkrts_save_fp_ctrl_state", CilkRTSFnTy),
+    });
+
+    // Add attributes to internalized functions
+    for (auto CilkRTSFnProto : CilkRTSFunctions) {
+      Function *Fn;
+      if (GetOrCreateFunction(M, CilkRTSFnProto.first, CilkRTSFnProto.second,
+                              Fn)) {
+        Fn->setLinkage(Function::AvailableExternallyLinkage);
+        Fn->setDoesNotThrow();
+        if (!DebugABICalls && !UseExternalABIFunctions)
+          Fn->addFnAttr(Attribute::AlwaysInline);
+      }
+    }
+  }
 
   Triple T(M.getTargetTriple());
   bool HasSSE = T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64;
@@ -408,23 +449,6 @@ static Value *LoadSTyField(
   return L;
 }
 
-/// Helper to find a function with the given name, creating it if it doesn't
-/// already exist. Returns false if the function was inserted, indicating that
-/// the body of the function has yet to be defined.
-static bool GetOrCreateFunction(Module &M, const StringRef FnName,
-                                FunctionType *FTy, Function *&Fn) {
-  // If the function already exists then let the caller know.
-  if ((Fn = M.getFunction(FnName)))
-    return true;
-
-  // Otherwise we have to create it.
-  Fn = cast<Function>(M.getOrInsertFunction(FnName, FTy).getCallee());
-
-  // Let the caller know that the function is incomplete and the body still
-  // needs to be added.
-  return false;
-}
-
 /// Emit a call to the CILK_SETJMP function.
 CallInst *OpenCilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   LLVMContext &Ctx = M.getContext();
@@ -480,13 +504,8 @@ Function *OpenCilkABI::Get__cilkrts_pop_frame() {
   Function *Fn = nullptr;
   if (GetOrCreateFunction(M, "__cilkrts_pop_frame",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn)) {
-    Fn->setLinkage(Function::AvailableExternallyLinkage);
-    Fn->setDoesNotThrow();
-    if (!DebugABICalls && !UseExternalABIFunctions)
-      Fn->addFnAttr(Attribute::AlwaysInline);
+                          Fn))
     return Fn;
-  }
 
   // Create the body of __cilkrts_pop_frame.
   const DataLayout &DL = M.getDataLayout();
@@ -556,13 +575,8 @@ Function *OpenCilkABI::Get__cilkrts_detach() {
   Function *Fn = nullptr;
   if (GetOrCreateFunction(M, "__cilkrts_detach",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn)) {
-    Fn->setLinkage(Function::AvailableExternallyLinkage);
-    Fn->setDoesNotThrow();
-    if (!DebugABICalls && !UseExternalABIFunctions)
-      Fn->addFnAttr(Attribute::AlwaysInline);
+                          Fn))
     return Fn;
-  }
 
   // Create the body of __cilkrts_detach.
   const DataLayout &DL = M.getDataLayout();
@@ -630,13 +644,8 @@ Function *OpenCilkABI::Get__cilkrts_save_fp_ctrl_state() {
   Function *Fn = nullptr;
   if (GetOrCreateFunction(M, "__cilkrts_save_fp_ctrl_state",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn)) {
-    Fn->setLinkage(Function::AvailableExternallyLinkage);
-    Fn->setDoesNotThrow();
-    if (!DebugABICalls && !UseExternalABIFunctions)
-      Fn->addFnAttr(Attribute::AlwaysInline);
+                          Fn))
     return Fn;
-  }
 
   Function::arg_iterator Args = Fn->arg_begin();
   Value *SF = &*Args;
@@ -967,19 +976,10 @@ Function *OpenCilkABI::Get__cilkrts_enter_frame() {
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Function *Fn = nullptr;
-  // NOTE(TFK): If the function was imported from the opencilk bitcode file
-  //            then it will not have the requisite attributes. It is perhaps
-  //            better to set these attributes when creating the opencilk bitcode
-  //            file... for now I set them here.
   if (GetOrCreateFunction(M, "__cilkrts_enter_frame",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn)) {
-    Fn->setLinkage(Function::AvailableExternallyLinkage);
-    Fn->setDoesNotThrow();
-    if (!DebugABICalls && !UseExternalABIFunctions)
-      Fn->addFnAttr(Attribute::AlwaysInline);
+                          Fn))
     return Fn;
-  }
 
   // Create the body of __cilkrts_enter_frame.
   const DataLayout &DL = M.getDataLayout();
@@ -1093,19 +1093,10 @@ Function *OpenCilkABI::Get__cilkrts_enter_frame_fast() {
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Function *Fn = nullptr;
-  // NOTE(TFK): If the function was imported from the opencilk bitcode file
-  //            then it will not have the requisite attributes. It is perhaps
-  //            better to set these attributes when creating the opencilk bitcode
-  //            file... for now I set them here.
   if (GetOrCreateFunction(M, "__cilkrts_enter_frame_fast",
                           FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn)) {
-    Fn->setLinkage(Function::AvailableExternallyLinkage);
-    Fn->setDoesNotThrow();
-    if (!DebugABICalls && !UseExternalABIFunctions)
-      Fn->addFnAttr(Attribute::AlwaysInline);
+                          Fn))
     return Fn;
-  }
 
   // Create the body of __cilkrts_enter_frame_fast.
   const DataLayout &DL = M.getDataLayout();
