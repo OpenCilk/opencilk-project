@@ -2191,8 +2191,10 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
       if (!LocalMAAPs.count(Obj)) {
         LLVM_DEBUG(dbgs() << "No local MAAP found for obj " << *Obj << "\n");
         if (RD.Racer.isValid())
-          return getMAAPIRValue(IRB, LocalRaceVal);
-        return DefaultMAAP;
+          MV = IRB.CreateOr(MV, getMAAPIRValue(IRB, LocalRaceVal));
+        else
+          MV = IRB.CreateOr(MV, DefaultMAAP);
+        continue;
       }
 
       Value *FlagLoad = readMAAPVal(LocalMAAPs[Obj], IRB);
@@ -2269,7 +2271,8 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
           // then there's nothing to check.
           if (!LocalMAAPs.count(&Arg)) {
             LLVM_DEBUG(dbgs() << "No local MAAP found for arg " << Arg << "\n");
-            return DefaultMAAP;
+            MV = IRB.CreateOr(MV, DefaultMAAP);
+            continue;
           }
 
           // These two objects may alias, based on static analysis.  Check the
@@ -3370,6 +3373,10 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
       const Function *CF = CB->getCalledFunction();
       if (FunctionRaceType.count(CF)) {
         FuncRT = RaceInfo::unionRaceTypes(FuncRT, FunctionRaceType[CF]);
+        // Preserve the local-race marking if the callsite itself is involved in
+        // a local race.
+        if (RaceInfo::isLocalRace(RI.getRaceType(I)))
+          FuncRT = RaceInfo::unionRaceTypes(FuncRT, RaceInfo::Local);
         continue;
       }
     }
