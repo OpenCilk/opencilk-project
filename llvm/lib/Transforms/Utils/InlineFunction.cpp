@@ -1959,14 +1959,23 @@ static void HandleInlinedResumeInTask(BasicBlock *EntryBlock, BasicBlock *Ctx,
   Module *M = Parent->getModule();
   if (isTaskFrameCreate(EntryBlock->front())) {
     Value *TaskFrame = &EntryBlock->front();
-    if (BasicBlock *ResumeDest = getTaskFrameResumeDest(TaskFrame)) {
+    if (InvokeInst *TFResume = getTaskFrameResume(TaskFrame)) {
+      BasicBlock *ResumeDest = TFResume->getUnwindDest();
       // Replace the resume with a taskframe.resume, whose unwind destination
       // matches the unwind destination of the taskframe.
       InvokeInst *NewTFResume = InvokeInst::Create(
           Intrinsic::getDeclaration(M, Intrinsic::taskframe_resume,
-                                    { Resume->getValue()->getType() }),
-          Unreachable, ResumeDest, { TaskFrame, Resume->getValue() });
+                                    {Resume->getValue()->getType()}),
+          Unreachable, ResumeDest, {TaskFrame, Resume->getValue()});
       ReplaceInstWithInst(Resume, NewTFResume);
+
+      // Update PHI nodes in ResumeDest.
+      for (PHINode &PN : ResumeDest->phis())
+        // Add an entry to the PHI node for the new predecessor block,
+        // NewTFResume->getParent(), using the same value as that from
+        // TFResume->getParent().
+        PN.addIncoming(PN.getIncomingValueForBlock(TFResume->getParent()),
+                       NewTFResume->getParent());
 
       // No need to continue up the stack of contexts.
       return;
@@ -1995,9 +2004,16 @@ static void HandleInlinedResumeInTask(BasicBlock *EntryBlock, BasicBlock *Ctx,
       BasicBlock *DetUnwind = DI->getUnwindDest();
       InvokeInst *NewDetRethrow = InvokeInst::Create(
           Intrinsic::getDeclaration(M, Intrinsic::detached_rethrow,
-                                    { Resume->getValue()->getType() }),
-          Unreachable, DetUnwind, { SyncRegion, Resume->getValue() });
+                                    {Resume->getValue()->getType()}),
+          Unreachable, DetUnwind, {SyncRegion, Resume->getValue()});
       ReplaceInstWithInst(Resume, NewDetRethrow);
+
+      // Update PHI nodes in unwind dest.
+      for (PHINode &PN : DetUnwind->phis())
+        // Add an entry to the PHI node for the new predecessor block,
+        // NewDetRethrow->getParent(), using the same value as that from Parent.
+        PN.addIncoming(PN.getIncomingValueForBlock(Parent),
+                       NewDetRethrow->getParent());
 
       // No need to continue up the stack of contexts.
       return;
