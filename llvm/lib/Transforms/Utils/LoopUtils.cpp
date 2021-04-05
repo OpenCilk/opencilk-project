@@ -572,7 +572,7 @@ TransformationMode llvm::hasLoopStripmineTransformation(Loop *L) {
   if (getBooleanLoopAttribute(L, "tapir.loop.stripmine.disable"))
     return TM_Disable;
 
-  if (getBooleanLoopAttribute(L, "tapir.loop.stripmine.enabe"))
+  if (getBooleanLoopAttribute(L, "tapir.loop.stripmine.enable"))
     return TM_ForcedByUser;
 
   return TM_Unspecified;
