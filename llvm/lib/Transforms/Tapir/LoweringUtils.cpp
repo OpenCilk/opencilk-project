@@ -950,6 +950,9 @@ Instruction *llvm::replaceTaskFrameWithCallToOutline(
     if (Instruction *TFResume = getTaskFrameResume(TFCreate))
       TFResumeBB = TFResume->getParent();
 
+  // Update PHI nodes in entry of taskframe.
+  TF->getEntry()->removePredecessor(ToReplace->getParent());
+
   // Add call to new helper function in original function.
   if (!Out.ReplUnwind) {
     // Common case.  Insert a call to the outline immediately before the detach.
