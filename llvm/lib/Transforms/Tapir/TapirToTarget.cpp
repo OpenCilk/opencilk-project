@@ -450,6 +450,8 @@ bool TapirToTargetImpl::run() {
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
   for (Function &F : M) {
+    if (F.empty())
+      continue;
     // TODO: Use per-function Tapir targets?
     if (!Target)
       Target = getTapirTargetFromID(M, GetTLI(F).getTapirTarget());
