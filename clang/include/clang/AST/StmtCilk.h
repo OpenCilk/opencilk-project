@@ -86,12 +86,12 @@ public:
 };
 
 /// CilkForRangeStmt - This represents a '_Cilk_for(range-declarator :
-/// range-expression)' or 'for (init-statement range-declarator :
-/// range-expression)'.) based on a CXXForRangeStmt which is a C++0x
+/// range-expression)' or a '_Cilk_for (init-statement range-declarator :
+/// range-expression)', based on a CXXForRangeStmt which is a C++0x
 /// [stmt.ranged]'s ranged for stmt
 ///
 /// This is stored as a FORRANGE stmt embedded inside a CILKFORRANGE with some
-/// other necessary semantic compenents.
+/// other necessary semantic components.
 class CilkForRangeStmt : public Stmt {
   enum { FORRANGE, LOOPINDEX, LOOPINDEXSTMT, LIMIT, COND, INC, END };
   Stmt *SubExprs[END];
