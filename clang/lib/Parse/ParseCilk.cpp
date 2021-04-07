@@ -60,6 +60,12 @@ StmtResult Parser::ParseCilkSpawnStatement() {
 /// [C++0x] '_Cilk_for'
 ///             '(' for-range-declaration ':' for-range-initializer ')'
 ///             statement
+///
+/// [C++0x] for-range-declaration:
+/// [C++0x]   attribute-specifier-seq[opt] type-specifier-seq declarator
+/// [C++0x] for-range-initializer:
+/// [C++0x]   expression
+/// [C++0x]   braced-init-list
 
 StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   assert(Tok.is(tok::kw__Cilk_for) && "Not a _Cilk_for stmt!");
