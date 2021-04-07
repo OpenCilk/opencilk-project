@@ -318,19 +318,16 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   //   CoawaitLoc = SourceLocation();
   // }
 
-  // // We need to perform most of the semantic analysis for a C++0x for-range
-  // // statememt before parsing the body, in order to be able to deduce the
-  // type
-  // // of an auto-typed loop variable.
+  // We need to perform most of the semantic analysis for a C++0x for-range
+  // statement before parsing the body, in order to be able to deduce the type
+  // of an auto-typed loop variable.
   StmtResult ForRangeStmt;
   // StmtResult ForEachStmt;
 
-  // TODO: Extend _Cilk_for to support these.
   if (ForRangeInfo.ParsedForRangeDecl()) {
     Diag(ForLoc, diag::warn_cilk_for_forrange_loop_experimental);
     ExprResult CorrectedRange =
         Actions.CorrectDelayedTyposInExpr(ForRangeInfo.RangeExpr.get());
-    // TODO(arvid): uncomment this
     ForRangeStmt = Actions.ActOnCilkForRangeStmt(
         getCurScope(), ForLoc, FirstPart.get(), ForRangeInfo.LoopVar.get(),
         ForRangeInfo.ColonLoc, CorrectedRange.get(), T.getCloseLocation(),
