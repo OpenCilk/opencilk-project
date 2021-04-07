@@ -1368,12 +1368,16 @@ public:
                                       RParenLoc, Body, LoopVar);
   }
 
-  // Builds a new Cilk for range statement.
-  // TODO: this feels very hacky
+  /// Build a new Cilk for range statement.
+  ///
+  /// By default, performs semantic analysis to build the new statement.
+  /// Subclasses may override this routine to provide different behavior.
   StmtResult RebuildCilkForRangeStmt(Stmt *ForRange) {
-    // we don't reconstruct the for range into its constituent parts,
-    // but rather let the ForRange handle it for us
-    return getSema().BuildCilkForRangeStmt(cast_or_null<CXXForRangeStmt>(ForRange));
+    // We don't reconstruct the for range from its constituent parts,
+    // but rather let the CXXForRange do the rebuild, and then recompute
+    // all our fields by building it again.
+    return getSema().BuildCilkForRangeStmt(
+        cast_or_null<CXXForRangeStmt>(ForRange));
   }
 
   /// Build a new goto statement.
