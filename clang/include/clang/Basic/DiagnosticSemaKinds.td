@@ -10515,5 +10515,5 @@ def warn_sycl_kernel_num_of_function_params : Warning<
 def warn_sycl_kernel_return_type : Warning<
   "function template with 'sycl_kernel' attribute must have a 'void' return type">,
   InGroup<IgnoredAttributes>;
-  
+
 } // end of sema component.
