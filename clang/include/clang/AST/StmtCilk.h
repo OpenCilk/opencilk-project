@@ -101,7 +101,7 @@ public:
                    VarDecl *LoopIndex, DeclStmt *Limit, Expr *Cond, Expr *Inc,
                    DeclStmt *LoopIndexStmt);
 
-  /// \brief Build an empty for range statement.
+  /// \brief Build an empty cilk for range statement.
   explicit CilkForRangeStmt(EmptyShell Empty)
       : Stmt(CilkForRangeStmtClass, Empty) {}
 
@@ -113,14 +113,14 @@ public:
 
   void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
 
-  DeclStmt *getLoopIndexStmt() {
-    return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
-  }
   VarDecl *getLoopIndex() const;
   void setLoopIndex(const ASTContext &C, VarDecl *V);
 
   Expr *getCond() { return reinterpret_cast<Expr *>(SubExprs[COND]); }
   Expr *getInc() { return reinterpret_cast<Expr *>(SubExprs[INC]); }
+  DeclStmt *getLoopIndexStmt() {
+    return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
+  }
   DeclStmt *getLimitStmt() { return cast_or_null<DeclStmt>(SubExprs[LIMIT]); }
 
   const Expr *getCond() const {

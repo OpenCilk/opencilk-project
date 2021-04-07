@@ -9487,7 +9487,6 @@ def note_cilk_for_loop_control_var_declared_here: Note<
 def warn_empty_cilk_for_body : Warning<
   "Cilk for loop has empty body">, InGroup<EmptyBody>;
 
-
 def note_constant_stride: Note<
   "constant stride is %0">;
 def warn_cilk_for_cond_user_defined_conv: Warning<
