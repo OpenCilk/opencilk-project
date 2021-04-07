@@ -2564,16 +2564,20 @@ void StmtPrinter::VisitCilkForStmt(CilkForStmt *Node) {
 
 void StmtPrinter::VisitCilkForRangeStmt(CilkForRangeStmt *Node) {
   Indent() << "_Cilk_for (";
+
   if (Node->getCXXForRangeStmt()->getInit())
     PrintInitStmt(Node->getCXXForRangeStmt()->getInit(), 5);
+
   PrintingPolicy SubPolicy(Policy);
   SubPolicy.SuppressInitializers = true;
-  Node->getCXXForRangeStmt()->getLoopVariable()->print(OS, SubPolicy, IndentLevel);
+  Node->getCXXForRangeStmt()->getLoopVariable()->print(OS, SubPolicy,
+                                                       IndentLevel);
+
   OS << " : ";
   PrintExpr(Node->getCXXForRangeStmt()->getRangeInit());
   OS << ")";
-  PrintControlledStmt(Node->getCXXForRangeStmt()->getBody());
 
+  PrintControlledStmt(Node->getCXXForRangeStmt()->getBody());
 }
 
 //===----------------------------------------------------------------------===//

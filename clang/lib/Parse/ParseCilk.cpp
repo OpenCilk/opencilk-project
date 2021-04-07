@@ -57,6 +57,10 @@ StmtResult Parser::ParseCilkSpawnStatement() {
 ///       cilk_for-statement:
 ///         '_Cilk_for' '(' expr ';' expr ';' expr ')' statement
 ///         '_Cilk_for' '(' declaration expr ';' expr ';' expr ')' statement
+/// [C++0x] '_Cilk_for'
+///             '(' for-range-declaration ':' for-range-initializer ')'
+///             statement
+
 StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   assert(Tok.is(tok::kw__Cilk_for) && "Not a _Cilk_for stmt!");
   SourceLocation ForLoc = ConsumeToken();  // eat the '_Cilk_for'.
@@ -253,8 +257,8 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
           Diag(FirstPart.get() ? FirstPart.get()->getBeginLoc()
                                : ForRangeInfo.ColonLoc,
                getLangOpts().CPlusPlus2a
-               ? diag::warn_cxx17_compat_for_range_init_stmt
-               : diag::ext_for_range_init_stmt)
+                   ? diag::warn_cxx17_compat_for_range_init_stmt
+                   : diag::ext_for_range_init_stmt)
               << (FirstPart.get() ? FirstPart.get()->getSourceRange()
                                   : SourceRange());
           if (EmptyInitStmtSemiLoc.isValid()) {
@@ -309,25 +313,25 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   // }
 
   // // We need to perform most of the semantic analysis for a C++0x for-range
-  // // statememt before parsing the body, in order to be able to deduce the type
+  // // statememt before parsing the body, in order to be able to deduce the
+  // type
   // // of an auto-typed loop variable.
-   StmtResult ForRangeStmt;
+  StmtResult ForRangeStmt;
   // StmtResult ForEachStmt;
 
   // TODO: Extend _Cilk_for to support these.
   if (ForRangeInfo.ParsedForRangeDecl()) {
     Diag(ForLoc, diag::warn_cilk_for_forrange_loop_experimental);
-     ExprResult CorrectedRange =
-         Actions.CorrectDelayedTyposInExpr(ForRangeInfo.RangeExpr.get());
+    ExprResult CorrectedRange =
+        Actions.CorrectDelayedTyposInExpr(ForRangeInfo.RangeExpr.get());
     // TODO(arvid): uncomment this
-     ForRangeStmt = Actions.ActOnCilkForRangeStmt(
-         getCurScope(), ForLoc, FirstPart.get(),
-         ForRangeInfo.LoopVar.get(), ForRangeInfo.ColonLoc, CorrectedRange.get(),
-         T.getCloseLocation(), Sema::BFRK_Build);
+    ForRangeStmt = Actions.ActOnCilkForRangeStmt(
+        getCurScope(), ForLoc, FirstPart.get(), ForRangeInfo.LoopVar.get(),
+        ForRangeInfo.ColonLoc, CorrectedRange.get(), T.getCloseLocation(),
+        Sema::BFRK_Build);
 
-
-  // Similarly, we need to do the semantic analysis for a for-range
-  // statement immediately in order to close over temporaries correctly.
+    // Similarly, we need to do the semantic analysis for a for-range
+    // statement immediately in order to close over temporaries correctly.
   } else if (ForEach) {
     Diag(ForLoc, diag::err_cilk_for_foreach_loop_not_supported);
     // ForEachStmt = Actions.ActOnObjCForCollectionStmt(ForLoc,
