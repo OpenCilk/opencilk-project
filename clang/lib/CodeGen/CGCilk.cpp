@@ -882,8 +882,8 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   llvm::AllocaInst *OldEHSelectorSlot;
   Address OldNormalCleanupDest = Address::invalid();
 
-  const VarDecl *LoopVar = ForRange.getLoopVariable();
-  RValue LoopVarInitRV;
+//  const VarDecl *LoopVar = ForRange.getLoopVariable();
+//  RValue LoopVarInitRV;
   llvm::BasicBlock *DetachBlock;
   llvm::BasicBlock *ForBodyEntry;
   llvm::BasicBlock *ForBody;
@@ -916,9 +916,9 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
     // Get the value of the loop variable initialization before we emit the
     // detach.
-    if (LoopVar) {
-      LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
-    }
+//    if (LoopVar) {
+//      LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
+//    }
 
     Detach =
         Builder.CreateDetach(ForBodyEntry, Continue.getBlock(), SyncRegion);
@@ -961,15 +961,16 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
   // Inside the detached block, create the loop variable, setting its value to
   // the saved initialization value.
-  if (LoopVar) {
-    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
-    QualType type = LoopVar->getType();
-    Address Loc = LVEmission.getObjectAddress(*this);
-    LValue LV = MakeAddrLValue(Loc, type);
-    LV.setNonGC(true);
-    EmitStoreThroughLValue(LoopVarInitRV, LV, true);
-    EmitAutoVarCleanups(LVEmission);
-  }
+//  if (LoopVar) {
+//    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
+//    QualType type = LoopVar->getType();
+//    Address Loc = LVEmission.getObjectAddress(*this);
+//    LValue LV = MakeAddrLValue(Loc, type);
+//    LV.setNonGC(true);
+//    EmitStoreThroughLValue(LoopVarInitRV, LV, true);
+//    EmitAutoVarCleanups(LVEmission);
+//  }
+//  EmitStmt(S.getLoopVarStmt());
 
   Builder.CreateBr(ForBody);
 
@@ -985,6 +986,7 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
     SyncedScopeRAII SyncedScp(*this);
     if (isa<CompoundStmt>(ForRange.getBody()))
       ScopeIsSynced = true;
+    EmitStmt(ForRange.getLoopVarStmt());
     EmitStmt(ForRange.getBody());
 
     if (HaveInsertPoint())
