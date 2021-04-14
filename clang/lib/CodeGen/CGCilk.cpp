@@ -986,9 +986,9 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
     // body is a compound statement or not.
     LexicalScope BodyScope(*this, ForRange.getSourceRange());
 
-//    SyncedScopeRAII SyncedScp(*this);
+    SyncedScopeRAII SyncedScp(*this);
 //    if (isa<CompoundStmt>(ForRange.getBody()))
-//      ScopeIsSynced = true;
+      ScopeIsSynced = true;
     EmitStmt(ForRange.getLoopVarStmt());
     EmitStmt(ForRange.getBody());
 
