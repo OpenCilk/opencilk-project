@@ -970,7 +970,7 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 //    EmitStoreThroughLValue(LoopVarInitRV, LV, true);
 //    EmitAutoVarCleanups(LVEmission);
 //  }
-//  EmitStmt(S.getLoopVarStmt());
+  EmitStmt(ForRange.getLoopVarStmt());
 
   Builder.CreateBr(ForBody);
 
@@ -984,12 +984,12 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
     // NO! Instead, always create a new lexical scope because we want to emit
     // the loop var stmt and then the body, so it doesn't matter if the
     // body is a compound statement or not.
-    LexicalScope BodyScope(*this, ForRange.getSourceRange());
+    RunCleanupsScope BodyScope(*this);
 
     SyncedScopeRAII SyncedScp(*this);
-//    if (isa<CompoundStmt>(ForRange.getBody()))
+    if (isa<CompoundStmt>(ForRange.getBody()))
       ScopeIsSynced = true;
-    EmitStmt(ForRange.getLoopVarStmt());
+//    EmitStmt(ForRange.getLoopVarStmt());
     EmitStmt(ForRange.getBody());
 
     if (HaveInsertPoint())
