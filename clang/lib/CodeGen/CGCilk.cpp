@@ -981,11 +981,14 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   {
     // Create a separate cleanup scope for the body, in case it is not
     // a compound statement.
-    RunCleanupsScope BodyScope(*this);
+    // NO! Instead, always create a new lexical scope because we want to emit
+    // the loop var stmt and then the body, so it doesn't matter if the
+    // body is a compound statement or not.
+    LexicalScope BodyScope(*this, ForRange.getSourceRange());
 
-    SyncedScopeRAII SyncedScp(*this);
-    if (isa<CompoundStmt>(ForRange.getBody()))
-      ScopeIsSynced = true;
+//    SyncedScopeRAII SyncedScp(*this);
+//    if (isa<CompoundStmt>(ForRange.getBody()))
+//      ScopeIsSynced = true;
     EmitStmt(ForRange.getLoopVarStmt());
     EmitStmt(ForRange.getBody());
 
