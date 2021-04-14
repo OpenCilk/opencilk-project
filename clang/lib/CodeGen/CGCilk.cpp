@@ -970,6 +970,8 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 //    EmitStoreThroughLValue(LoopVarInitRV, LV, true);
 //    EmitAutoVarCleanups(LVEmission);
 //  }
+  // TODO: create a cleanup scope here?
+  // TODO: performance problems when emitting everything here?
   EmitStmt(ForRange.getLoopVarStmt());
 
   Builder.CreateBr(ForBody);
@@ -981,14 +983,12 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   {
     // Create a separate cleanup scope for the body, in case it is not
     // a compound statement.
-    // NO! Instead, always create a new lexical scope because we want to emit
-    // the loop var stmt and then the body, so it doesn't matter if the
-    // body is a compound statement or not.
     RunCleanupsScope BodyScope(*this);
 
     SyncedScopeRAII SyncedScp(*this);
     if (isa<CompoundStmt>(ForRange.getBody()))
       ScopeIsSynced = true;
+    // TODO: why does the cleanup crash if we emit the loop var stmt here?
 //    EmitStmt(ForRange.getLoopVarStmt());
     EmitStmt(ForRange.getBody());
 
