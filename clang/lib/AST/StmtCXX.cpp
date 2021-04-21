@@ -163,6 +163,16 @@ void CilkForRangeStmt::setLoopIndex(const ASTContext &C, VarDecl *V) {
       new (C) DeclStmt(DeclGroupRef(V), VarRange.getBegin(), VarRange.getEnd());
 }
 
+VarDecl *CilkForRangeStmt::getLocalLoopIndex() {
+  Decl *LV = cast<DeclStmt>(getLocalLoopIndexStmt())->getSingleDecl();
+  assert(LV && "No local loop index in CilkForRangeStmt");
+  return cast<VarDecl>(LV);
+}
+
+const VarDecl *CilkForRangeStmt::getLocalLoopIndex() const {
+  return const_cast<CilkForRangeStmt *>(this)->getLocalLoopIndex();
+}
+
 /// returns the FORRANGE stmt embedded in the CilkForRange. (May be null.)
 CXXForRangeStmt *CilkForRangeStmt::getCXXForRangeStmt() const {
   return cast_or_null<CXXForRangeStmt>(SubExprs[FORRANGE]);

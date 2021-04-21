@@ -3517,6 +3517,7 @@ StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
   ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
                                          VK_LValue, CXXForRange->getColonLoc());
 
+//  VarDecl *LoopIndex = CilkForRange->getLocalLoopIndex();
   VarDecl *LoopIndex = CilkForRange->getLoopIndex();
   QualType LoopIndexType = LoopIndex->getType();
   const QualType LoopIndexRefNonRefType = LoopIndexType.getNonReferenceType();
@@ -3612,6 +3613,7 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (LoopIndexStmt.isInvalid())
     return StmtError();
 
+
   ExprResult LimitRef =
       BuildDeclRefExpr(Limit, Limit->getType(), VK_LValue, RangeLoc);
   ExprResult LoopIndexRef =
@@ -3620,6 +3622,20 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   Cond = ActOnBinOp(S, RangeLoc, tok::exclaimequal, LoopIndexRef.get(),
                     LimitRef.get());
   if (Cond.isInvalid())
+    return StmtError();
+
+  VarDecl *LocalLoopIndex =
+      BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(),
+                           std::string("__local_loopindex"));
+  AddInitializerToDecl(LocalLoopIndex, LoopIndexRef.get(),
+      /*DirectInit=*/false);
+  FinalizeDeclaration(LocalLoopIndex);
+  CurContext->addHiddenDecl(LocalLoopIndex);
+
+  DeclGroupPtrTy LocalLoopIndexGroup =
+      BuildDeclaratorGroup(MutableArrayRef<Decl *>((Decl **)&LocalLoopIndex, 1));
+  StmtResult LocalLoopIndexStmt = ActOnDeclStmt(LocalLoopIndexGroup, RangeLoc, RangeLoc);
+  if (LocalLoopIndexStmt.isInvalid())
     return StmtError();
 
   // Create a new increment operation on the new beginning variable, and add it
@@ -3631,7 +3647,7 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
     return StmtError();
 
   return new (Context) CilkForRangeStmt(
-      Context, ForRange, LoopIndex, cast<DeclStmt>(LimitStmt.get()), Cond.get(),
+      Context, ForRange, LoopIndex, cast<DeclStmt>(LocalLoopIndexStmt.get()), cast<DeclStmt>(LimitStmt.get()), Cond.get(),
       NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
 }
 

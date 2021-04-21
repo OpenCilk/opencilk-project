@@ -93,12 +93,12 @@ public:
 /// This is stored as a FORRANGE stmt embedded inside a CILKFORRANGE with some
 /// other necessary semantic components.
 class CilkForRangeStmt : public Stmt {
-  enum { FORRANGE, LOOPINDEX, LOOPINDEXSTMT, LIMIT, COND, INC, END };
+  enum { FORRANGE, LOOPINDEX, LOOPINDEXSTMT, LOCALLOOPINDEX, LIMIT, COND, INC, END };
   Stmt *SubExprs[END];
 
 public:
   CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange,
-                   VarDecl *LoopIndex, DeclStmt *Limit, Expr *Cond, Expr *Inc,
+                   VarDecl *LoopIndex, DeclStmt *LocalLoopIndex, DeclStmt *Limit, Expr *Cond, Expr *Inc,
                    DeclStmt *LoopIndexStmt);
 
   /// \brief Build an empty cilk for range statement.
@@ -122,6 +122,7 @@ public:
     return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
   }
   DeclStmt *getLimitStmt() { return cast_or_null<DeclStmt>(SubExprs[LIMIT]); }
+  DeclStmt *getLocalLoopIndexStmt() { return cast<DeclStmt>(SubExprs[LOCALLOOPINDEX]); }
 
   const Expr *getCond() const {
     return reinterpret_cast<Expr *>(SubExprs[COND]);
@@ -133,6 +134,7 @@ public:
   const DeclStmt *getLimitStmt() const {
     return cast_or_null<DeclStmt>(SubExprs[LIMIT]);
   }
+  const DeclStmt *getLocalLoopIndexStmt() const { return cast<DeclStmt>(SubExprs[LOCALLOOPINDEX]); }
 
   SourceLocation getBeginLoc() const LLVM_READONLY;
   SourceLocation getEndLoc() const LLVM_READONLY;
