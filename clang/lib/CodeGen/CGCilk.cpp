@@ -914,8 +914,11 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
     EmitBlockAfterUses(DetachBlock);
 
-    // Get the value of the loop variable initialization before we emit the
-    // detach.
+    // Get the value of the loop index before we emit the detach.
+    // This avoids a race condition on cilk_loopindex with -O0.
+    // Note that the ordinary cilk_for code emits the value of the loop var;
+    // that does not work for us, since our loop var may be any complicated
+    // type, and emitting to temp RV only works for simple types.
     if (LocalLoopIndex) {
       LocalLoopIndexInitRV = EmitAnyExprToTemp(LocalLoopIndex->getInit());
     }
@@ -959,8 +962,8 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   JumpDest Preattach = getJumpDestInCurrentScope("pfor.preattach");
   BreakContinueStack.push_back(BreakContinue(Preattach, Preattach));
 
-  // Inside the detached block, create the loop variable, setting its value to
-  // the saved initialization value.
+  // Inside the detached block, create the loop index, setting its value to
+  // the saved initialization value. This avoids a race condition.
   if (LocalLoopIndex) {
     AutoVarEmission LVEmission = EmitAutoVarAlloca(*LocalLoopIndex);
     QualType type = LocalLoopIndex->getType();
@@ -970,6 +973,7 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
     EmitStoreThroughLValue(LocalLoopIndexInitRV, LV, true);
     EmitAutoVarCleanups(LVEmission);
   }
+  // Emit the loop var stmt, which will use the local loop index emitted above.
   EmitStmt(ForRange.getLoopVarStmt());
 
   Builder.CreateBr(ForBody);
