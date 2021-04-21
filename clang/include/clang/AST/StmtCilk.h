@@ -116,6 +116,9 @@ public:
   VarDecl *getLoopIndex() const;
   void setLoopIndex(const ASTContext &C, VarDecl *V);
 
+  VarDecl *getLocalLoopIndex();
+  const VarDecl *getLocalLoopIndex() const;
+
   Expr *getCond() { return reinterpret_cast<Expr *>(SubExprs[COND]); }
   Expr *getInc() { return reinterpret_cast<Expr *>(SubExprs[INC]); }
   DeclStmt *getLoopIndexStmt() {

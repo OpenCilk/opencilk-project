@@ -130,12 +130,13 @@ CoroutineBodyStmt::CoroutineBodyStmt(CoroutineBodyStmt::CtorArgs const &Args)
 /// Constructor for the CilkForRangeStmt
 CilkForRangeStmt::CilkForRangeStmt(const ASTContext &C,
                                    CXXForRangeStmt *ForRange,
-                                   VarDecl *LoopIndex, DeclStmt *Limit,
+                                   VarDecl *LoopIndex, DeclStmt *LocalLoopIndex, DeclStmt *Limit,
                                    Expr *Cond, Expr *Inc,
                                    DeclStmt *LoopIndexStmt)
     : Stmt(CilkForRangeStmtClass) {
   SubExprs[FORRANGE] = ForRange;
   setLoopIndex(C, LoopIndex);
+  SubExprs[LOCALLOOPINDEX] = LocalLoopIndex;
   SubExprs[COND] = Cond;
   SubExprs[INC] = Inc;
   SubExprs[LOOPINDEXSTMT] = LoopIndexStmt;
