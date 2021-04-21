@@ -3517,7 +3517,7 @@ StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
   ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
                                          VK_LValue, CXXForRange->getColonLoc());
 
-  VarDecl *LoopIndex = CilkForRange->getLoopIndex();
+  VarDecl *LoopIndex = CilkForRange->getLocalLoopIndex();
   QualType LoopIndexType = LoopIndex->getType();
   const QualType LoopIndexRefNonRefType = LoopIndexType.getNonReferenceType();
   ExprResult LoopIndexRef = BuildDeclRefExpr(
@@ -3622,6 +3622,21 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (Cond.isInvalid())
     return StmtError();
 
+  VarDecl *LocalLoopIndex =
+      BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(),
+                           std::string("__local_loopindex"));
+  AddInitializerToDecl(LocalLoopIndex, LoopIndexRef.get(),
+                       /*DirectInit=*/false);
+  FinalizeDeclaration(LocalLoopIndex);
+  CurContext->addHiddenDecl(LocalLoopIndex);
+
+  DeclGroupPtrTy LocalLoopIndexGroup = BuildDeclaratorGroup(
+      MutableArrayRef<Decl *>((Decl **)&LocalLoopIndex, 1));
+  StmtResult LocalLoopIndexStmt =
+      ActOnDeclStmt(LocalLoopIndexGroup, RangeLoc, RangeLoc);
+  if (LocalLoopIndexStmt.isInvalid())
+    return StmtError();
+
   // Create a new increment operation on the new beginning variable, and add it
   // to the existing increment operation.
   SourceLocation IncLoc = RangeLoc;
@@ -3631,8 +3646,9 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
     return StmtError();
 
   return new (Context) CilkForRangeStmt(
-      Context, ForRange, LoopIndex, cast<DeclStmt>(LimitStmt.get()), Cond.get(),
-      NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
+      Context, ForRange, LoopIndex, cast<DeclStmt>(LocalLoopIndexStmt.get()),
+      cast<DeclStmt>(LimitStmt.get()), Cond.get(), NewInc.get(),
+      cast<DeclStmt>(LoopIndexStmt.get()));
 }
 
 StmtResult
