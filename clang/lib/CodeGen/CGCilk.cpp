@@ -882,8 +882,8 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   llvm::AllocaInst *OldEHSelectorSlot;
   Address OldNormalCleanupDest = Address::invalid();
 
-//  const VarDecl *LoopVar = ForRange.getLoopVariable();
-//  RValue LoopVarInitRV;
+  const VarDecl *LocalLoopIndex = S.getLocalLoopIndex();
+  RValue LocalLoopIndexInitRV;
   llvm::BasicBlock *DetachBlock;
   llvm::BasicBlock *ForBodyEntry;
   llvm::BasicBlock *ForBody;
@@ -916,9 +916,9 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
     // Get the value of the loop variable initialization before we emit the
     // detach.
-//    if (LoopVar) {
-//      LoopVarInitRV = EmitAnyExprToTemp(LoopVar->getInit());
-//    }
+    if (LocalLoopIndex) {
+      LocalLoopIndexInitRV = EmitAnyExprToTemp(LocalLoopIndex->getInit());
+    }
 
     Detach =
         Builder.CreateDetach(ForBodyEntry, Continue.getBlock(), SyncRegion);
@@ -961,17 +961,15 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
 
   // Inside the detached block, create the loop variable, setting its value to
   // the saved initialization value.
-//  if (LoopVar) {
-//    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
-//    QualType type = LoopVar->getType();
-//    Address Loc = LVEmission.getObjectAddress(*this);
-//    LValue LV = MakeAddrLValue(Loc, type);
-//    LV.setNonGC(true);
-//    EmitStoreThroughLValue(LoopVarInitRV, LV, true);
-//    EmitAutoVarCleanups(LVEmission);
-//  }
-  // TODO: create a cleanup scope here?
-  // TODO: performance problems when emitting everything here?
+  if (LocalLoopIndex) {
+    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LocalLoopIndex);
+    QualType type = LocalLoopIndex->getType();
+    Address Loc = LVEmission.getObjectAddress(*this);
+    LValue LV = MakeAddrLValue(Loc, type);
+    LV.setNonGC(true);
+    EmitStoreThroughLValue(LocalLoopIndexInitRV, LV, true);
+    EmitAutoVarCleanups(LVEmission);
+  }
   EmitStmt(ForRange.getLoopVarStmt());
 
   Builder.CreateBr(ForBody);
