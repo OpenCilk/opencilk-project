@@ -986,8 +986,6 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
     SyncedScopeRAII SyncedScp(*this);
     if (isa<CompoundStmt>(ForRange.getBody()))
       ScopeIsSynced = true;
-    // TODO: why does the cleanup crash if we emit the loop var stmt here?
-//    EmitStmt(ForRange.getLoopVarStmt());
     EmitStmt(ForRange.getBody());
 
     if (HaveInsertPoint())

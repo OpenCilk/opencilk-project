@@ -3518,7 +3518,6 @@ StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
                                          VK_LValue, CXXForRange->getColonLoc());
 
   VarDecl *LoopIndex = CilkForRange->getLocalLoopIndex();
-//  VarDecl *LoopIndex = CilkForRange->getLoopIndex();
   QualType LoopIndexType = LoopIndex->getType();
   const QualType LoopIndexRefNonRefType = LoopIndexType.getNonReferenceType();
   ExprResult LoopIndexRef = BuildDeclRefExpr(
@@ -3613,7 +3612,6 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   if (LoopIndexStmt.isInvalid())
     return StmtError();
 
-
   ExprResult LimitRef =
       BuildDeclRefExpr(Limit, Limit->getType(), VK_LValue, RangeLoc);
   ExprResult LoopIndexRef =
@@ -3628,13 +3626,14 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
       BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(),
                            std::string("__local_loopindex"));
   AddInitializerToDecl(LocalLoopIndex, LoopIndexRef.get(),
-      /*DirectInit=*/false);
+                       /*DirectInit=*/false);
   FinalizeDeclaration(LocalLoopIndex);
   CurContext->addHiddenDecl(LocalLoopIndex);
 
-  DeclGroupPtrTy LocalLoopIndexGroup =
-      BuildDeclaratorGroup(MutableArrayRef<Decl *>((Decl **)&LocalLoopIndex, 1));
-  StmtResult LocalLoopIndexStmt = ActOnDeclStmt(LocalLoopIndexGroup, RangeLoc, RangeLoc);
+  DeclGroupPtrTy LocalLoopIndexGroup = BuildDeclaratorGroup(
+      MutableArrayRef<Decl *>((Decl **)&LocalLoopIndex, 1));
+  StmtResult LocalLoopIndexStmt =
+      ActOnDeclStmt(LocalLoopIndexGroup, RangeLoc, RangeLoc);
   if (LocalLoopIndexStmt.isInvalid())
     return StmtError();
 
@@ -3647,8 +3646,9 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
     return StmtError();
 
   return new (Context) CilkForRangeStmt(
-      Context, ForRange, LoopIndex, cast<DeclStmt>(LocalLoopIndexStmt.get()), cast<DeclStmt>(LimitStmt.get()), Cond.get(),
-      NewInc.get(), cast<DeclStmt>(LoopIndexStmt.get()));
+      Context, ForRange, LoopIndex, cast<DeclStmt>(LocalLoopIndexStmt.get()),
+      cast<DeclStmt>(LimitStmt.get()), Cond.get(), NewInc.get(),
+      cast<DeclStmt>(LoopIndexStmt.get()));
 }
 
 StmtResult
