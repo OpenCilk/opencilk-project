@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -std=c++1z -fcilkplus -fsyntax-only -verify %s
+// RUN: %clang_cc1 -std=c++1z -fopencilk -fsyntax-only -verify %s
 
 class Bar {
   int val[4] = {0,0,0,0};

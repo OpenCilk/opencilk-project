@@ -151,13 +151,10 @@ void CodeMetrics::analyzeBasicBlock(
         if (IsLoweredToCall)
           ++NumCalls;
 
-        // Check for a call to a builtin function.
+        // Check for a call to a builtin function or a Tapir-target library
+        // function.
         LibFunc LF;
-        if (TLI && TLI->getLibFunc(*F, LF))
-          ++NumBuiltinCalls;
-
-        // Check for a call to a Tapir-target library function.
-        if (TLI && TLI->isTapirTargetLibFunc(*F))
+        if (TLI && (TLI->getLibFunc(*F, LF) || TLI->isTapirTargetLibFunc(*F)))
           ++NumBuiltinCalls;
 
       } else {

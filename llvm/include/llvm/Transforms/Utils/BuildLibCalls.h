@@ -69,6 +69,13 @@ namespace llvm {
   bool isLibFuncEmittable(const Module *M, const TargetLibraryInfo *TLI,
                           StringRef Name);
 
+  /// Analyze the name the given function and set any applicable attributes.  If
+  /// the library function is unavailable, this doesn't modify it.
+  ///
+  /// Returns true if any attributes were set and false otherwise.
+  bool inferTapirTargetLibFuncAttributes(Function &F,
+                                         const TargetLibraryInfo &TLI);
+
   /// Check whether the overloaded floating point function
   /// corresponding to \a Ty is available.
   bool hasFloatFn(const Module *M, const TargetLibraryInfo *TLI, Type *Ty,

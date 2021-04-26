@@ -268,20 +268,24 @@ StructType *createSharedsTy(Function *F) {
 }
 
 Type *getOrCreateIdentTy(Module &M) {
-  if (M.getTypeByName("ident_t") == nullptr) {
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto *Int8PtrTy = Type::getInt8PtrTy(M.getContext());
+  LLVMContext &Ctx = M.getContext();
+  if (StructType::getTypeByName(Ctx, "ident_t") == nullptr) {
+    auto *Int32Ty = Type::getInt32Ty(Ctx);
+    auto *Int8PtrTy = Type::getInt8PtrTy(Ctx);
     IdentTy = StructType::create(ArrayRef<llvm::Type*>({Int32Ty /* reserved_1 */,
                                  Int32Ty /* flags */, Int32Ty /* reserved_2 */,
                                  Int32Ty /* reserved_3 */,
                                  Int8PtrTy /* psource */}), "ident_t");
-  } else if ((IdentTy = dyn_cast<StructType>(M.getTypeByName("ident_t")))->isOpaque()) {
-      auto *Int32Ty = Type::getInt32Ty(M.getContext());
-      auto *Int8PtrTy = Type::getInt8PtrTy(M.getContext());
-      IdentTy->setBody(ArrayRef<llvm::Type*>({Int32Ty /* reserved_1 */,
-                                   Int32Ty /* flags */, Int32Ty /* reserved_2 */,
-                                   Int32Ty /* reserved_3 */,
-                                   Int8PtrTy /* psource */}), false);
+
+  } else if ((IdentTy = StructType::getTypeByName(Ctx, "ident_t"))
+                 ->isOpaque()) {
+    auto *Int32Ty = Type::getInt32Ty(Ctx);
+    auto *Int8PtrTy = Type::getInt8PtrTy(Ctx);
+    IdentTy->setBody(ArrayRef<llvm::Type *>(
+                         {Int32Ty /* reserved_1 */, Int32Ty /* flags */,
+                          Int32Ty /* reserved_2 */, Int32Ty /* reserved_3 */,
+                          Int8PtrTy /* psource */}),
+                     false);
   }
   return IdentTy;
 }

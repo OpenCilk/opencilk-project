@@ -160,8 +160,7 @@ bool DRFScopedNoAliasImpl::populateTaskScopeNoAliasInBlock(
     bool UsesObjectOutsideTask = false;
     for (const Value *V : PtrArgs) {
       SmallVector<const Value *, 4> Objects;
-      const DataLayout &DL = F.getParent()->getDataLayout();
-      GetUnderlyingObjects(const_cast<Value*>(V), Objects, DL, LI);
+      getUnderlyingObjects(const_cast<Value*>(V), Objects, LI);
 
       for (const Value *O : Objects) {
         LLVM_DEBUG(dbgs() << "Checking object " << *O << "\n");

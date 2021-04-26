@@ -240,11 +240,15 @@
 ; CHECK-O23SZ-NEXT: Running pass: LoopStripMinePass
 ; CHECK-O23SZ-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-O23SZ-NEXT: Running pass: LoopSimplifyPass
+; CHECK-O23SZ-NEXT: Running pass: LCSSAPass
+; CHECK-O23SZ-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-O23SZ-NEXT: Running pass: IndVarSimplifyPass
 ; CHECK-O23SZ-NEXT: Running pass: LICMPass
 ; CHECK-O23SZ-NEXT: Running pass: EarlyCSEPass
 ; CHECK-O23SZ-NEXT: Running pass: JumpThreadingPass
+; CHECK-O23SZ-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-O23SZ-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-O23SZ-NEXT: Invalidating analysis: LazyValueAnalysis
 ; CHECK-O23SZ-NEXT: Running pass: InstCombinePass
 ; CHECK-EP-VECTORIZER-START-NEXT: Running pass: NoOpFunctionPass
 ; CHECK-EXT: Running pass: {{.*}}::Bye on foo
@@ -261,7 +265,6 @@
 ; CHECK-O-NEXT: Running analysis: BranchProbabilityAnalysis
 ; CHECK-O-NEXT: Running pass: LoopLoadEliminationPass
 ; CHECK-O-NEXT: Running pass: InstCombinePass
-; CHECK-O-NEXT: Running pass: TaskSimplifyPass
 ; CHECK-O-NEXT: Running pass: SimplifyCFGPass
 ; CHECK-O-NEXT: Running pass: EarlyCSEPass
 ; CHECK-O2-NEXT: Running pass: SLPVectorizerPass

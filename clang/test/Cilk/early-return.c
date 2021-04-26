@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %s -triple x86_64-unknown-linux-gnu -fcilkplus -verify -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -triple x86_64-unknown-linux-gnu -fopencilk -verify -ftapir=none -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 
 void bar();

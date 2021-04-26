@@ -91,6 +91,7 @@
 ; CHECK-NEXT:       AArch64 Stack Tagging
 ; CHECK-NEXT:       Complex Deinterleaving Pass
 ; CHECK-NEXT:       Function Alias Analysis Results
+; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Memory SSA
 ; CHECK-NEXT:       Interleaved Load Combine Pass
 ; CHECK-NEXT:       Dominator Tree Construction

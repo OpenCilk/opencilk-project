@@ -369,12 +369,12 @@ uint64_t SizeTable::add(const BasicBlock &BB, TargetTransformInfo *TTI) {
   int32_t IRCost = 0;
   for (const Instruction &I : BB) {
     if (TTI) {
-      int ICost =
+      InstructionCost ICost =
           TTI->getInstructionCost(&I, TargetTransformInfo::TCK_Latency);
-      if (-1 == ICost)
+      if (!ICost.isValid())
         IRCost += static_cast<int>(TargetTransformInfo::TCC_Basic);
       else
-        IRCost += ICost;
+        IRCost += *(ICost.getValue());
     } else {
       if (isa<PHINode>(I))
         continue;
@@ -2144,9 +2144,9 @@ void llvm::CSIImpl::loadConfiguration() {
 }
 
 Value *CSIImpl::lookupUnderlyingObject(Value *Addr) const {
-  return GetUnderlyingObject(Addr, DL, 0);
+  return getUnderlyingObject(Addr, 0);
   // if (!UnderlyingObject.count(Addr))
-  //   UnderlyingObject[Addr] = GetUnderlyingObject(Addr, DL, 0);
+  //   UnderlyingObject[Addr] = getUnderlyingObject(Addr, 0);
 
   // return UnderlyingObject[Addr];
 }

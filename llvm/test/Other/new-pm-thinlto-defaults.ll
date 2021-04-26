@@ -207,7 +207,8 @@
 ; CHECK-POSTLINK-O-NEXT: Running pass: LowerConstantIntrinsicsPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopStripMinePass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: TaskSimplifyPass on foo
-; CHECK-POSTLINK-O2-NEXT: Running pass: FunctionToLoopPassAdaptor<{{.*}}LoopStandardAnalysisResults{{.*}}>
+; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyPass on foo
+; CHECK-POSTLINK-O2-NEXT: Running pass: LCSSAPass on foo
 ; CHECK-POSTLINK-O2-NEXT: Starting Loop pass manager run.
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: IndVarSimplifyPass
@@ -215,11 +216,14 @@
 ; CHECK-POSTLINK-O2-NEXT: Finished Loop pass manager run.
 ; CHECK-POSTLINK-O2-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: JumpThreadingPass
+; CHECK-POSTLINK-O2-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-POSTLINK-O2-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-POSTLINK-O2-NEXT: Invalidating analysis: LazyValueAnalysis
 ; CHECK-POSTLINK-O2-NEXT: Running pass: InstCombinePass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopStripMinePass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: TaskSimplifyPass on foo
-; CHECK-POSTLINK-O3-NEXT: Running pass: FunctionToLoopPassAdaptor<{{.*}}LoopStandardAnalysisResults{{.*}}>
+; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyPass on foo
+; CHECK-POSTLINK-O3-NEXT: Running pass: LCSSAPass on foo
 ; CHECK-POSTLINK-O3-NEXT: Starting Loop pass manager run.
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: IndVarSimplifyPass
@@ -227,7 +231,9 @@
 ; CHECK-POSTLINK-O3-NEXT: Finished Loop pass manager run.
 ; CHECK-POSTLINK-O3-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: JumpThreadingPass
+; CHECK-POSTLINK-O3-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-POSTLINK-O3-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-POSTLINK-O3-NEXT: Invalidating analysis: LazyValueAnalysis
 ; CHECK-POSTLINK-O3-NEXT: Running pass: InstCombinePass
 ; CHECK-EXT: Running pass: {{.*}}::Bye
 ; CHECK-POSTLINK-O-NEXT: Running pass: LoopSimplifyPass
@@ -242,7 +248,6 @@
 ; CHECK-POSTLINK-O-NEXT: Running analysis: BranchProbabilityAnalysis
 ; CHECK-POSTLINK-O-NEXT: Running pass: LoopLoadEliminationPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: InstCombinePass
-; CHECK-POSTLINK-O-NEXT: Running pass: TaskSimplifyPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: SimplifyCFGPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: SLPVectorizerPass

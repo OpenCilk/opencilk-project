@@ -934,8 +934,9 @@ PreservedAnalyses MustExecutePrinterPass::run(Function &F,
                                               FunctionAnalysisManager &AM) {
   auto &LI = AM.getResult<LoopAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
+  auto &TI = AM.getResult<TaskAnalysis>(F);
 
-  MustExecuteAnnotatedWriter Writer(F, DT, LI);
+  MustExecuteAnnotatedWriter Writer(F, DT, LI, TI);
   F.print(OS, &Writer);
   return PreservedAnalyses::all();
 }

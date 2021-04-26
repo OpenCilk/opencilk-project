@@ -105,12 +105,12 @@ public:
               Stmt *Body, SourceLocation CFL, SourceLocation LP,
               SourceLocation RP);
 
-  /// \brief Build an empty for statement.
+  /// Build an empty _Cilk_for statement.
   explicit CilkForStmt(EmptyShell Empty) : Stmt(CilkForStmtClass, Empty) { }
 
   Stmt *getInit() { return SubExprs[INIT]; }
 
-  // /// \brief Retrieve the variable declared in this "for" statement, if any.
+  // /// Retrieve the variable declared in this "for" statement, if any.
   // ///
   // /// In the following example, "y" is the condition variable.
   // /// \code

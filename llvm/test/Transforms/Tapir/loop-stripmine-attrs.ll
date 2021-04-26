@@ -122,7 +122,7 @@ attributes #1 = { argmemonly nounwind willreturn }
 
 ; CHECK: [[STRPM_LOOPID1]] = distinct !{[[STRPM_LOOPID1]], [[NOVEC:![0-9]+]], [[FROM_TAPIR:![0-9]+]]}
 ; CHECK: [[NOVEC]] = !{!"llvm.loop.vectorize.width", i32 1}
-; CHECK: [[FROM_TAPIR]] = !{!"llvm.loop.from.tapir.loop"}
+; CHECK: [[FROM_TAPIR]] = !{!"llvm.loop.fromtapirloop"}
 
 ; CHECK: [[STRPM_OUTER_LOOPID1]] = distinct !{[[STRPM_OUTER_LOOPID1]], [[SPAWN_STRATEGY:![0-9]+]], [[NOVEC]], [[GRAINSIZE:![0-9]+]]}
 ; CHECK: [[SPAWN_STRATEGY]] = !{!"tapir.loop.spawn.strategy", i32 1}

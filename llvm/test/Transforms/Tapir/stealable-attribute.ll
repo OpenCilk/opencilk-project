@@ -19,7 +19,7 @@
 $_ZN9gTreeNodeI8_point3dIdE7_vect3dIdE6vertexIS1_Li1EE5nDataIS5_EE13sortBlocksBigEPPS5_iiidS1_Pi = comdat any
 
 ; Function Attrs: nounwind uwtable
-define linkonce_odr void @_ZN9gTreeNodeI8_point3dIdE7_vect3dIdE6vertexIS1_Li1EE5nDataIS5_EE13sortBlocksBigEPPS5_iiidS1_Pi(%struct.vertex.29** %S, i32 %count, i32 %quadrants, i32 %logdivs, double %size, %class._point3d* byval align 8 %center, i32* %offsets) local_unnamed_addr #6 comdat align 2 {
+define linkonce_odr void @_ZN9gTreeNodeI8_point3dIdE7_vect3dIdE6vertexIS1_Li1EE5nDataIS5_EE13sortBlocksBigEPPS5_iiidS1_Pi(%struct.vertex.29** %S, i32 %count, i32 %quadrants, i32 %logdivs, double %size, %class._point3d* byval(%class._point3d) align 8 %center, i32* %offsets) local_unnamed_addr #6 comdat align 2 {
 entry:
   %syncreg = tail call token @llvm.syncregion.start()
   %syncreg18 = tail call token @llvm.syncregion.start()

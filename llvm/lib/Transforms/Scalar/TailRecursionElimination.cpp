@@ -875,9 +875,29 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
   } else if (SyncInst *SI = dyn_cast<SyncInst>(TI)) {
 
     BasicBlock *Succ = SI->getSuccessor(0);
+    // If the successor is terminated by a sync.unwind (which will necessarily
+    // be an invoke), skip TRE.
+    if (isSyncUnwind(Succ->getTerminator()))
+      return false;
+
+    // Try to find a return instruction in the block following a sync.
     ReturnInst *Ret =
         dyn_cast<ReturnInst>(Succ->getFirstNonPHIOrDbgOrSyncUnwind(true));
 
+    // After the sync, there might be a block with a sync.unwind instruction and
+    // an unconditional branch to a block containing just a return.  Check for
+    // this structure.
+    BasicBlock *BrSucc = nullptr;
+    if (!Ret) {
+      if (BranchInst *BI = dyn_cast<BranchInst>(
+              Succ->getFirstNonPHIOrDbgOrSyncUnwind(true))) {
+        if (BI->isConditional())
+          return false;
+
+        BrSucc = BI->getSuccessor(0);
+        Ret = dyn_cast<ReturnInst>(BrSucc->getFirstNonPHIOrDbg(true));
+      }
+    }
     if (!Ret)
       return false;
 
@@ -898,7 +918,7 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
 
     // Get the sync region for this sync.
     Value *SyncRegion = SI->getSyncRegion();
-    BasicBlock *OldEntryBlock = BB.getParent()->getEntryBlock();
+    BasicBlock *OldEntryBlock = &BB.getParent()->getEntryBlock();
 
     // Check that the sync region begins in the entry block of the function.
     if (cast<Instruction>(SyncRegion)->getParent() != OldEntryBlock) {
@@ -911,6 +931,15 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
     SmallVector<BasicBlock *, 8> ReturnBlocksToSync;
     getReturnBlocksToSync(OldEntryBlock, SI, ReturnBlocksToSync);
 
+    // If we found a sync.unwind and unconditional branch between the sync and
+    // return, first fold the return into this unconditional branch.
+    if (BrSucc) {
+      LLVM_DEBUG(dbgs() << "FOLDING: " << *BrSucc
+                        << "INTO UNCOND BRANCH PRED: " << *Succ);
+      FoldReturnIntoUncondBranch(Ret, BrSucc, Succ, &DTU);
+    }
+
+    // Fold the return into the sync.
     LLVM_DEBUG(dbgs() << "FOLDING: " << *Succ << "INTO SYNC PRED: " << BB);
     FoldReturnIntoUncondBranch(Ret, Succ, &BB, &DTU);
     ++NumRetDuped;
@@ -927,7 +956,7 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
 
     // If a recursive tail was eliminated, fix up the syncs and sync region in
     // the CFG.
-    if (EliminatedTail) {
+    if (EliminatedCall) {
       // Move the sync region start to the new entry block.
       Function *SyncUnwindFn = Intrinsic::getDeclaration(
           OldEntryBlock->getModule(), Intrinsic::sync_unwind);
@@ -940,14 +969,14 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
         ReplaceInstWithInst(RetBlock->getTerminator(),
                             SyncInst::Create(NewRetBlock, SyncRegion));
 
-        if (!OldEntry->getParent()->doesNotThrow())
+        if (!OldEntryBlock->getParent()->doesNotThrow())
           CallInst::Create(SyncUnwindFn, {SyncRegion}, "",
                            NewRetBlock->getTerminator());
       }
     } else {
       // Restore the sync that was eliminated.
-      BasicBlock *RetBlock = RI->getParent();
-      BasicBlock *NewRetBlock = SplitBlock(RetBlock, RI, &DTU);
+      BasicBlock *RetBlock = Ret->getParent();
+      BasicBlock *NewRetBlock = SplitBlock(RetBlock, Ret, &DTU);
       ReplaceInstWithInst(RetBlock->getTerminator(),
                           SyncInst::Create(NewRetBlock, SyncRegion));
       // The earlier call to FoldReturnIntoUncondBranch did not remove the

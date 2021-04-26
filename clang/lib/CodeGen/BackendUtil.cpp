@@ -1077,13 +1077,14 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
       switch (LangOpts.getComprehensiveStaticInstrumentation()) {
       case LangOptions::CSI_EarlyAsPossible:
       case LangOptions::CSI_ModuleOptimizerEarly:
-        PB.registerPipelineStartEPCallback([](ModulePassManager &MPM) {
-          // CSI performs significant changes to the CFG before attempting
-          // to analyze and insert instrumentation.  Hence we invalidate all
-          // analysis passes before running CSI.
-          MPM.addPass(InvalidateAllAnalysesPass());
-          MPM.addPass(ComprehensiveStaticInstrumentationPass());
-        });
+        PB.registerPipelineStartEPCallback(
+            [](ModulePassManager &MPM, PassBuilder::OptimizationLevel Level) {
+              // CSI performs significant changes to the CFG before attempting
+              // to analyze and insert instrumentation.  Hence we invalidate all
+              // analysis passes before running CSI.
+              MPM.addPass(InvalidateAllAnalysesPass());
+              MPM.addPass(ComprehensiveStaticInstrumentationPass());
+            });
         break;
       case LangOptions::CSI_TapirLate:
         PB.registerTapirLateEPCallback(

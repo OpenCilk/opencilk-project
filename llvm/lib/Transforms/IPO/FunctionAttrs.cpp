@@ -506,7 +506,6 @@ static FunctionAccessKind checkFunctionAccess(Function &F, bool ThisBody,
   }
 
   DenseMap<const Value *, SmallVector<const Value *, 1>> ObjectMap;
-  const DataLayout DL = F.getParent()->getDataLayout();
 
   // Scan the function body for instructions that may read or write memory.
   FunctionAccessKind AccessKind = FAK_None;
@@ -562,8 +561,8 @@ static FunctionAccessKind checkFunctionAccess(Function &F, bool ThisBody,
           continue;
 
         if (!ObjectMap.count(Loc.Ptr))
-          GetUnderlyingObjects(const_cast<Value *>(Loc.Ptr),
-                               ObjectMap[Loc.Ptr], DL, nullptr, 0);
+          getUnderlyingObjects(const_cast<Value *>(Loc.Ptr), ObjectMap[Loc.Ptr],
+                               nullptr, 0);
         for (const Value *Obj : ObjectMap[Loc.Ptr]) {
           if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(Obj))
             if (!GV->isConstant())
@@ -609,8 +608,8 @@ static FunctionAccessKind checkFunctionAccess(Function &F, bool ThisBody,
         continue;
 
       if (!ObjectMap.count(Loc->Ptr))
-        GetUnderlyingObjects(const_cast<Value *>(Loc->Ptr),
-                             ObjectMap[Loc->Ptr], DL, nullptr, 0);
+        getUnderlyingObjects(const_cast<Value *>(Loc->Ptr), ObjectMap[Loc->Ptr],
+                             nullptr, 0);
       for (const Value *Obj : ObjectMap[Loc->Ptr]) {
         if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(Obj))
           if (!GV->isConstant())

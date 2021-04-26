@@ -7341,7 +7341,7 @@ static bool serializeDetachToImmediateSync(BasicBlock *BB,
       ReplaceInstWithInst(DI, BranchInst::Create(Detached));
       // Record update to DTU if DTU is available.
       if (DTU)
-        Updates.push_back({{DominatorTree::Delete, DI->getParent(), BB}});
+        Updates.push_back({DominatorTree::Delete, DI->getParent(), BB});
 
       // Move static alloca instructions in the detached block to the
       // appropriate entry block.

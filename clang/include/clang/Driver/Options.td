@@ -2468,7 +2468,7 @@ def fopencilk : Flag<["-"], "fopencilk">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Enable OpenCilk extensions">;
 def static_libopencilk : Flag<["-"], "static-libopencilk">;
 def opencilk_resource_dir_EQ : Joined<["--"], "opencilk-resource-dir=">,
-  Flags<[DriverOption]>,
+  Flags<[NoXarchOption]>,
   HelpText<"The directory that holds OpenCilk resource files">;
 def opencilk_abi_bitcode_EQ : Joined<["--"], "opencilk-abi-bitcode=">,
   Flags<[CC1Option]>, HelpText<"Path to OpenCilk ABI bitcode file">;

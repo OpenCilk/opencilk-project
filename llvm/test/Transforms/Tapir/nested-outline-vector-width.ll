@@ -1,5 +1,5 @@
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -functionattrs -tapir2target -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -functionattrs -tapir2target -always-inline -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
+; RUN: opt < %s -loop-spawning-ti -simplifycfg -function-attrs -tapir2target -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
+; RUN: opt < %s -loop-spawning-ti -simplifycfg -function-attrs -tapir2target -always-inline -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
 ; RUN: opt < %s -passes="loop-spawning,function(simplify-cfg),cgscc(function-attrs),tapir2target" -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
 ; RUN: opt < %s -passes="loop-spawning,function(simplify-cfg),cgscc(function-attrs),tapir2target,always-inline" -use-opencilk-runtime-bc=false -S -o - | FileCheck %s
 
