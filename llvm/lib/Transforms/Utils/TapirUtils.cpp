@@ -530,15 +530,13 @@ void LandingPadInliningInfo::forwardTaskResume(InvokeInst *TR) {
   TR->eraseFromParent();
 
   if (NormalDest) {
-    for (BasicBlock *Succ : successors(NormalDest)) {
+    for (BasicBlock *Succ : successors(NormalDest))
       maybeRemovePredecessor(Succ, NormalDest);
-    }
     NormalDest->eraseFromParent();
   }
   if (UnwindDest) {
-    for (BasicBlock *Succ : successors(UnwindDest)) {
+    for (BasicBlock *Succ : successors(UnwindDest))
       maybeRemovePredecessor(Succ, UnwindDest);
-    }
     UnwindDest->eraseFromParent();
   }
 }
@@ -836,6 +834,8 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
 
   // Replace the detach with an unconditional branch to the task entry.
   Continue->removePredecessor(Spawner);
+  if (DI->hasUnwindDest())
+    Unwind->removePredecessor(Spawner);
   ReplaceInstWithInst(DI, BranchInst::Create(TaskEntry));
 
   // Update dominator tree.
