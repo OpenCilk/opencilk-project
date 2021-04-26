@@ -1178,6 +1178,20 @@ bool llvm::inferLibFuncAttributes(Function &F, const TargetLibraryInfo &TLI) {
   }
 }
 
+bool llvm::inferTapirTargetLibFuncAttributes(Function &F,
+                                             const TargetLibraryInfo &TLI) {
+  if (!TLI.isTapirTargetLibFunc(F))
+    return false;
+
+  bool Changed = false;
+  // FIXME: For now, we just set generic properties on Tapir-target library
+  // functions.
+  Changed |= setDoesNotFreeMemory(F);
+  Changed |= setWillReturn(F);
+
+  return Changed;
+}
+
 bool llvm::hasFloatFn(const TargetLibraryInfo *TLI, Type *Ty,
                       LibFunc DoubleFn, LibFunc FloatFn, LibFunc LongDoubleFn) {
   switch (Ty->getTypeID()) {

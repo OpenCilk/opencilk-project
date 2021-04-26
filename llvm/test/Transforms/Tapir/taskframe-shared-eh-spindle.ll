@@ -298,7 +298,7 @@ $_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E = com
 @__csi_func_id__ZNSt6vectorImSaImEED2Ev = weak global i64 -1
 
 ; Function Attrs: uwtable
-define dso_local void @_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E(%"class.parlay::sequence"* noalias sret %agg.result, %"struct.std::pair.7"* dereferenceable(8) %P) local_unnamed_addr #0 comdat personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
+define dso_local void @_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E(%"class.parlay::sequence"* noalias sret(%"class.parlay::sequence") %agg.result, %"struct.std::pair.7"* dereferenceable(8) %P) local_unnamed_addr #0 comdat personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 _ZNK6parlay14_sequence_baseIcNS_9allocatorIcEEE14_sequence_impl8capacityEv.exit.i.i:
   %0 = load i64, i64* @__csi_unit_detach_base_id, align 8, !invariant.load !2
   %1 = add i64 %0, 159
@@ -996,7 +996,7 @@ _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED2Ev.exit: ; preds = %_ZN6p
   call void @__csan_set_MAAP(i8 %201, i64 %202)
   %203 = add i64 %66, 843
   call void @__csan_before_call(i64 %203, i64 %202, i8 2, i64 0)
-  invoke void @_ZN6parlay7flattenINS_8sequenceINS1_IcNS_9allocatorIcEEEENS2_IS4_EEEEEEDaRKT_(%"class.parlay::sequence"* sret %agg.result, %"class.parlay::sequence.2"* nonnull dereferenceable(15) %s)
+  invoke void @_ZN6parlay7flattenINS_8sequenceINS1_IcNS_9allocatorIcEEEENS2_IS4_EEEEEEDaRKT_(%"class.parlay::sequence"* sret(%"class.parlay::sequence") %agg.result, %"class.parlay::sequence.2"* nonnull dereferenceable(15) %s)
           to label %invoke.cont33 unwind label %lpad32
 
 invoke.cont33:                                    ; preds = %_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED2Ev.exit
@@ -1707,7 +1707,7 @@ declare dso_local void @_ZN6parlay14pool_allocator10deallocateEPvm(%"struct.parl
 declare dso_local i8* @_ZN6parlay14pool_allocator8allocateEm(%"struct.parlay::pool_allocator"*, i64) local_unnamed_addr #0
 
 ; Function Attrs: uwtable
-declare dso_local void @_ZN6parlay7flattenINS_8sequenceINS1_IcNS_9allocatorIcEEEENS2_IS4_EEEEEEDaRKT_(%"class.parlay::sequence"* noalias sret, %"class.parlay::sequence.2"* dereferenceable(15)) local_unnamed_addr #0
+declare dso_local void @_ZN6parlay7flattenINS_8sequenceINS1_IcNS_9allocatorIcEEEENS2_IS4_EEEEEEDaRKT_(%"class.parlay::sequence"* noalias sret(%"class.parlay::sequence"), %"class.parlay::sequence.2"* dereferenceable(15)) local_unnamed_addr #0
 
 ; Function Attrs: inlinehint uwtable
 declare dso_local dereferenceable(96) %"struct.parlay::pool_allocator"* @_ZN6parlay8internal21get_default_allocatorEv() local_unnamed_addr #1

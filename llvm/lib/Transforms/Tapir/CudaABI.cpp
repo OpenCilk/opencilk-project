@@ -22,6 +22,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Vectorize.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -278,8 +279,7 @@ void PTXLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   PassManager->add(createCFGSimplificationPass());
   PassManager->add(createSLPVectorizerPass());
   //PassManager->add(createBreakCriticalEdgesPass());
-  PassManager->add(createConstantPropagationPass());
-  PassManager->add(createDeadInstEliminationPass());
+  PassManager->add(createInstSimplifyLegacyPass());
   PassManager->add(createDeadStoreEliminationPass());
   //PassManager->add(createInstructionCombiningPass());
   PassManager->add(createCFGSimplificationPass());

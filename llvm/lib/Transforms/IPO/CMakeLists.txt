@@ -69,6 +69,7 @@ add_llvm_component_library(LLVMipo
   ProfileData
   Scalar
   Support
+  TapirOpts
   TransformUtils
   Vectorize
   Instrumentation

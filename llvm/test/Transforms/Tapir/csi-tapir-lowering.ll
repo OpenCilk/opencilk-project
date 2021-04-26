@@ -1,5 +1,5 @@
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -functionattrs -csi -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK,OLDPM
-; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg),cgscc(function-attrs),csi' -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK,NEWPM
+; RUN: opt < %s -loop-spawning-ti -simplifycfg -function-attrs -csi -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
+; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg),cgscc(function-attrs),csi' -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -185,9 +185,9 @@ declare void @_ZN3tfk6Render12render_stackEPNS_5StackESt4pairIN2cv6Point_IfEES6_
 
 declare void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs(%"class.tfk::Render"* readnone, %"class.tfk::Section"*, %"struct.std::pair"* nocapture readonly, i32, %"class.std::basic_string"* nocapture readonly) local_unnamed_addr
 
-declare void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* noalias sret, %"class.tfk::Render"* readnone, %"class.tfk::Section"*, %"struct.std::pair"* nocapture readonly, i32, i1 zeroext) local_unnamed_addr
+declare void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* noalias sret(%"class.cv::Mat"), %"class.tfk::Render"* readnone, %"class.tfk::Section"*, %"struct.std::pair"* nocapture readonly, i32, i1 zeroext) local_unnamed_addr
 
-declare void @_ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z(%"class.std::basic_string"* noalias sret, i32 (i8*, i64, i8*, %struct.__va_list_tag*)*, i64, i8*, ...) local_unnamed_addr
+declare void @_ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z(%"class.std::basic_string"* noalias sret(%"class.std::basic_string"), i32 (i8*, i64, i8*, %struct.__va_list_tag*)*, i64, i8*, ...) local_unnamed_addr
 
 declare void @_ZNSs4_Rep10_M_destroyERKSaIcE(%"struct.std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep"*, %"class.std::allocator"* dereferenceable(1)) local_unnamed_addr
 
@@ -393,7 +393,7 @@ invoke.cont11:                                    ; preds = %entry
   %24 = bitcast %"struct.std::pair"* %bbox to <4 x i32>*
   %25 = load <4 x i32>, <4 x i32>* %24, align 4, !tbaa !7
   store <4 x i32> %25, <4 x i32>* %agg.tmp6, align 16, !tbaa !7
-  call void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* nonnull sret %next_section_img, %"class.tfk::Render"* %this, %"class.tfk::Section"* %22, %"struct.std::pair"* nonnull %tmpcast, i32 %resolution, i1 zeroext false)
+  call void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* nonnull sret(%"class.cv::Mat") %next_section_img, %"class.tfk::Render"* %this, %"class.tfk::Section"* %22, %"struct.std::pair"* nonnull %tmpcast, i32 %resolution, i1 zeroext false)
   %26 = bitcast %"class.cv::Mat"* %img to i8*
   call void @llvm.lifetime.start.p0i8(i64 96, i8* nonnull %26)
   %27 = load %"class.tfk::Section"**, %"class.tfk::Section"*** %_M_start.i, align 8, !tbaa !6
@@ -401,7 +401,7 @@ invoke.cont11:                                    ; preds = %entry
   %29 = bitcast %"struct.std::pair"* %bbox to <4 x i32>*
   %30 = load <4 x i32>, <4 x i32>* %29, align 4, !tbaa !7
   store <4 x i32> %30, <4 x i32>* %agg.tmp9, align 16, !tbaa !7
-  invoke void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* nonnull sret %img, %"class.tfk::Render"* %this, %"class.tfk::Section"* %28, %"struct.std::pair"* nonnull %tmpcast1939, i32 %resolution, i1 zeroext false)
+  invoke void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* nonnull sret(%"class.cv::Mat") %img, %"class.tfk::Render"* %this, %"class.tfk::Section"* %28, %"struct.std::pair"* nonnull %tmpcast1939, i32 %resolution, i1 zeroext false)
           to label %invoke.cont14 unwind label %lpad10
 
 invoke.cont14:                                    ; preds = %invoke.cont11
@@ -1181,7 +1181,7 @@ invoke.cont304:                                   ; preds = %.noexc1019
   call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %46)
   %real_section_id = getelementptr inbounds %"class.tfk::Section", %"class.tfk::Section"* %96, i64 0, i32 1
   %241 = load i32, i32* %real_section_id, align 4, !tbaa !42
-  invoke void (%"class.std::basic_string"*, i32 (i8*, i64, i8*, %struct.__va_list_tag*)*, i64, i8*, ...) @_ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z(%"class.std::basic_string"* nonnull sret %ref.tmp305, i32 (i8*, i64, i8*, %struct.__va_list_tag*)* nonnull @vsnprintf, i64 16, i8* getelementptr inbounds ([3 x i8], [3 x i8]* @.str.16, i64 0, i64 0), i32 %241)
+  invoke void (%"class.std::basic_string"*, i32 (i8*, i64, i8*, %struct.__va_list_tag*)*, i64, i8*, ...) @_ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z(%"class.std::basic_string"* nonnull sret(%"class.std::basic_string") %ref.tmp305, i32 (i8*, i64, i8*, %struct.__va_list_tag*)* nonnull @vsnprintf, i64 16, i8* getelementptr inbounds ([3 x i8], [3 x i8]* @.str.16, i64 0, i64 0), i32 %241)
           to label %invoke.cont307 unwind label %lpad306
 
 invoke.cont307:                                   ; preds = %invoke.cont304
@@ -1606,7 +1606,7 @@ invoke.cont352:                                   ; preds = %invoke.cont337
   %322 = load %"class.tfk::Section"*, %"class.tfk::Section"** %add.ptr.i1201, align 8, !tbaa !15
   %323 = load <4 x i32>, <4 x i32>* %75, align 4, !tbaa !7
   store <4 x i32> %323, <4 x i32>* %agg.tmp350, align 16, !tbaa !7
-  invoke void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* nonnull sret %ref.tmp345, %"class.tfk::Render"* %this, %"class.tfk::Section"* %322, %"struct.std::pair"* nonnull %tmpcast1941, i32 %resolution, i1 zeroext false)
+  invoke void @_ZN3tfk6Render6renderEPNS_7SectionESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionEb(%"class.cv::Mat"* nonnull sret(%"class.cv::Mat") %ref.tmp345, %"class.tfk::Render"* %this, %"class.tfk::Section"* %322, %"struct.std::pair"* nonnull %tmpcast1941, i32 %resolution, i1 zeroext false)
           to label %invoke.cont353 unwind label %lpad351
 
 invoke.cont353:                                   ; preds = %invoke.cont352
@@ -2487,7 +2487,7 @@ invoke.cont388:                                   ; preds = %.noexc880
   call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %84)
   %real_section_id390 = getelementptr inbounds %"class.tfk::Section", %"class.tfk::Section"* %484, i64 0, i32 1
   %493 = load i32, i32* %real_section_id390, align 4, !tbaa !42
-  invoke void (%"class.std::basic_string"*, i32 (i8*, i64, i8*, %struct.__va_list_tag*)*, i64, i8*, ...) @_ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z(%"class.std::basic_string"* nonnull sret %ref.tmp389, i32 (i8*, i64, i8*, %struct.__va_list_tag*)* nonnull @vsnprintf, i64 16, i8* getelementptr inbounds ([3 x i8], [3 x i8]* @.str.16, i64 0, i64 0), i32 %493)
+  invoke void (%"class.std::basic_string"*, i32 (i8*, i64, i8*, %struct.__va_list_tag*)*, i64, i8*, ...) @_ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z(%"class.std::basic_string"* nonnull sret(%"class.std::basic_string") %ref.tmp389, i32 (i8*, i64, i8*, %struct.__va_list_tag*)* nonnull @vsnprintf, i64 16, i8* getelementptr inbounds ([3 x i8], [3 x i8]* @.str.16, i64 0, i64 0), i32 %493)
           to label %invoke.cont392 unwind label %lpad391
 
 invoke.cont392:                                   ; preds = %invoke.cont388
@@ -3355,8 +3355,7 @@ if.then146.us.4:                                  ; preds = %if.end141.us.4
 ; CHECK: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
 ; CHECK-LABEL: define private fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach.us.ls2(
-; OLDPM: unnamed_addr #[[ATTRIBUTE2:[0-9]+]]
-; NEWPM: unnamed_addr #[[ATTRIBUTE]]
+; CHECK: unnamed_addr #[[ATTRIBUTE2:[0-9]+]]
 ; CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 ; CHECK: [[DETACHED]]:
 ; CHECK: call void @__csi_task(
@@ -3368,7 +3367,7 @@ attributes #0 = { argmemonly nounwind }
 attributes #1 = { nounwind readnone speculatable }
 
 ; CHECK: attributes #[[ATTRIBUTE]] = { {{.*}}nounwind
-; OLDPM: attributes #[[ATTRIBUTE2]] = { {{.*}}nounwind
+; CHECK: attributes #[[ATTRIBUTE2]] = { {{.*}}nounwind
 
 !0 = !{!1, !3, i64 8}
 !1 = !{!"_ZTSSt12_Vector_baseIPN3tfk7SectionESaIS2_EE", !2, i64 0}

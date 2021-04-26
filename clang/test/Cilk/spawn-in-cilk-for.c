@@ -4,7 +4,7 @@
 // Thanks to Jackie Bredenberg and Yuan Yao for the original source code for
 // this test case.
 //
-// RUN: %clang_cc1 %s -std=gnu11 -triple x86_64-unknown-linux-gnu -O0 -fcilkplus -verify -S -emit-llvm -ftapir=none -o - | FileCheck %s
+// RUN: %clang_cc1 %s -std=gnu11 -triple x86_64-unknown-linux-gnu -O0 -fopencilk -verify -S -emit-llvm -ftapir=none -o - | FileCheck %s
 // expected-no-diagnostics
 
 // A two-dimensional line.

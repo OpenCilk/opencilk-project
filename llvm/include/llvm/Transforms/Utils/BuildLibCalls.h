@@ -29,6 +29,13 @@ namespace llvm {
   bool inferLibFuncAttributes(Function &F, const TargetLibraryInfo &TLI);
   bool inferLibFuncAttributes(Module *M, StringRef Name, const TargetLibraryInfo &TLI);
 
+  /// Analyze the name the given function and set any applicable attributes.  If
+  /// the library function is unavailable, this doesn't modify it.
+  ///
+  /// Returns true if any attributes were set and false otherwise.
+  bool inferTapirTargetLibFuncAttributes(Function &F,
+                                         const TargetLibraryInfo &TLI);
+
   /// Check whether the overloaded floating point function
   /// corresponding to \a Ty is available.
   bool hasFloatFn(const TargetLibraryInfo *TLI, Type *Ty,

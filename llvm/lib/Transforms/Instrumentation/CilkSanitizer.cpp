@@ -475,7 +475,7 @@ private:
   bool unknownObjectUses(const Value *Addr, LoopInfo *LI,
                          const TargetLibraryInfo *TLI) const;
 
-  // Cached results of calls to GetUnderlyingObjects.
+  // Cached results of calls to getUnderlyingObjects.
   using BaseObjMapTy =
       DenseMap<const Value *, SmallVector<const Value *, 1>>;
   mutable BaseObjMapTy BaseObjects;
@@ -485,7 +485,7 @@ private:
       if (isa<GlobalValue>(Addr))
         BaseObjects.lookup(Addr);
       else
-        GetUnderlyingObjects(Addr, BaseObjects[Addr], DL, LI, 0);
+        getUnderlyingObjects(Addr, BaseObjects[Addr], LI, 0);
     }
     return BaseObjects[Addr];
   }
@@ -2072,7 +2072,7 @@ Value *CilkSanitizerImpl::Instrumentor::getNoAliasMAAPValue(
       //   return getMAAPIRValue(IRB, 0);
 
       // Otherwise, check if the other object might alias this one.
-      if (AA->alias(Loc, MemoryLocation(OtherObj))) {
+      if (AA->alias(Loc, MemoryLocation::getBeforeOrAfter(OtherObj))) {
         LLVM_DEBUG({
             dbgs() << "getNoAliasMAAPValue: Possible aliasing between:\n";
             dbgs() << "  Obj: " << *Obj << "\n";
@@ -2132,7 +2132,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
       for (const Value *Obj : ArgObjects) {
         // If Loc and the racer object cannot alias, then there's nothing to
         // check.
-        if (!AA->alias(Loc, MemoryLocation(Obj)))
+        if (!AA->alias(Loc, MemoryLocation::getBeforeOrAfter(Obj)))
           continue;
 
         // If we have no local MAAP data for Obj, then act pessimally.
@@ -2219,14 +2219,16 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
 
           // If Loc and the racer object cannot alias, then there's nothing to
           // check.
-          if (!AA->alias(Loc, MemoryLocation(RObj)))
+          if (!AA->alias(Loc, MemoryLocation::getBeforeOrAfter(RObj)))
             continue;
 
           // If there is must or partial aliasing between this object and racer
           // object, or we have no local MAAP information for RObj, then
           // act conservatively, because there's nothing to check.
-          if (MustAlias == AA->alias(Loc, MemoryLocation(RObj)) ||
-              PartialAlias == AA->alias(Loc, MemoryLocation(RObj)) ||
+          if (MustAlias ==
+                  AA->alias(Loc, MemoryLocation::getBeforeOrAfter(RObj)) ||
+              PartialAlias ==
+                  AA->alias(Loc, MemoryLocation::getBeforeOrAfter(RObj)) ||
               !LocalMAAPs.count(RObj)) {
             if (!LocalMAAPs.count(RObj))
               LLVM_DEBUG(dbgs() << "No local MAAP found for racer object "
@@ -2265,7 +2267,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
           if (&Arg == Obj)
             continue;
           // Check if Loc and Arg may alias.
-          if (!AA->alias(Loc, MemoryLocation(&Arg)))
+          if (!AA->alias(Loc, MemoryLocation::getBeforeOrAfter(&Arg)))
             continue;
           // If we have no local MAAP information about the argument,
           // then there's nothing to check.
@@ -2380,7 +2382,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
           }
 
           // Check if Loc and the racer object may alias.
-          if (!AA->alias(Loc, MemoryLocation(RObj)))
+          if (!AA->alias(Loc, MemoryLocation::getBeforeOrAfter(RObj)))
             continue;
 
           if (!LocalMAAPs.count(RObj)) {
@@ -2420,7 +2422,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
         if (&Arg == Obj)
           continue;
         // Check if Loc and Arg may alias.
-        if (!AA->alias(Loc, MemoryLocation(&Arg)))
+        if (!AA->alias(Loc, MemoryLocation::getBeforeOrAfter(&Arg)))
           continue;
         // If we have no local MAAP information about the argument, give up.
         if (!LocalMAAPs.count(&Arg)) {

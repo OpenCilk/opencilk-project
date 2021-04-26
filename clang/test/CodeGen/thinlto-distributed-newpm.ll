@@ -87,9 +87,13 @@
 ; CHECK-O: Running analysis: TaskAnalysis on main
 ; CHECK-O: Running pass: TaskSimplifyPass on main
 ; CHECK-O: Running pass: EarlyCSEPass on main
+; CHECK-O: Running pass: LoopSimplifyPass on main
+; CHECK-O: Running pass: LCSSAPass on main
 ; CHECK-O: Running analysis: MemorySSAAnalysis on main
 ; CHECK-O: Running analysis: AAManager on main
 ; CHECK-O: Running analysis: BasicAA on main
+; CHECK-O: Running analysis: InnerAnalysisManagerProxy
+; CHECK-O: Running pass: EarlyCSEPass on main
 ; CHECK-O: Running pass: JumpThreadingPass on main
 ; CHECK-O: Running analysis: LazyValueAnalysis on main
 ; CHECK-O: Running pass: LoopSimplifyPass on main
