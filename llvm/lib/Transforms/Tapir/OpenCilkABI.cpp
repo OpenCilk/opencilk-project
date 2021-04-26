@@ -666,6 +666,11 @@ Function *OpenCilkABI::Get__cilkrts_save_fp_ctrl_state() {
 
   B.CreateRetVoid();
 
+  Fn->setLinkage(Function::AvailableExternallyLinkage);
+  Fn->setDoesNotThrow();
+  if (!DebugABICalls && !UseExternalABIFunctions)
+    Fn->addFnAttr(Attribute::AlwaysInline);
+
   return Fn;
 }
 
