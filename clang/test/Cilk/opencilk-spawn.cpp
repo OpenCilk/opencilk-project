@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -std=c++1z -fexceptions -fcxx-exceptions -fcilkplus -ftapir=none -triple x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck %s
+// RUN: %clang_cc1 -std=c++1z -fexceptions -fcxx-exceptions -fopencilk -ftapir=none -triple x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck %s
 
 int return_stuff(int i);
 
@@ -49,12 +49,12 @@ void spawn_infinite_loop() {
 // CHECK: %[[REFTMP2:.+]] = alloca %class.Bar
 // CHECK: br label %[[LABEL1:.+]]
 // CHECK: [[LABEL1]]
-// CHECK: call void @_ZN3BarC1Ev(%class.Bar* %[[REFTMP]])
-// CHECK: %[[CALL:.+]] = invoke i32 @_ZNK3Bar11getValSpawnEi(%class.Bar* %[[REFTMP]], i32 0)
-// CHECK: call void @_ZN3BarD1Ev(%class.Bar* %[[REFTMP]])
-// CHECK: call void @_ZN3BarC1Ev(%class.Bar* %[[REFTMP2]])
+// CHECK: call void @_ZN3BarC1Ev(%class.Bar* nonnull dereferenceable(16) %[[REFTMP]])
+// CHECK: %[[CALL:.+]] = invoke i32 @_ZNK3Bar11getValSpawnEi(%class.Bar* nonnull dereferenceable(16) %[[REFTMP]], i32 0)
+// CHECK: call void @_ZN3BarD1Ev(%class.Bar* nonnull dereferenceable(16) %[[REFTMP]])
+// CHECK: call void @_ZN3BarC1Ev(%class.Bar* nonnull dereferenceable(16) %[[REFTMP2]])
 // CHECK: %[[CALL:.+]] = invoke i32 @_Z3fooRK3Bar(%class.Bar* {{.+}}%[[REFTMP2]])
-// CHECK: call void @_ZN3BarD1Ev(%class.Bar* %[[REFTMP2]])
+// CHECK: call void @_ZN3BarD1Ev(%class.Bar* nonnull dereferenceable(16) %[[REFTMP2]])
 // CHECK-NEXT: br label %[[LABEL1]]
 // CHECK: [[CONTINUE]]
 // CHECK: ret void

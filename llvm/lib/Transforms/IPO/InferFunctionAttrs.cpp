@@ -26,8 +26,10 @@ static bool inferAllPrototypeAttributes(
   for (Function &F : M.functions())
     // We only infer things using the prototype and the name; we don't need
     // definitions.
-    if (F.isDeclaration() && !F.hasOptNone())
+    if (F.isDeclaration() && !F.hasOptNone()) {
       Changed |= inferLibFuncAttributes(F, GetTLI(F));
+      Changed |= inferTapirTargetLibFuncAttributes(F, GetTLI(F));
+    }
 
   return Changed;
 }

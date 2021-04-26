@@ -65,7 +65,7 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 declare double @sqrt(double) local_unnamed_addr
 
 ; Function Attrs: uwtable
-define linkonce_odr void @_ZN4pbbs12sample_sort_Im8sequenceIlESt4lessIlEEES1_INT0_1TEES5_RKT1_b(%struct.sequence.46* noalias sret %agg.result, %struct.sequence.46* %A, %"struct.std::less"* dereferenceable(1) %f, i1 zeroext %inplace) local_unnamed_addr #0 comdat personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
+define linkonce_odr void @_ZN4pbbs12sample_sort_Im8sequenceIlESt4lessIlEEES1_INT0_1TEES5_RKT1_b(%struct.sequence.46* noalias sret(%struct.sequence.46) %agg.result, %struct.sequence.46* %A, %"struct.std::less"* dereferenceable(1) %f, i1 zeroext %inplace) local_unnamed_addr #0 comdat personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 entry:
   %syncreg.i599 = tail call token @llvm.syncregion.start()
   %syncreg.i572 = tail call token @llvm.syncregion.start()

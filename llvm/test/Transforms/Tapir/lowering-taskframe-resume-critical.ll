@@ -22,16 +22,16 @@ $__clang_call_terminate = comdat any
 $_ZNSt20__uninitialized_copyILb0EE13__uninit_copyIN9__gnu_cxx17__normal_iteratorIPKSt6vectorIlSaIlEES4_IS6_SaIS6_EEEEPS6_EET0_T_SE_SD_ = comdat any
 
 ; Function Attrs: uwtable
-define dso_local void @_Z15SerialPartitionv(%"struct.std::pair"* noalias nocapture sret %agg.result) local_unnamed_addr #0 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
+define dso_local void @_Z15SerialPartitionv(%"struct.std::pair"* noalias nocapture sret(%"struct.std::pair") %agg.result) local_unnamed_addr #0 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 entry:
   %ref.tmp = alloca %"class.std::vector", align 16
   %ref.tmp1 = alloca %"class.std::vector", align 16
   %0 = bitcast %"class.std::vector"* %ref.tmp to i8*
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %0) #8
-  call void @_Z1gv(%"class.std::vector"* nonnull sret %ref.tmp)
+  call void @_Z1gv(%"class.std::vector"* nonnull sret(%"class.std::vector") %ref.tmp)
   %1 = bitcast %"class.std::vector"* %ref.tmp1 to i8*
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %1) #8
-  invoke void @_Z1gv(%"class.std::vector"* nonnull sret %ref.tmp1)
+  invoke void @_Z1gv(%"class.std::vector"* nonnull sret(%"class.std::vector") %ref.tmp1)
           to label %_ZNSt6vectorIS_IlSaIlEESaIS1_EED2Ev.exit40 unwind label %lpad
 
 _ZNSt6vectorIS_IlSaIlEESaIS1_EED2Ev.exit40:       ; preds = %entry
@@ -110,7 +110,7 @@ _ZNSt6vectorIS_IlSaIlEESaIS1_EED2Ev.exit:         ; preds = %invoke.cont.i, %if.
 ; Function Attrs: argmemonly nounwind willreturn
 declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #1
 
-declare dso_local void @_Z1gv(%"class.std::vector"* sret) local_unnamed_addr #2
+declare dso_local void @_Z1gv(%"class.std::vector"* sret(%"class.std::vector")) local_unnamed_addr #2
 
 declare dso_local i32 @__gxx_personality_v0(...)
 
@@ -134,10 +134,10 @@ entry:
 if.then:                                          ; preds = %entry
   %3 = bitcast %"class.std::vector"* %ref.tmp.i to i8*
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %3) #8, !noalias !12
-  call void @_Z1gv(%"class.std::vector"* nonnull sret %ref.tmp.i), !noalias !12
+  call void @_Z1gv(%"class.std::vector"* nonnull sret(%"class.std::vector") %ref.tmp.i), !noalias !12
   %4 = bitcast %"class.std::vector"* %ref.tmp1.i to i8*
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %4) #8, !noalias !12
-  invoke void @_Z1gv(%"class.std::vector"* nonnull sret %ref.tmp1.i)
+  invoke void @_Z1gv(%"class.std::vector"* nonnull sret(%"class.std::vector") %ref.tmp1.i)
           to label %if.then.tf unwind label %lpad.i, !noalias !12
 
 lpad.i:                                           ; preds = %if.then

@@ -1449,7 +1449,7 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
 
 ModulePassManager
 PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
-                                        ThinLTOPhase Phase) {
+                                        ThinOrFullLTOPhase Phase) {
   ModulePassManager MPM(DebugLogging);
 
   // Add passes to run just before Tapir lowering.
@@ -1546,8 +1546,9 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   // Begin a postorder CGSCC pipeline to clean up and perform function inlining
   // after Tapir lowering.
   InlineParams IP = getInlineParamsFromOptLevel(OptimizationLevel::O0);
-  ModuleInlinerWrapperPass PostLowerMIWP(IP, DebugLogging, UseInlineAdvisor,
-                                         MaxDevirtIterations);
+  ModuleInlinerWrapperPass PostLowerMIWP(IP, DebugLogging,
+                                         PerformMandatoryInliningsFirst,
+                                         UseInlineAdvisor, MaxDevirtIterations);
 
   // Require the GlobalsAA analysis for the module so we can query it within
   // the CGSCC pipeline.
@@ -1571,7 +1572,7 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   // Lastly, add the core function simplification pipeline nested inside the
   // CGSCC walk.
   PostLowerCGPipeline.addPass(createCGSCCToFunctionPassAdaptor(
-      buildFunctionSimplificationPipeline(Level, Phase, DebugLogging)));
+      buildFunctionSimplificationPipeline(Level, Phase)));
 
   // We wrap the CGSCC pipeline in a devirtualization repeater. This will try
   // to detect when we devirtualize indirect calls and iterate the SCC passes
@@ -1598,7 +1599,6 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
          "Must request optimizations for the default pipeline!");
 
   ModulePassManager MPM(DebugLogging);
-  bool TapirHasBeenLowered = !LowerTapir;
 
   // Convert @llvm.global.annotations to !annotation metadata.
   MPM.addPass(Annotation2MetadataPass());
@@ -1612,10 +1612,6 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
 
   if (PGOOpt && PGOOpt->DebugInfoForProfiling)
     MPM.addPass(createModuleToFunctionPassAdaptor(AddDiscriminatorsPass()));
-
-  // Add the core simplification pipeline.
-  MPM.addPass(buildModuleSimplificationPipeline(Level, ThinLTOPhase::None,
-                                                DebugLogging));
 
   // Add the core simplification pipeline.
   MPM.addPass(buildModuleSimplificationPipeline(
@@ -1635,8 +1631,10 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
     addRequiredLTOPreLinkPasses(MPM);
 
   // Lower Tapir if necessary
-  if (!TapirHasBeenLowered)
-    MPM.addPass(buildTapirLoweringPipeline(Level, ThinLTOPhase::None));
+  if (LowerTapir)
+    MPM.addPass(buildTapirLoweringPipeline(
+        Level, LTOPreLink ? ThinOrFullLTOPhase::FullLTOPreLink
+                          : ThinOrFullLTOPhase::None));
 
   return MPM;
 }
@@ -1701,7 +1699,6 @@ ModulePassManager PassBuilder::buildThinLTODefaultPipeline(
     OptimizationLevel Level, const ModuleSummaryIndex *ImportSummary,
     bool LowerTapir) {
   ModulePassManager MPM(DebugLogging);
-  bool TapirHasBeenLowered = !LowerTapir;
 
   // Convert @llvm.global.annotations to !annotation metadata.
   MPM.addPass(Annotation2MetadataPass());
@@ -1740,8 +1737,9 @@ ModulePassManager PassBuilder::buildThinLTODefaultPipeline(
   MPM.addPass(buildModuleOptimizationPipeline(Level));
 
   // Lower Tapir if necessary
-  if (!TapirHasBeenLowered)
-    MPM.addPass(buildTapirLoweringPipeline(Level, ThinLTOPhase::PostLink));
+  if (LowerTapir)
+    MPM.addPass(
+        buildTapirLoweringPipeline(Level, ThinOrFullLTOPhase::ThinLTOPostLink));
 
   // Emit annotation remarks.
   addAnnotationRemarksPass(MPM);
@@ -1763,7 +1761,6 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
                                      ModuleSummaryIndex *ExportSummary,
                                      bool LowerTapir) {
   ModulePassManager MPM(DebugLogging);
-  bool TapirHasBeenLowered = !LowerTapir;
 
   // Convert @llvm.global.annotations to !annotation metadata.
   MPM.addPass(Annotation2MetadataPass());
@@ -2005,8 +2002,9 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
     MPM.addPass(MergeFunctionsPass());
 
   // Lower Tapir if necessary
-  if (!TapirHasBeenLowered)
-    MPM.addPass(buildTapirLoweringPipeline(Level, ThinLTOPhase::None));
+  if (LowerTapir)
+    MPM.addPass(
+        buildTapirLoweringPipeline(Level, ThinOrFullLTOPhase::FullLTOPostLink));
 
   // Emit annotation remarks.
   addAnnotationRemarksPass(MPM);

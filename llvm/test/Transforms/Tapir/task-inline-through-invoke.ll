@@ -241,14 +241,14 @@ invoke.cont5:                                     ; preds = %invoke.cont2
   %2 = extractvalue { i8*, i8* } %call, 0
   %3 = bitcast %"struct.benchIO::seqData"* %In to i8*
   call void @llvm.lifetime.start.p0i8(i64 32, i8* nonnull %3) #22
-  invoke void @_ZN7benchIO20readSequenceFromFileEPc(%"struct.benchIO::seqData"* nonnull sret %In, i8* %2)
+  invoke void @_ZN7benchIO20readSequenceFromFileEPc(%"struct.benchIO::seqData"* nonnull sret(%"struct.benchIO::seqData") %In, i8* %2)
           to label %invoke.cont7 unwind label %lpad6
 
 invoke.cont7:                                     ; preds = %invoke.cont5
   %4 = extractvalue { i8*, i8* } %call, 1
   %5 = bitcast %"struct.benchIO::seqData"* %Out to i8*
   call void @llvm.lifetime.start.p0i8(i64 32, i8* nonnull %5) #22
-  invoke void @_ZN7benchIO20readSequenceFromFileEPc(%"struct.benchIO::seqData"* nonnull sret %Out, i8* %4)
+  invoke void @_ZN7benchIO20readSequenceFromFileEPc(%"struct.benchIO::seqData"* nonnull sret(%"struct.benchIO::seqData") %Out, i8* %4)
           to label %invoke.cont9 unwind label %lpad8
 
 invoke.cont9:                                     ; preds = %invoke.cont7
@@ -593,7 +593,7 @@ declare dso_local { i8*, i8* } @_ZN11commandLine11IOFileNamesEv(%struct.commandL
 declare dso_local void @_ZN11commandLineC2EiPPcNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE(%struct.commandLine* %this, i32 %_c, i8** %_v, %"class.std::__cxx11::basic_string"* %_cl) unnamed_addr #0
 
 ; Function Attrs: uwtable
-declare dso_local void @_ZN7benchIO20readSequenceFromFileEPc(%"struct.benchIO::seqData"* noalias sret %agg.result, i8* %fileName) local_unnamed_addr #0
+declare dso_local void @_ZN7benchIO20readSequenceFromFileEPc(%"struct.benchIO::seqData"* noalias sret(%"struct.benchIO::seqData") %agg.result, i8* %fileName) local_unnamed_addr #0
 
 ; Function Attrs: nounwind uwtable
 declare dso_local void @_ZNSaIcED2Ev(%"class.std::allocator"* %this) unnamed_addr #4

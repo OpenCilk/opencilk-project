@@ -1058,7 +1058,7 @@ invoke.cont10:                                    ; preds = %invoke.cont6.i.i.i
   store %"struct.oct_tree<vertex<point2d<double> > >::node.110.421.728.1035.1342.1649.1956"* null, %"struct.oct_tree<vertex<point2d<double> > >::node.110.421.728.1035.1342.1649.1956"** %_M_head_impl.i.i.i.i.i.i.i, align 8, !tbaa !49
   %86 = bitcast %"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"* %ref.tmp.i to i8*
   call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %86) #16
-  invoke void @_ZN8oct_treeI6vertexI7point2dIdEEE5buildIN6parlay8sequenceIPS3_NS6_9allocatorIS8_EEEEEESt10unique_ptrINS4_4nodeENS4_11delete_treeEERT_(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"* nonnull sret %ref.tmp.i, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull dereferenceable(15) %init)
+  invoke void @_ZN8oct_treeI6vertexI7point2dIdEEE5buildIN6parlay8sequenceIPS3_NS6_9allocatorIS8_EEEEEESt10unique_ptrINS4_4nodeENS4_11delete_treeEERT_(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"* nonnull sret(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962") %ref.tmp.i, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull dereferenceable(15) %init)
           to label %invoke.cont12 unwind label %lpad.i95
 
 lpad.i95:                                         ; preds = %invoke.cont10
@@ -1298,7 +1298,7 @@ invoke.cont20:                                    ; preds = %if.else.i.i116, %if
   call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %102) #16
   store %"struct.oct_tree<vertex<point2d<double> > >::node.110.421.728.1035.1342.1649.1956"* null, %"struct.oct_tree<vertex<point2d<double> > >::node.110.421.728.1035.1342.1649.1956"** %_M_head_impl.i.i.i.i.i.i.i121, align 8, !tbaa !49
   call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %103) #16
-  invoke void @_ZN8oct_treeI6vertexI7point2dIdEEE5buildIN6parlay8sequenceIPS3_NS6_9allocatorIS8_EEEEEESt10unique_ptrINS4_4nodeENS4_11delete_treeEERT_(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"* nonnull sret %ref.tmp.i119, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull dereferenceable(15) %vtxs)
+  invoke void @_ZN8oct_treeI6vertexI7point2dIdEEE5buildIN6parlay8sequenceIPS3_NS6_9allocatorIS8_EEEEEESt10unique_ptrINS4_4nodeENS4_11delete_treeEERT_(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"* nonnull sret(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962") %ref.tmp.i119, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull dereferenceable(15) %vtxs)
           to label %invoke.cont23 unwind label %lpad.i123
 
 lpad.i123:                                        ; preds = %invoke.cont20
@@ -1505,7 +1505,7 @@ invoke.cont39:                                    ; preds = %sync.continue.i, %i
   call void @llvm.lifetime.start.p0i8(i64 16, i8* nonnull %118) #16, !noalias !60
   store i64 %203, i64* %119, align 8, !noalias !60
   store i64 %204, i64* %121, align 8, !noalias !60
-  invoke void @_ZN6parlay8internal4packINS_5sliceIPP6vertexI7point2dIdEES8_EENS2_IPbSA_EEEENS_8sequenceINT_10value_typeENS_9allocatorISE_EEEERKSD_RKT0_j(%"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull sret %agg.tmp40, %"struct.parlay::slice.170.480.787.1094.1401.1708.2015"* nonnull dereferenceable(16) %ref.tmp.i186, %"struct.parlay::slice.54.171.481.788.1095.1402.1709.2016"* nonnull dereferenceable(16) %ref.tmp1.i, i32 0)
+  invoke void @_ZN6parlay8internal4packINS_5sliceIPP6vertexI7point2dIdEES8_EENS2_IPbSA_EEEENS_8sequenceINT_10value_typeENS_9allocatorISE_EEEERKSD_RKT0_j(%"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull sret(%"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954") %agg.tmp40, %"struct.parlay::slice.170.480.787.1094.1401.1708.2015"* nonnull dereferenceable(16) %ref.tmp.i186, %"struct.parlay::slice.54.171.481.788.1095.1402.1709.2016"* nonnull dereferenceable(16) %ref.tmp1.i, i32 0)
           to label %invoke.cont51 unwind label %lpad46
 
 invoke.cont51:                                    ; preds = %invoke.cont39
@@ -2581,10 +2581,10 @@ declare dso_local void @_ZN6parlay14_sequence_baseIP6vertexI7point2dIdEENS_9allo
 declare dso_local fastcc void @"_ZN6parlay12parallel_forIZ24incrementally_add_pointsNS_8sequenceIP6vertexI7point2dIdEENS_9allocatorIS6_EEEES6_E3$_4EEvmmT_mb"(i64, %class.anon.52.136.447.754.1061.1368.1675.1982* nocapture readonly byval(%class.anon.52.136.447.754.1061.1368.1675.1982) align 8) unnamed_addr #6
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z8delaunayRN6parlay8sequenceI7point2dIdENS_9allocatorIS2_EEEE(%struct.triangles.146.457.764.1071.1378.1685.1992* noalias nocapture sret, %"class.parlay::sequence.14.90.401.708.1015.1322.1629.1936"* dereferenceable(15)) local_unnamed_addr #4
+declare dso_local void @_Z8delaunayRN6parlay8sequenceI7point2dIdENS_9allocatorIS2_EEEE(%struct.triangles.146.457.764.1071.1378.1685.1992* noalias nocapture sret(%struct.triangles.146.457.764.1071.1378.1685.1992), %"class.parlay::sequence.14.90.401.708.1015.1322.1629.1936"* dereferenceable(15)) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay18random_permutationImEENS_8sequenceIT_NS_9allocatorIS2_EEEEmNS_6randomE(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret, i64, i64) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay18random_permutationImEENS_8sequenceIT_NS_9allocatorIS2_EEEEmNS_6randomE(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"), i64, i64) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_ZN5timer4nextENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE(%struct.timer.5.316.623.930.1237.1544.1851*, %"class.std::__cxx11::basic_string.3.314.621.928.1235.1542.1849"*) local_unnamed_addr #4 align 2
@@ -2832,7 +2832,7 @@ call.i.i.i.i.noexc72:                             ; preds = %if.then.i20
 
 ; CHECK: define linkonce_odr dso_local void @_ZN8oct_treeI6vertexI7point2dIdEEE4nodeD2Ev(
 ; CHECK: call.i.i.i.i.noexc72:
-; CHECK: call void @__csan_load(i64 %138, i8* bitcast (%"struct.parlay::block_allocator::thread_list.33.344.651.958.1265.1572.1879"** getelementptr inbounds (%"struct.parlay::block_allocator.36.347.654.961.1268.1575.1882", %"struct.parlay::block_allocator.36.347.654.961.1268.1575.1882"* @_ZN6parlay14type_allocatorIN8oct_treeI6vertexI7point2dIdEEE4nodeEE9allocatorE, i64 0, i32 4) to i8*)
+; CHECK: call void @__csan_load(i64 %{{[0-9]+}}, i8* bitcast (%"struct.parlay::block_allocator::thread_list.33.344.651.958.1265.1572.1879"** getelementptr inbounds (%"struct.parlay::block_allocator.36.347.654.961.1268.1575.1882", %"struct.parlay::block_allocator.36.347.654.961.1268.1575.1882"* @_ZN6parlay14type_allocatorIN8oct_treeI6vertexI7point2dIdEEE4nodeEE9allocatorE, i64 0, i32 4) to i8*)
 ; CHECK: load %"struct.parlay::block_allocator::thread_list.33.344.651.958.1265.1572.1879"*, %"struct.parlay::block_allocator::thread_list.33.344.651.958.1265.1572.1879"** getelementptr inbounds (%"struct.parlay::block_allocator.36.347.654.961.1268.1575.1882", %"struct.parlay::block_allocator.36.347.654.961.1268.1575.1882"* @_ZN6parlay14type_allocatorIN8oct_treeI6vertexI7point2dIdEEE4nodeEE9allocatorE, i64 0, i32 4), align 64
 
 ; CHECK: if.then.i.i.i59:
@@ -3161,7 +3161,7 @@ lpad:                                             ; preds = %if.then11.i.i.i45, 
 declare dso_local void @_ZNSt10unique_ptrIN8oct_treeI6vertexI7point2dIdEEE4nodeENS5_11delete_treeEED2Ev(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"*) unnamed_addr #8 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal4packINS_5sliceIPP6vertexI7point2dIdEES8_EENS2_IPbSA_EEEENS_8sequenceINT_10value_typeENS_9allocatorISE_EEEERKSD_RKT0_j(%"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* noalias sret, %"struct.parlay::slice.170.480.787.1094.1401.1708.2015"* dereferenceable(16), %"struct.parlay::slice.54.171.481.788.1095.1402.1709.2016"* dereferenceable(16), i32) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal4packINS_5sliceIPP6vertexI7point2dIdEES8_EENS2_IPbSA_EEEENS_8sequenceINT_10value_typeENS_9allocatorISE_EEEERKSD_RKT0_j(%"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* noalias sret(%"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"), %"struct.parlay::slice.170.480.787.1094.1401.1708.2015"* dereferenceable(16), %"struct.parlay::slice.54.171.481.788.1095.1402.1709.2016"* dereferenceable(16), i32) local_unnamed_addr #4
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8internal10sliced_forIZNS1_4packINS_5sliceIPP6vertexI7point2dIdEESA_EENS4_IPbSC_EEEENS_8sequenceINT_10value_typeENS_9allocatorISG_EEEERKSF_RKT0_jEUlmmmE_EEvmmSL_jEUlmE_EEvmmSF_mb(i64, i64, %class.anon.126.173.483.790.1097.1404.1711.2018* byval(%class.anon.126.173.483.790.1097.1404.1711.2018) align 8, i64, i1 zeroext) local_unnamed_addr #6
@@ -3232,7 +3232,7 @@ declare dso_local void @_ZN6parlay8sequenceIbNS_9allocatorIbEEE18initialize_defa
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8sequenceIbNS_9allocatorIbEEE18initialize_defaultEmEUlmE_EEvmmT_mb(i64, i64, %"class.parlay::sequence.38.191.501.808.1115.1422.1729.2036"*, i8**, i64, i1 zeroext) local_unnamed_addr #6
 
 ; Function Attrs: sanitize_cilk uwtable
-define linkonce_odr dso_local void @_ZN8oct_treeI6vertexI7point2dIdEEE5buildIN6parlay8sequenceIPS3_NS6_9allocatorIS8_EEEEEESt10unique_ptrINS4_4nodeENS4_11delete_treeEERT_(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"* noalias sret %agg.result, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* dereferenceable(15) %P) local_unnamed_addr #4 comdat align 2 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
+define linkonce_odr dso_local void @_ZN8oct_treeI6vertexI7point2dIdEEE5buildIN6parlay8sequenceIPS3_NS6_9allocatorIS8_EEEEEESt10unique_ptrINS4_4nodeENS4_11delete_treeEERT_(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962"* noalias sret(%"class.std::unique_ptr.116.427.734.1041.1348.1655.1962") %agg.result, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* dereferenceable(15) %P) local_unnamed_addr #4 comdat align 2 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED2Ev.exit:
   %t = alloca %struct.timer.5.316.623.930.1237.1544.1851, align 8
   %agg.tmp = alloca %"class.std::__cxx11::basic_string.3.314.621.928.1235.1542.1849", align 8
@@ -3271,7 +3271,7 @@ _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED2Ev.exit:
   store i32 0, i32* %tz_dsttime.i, align 4, !tbaa !115
   %9 = bitcast %"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"* %pts to i8*
   call void @llvm.lifetime.start.p0i8(i64 15, i8* nonnull %9) #16
-  invoke void @_ZN8oct_treeI6vertexI7point2dIdEEE10tag_pointsERN6parlay8sequenceIPS3_NS5_9allocatorIS7_EEEE(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"* nonnull sret %pts, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull dereferenceable(15) %P)
+  invoke void @_ZN8oct_treeI6vertexI7point2dIdEEE10tag_pointsERN6parlay8sequenceIPS3_NS5_9allocatorIS7_EEEE(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"* nonnull sret(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045") %pts, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* nonnull dereferenceable(15) %P)
           to label %invoke.cont9 unwind label %lpad8
 
 invoke.cont9:                                     ; preds = %_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED2Ev.exit
@@ -3486,7 +3486,7 @@ ehcleanup39:                                      ; preds = %if.then.i.i.i, %ehc
 }
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN8oct_treeI6vertexI7point2dIdEEE10tag_pointsERN6parlay8sequenceIPS3_NS5_9allocatorIS7_EEEE(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"* noalias sret, %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* dereferenceable(15)) local_unnamed_addr #4 align 2
+declare dso_local void @_ZN8oct_treeI6vertexI7point2dIdEEE10tag_pointsERN6parlay8sequenceIPS3_NS5_9allocatorIS7_EEEE(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"* noalias sret(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"), %"class.parlay::sequence.28.108.419.726.1033.1340.1647.1954"* dereferenceable(15)) local_unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
 define linkonce_odr dso_local %"struct.oct_tree<vertex<point2d<double> > >::node.110.421.728.1035.1342.1649.1956"* @_ZN8oct_treeI6vertexI7point2dIdEEE15build_recursiveEN6parlay5sliceIPSt4pairImPS3_ESA_EEi(%"struct.std::pair.149.202.511.818.1125.1432.1739.2046"* %Pts.coerce0, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"* %Pts.coerce1, i32 %bit) local_unnamed_addr #4 comdat align 2 {
@@ -3654,10 +3654,10 @@ cleanup24:                                        ; preds = %_ZN6parlayL9par_do_
 }
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal6reduceINS_5sliceINS_16delayed_sequenceISt4pairI7point2dIdES6_EZN8oct_treeI6vertexIS6_EE7get_boxINS_8sequenceIPSA_NS_9allocatorISE_EEEEEES7_RT_EUlmE_E8iteratorESM_EENS_6monoidIZNSC_ISH_EES7_SJ_EUlS7_S7_E_S7_EEEENSI_10value_typeERKSI_T0_j(%"struct.std::pair.109.420.727.1034.1341.1648.1955"* noalias sret, %"struct.parlay::slice.161.206.515.822.1129.1436.1743.2050"* dereferenceable(32), %"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052"* byval(%"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052") align 8, i32) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal6reduceINS_5sliceINS_16delayed_sequenceISt4pairI7point2dIdES6_EZN8oct_treeI6vertexIS6_EE7get_boxINS_8sequenceIPSA_NS_9allocatorISE_EEEEEES7_RT_EUlmE_E8iteratorESM_EENS_6monoidIZNSC_ISH_EES7_SJ_EUlS7_S7_E_S7_EEEENSI_10value_typeERKSI_T0_j(%"struct.std::pair.109.420.727.1034.1341.1648.1955"* noalias sret(%"struct.std::pair.109.420.727.1034.1341.1648.1955"), %"struct.parlay::slice.161.206.515.822.1129.1436.1743.2050"* dereferenceable(32), %"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052"* byval(%"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052") align 8, i32) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal6reduceINS_8sequenceISt4pairI7point2dIdES5_ENS_9allocatorIS6_EEEENS_6monoidIZN8oct_treeI6vertexIS5_EE7get_boxINS2_IPSD_NS7_ISG_EEEEEES6_RT_EUlS6_S6_E_S6_EEEENSJ_10value_typeERKSJ_T0_j(%"struct.std::pair.109.420.727.1034.1341.1648.1955"* noalias sret, %"class.parlay::sequence.162.217.526.833.1140.1447.1754.2061"* dereferenceable(15), %"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052"* byval(%"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052") align 8, i32) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal6reduceINS_8sequenceISt4pairI7point2dIdES5_ENS_9allocatorIS6_EEEENS_6monoidIZN8oct_treeI6vertexIS5_EE7get_boxINS2_IPSD_NS7_ISG_EEEEEES6_RT_EUlS6_S6_E_S6_EEEENSJ_10value_typeERKSJ_T0_j(%"struct.std::pair.109.420.727.1034.1341.1648.1955"* noalias sret(%"struct.std::pair.109.420.727.1034.1341.1648.1955"), %"class.parlay::sequence.162.217.526.833.1140.1447.1754.2061"* dereferenceable(15), %"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052"* byval(%"struct.parlay::monoid.160.208.517.824.1131.1438.1745.2052") align 8, i32) local_unnamed_addr #4
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8internal10sliced_forIZNS1_6reduceINS_5sliceINS_16delayed_sequenceISt4pairI7point2dIdES8_EZN8oct_treeI6vertexIS8_EE7get_boxINS_8sequenceIPSC_NS_9allocatorISG_EEEEEES9_RT_EUlmE_E8iteratorESO_EENS_6monoidIZNSE_ISJ_EES9_SL_EUlS9_S9_E_S9_EEEENSK_10value_typeERKSK_T0_jEUlmmmE_EEvmmSV_jEUlmE_EEvmmSK_mb(i64, i64, %class.anon.170.219.528.835.1142.1449.1756.2063* byval(%class.anon.170.219.528.835.1142.1449.1756.2063) align 8, i64, i1 zeroext) local_unnamed_addr #6
@@ -3669,7 +3669,7 @@ declare dso_local void @_ZZN6parlay8internal6reduceINS_5sliceINS_16delayed_seque
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8internal10sliced_forIZNS1_6reduceINS_8sequenceISt4pairI7point2dIdES7_ENS_9allocatorIS8_EEEENS_6monoidIZN8oct_treeI6vertexIS7_EE7get_boxINS4_IPSF_NS9_ISI_EEEEEES8_RT_EUlS8_S8_E_S8_EEEENSL_10value_typeERKSL_T0_jEUlmmmE_EEvmmSR_jEUlmE_EEvmmSL_mb(i64, i64, %class.anon.172.221.530.837.1144.1451.1758.2065* byval(%class.anon.172.221.530.837.1144.1451.1758.2065) align 8, i64, i1 zeroext) local_unnamed_addr #6
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal11sample_sortINS_16delayed_sequenceISt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS7_E10tag_pointsERNS_8sequenceIS8_NS_9allocatorIS8_EEEEEUlmE_E8iteratorEZNSB_10tag_pointsESG_EUlS9_S9_E_EEDaNS_5sliceIT_SM_EERKT0_b(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"* noalias sret, %"struct.parlay::slice.174.225.534.841.1148.1455.1762.2069"* byval(%"struct.parlay::slice.174.225.534.841.1148.1455.1762.2069") align 8, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1), i1 zeroext) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal11sample_sortINS_16delayed_sequenceISt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS7_E10tag_pointsERNS_8sequenceIS8_NS_9allocatorIS8_EEEEEUlmE_E8iteratorEZNSB_10tag_pointsESG_EUlS9_S9_E_EEDaNS_5sliceIT_SM_EERKT0_b(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"* noalias sret(%"class.parlay::sequence.142.201.510.817.1124.1431.1738.2045"), %"struct.parlay::slice.174.225.534.841.1148.1455.1762.2069"* byval(%"struct.parlay::slice.174.225.534.841.1148.1455.1762.2069") align 8, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1), i1 zeroext) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay8internal12sample_sort_IjNS_16delayed_sequenceISt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS7_E10tag_pointsERNS_8sequenceIS8_NS_9allocatorIS8_EEEEEUlmE_E8iteratorEPS9_ZNSB_10tag_pointsESG_EUlS9_S9_E_EEvNS_5sliceIT0_SN_EENSM_IT1_SP_EERKT2_b(%"struct.parlay::slice.174.225.534.841.1148.1455.1762.2069"* byval(%"struct.parlay::slice.174.225.534.841.1148.1455.1762.2069") align 8, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1), i1 zeroext) local_unnamed_addr #4
@@ -3684,7 +3684,7 @@ declare dso_local void @_ZN6parlay8sequenceISt4pairImP6vertexI7point2dIdEEENS_9a
 declare dso_local void @_ZN6parlay8internal9quicksortIPSt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS6_E10tag_pointsERNS_8sequenceIS7_NS_9allocatorIS7_EEEEEUlS8_S8_E_EEvT_mRKT0_(%"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, i64, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1)) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal17transpose_bucketsINS_26uninitialized_relocate_tagEPSt4pairImP6vertexI7point2dIdEEESA_jEENS_8sequenceImNS_9allocatorImEEEET0_T1_RNSB_IT2_NSC_ISH_EEEEmmmm(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"class.parlay::sequence.177.235.544.851.1158.1465.1772.2079"* dereferenceable(15), i64, i64, i64, i64) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal17transpose_bucketsINS_26uninitialized_relocate_tagEPSt4pairImP6vertexI7point2dIdEEESA_jEENS_8sequenceImNS_9allocatorImEEEET0_T1_RNSB_IT2_NSC_ISH_EEEEmmmm(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"), %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"class.parlay::sequence.177.235.544.851.1158.1465.1772.2079"* dereferenceable(15), i64, i64, i64, i64) local_unnamed_addr #4
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8internal12sample_sort_IjNS_16delayed_sequenceISt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS8_E10tag_pointsERNS_8sequenceIS9_NS_9allocatorIS9_EEEEEUlmE_E8iteratorEPSA_ZNSC_10tag_pointsESH_EUlSA_SA_E_EEvNS_5sliceIT0_SO_EENSN_IT1_SQ_EERKT2_bEUlmE1_EEvmmT_mb(i64, i64, %class.anon.184.237.546.853.1160.1467.1774.2081* byval(%class.anon.184.237.546.853.1160.1467.1774.2081) align 8, i64, i1 zeroext) local_unnamed_addr #6
@@ -3717,7 +3717,7 @@ declare dso_local void @_ZN6parlay12parallel_forIZNS_8sequenceISt4pairImP6vertex
 declare dso_local void @_ZN6parlay8internal16quicksort_serialIPSt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS6_E10tag_pointsERNS_8sequenceIS7_NS_9allocatorIS7_EEEEEUlS8_S8_E_EEvT_mRKT0_(%"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, i64, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1)) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal6split3IPSt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS6_E10tag_pointsERNS_8sequenceIS7_NS_9allocatorIS7_EEEEEUlS8_S8_E_EESt5tupleIJT_SJ_bEESJ_mRKT0_(%"class.std::tuple.192.246.555.862.1169.1476.1783.2090"* noalias sret, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, i64, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1)) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal6split3IPSt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS6_E10tag_pointsERNS_8sequenceIS7_NS_9allocatorIS7_EEEEEUlS8_S8_E_EESt5tupleIJT_SJ_bEESJ_mRKT0_(%"class.std::tuple.192.246.555.862.1169.1476.1783.2090"* noalias sret(%"class.std::tuple.192.246.555.862.1169.1476.1783.2090"), %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, i64, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1)) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay8internal5sort5IPSt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS6_E10tag_pointsERNS_8sequenceIS7_NS_9allocatorIS7_EEEEEUlS8_S8_E_EEvT_mRKT0_(%"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, i64, %class.anon.154.226.535.842.1149.1456.1763.2070* dereferenceable(1)) local_unnamed_addr #4
@@ -4036,7 +4036,7 @@ sync.continue23:                                  ; preds = %sync.continue21, %_
 }
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal17transpose_bucketsINS_26uninitialized_relocate_tagEPSt4pairImP6vertexI7point2dIdEEESA_mEENS_8sequenceImNS_9allocatorImEEEET0_T1_RNSB_IT2_NSC_ISH_EEEEmmmm(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* dereferenceable(15), i64, i64, i64, i64) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal17transpose_bucketsINS_26uninitialized_relocate_tagEPSt4pairImP6vertexI7point2dIdEEESA_mEENS_8sequenceImNS_9allocatorImEEEET0_T1_RNSB_IT2_NSC_ISH_EEEEmmmm(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"), %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"struct.std::pair.149.202.511.818.1125.1432.1739.2046"*, %"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* dereferenceable(15), i64, i64, i64, i64) local_unnamed_addr #4
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8internal12sample_sort_ImNS_16delayed_sequenceISt4pairImP6vertexI7point2dIdEEEZN8oct_treeIS8_E10tag_pointsERNS_8sequenceIS9_NS_9allocatorIS9_EEEEEUlmE_E8iteratorEPSA_ZNSC_10tag_pointsESH_EUlSA_SA_E_EEvNS_5sliceIT0_SO_EENSN_IT1_SQ_EERKT2_bEUlmE1_EEvmmT_mb(i64, i64, %class.anon.229.267.575.882.1189.1496.1803.2110* byval(%class.anon.229.267.575.882.1189.1496.1803.2110) align 8, i64, i1 zeroext) local_unnamed_addr #6
@@ -4134,7 +4134,7 @@ declare dso_local void @_ZN6parlay8sequenceI8triangleI7point2dIdEENS_9allocatorI
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8sequenceI8triangleI7point2dIdEENS_9allocatorIS5_EEE18initialize_defaultEmEUlmE_EEvmmT_mb(i64, i64, %"class.parlay::sequence.72.383.690.997.1304.1611.1918"*, %struct.triangle.53.364.671.978.1285.1592.1899**, i64, i1 zeroext) local_unnamed_addr #6
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay14random_shuffleINS_8sequenceImNS_9allocatorImEEEEEEDaRKT_NS_6randomE(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret, %"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* dereferenceable(15), i64) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay14random_shuffleINS_8sequenceImNS_9allocatorImEEEEEEDaRKT_NS_6randomE(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"), %"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* dereferenceable(15), i64) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay8sequenceImNS_9allocatorImEEEC2IZNS_18random_permutationImEENS0_IT_NS1_IS6_EEEEmNS_6randomEEUlmE_EEmOS6_NS3_18_from_function_tagEm(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"*, i64, %class.anon.270.288.595.902.1209.1516.1823.2130* dereferenceable(1), i64) unnamed_addr #4 align 2
@@ -4149,13 +4149,13 @@ declare dso_local void @_ZN6parlay8internal15random_shuffle_IPKmPmEEvNS_5sliceIT
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8internal15random_shuffle_IPKmPmEEvNS_5sliceIT_S7_EENS6_IT0_S9_EENS_6randomEEUlmE1_EEvmmS7_mb(i64, i64, %class.anon.285.291.598.905.1212.1519.1826.2133* byval(%class.anon.285.291.598.905.1212.1519.1826.2133) align 8, i64, i1 zeroext) local_unnamed_addr #6
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal11count_sort_INS_22uninitialized_copy_tagEjPKmPmNS_16delayed_sequenceImZNS0_15random_shuffle_IS4_S5_EEvNS_5sliceIT_S9_EENS8_IT0_SB_EENS_6randomEEUlmE0_E8iteratorEEESt4pairINS_8sequenceImNS_9allocatorImEEEEbENS8_IT1_SN_EENS8_IT2_SP_EENS8_IT3_SR_EEmfb(%"struct.std::pair.276.292.599.906.1213.1520.1827.2134"* noalias sret, i64*, i64*, i64*, i64*, %"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138"* byval(%"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138") align 8, i64, float, i1 zeroext) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal11count_sort_INS_22uninitialized_copy_tagEjPKmPmNS_16delayed_sequenceImZNS0_15random_shuffle_IS4_S5_EEvNS_5sliceIT_S9_EENS8_IT0_SB_EENS_6randomEEUlmE0_E8iteratorEEESt4pairINS_8sequenceImNS_9allocatorImEEEEbENS8_IT1_SN_EENS8_IT2_SP_EENS8_IT3_SR_EEmfb(%"struct.std::pair.276.292.599.906.1213.1520.1827.2134"* noalias sret(%"struct.std::pair.276.292.599.906.1213.1520.1827.2134"), i64*, i64*, i64*, i64*, %"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138"* byval(%"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138") align 8, i64, float, i1 zeroext) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal11count_sort_INS_22uninitialized_copy_tagEmPKmPmNS_16delayed_sequenceImZNS0_15random_shuffle_IS4_S5_EEvNS_5sliceIT_S9_EENS8_IT0_SB_EENS_6randomEEUlmE0_E8iteratorEEESt4pairINS_8sequenceImNS_9allocatorImEEEEbENS8_IT1_SN_EENS8_IT2_SP_EENS8_IT3_SR_EEmfb(%"struct.std::pair.276.292.599.906.1213.1520.1827.2134"* noalias sret, i64*, i64*, i64*, i64*, %"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138"* byval(%"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138") align 8, i64, float, i1 zeroext) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal11count_sort_INS_22uninitialized_copy_tagEmPKmPmNS_16delayed_sequenceImZNS0_15random_shuffle_IS4_S5_EEvNS_5sliceIT_S9_EENS8_IT0_SB_EENS_6randomEEUlmE0_E8iteratorEEESt4pairINS_8sequenceImNS_9allocatorImEEEEbENS8_IT1_SN_EENS8_IT2_SP_EENS8_IT3_SR_EEmfb(%"struct.std::pair.276.292.599.906.1213.1520.1827.2134"* noalias sret(%"struct.std::pair.276.292.599.906.1213.1520.1827.2134"), i64*, i64*, i64*, i64*, %"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138"* byval(%"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138") align 8, i64, float, i1 zeroext) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN6parlay8internal14seq_count_sortINS_22uninitialized_copy_tagEPKmPmNS_16delayed_sequenceImZNS0_15random_shuffle_IS4_S5_EEvNS_5sliceIT_S9_EENS8_IT0_SB_EENS_6randomEEUlmE0_E8iteratorEEENS_8sequenceImNS_9allocatorImEEEESC_NS8_IT1_SL_EENS8_IT2_SN_EEm(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret, i64*, i64*, i64*, i64*, %"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138"* byval(%"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138") align 8, i64) local_unnamed_addr #4
+declare dso_local void @_ZN6parlay8internal14seq_count_sortINS_22uninitialized_copy_tagEPKmPmNS_16delayed_sequenceImZNS0_15random_shuffle_IS4_S5_EEvNS_5sliceIT_S9_EENS8_IT0_SB_EENS_6randomEEUlmE0_E8iteratorEEENS_8sequenceImNS_9allocatorImEEEESC_NS8_IT1_SL_EENS8_IT2_SN_EEm(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"* noalias sret(%"class.parlay::sequence.9.81.392.699.1006.1313.1620.1927"), i64*, i64*, i64*, i64*, %"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138"* byval(%"struct.parlay::slice.279.296.603.910.1217.1524.1831.2138") align 8, i64) local_unnamed_addr #4
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN6parlay12parallel_forIZNS_8internal11count_sort_INS_22uninitialized_copy_tagEjPKmPmNS_16delayed_sequenceImZNS1_15random_shuffle_IS5_S6_EEvNS_5sliceIT_SA_EENS9_IT0_SC_EENS_6randomEEUlmE0_E8iteratorEEESt4pairINS_8sequenceImNS_9allocatorImEEEEbENS9_IT1_SO_EENS9_IT2_SQ_EENS9_IT3_SS_EEmfbEUlmE_EEvmmSA_mb(i64, i64, %class.anon.286.297.604.911.1218.1525.1832.2139* byval(%class.anon.286.297.604.911.1218.1525.1832.2139) align 8, i64, i1 zeroext) local_unnamed_addr #6

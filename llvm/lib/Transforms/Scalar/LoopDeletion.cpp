@@ -20,6 +20,7 @@
 #include "llvm/Analysis/LoopPass.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/InitializePasses.h"
@@ -271,7 +272,7 @@ PreservedAnalyses LoopDeletionPass::run(Loop &L, LoopAnalysisManager &AM,
   // to the right exit based on whatever loop invariant structure remains.
   if (Result != LoopDeletionResult::Deleted)
     Result = merge(Result, breakBackedgeIfNotTaken(&L, AR.DT, AR.SE, AR.LI,
-                                                   AR.TI, AR.MSSA, ORE));
+                                                   AR.MSSA, ORE));
 
   if (Result == LoopDeletionResult::Unmodified)
     return PreservedAnalyses::all();

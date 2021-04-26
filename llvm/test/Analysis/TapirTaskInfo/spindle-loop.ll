@@ -68,7 +68,7 @@ declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture writeonly, i8* nocapture r
 
 declare void @_ZN13matrix_serial9transposeERS_(%class.matrix_serial*, %class.matrix_serial* dereferenceable(16)) local_unnamed_addr #0
 
-declare void @_ZN13matrix_serialmlERS_(%class.matrix_serial* sret, %class.matrix_serial*, %class.matrix_serial* dereferenceable(16)) local_unnamed_addr #0
+declare void @_ZN13matrix_serialmlERS_(%class.matrix_serial* sret(%class.matrix_serial), %class.matrix_serial*, %class.matrix_serial* dereferenceable(16)) local_unnamed_addr #0
 
 declare dereferenceable(16) %class.matrix_serial* @_ZN13matrix_serialaSERKS_(%class.matrix_serial*, %class.matrix_serial* dereferenceable(16)) local_unnamed_addr #0
 

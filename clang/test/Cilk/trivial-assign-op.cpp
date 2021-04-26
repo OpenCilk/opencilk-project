@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fcilkplus -ftapir=none -triple x86_64-unknown-linux-gnu -std=c++11 -emit-llvm %s -o - | FileCheck %s
+// RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fopencilk -ftapir=none -triple x86_64-unknown-linux-gnu -std=c++11 -emit-llvm %s -o - | FileCheck %s
 // expected-no-diagnostics
 
 struct event {
@@ -41,7 +41,7 @@ void generateNode(Boxes boxes, Events events, BoundingBox B,  long n,
   _Cilk_sync;
 }
 
-// CHECK: define void @_Z12generateNodePP5rangePP5eventS0_li(
+// CHECK: define {{.*}}void @_Z12generateNodePP5rangePP5eventS0_li(
 // CHECK: getelementptr inbounds [3 x %struct.cutInfo], [3 x %struct.cutInfo]* %cuts, i64 0, i64 0
 // CHECK-NOT: call void @_Z7bestCutP5event5rangeS1_S1_l(
 // CHECK: detach

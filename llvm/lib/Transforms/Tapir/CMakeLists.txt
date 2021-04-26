@@ -24,4 +24,16 @@ add_llvm_component_library(LLVMTapirOpts
   DEPENDS
   intrinsics_gen
   LLVMLinker
+
+  COMPONENT_NAME
+  TapirOpts
+
+  LINK_COMPONENTS
+  Analysis
+  Core
+  IRReader
+  Linker
+  Scalar
+  Support
+  TransformUtils
   )

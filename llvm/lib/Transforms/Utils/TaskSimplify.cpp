@@ -15,6 +15,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/CFG.h"
+#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -409,22 +410,36 @@ bool llvm::simplifyTaskFrames(TaskInfo &TI, DominatorTree &DT) {
 /// Call SimplifyCFG on all the blocks in the function,
 /// iterating until no more changes are made.
 static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
+                                   DomTreeUpdater *DTU,
                                    const SimplifyCFGOptions &Options) {
   bool Changed = false;
   bool LocalChange = true;
 
   SmallVector<std::pair<const BasicBlock *, const BasicBlock *>, 32> Edges;
   FindFunctionBackedges(F, Edges);
-  SmallPtrSet<BasicBlock *, 16> LoopHeaders;
+  SmallPtrSet<BasicBlock *, 16> UniqueLoopHeaders;
   for (unsigned i = 0, e = Edges.size(); i != e; ++i)
-    LoopHeaders.insert(const_cast<BasicBlock *>(Edges[i].second));
+    UniqueLoopHeaders.insert(const_cast<BasicBlock *>(Edges[i].second));
+
+  SmallVector<WeakVH, 16> LoopHeaders(UniqueLoopHeaders.begin(),
+                                      UniqueLoopHeaders.end());
 
   while (LocalChange) {
     LocalChange = false;
 
     // Loop over all of the basic blocks and remove them if they are unneeded.
     for (Function::iterator BBIt = F.begin(); BBIt != F.end(); ) {
-      if (simplifyCFG(&*BBIt++, TTI, Options, &LoopHeaders)) {
+      BasicBlock &BB = *BBIt++;
+      if (DTU) {
+        assert(
+            !DTU->isBBPendingDeletion(&BB) &&
+            "Should not end up trying to simplify blocks marked for removal.");
+        // Make sure that the advanced iterator does not point at the blocks
+        // that are marked for removal, skip over all such blocks.
+        while (BBIt != F.end() && DTU->isBBPendingDeletion(&*BBIt))
+          ++BBIt;
+      }
+      if (simplifyCFG(&BB, TTI, DTU, Options, LoopHeaders)) {
         LocalChange = true;
         ++NumSimpl;
       }
@@ -435,9 +450,12 @@ static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
 }
 
 static bool simplifyFunctionCFG(Function &F, const TargetTransformInfo &TTI,
+                                DominatorTree *DT,
                                 const SimplifyCFGOptions &Options) {
-  bool EverChanged = removeUnreachableBlocks(F);
-  EverChanged |= iterativelySimplifyCFG(F, TTI, Options);
+  DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
+
+  bool EverChanged = removeUnreachableBlocks(F, DT ? &DTU : nullptr);
+  EverChanged |= iterativelySimplifyCFG(F, TTI, DT ? &DTU : nullptr, Options);
 
   // If neither pass changed anything, we're done.
   if (!EverChanged) return false;
@@ -447,12 +465,12 @@ static bool simplifyFunctionCFG(Function &F, const TargetTransformInfo &TTI,
   // iterate between the two optimizations.  We structure the code like this to
   // avoid rerunning iterativelySimplifyCFG if the second pass of
   // removeUnreachableBlocks doesn't do anything.
-  if (!removeUnreachableBlocks(F))
+  if (!removeUnreachableBlocks(F, DT ? &DTU : nullptr))
     return true;
 
   do {
-    EverChanged = iterativelySimplifyCFG(F, TTI, Options);
-    EverChanged |= removeUnreachableBlocks(F);
+    EverChanged = iterativelySimplifyCFG(F, TTI, DT ? &DTU : nullptr, Options);
+    EverChanged |= removeUnreachableBlocks(F, DT ? &DTU : nullptr);
   } while (EverChanged);
 
   return true;
@@ -520,7 +538,7 @@ bool TaskSimplify::runOnFunction(Function &F) {
       TI.recalculate(F, DT);
       if (TI.isSerial()) {
         if (PostCleanupCFG && SplitBlocks)
-          simplifyFunctionCFG(F, TTI, Options);
+          simplifyFunctionCFG(F, TTI, &DT, Options);
         return Changed;
       }
     }
@@ -541,7 +559,7 @@ bool TaskSimplify::runOnFunction(Function &F) {
     Changed |= simplifyTask(T);
 
   if (PostCleanupCFG && (Changed | SplitBlocks))
-    Changed |= simplifyFunctionCFG(F, TTI, Options);
+    Changed |= simplifyFunctionCFG(F, TTI, nullptr, Options);
 
   return Changed;
 }
@@ -573,7 +591,7 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
       TI.recalculate(F, DT);
       if (TI.isSerial()) {
         if (PostCleanupCFG && SplitBlocks)
-          simplifyFunctionCFG(F, TTI, Options);
+          simplifyFunctionCFG(F, TTI, &DT, Options);
         PreservedAnalyses PA;
         PA.preserve<GlobalsAA>();
         return PA;
@@ -596,7 +614,7 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
     Changed |= simplifyTask(T);
 
   if (PostCleanupCFG && (Changed | SplitBlocks))
-    Changed |= simplifyFunctionCFG(F, TTI, Options);
+    Changed |= simplifyFunctionCFG(F, TTI, nullptr, Options);
 
   if (!Changed)
     return PreservedAnalyses::all();

@@ -275,7 +275,7 @@ void llvm::PointerMayBeCaptured(const Value *V, CaptureTracker *Tracker,
     const Use *U = Worklist.pop_back_val();
     Instruction *I = cast<Instruction>(U->getUser());
 
-    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U->getUser())) {
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(I)) {
       switch (CE->getOpcode()) {
       case Instruction::BitCast:
       case Instruction::GetElementPtr:
@@ -314,7 +314,6 @@ void llvm::PointerMayBeCaptured(const Value *V, CaptureTracker *Tracker,
       continue;
     }
 
-    Instruction *I = cast<Instruction>(U->getUser());
     switch (I->getOpcode()) {
     case Instruction::Call:
     case Instruction::Invoke: {

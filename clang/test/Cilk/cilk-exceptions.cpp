@@ -1,6 +1,6 @@
 // Test case for code generation of Tapir for Cilk code that uses exceptions.
 //
-// RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fcilkplus -ftapir=none -triple x86_64-unknown-linux-gnu -std=c++11 -emit-llvm %s -o - | FileCheck %s
+// RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fopencilk -ftapir=none -triple x86_64-unknown-linux-gnu -std=c++11 -emit-llvm %s -o - | FileCheck %s
 
 void handle_exn(int e = -1);
 
@@ -248,7 +248,7 @@ void spawn_stmt_destructor(int n) {
   // CHECK: %[[REFTMP:.+]] = alloca %class.Foo
   // CHECK: %[[EXNTF:.+]] = alloca i8*
   // CHECK: %[[EHSELECTORTF:.+]] = alloca i32
-  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* %[[REFTMP]])
+  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* nonnull dereferenceable(1) %[[REFTMP]])
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
   // CHECK: [[DETACHED]]:
   // CHECK-NEXT: %[[EXN:.+]] = alloca i8*
@@ -257,14 +257,14 @@ void spawn_stmt_destructor(int n) {
   // CHECK-NEXT: invoke i32 @_Z3bazRK3Foo(
   // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[TASKLPAD:.+]]
   // CHECK: [[INVOKECONT]]:
-  // CHECK-NEXT: call void @_ZN3FooD1Ev(%class.Foo* %[[REFTMP]])
+  // CHECK-NEXT: call void @_ZN3FooD1Ev(%class.Foo* nonnull dereferenceable(1) %[[REFTMP]])
   // CHECK-NEXT: reattach within %[[SYNCREG]]
   // CHECK: [[TASKLPAD]]:
   // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
   // CHECK-NEXT: cleanup
   // CHECK: store i8* %{{.+}}, i8** %[[EXN]],
   // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK: call void @_ZN3FooD1Ev(%class.Foo* %[[REFTMP]])
+  // CHECK: call void @_ZN3FooD1Ev(%class.Foo* nonnull dereferenceable(1) %[[REFTMP]])
   // CHECK: invoke void @llvm.detached.rethrow
   // CHECK: (token %[[SYNCREG]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
@@ -303,7 +303,7 @@ void spawn_decl_destructor(int n) {
   // CHECK: %[[REFTMP:.+]] = alloca %class.Foo
   // CHECK: %[[EXNTF:.+]] = alloca i8*
   // CHECK: %[[EHSELECTORTF:.+]] = alloca i32
-  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* %[[REFTMP]])
+  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* nonnull dereferenceable(1) %[[REFTMP]])
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
   // CHECK: [[DETACHED]]:
   // CHECK-NEXT: %[[EXN:.+]] = alloca i8*
@@ -312,7 +312,7 @@ void spawn_decl_destructor(int n) {
   // CHECK: %[[CALL:.+]] = invoke i32 @_Z3bazRK3Foo(
   // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[TASKLPAD:.+]]
   // CHECK: [[INVOKECONT]]:
-  // CHECK-NEXT: call void @_ZN3FooD1Ev(%class.Foo* %[[REFTMP]])
+  // CHECK-NEXT: call void @_ZN3FooD1Ev(%class.Foo* nonnull dereferenceable(1) %[[REFTMP]])
   // CHECK-NEXT: store i32 %[[CALL]]
   // CHECK-NEXT: reattach within %[[SYNCREG]]
   // CHECK: [[TASKLPAD]]:
@@ -320,7 +320,7 @@ void spawn_decl_destructor(int n) {
   // CHECK-NEXT: cleanup
   // CHECK: store i8* %{{.+}}, i8** %[[EXN]],
   // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK: call void @_ZN3FooD1Ev(%class.Foo* %[[REFTMP]])
+  // CHECK: call void @_ZN3FooD1Ev(%class.Foo* nonnull dereferenceable(1) %[[REFTMP]])
   // CHECK: invoke void @llvm.detached.rethrow
   // CHECK: (token %[[SYNCREG]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
@@ -363,7 +363,7 @@ void spawn_decl_destructor(int n) {
 // CHECK-LABEL: @_Z22spawn_block_destructori(
 void spawn_block_destructor(int n) {
   // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
-  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* %[[REFTMP:.+]])
+  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* nonnull dereferenceable(1) %[[REFTMP:.+]])
   // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
   // CHECK-NEXT: %[[EXNTF:.+]] = alloca i8*
   // CHECK-NEXT: %[[EHSELECTORTF:.+]] = alloca i32
