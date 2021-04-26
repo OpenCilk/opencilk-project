@@ -7,6 +7,7 @@
 ; CHECK-Osz-NEXT: Function Integration/Inlining
 ; CHECK-Osz-NEXT: FunctionPass Manager
 ; CHECK-Osz-NEXT: Dominator Tree Construction
+; CHECK-Osz-NEXT: Tapir Task Information
 ; CHECK-Osz-NEXT: SROA
 ; CHECK-Osz-NEXT: Early CSE
 ; CHECK-Osz-NEXT: Simplify the CFG

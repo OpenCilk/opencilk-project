@@ -41,6 +41,7 @@
 ; CHECK-NEXT:         Block Frequency Analysis
 ; CHECK-NEXT:     FunctionPass Manager
 ; CHECK-NEXT:       Dominator Tree Construction
+; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Promote Memory to Register
 ; CHECK-NEXT:     Merge Duplicate Global Constants
 ; CHECK-NEXT:     Dead Argument Elimination
@@ -80,6 +81,7 @@
 ; CHECK-NEXT:         Combine redundant instructions
 ; CHECK-NEXT:         Lazy Value Information Analysis
 ; CHECK-NEXT:         Jump Threading
+; CHECK-NEXT:         Tapir Task Information
 ; CHECK-NEXT:         SROA
 ; CHECK-NEXT:         Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:         Function Alias Analysis Results
@@ -94,6 +96,7 @@
 ; CHECK-NEXT:     Globals Alias Analysis
 ; CHECK-NEXT:     FunctionPass Manager
 ; CHECK-NEXT:       Dominator Tree Construction
+; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:       Function Alias Analysis Results
 ; CHECK-NEXT:       Memory SSA
@@ -149,6 +152,7 @@
 ; CHECK-NEXT:       Loop-Closed SSA Form Pass
 ; CHECK-NEXT:       Function Alias Analysis Results
 ; CHECK-NEXT:       Scalar Evolution Analysis
+; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Unroll loops
 ; CHECK-NEXT:       Lazy Branch Probability Analysis

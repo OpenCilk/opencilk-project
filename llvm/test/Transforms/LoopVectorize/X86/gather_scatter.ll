@@ -1768,18 +1768,13 @@ define void @test_gather_not_profitable_pr48429(i32 %d, float* readonly %ptr, fl
 ; AVX512-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 60
 ; AVX512-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[FOR_BODY_PREHEADER:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; AVX512:       vector.memcheck:
-; AVX512-NEXT:    [[TMP4:%.*]] = shl nsw i64 [[IDX_EXT]], 2
-; AVX512-NEXT:    [[TMP5:%.*]] = add nsw i64 [[TMP4]], -4
-; AVX512-NEXT:    [[TMP6:%.*]] = lshr exact i64 [[TMP5]], 2
-; AVX512-NEXT:    [[TMP7:%.*]] = shl nsw i64 [[TMP5]], 2
-; AVX512-NEXT:    [[TMP8:%.*]] = or i64 [[TMP7]], 2
-; AVX512-NEXT:    [[SCEVGEP:%.*]] = getelementptr float, float* [[DEST:%.*]], i64 [[TMP8]]
-; AVX512-NEXT:    [[TMP9:%.*]] = add nuw nsw i64 [[TMP6]], 1
-; AVX512-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP9]]
+; AVX512-NEXT:    [[TMP4:%.*]] = shl nsw i64 [[TMP1]], 2
+; AVX512-NEXT:    [[TMP5:%.*]] = or i64 [[TMP4]], 2
+; AVX512-NEXT:    [[SCEVGEP:%.*]] = getelementptr float, float* [[DEST:%.*]], i64 [[TMP5]]
+; AVX512-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP3]]
 ; AVX512-NEXT:    [[SCEVGEP6:%.*]] = getelementptr float, float* [[PTR]], i64 [[IDXPROM]]
-; AVX512-NEXT:    [[TMP10:%.*]] = add nuw nsw i64 [[TMP6]], 1
-; AVX512-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP10]], [[IDX_EXT]]
-; AVX512-NEXT:    [[SCEVGEP8:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP11]]
+; AVX512-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP3]], [[IDX_EXT]]
+; AVX512-NEXT:    [[SCEVGEP8:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP6]]
 ; AVX512-NEXT:    [[BOUND0:%.*]] = icmp ugt float* [[SCEVGEP4]], [[DEST]]
 ; AVX512-NEXT:    [[BOUND1:%.*]] = icmp ugt float* [[SCEVGEP]], [[PTR]]
 ; AVX512-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
@@ -1968,18 +1963,13 @@ define void @test_gather_not_profitable_pr48429(i32 %d, float* readonly %ptr, fl
 ; FVW2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 12
 ; FVW2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[FOR_BODY_PREHEADER:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; FVW2:       vector.memcheck:
-; FVW2-NEXT:    [[TMP4:%.*]] = shl nsw i64 [[IDX_EXT]], 2
-; FVW2-NEXT:    [[TMP5:%.*]] = add nsw i64 [[TMP4]], -4
-; FVW2-NEXT:    [[TMP6:%.*]] = lshr exact i64 [[TMP5]], 2
-; FVW2-NEXT:    [[TMP7:%.*]] = shl nsw i64 [[TMP5]], 2
-; FVW2-NEXT:    [[TMP8:%.*]] = or i64 [[TMP7]], 2
-; FVW2-NEXT:    [[SCEVGEP:%.*]] = getelementptr float, float* [[DEST:%.*]], i64 [[TMP8]]
-; FVW2-NEXT:    [[TMP9:%.*]] = add nuw nsw i64 [[TMP6]], 1
-; FVW2-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP9]]
+; FVW2-NEXT:    [[TMP4:%.*]] = shl nsw i64 [[TMP1]], 2
+; FVW2-NEXT:    [[TMP5:%.*]] = or i64 [[TMP4]], 2
+; FVW2-NEXT:    [[SCEVGEP:%.*]] = getelementptr float, float* [[DEST:%.*]], i64 [[TMP5]]
+; FVW2-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP3]]
 ; FVW2-NEXT:    [[SCEVGEP6:%.*]] = getelementptr float, float* [[PTR]], i64 [[IDXPROM]]
-; FVW2-NEXT:    [[TMP10:%.*]] = add nuw nsw i64 [[TMP6]], 1
-; FVW2-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP10]], [[IDX_EXT]]
-; FVW2-NEXT:    [[SCEVGEP8:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP11]]
+; FVW2-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP3]], [[IDX_EXT]]
+; FVW2-NEXT:    [[SCEVGEP8:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP6]]
 ; FVW2-NEXT:    [[BOUND0:%.*]] = icmp ugt float* [[SCEVGEP4]], [[DEST]]
 ; FVW2-NEXT:    [[BOUND1:%.*]] = icmp ugt float* [[SCEVGEP]], [[PTR]]
 ; FVW2-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]

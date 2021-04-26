@@ -60,6 +60,7 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
@@ -1887,9 +1888,8 @@ static bool isSafeToExecuteUnconditionally(Instruction &Inst,
     // CtxI.  Loads from such variables are not safe to execute unconditionally
     // outside of parallel loops.
     if (LoadInst *LI = dyn_cast<LoadInst>(&Inst)) {
-      const DataLayout &DL = Inst.getModule()->getDataLayout();
       if (GlobalValue *GV = dyn_cast<GlobalValue>(
-              GetUnderlyingObject(LI->getPointerOperand(), DL))) {
+              getUnderlyingObject(LI->getPointerOperand()))) {
         if (GV->isThreadLocal() && TI->getSpindleFor(Inst.getParent()) !=
                                        TI->getSpindleFor(CtxI->getParent()))
           return false;

@@ -391,7 +391,7 @@ declare dso_local void @_ZNSt14basic_ifstreamIcSt11char_traitsIcEE5closeEv(%"cla
 declare dso_local void @_ZNSt14basic_ifstreamIcSt11char_traitsIcEED1Ev(%"class.std::basic_ifstream.36.189.340"*) unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z13stringToWordsPcl(%struct.words.39.192.343* noalias sret, i8*, i64) local_unnamed_addr #0
+declare dso_local void @_Z13stringToWordsPcl(%struct.words.39.192.343* noalias sret(%struct.words.39.192.343), i8*, i64) local_unnamed_addr #0
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local zeroext i1 @_Z7isSpacec(i8 signext) local_unnamed_addr #13
@@ -427,7 +427,7 @@ declare dso_local i8* @_ZN11commandLine14getOptionValueENSt7__cxx1112basic_strin
 declare dso_local i64 @_ZN11commandLine18getOptionLongValueENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEl(%struct.commandLine.44.197.348*, %"class.std::__cxx11::basic_string.43.196.347"*, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z19readCompressedGraphI25compressedSymmetricVertexE5graphIT_EPcbb(%struct.graph.47.200.351* noalias sret, i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
+declare dso_local void @_Z19readCompressedGraphI25compressedSymmetricVertexE5graphIT_EPcbb(%struct.graph.47.200.351* noalias sret(%struct.graph.47.200.351), i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_Z7ComputeI25compressedSymmetricVertexEvR5graphIT_E11commandLine(%struct.graph.47.200.351* dereferenceable(48), %struct.commandLine.44.197.348*) local_unnamed_addr #0
@@ -448,7 +448,7 @@ declare dso_local void @_ZN5timer10reportNextENSt7__cxx1112basic_stringIcSt11cha
 declare dso_local void @_ZN5graphI25compressedSymmetricVertexE3delEv(%struct.graph.47.200.351*) local_unnamed_addr #0 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z19readCompressedGraphI26compressedAsymmetricVertexE5graphIT_EPcbb(%struct.graph.2.49.202.353* noalias sret, i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
+declare dso_local void @_Z19readCompressedGraphI26compressedAsymmetricVertexE5graphIT_EPcbb(%struct.graph.2.49.202.353* noalias sret(%struct.graph.2.49.202.353), i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_Z7ComputeI26compressedAsymmetricVertexEvR5graphIT_E11commandLine(%struct.graph.2.49.202.353* dereferenceable(48), %struct.commandLine.44.197.348*) local_unnamed_addr #0
@@ -460,7 +460,7 @@ declare dso_local void @_ZN5graphI26compressedAsymmetricVertexE9transposeEv(%str
 declare dso_local void @_ZN5graphI26compressedAsymmetricVertexE3delEv(%struct.graph.2.49.202.353*) local_unnamed_addr #0 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z9readGraphI15symmetricVertexE5graphIT_EPcbbbb(%struct.graph.3.51.204.355* noalias sret, i8*, i1 zeroext, i1 zeroext, i1 zeroext, i1 zeroext) local_unnamed_addr #0
+declare dso_local void @_Z9readGraphI15symmetricVertexE5graphIT_EPcbbbb(%struct.graph.3.51.204.355* noalias sret(%struct.graph.3.51.204.355), i8*, i1 zeroext, i1 zeroext, i1 zeroext, i1 zeroext) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_Z7ComputeI15symmetricVertexEvR5graphIT_E11commandLine(%struct.graph.3.51.204.355* dereferenceable(48), %struct.commandLine.44.197.348*) local_unnamed_addr #0
@@ -469,7 +469,7 @@ declare dso_local void @_Z7ComputeI15symmetricVertexEvR5graphIT_E11commandLine(%
 declare dso_local void @_ZN5graphI15symmetricVertexE3delEv(%struct.graph.3.51.204.355*) local_unnamed_addr #0 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z9readGraphI16asymmetricVertexE5graphIT_EPcbbbb(%struct.graph.4.53.206.357* noalias sret, i8*, i1 zeroext, i1 zeroext, i1 zeroext, i1 zeroext) local_unnamed_addr #0
+declare dso_local void @_Z9readGraphI16asymmetricVertexE5graphIT_EPcbbbb(%struct.graph.4.53.206.357* noalias sret(%struct.graph.4.53.206.357), i8*, i1 zeroext, i1 zeroext, i1 zeroext, i1 zeroext) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_Z7ComputeI16asymmetricVertexEvR5graphIT_E11commandLine(%struct.graph.4.53.206.357* dereferenceable(48), %struct.commandLine.44.197.348*) local_unnamed_addr #0
@@ -493,7 +493,7 @@ declare dso_local void @_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC2E
 declare dso_local i8* @_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE13_M_local_dataEv(%"class.std::__cxx11::basic_string.43.196.347"*) local_unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN9__gnu_cxx14__alloc_traitsISaIcEcE17_S_select_on_copyERKS1_(%"class.std::allocator.40.193.344"* noalias sret, %"class.std::allocator.40.193.344"* dereferenceable(1)) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN9__gnu_cxx14__alloc_traitsISaIcEcE17_S_select_on_copyERKS1_(%"class.std::allocator.40.193.344"* noalias sret(%"class.std::allocator.40.193.344"), %"class.std::allocator.40.193.344"* dereferenceable(1)) local_unnamed_addr #0 align 2
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local dereferenceable(1) %"class.std::allocator.40.193.344"* @_ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE16_M_get_allocatorEv(%"class.std::__cxx11::basic_string.43.196.347"*) local_unnamed_addr #4 align 2
@@ -523,7 +523,7 @@ declare dso_local i8* @_ZSt9addressofIcEPT_RS0_(i8* dereferenceable(1)) local_un
 declare dso_local i8* @_ZSt11__addressofIcEPT_RS0_(i8* dereferenceable(1)) local_unnamed_addr #13
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
-declare dso_local void @_ZNSt16allocator_traitsISaIcEE37select_on_container_copy_constructionERKS0_(%"class.std::allocator.40.193.344"* noalias sret, %"class.std::allocator.40.193.344"* dereferenceable(1)) local_unnamed_addr #4 align 2
+declare dso_local void @_ZNSt16allocator_traitsISaIcEE37select_on_container_copy_constructionERKS0_(%"class.std::allocator.40.193.344"* noalias sret(%"class.std::allocator.40.193.344"), %"class.std::allocator.40.193.344"* dereferenceable(1)) local_unnamed_addr #4 align 2
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local void @_ZNSaIcEC2ERKS_(%"class.std::allocator.40.193.344"*, %"class.std::allocator.40.193.344"* dereferenceable(1)) unnamed_addr #4 align 2
@@ -883,7 +883,7 @@ declare dso_local void @_ZN16vertexSubsetDataIN4pbbs5emptyEEC2Elj(%struct.vertex
 declare dso_local zeroext i1 @_ZN16vertexSubsetDataIN4pbbs5emptyEE7isEmptyEv(%struct.vertexSubsetData.61.214.365*) local_unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z7edgeMapI25compressedSymmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.47.200.351* byval(%struct.graph.47.200.351) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z7edgeMapI25compressedSymmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.47.200.351* byval(%struct.graph.47.200.351) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local void @_ZN5BFS_FC2EPj(%struct.BFS_F.62.215.366*, i32*) unnamed_addr #4 align 2
@@ -892,7 +892,7 @@ declare dso_local void @_ZN5BFS_FC2EPj(%struct.BFS_F.62.215.366*, i32*) unnamed_
 declare dso_local void @_ZN16vertexSubsetDataIN4pbbs5emptyEE3delEv(%struct.vertexSubsetData.61.214.365*) local_unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.47.200.351* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.47.200.351* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local i64 @_ZN16vertexSubsetDataIN4pbbs5emptyEE11numNonzerosEv(%struct.vertexSubsetData.61.214.365*) local_unnamed_addr #4 align 2
@@ -922,25 +922,25 @@ declare dso_local i32 @_ZN8sequence10plusReduceIjlEET_PS1_T0_(i32*, i64) local_u
 declare dso_local void @_ZN16vertexSubsetDataIN4pbbs5emptyEE7toDenseEv(%struct.vertexSubsetData.61.214.365*) local_unnamed_addr #0 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.47.200.351* byval(%struct.graph.47.200.351) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.47.200.351* byval(%struct.graph.47.200.351) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.47.200.351* byval(%struct.graph.47.200.351) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.47.200.351* byval(%struct.graph.47.200.351) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local zeroext i1 @_Z13should_outputRKj(i32* dereferenceable(4)) local_unnamed_addr #13
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.47.200.351* dereferenceable(48), %struct.compressedSymmetricVertex.45.198.349*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.47.200.351* dereferenceable(48), %struct.compressedSymmetricVertex.45.198.349*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.47.200.351* dereferenceable(48), %struct.compressedSymmetricVertex.45.198.349*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.47.200.351* dereferenceable(48), %struct.compressedSymmetricVertex.45.198.349*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12make_in_imapIbZN16vertexSubsetDataIN4pbbs5emptyEE8toSparseEvEUlmE_E7in_imapIT_T0_EmS7_(%struct.in_imap.66.217.368* noalias sret, i64, i8**) local_unnamed_addr #0
+declare dso_local void @_Z12make_in_imapIbZN16vertexSubsetDataIN4pbbs5emptyEE8toSparseEvEUlmE_E7in_imapIT_T0_EmS7_(%struct.in_imap.66.217.368* noalias sret(%struct.in_imap.66.217.368), i64, i8**) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN4pbbs10pack_indexIj7in_imapIbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_j(%struct.array_imap.67.218.369* noalias sret, %struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8, i32) local_unnamed_addr #0
+declare dso_local void @_ZN4pbbs10pack_indexIj7in_imapIbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_j(%struct.array_imap.67.218.369* noalias sret(%struct.array_imap.67.218.369), %struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8, i32) local_unnamed_addr #0
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local i64 @_ZN10array_imapIjE4sizeEv(%struct.array_imap.67.218.369*) local_unnamed_addr #13 align 2
@@ -955,10 +955,10 @@ declare dso_local void @_ZN10array_imapIjED2Ev(%struct.array_imap.67.218.369*) u
 declare dso_local void @_ZN7in_imapIbZN16vertexSubsetDataIN4pbbs5emptyEE8toSparseEvEUlmE_EC2EmS4_(%struct.in_imap.66.217.368*, i64, i8**) unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN4pbbs4packI7in_imapIjZNS_10pack_indexIjS1_IbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES7_EES8_INS9_1TEES9_SB_j(%struct.array_imap.67.218.369* noalias sret, %struct.in_imap.6.69.220.371* byval(%struct.in_imap.6.69.220.371) align 8, %struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8, i32) local_unnamed_addr #0
+declare dso_local void @_ZN4pbbs4packI7in_imapIjZNS_10pack_indexIjS1_IbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES7_EES8_INS9_1TEES9_SB_j(%struct.array_imap.67.218.369* noalias sret(%struct.array_imap.67.218.369), %struct.in_imap.6.69.220.371* byval(%struct.in_imap.6.69.220.371) align 8, %struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8, i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12make_in_imapIjZN4pbbs10pack_indexIj7in_imapIbZN16vertexSubsetDataINS0_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES2_IS9_SB_EmSB_(%struct.in_imap.6.69.220.371* noalias sret, i64) local_unnamed_addr #0
+declare dso_local void @_Z12make_in_imapIjZN4pbbs10pack_indexIj7in_imapIbZN16vertexSubsetDataINS0_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES2_IS9_SB_EmSB_(%struct.in_imap.6.69.220.371* noalias sret(%struct.in_imap.6.69.220.371), i64) local_unnamed_addr #0
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local i64 @_ZN7in_imapIbZN16vertexSubsetDataIN4pbbs5emptyEE8toSparseEvEUlmE_E4sizeEv(%struct.in_imap.66.217.368*) local_unnamed_addr #4 align 2
@@ -970,7 +970,7 @@ declare dso_local i64 @_ZN7in_imapIjZN4pbbs10pack_indexIjS_IbZN16vertexSubsetDat
 declare dso_local i64 @_ZN4pbbs10num_blocksEmm(i64, i64) local_unnamed_addr #13
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN4pbbs11pack_serialI7in_imapIjZNS_10pack_indexIjS1_IbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES7_EES8_INS9_1TEES9_SB_(%struct.array_imap.67.218.369* noalias sret, %struct.in_imap.6.69.220.371* byval(%struct.in_imap.6.69.220.371) align 8, %struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8) local_unnamed_addr #0
+declare dso_local void @_ZN4pbbs11pack_serialI7in_imapIjZNS_10pack_indexIjS1_IbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES7_EES8_INS9_1TEES9_SB_(%struct.array_imap.67.218.369* noalias sret(%struct.array_imap.67.218.369), %struct.in_imap.6.69.220.371* byval(%struct.in_imap.6.69.220.371) align 8, %struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local void @_ZN10array_imapImEC2Em(%struct.array_imap.7.70.221.372*, i64) unnamed_addr #0 align 2
@@ -994,7 +994,7 @@ declare dso_local i32* @_ZN4pbbs17new_array_no_initIjEEPT_mb(i64, i1 zeroext) lo
 declare dso_local void @_ZN4pbbs10sliced_forIZNS_4packI7in_imapIjZNS_10pack_indexIjS2_IbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES8_EES9_INSA_1TEESA_SC_jEUlmmmE0_EEvmmRKSA_(i64, i64, %class.anon.10.72.223.374* dereferenceable(32)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z15make_array_imapIjE10array_imapIT_EPS1_m(%struct.array_imap.67.218.369* noalias sret, i32*, i64) local_unnamed_addr #0
+declare dso_local void @_Z15make_array_imapIjE10array_imapIT_EPS1_m(%struct.array_imap.67.218.369* noalias sret(%struct.array_imap.67.218.369), i32*, i64) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local i64 @_ZN4pbbs16sum_flags_serialI7in_imapIbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEEmT_(%struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8) local_unnamed_addr #0
@@ -1039,7 +1039,7 @@ declare void @llvm.taskframe.use(token) #7
 declare dso_local void @_ZZN4pbbs4packI7in_imapIjZNS_10pack_indexIjS1_IbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES7_EES8_INS9_1TEES9_SB_jENKUlmmmE_clEmmm(%class.anon.9.71.222.373*, i64, i64, i64) local_unnamed_addr #11 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN7in_imapIbZN16vertexSubsetDataIN4pbbs5emptyEE8toSparseEvEUlmE_E3cutEmm(%struct.in_imap.66.217.368* noalias sret, %struct.in_imap.66.217.368*, i64, i64) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN7in_imapIbZN16vertexSubsetDataIN4pbbs5emptyEE8toSparseEvEUlmE_E3cutEmm(%struct.in_imap.66.217.368* noalias sret(%struct.in_imap.66.217.368), %struct.in_imap.66.217.368*, i64, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local dereferenceable(8) i64* @_ZNK10array_imapImEixEm(%struct.array_imap.7.70.221.372*, i64) local_unnamed_addr #13 align 2
@@ -1075,7 +1075,7 @@ declare dso_local void @_ZZN4pbbs4scanI10array_imapImES2_ZNS_8scan_addIS2_S2_EEN
 declare dso_local i64 @_ZN4pbbs13reduce_serialI10array_imapImEZNS_8scan_addIS2_S2_EENT_1TES4_T0_jEUlmmE_EES5_S4_RKS6_(%struct.array_imap.7.70.221.372*, %class.anon.11.73.224.375* dereferenceable(1)) local_unnamed_addr #4
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
-declare dso_local void @_ZN10array_imapImE3cutEmm(%struct.array_imap.7.70.221.372* noalias sret, %struct.array_imap.7.70.221.372*, i64, i64) local_unnamed_addr #11 align 2
+declare dso_local void @_ZN10array_imapImE3cutEmm(%struct.array_imap.7.70.221.372* noalias sret(%struct.array_imap.7.70.221.372), %struct.array_imap.7.70.221.372*, i64, i64) local_unnamed_addr #11 align 2
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local void @_ZN10array_imapImEC2EPmmb(%struct.array_imap.7.70.221.372*, i64*, i64, i1 zeroext) unnamed_addr #4 align 2
@@ -1090,7 +1090,7 @@ declare dso_local void @_ZZN4pbbs4packI7in_imapIjZNS_10pack_indexIjS1_IbZN16vert
 declare dso_local void @_ZN4pbbs14pack_serial_atI7in_imapIjZNS_10pack_indexIjS1_IbZN16vertexSubsetDataINS_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_ES7_EEvS9_PNS9_1TESB_(%struct.in_imap.6.69.220.371* byval(%struct.in_imap.6.69.220.371) align 8, i32*, %struct.in_imap.66.217.368* byval(%struct.in_imap.66.217.368) align 8) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN7in_imapIjZN4pbbs10pack_indexIjS_IbZN16vertexSubsetDataINS0_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_E3cutEmm(%struct.in_imap.6.69.220.371* noalias sret, %struct.in_imap.6.69.220.371*, i64, i64) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN7in_imapIjZN4pbbs10pack_indexIjS_IbZN16vertexSubsetDataINS0_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_E3cutEmm(%struct.in_imap.6.69.220.371* noalias sret(%struct.in_imap.6.69.220.371), %struct.in_imap.6.69.220.371*, i64, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local void @_ZN7in_imapIjZN4pbbs10pack_indexIjS_IbZN16vertexSubsetDataINS0_5emptyEE8toSparseEvEUlmE_EEE10array_imapIT_ET0_jEUlmE_EC2EmmSB_(%struct.in_imap.6.69.220.371*, i64, i64) unnamed_addr #4 align 2
@@ -1182,7 +1182,7 @@ declare dso_local void @_ZZ23get_emdense_forward_genIN4pbbs5emptyELi0EEDaPSt5tup
 declare dso_local zeroext i1 @_Z3CASIjEbPT_S0_S0_(i32*, i32, i32) local_unnamed_addr #13
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
-declare dso_local void @_ZSt10make_tupleIJiN4pbbs5emptyEEESt5tupleIJDpNSt25__strip_reference_wrapperINSt5decayIT_E4typeEE6__typeEEEDpOS5_(%"class.std::tuple.22.86.237.388"* noalias sret, i32* dereferenceable(4), %"struct.pbbs::empty.87.238.389"* dereferenceable(1)) local_unnamed_addr #4
+declare dso_local void @_ZSt10make_tupleIJiN4pbbs5emptyEEESt5tupleIJDpNSt25__strip_reference_wrapperINSt5decayIT_E4typeEE6__typeEEEDpOS5_(%"class.std::tuple.22.86.237.388"* noalias sret(%"class.std::tuple.22.86.237.388"), i32* dereferenceable(4), %"struct.pbbs::empty.87.238.389"* dereferenceable(1)) local_unnamed_addr #4
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local dereferenceable(1) %"class.std::tuple.80.231.382"* @_ZNSt5tupleIJbN4pbbs5emptyEEEaSIiS1_EENSt9enable_ifIXcl12__assignableIT_T0_EEERS2_E4typeEOS_IJS5_S6_EE(%"class.std::tuple.80.231.382"*, %"class.std::tuple.22.86.237.388"* dereferenceable(4)) local_unnamed_addr #4 align 2
@@ -1239,7 +1239,7 @@ declare dso_local dereferenceable(1) %"struct.pbbs::empty.87.238.389"* @_ZNSt11_
 declare dso_local dereferenceable(1) %"struct.pbbs::empty.87.238.389"* @_ZNSt10_Head_baseILm1EN4pbbs5emptyELb1EE7_M_headERS2_(%"struct.std::_Head_base.89.240.391"* dereferenceable(1)) local_unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12make_in_imapImZN16vertexSubsetDataIN4pbbs5emptyEEC1ElPSt5tupleIJbS2_EEEUlmE_E7in_imapIT_T0_EmSA_(%struct.in_imap.25.91.242.393* noalias sret, i64, %"class.std::tuple.80.231.382"**) local_unnamed_addr #0
+declare dso_local void @_Z12make_in_imapImZN16vertexSubsetDataIN4pbbs5emptyEEC1ElPSt5tupleIJbS2_EEEUlmE_E7in_imapIT_T0_EmSA_(%struct.in_imap.25.91.242.393* noalias sret(%struct.in_imap.25.91.242.393), i64, %"class.std::tuple.80.231.382"**) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local i64 @_ZN4pbbs6reduceI7in_imapImZN16vertexSubsetDataINS_5emptyEEC1ElPSt5tupleIJbS3_EEEUlmE_EZNS4_C1ElS7_EUlmmE_EENT_1TESB_RKT0_j(%struct.in_imap.25.91.242.393* byval(%struct.in_imap.25.91.242.393) align 8, %class.anon.27.92.243.394* dereferenceable(1), i32) local_unnamed_addr #0
@@ -1272,7 +1272,7 @@ declare dso_local zeroext i1 @_ZZN16vertexSubsetDataIN4pbbs5emptyEEC1ElPSt5tuple
 declare dso_local void @_ZZN4pbbs6reduceI7in_imapImZN16vertexSubsetDataINS_5emptyEEC1ElPSt5tupleIJbS3_EEEUlmE_EZNS4_C1ElS7_EUlmmE_EENT_1TESB_RKT0_jENKUlmmmE_clEmmm(%class.anon.29.93.244.395*, i64, i64, i64) local_unnamed_addr #11 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN7in_imapImZN16vertexSubsetDataIN4pbbs5emptyEEC1ElPSt5tupleIJbS2_EEEUlmE_E3cutEmm(%struct.in_imap.25.91.242.393* noalias sret, %struct.in_imap.25.91.242.393*, i64, i64) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN7in_imapImZN16vertexSubsetDataIN4pbbs5emptyEEC1ElPSt5tupleIJbS2_EEEUlmE_E3cutEmm(%struct.in_imap.25.91.242.393* noalias sret(%struct.in_imap.25.91.242.393), %struct.in_imap.25.91.242.393*, i64, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local void @_ZN7in_imapImZN16vertexSubsetDataIN4pbbs5emptyEEC1ElPSt5tupleIJbS2_EEEUlmE_EC2EmmS7_(%struct.in_imap.25.91.242.393*, i64, i64, %"class.std::tuple.80.231.382"**) unnamed_addr #4 align 2
@@ -1347,7 +1347,7 @@ declare dso_local i32 @_ZN8sequence8plusScanIjjEET_PS1_S2_T0_(i32*, i32*, i32) l
 declare dso_local %"class.std::tuple.35.101.252.403"* @_Z26get_emsparse_no_filter_genIN4pbbs5emptyELi0EEDaPSt5tupleIJjT_EE(%"class.std::tuple.35.101.252.403"*) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.39.103.254.405* noalias sret, i64, i32**) local_unnamed_addr #0
+declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.39.103.254.405* noalias sret(%struct.in_imap.39.103.254.405), i64, i32**) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local i64 @_ZN4pbbs13binary_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE25compressedSymmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.39.103.254.405* byval(%struct.in_imap.39.103.254.405) align 8, i32, %class.anon.41.104.255.406* dereferenceable(1)) local_unnamed_addr #0
@@ -1404,7 +1404,7 @@ declare dso_local i32 @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE25co
 declare dso_local i64 @_ZN4pbbs13linear_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE25compressedSymmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.39.103.254.405* byval(%struct.in_imap.39.103.254.405) align 8, i32, %class.anon.41.104.255.406* dereferenceable(1)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.39.103.254.405* noalias sret, %struct.in_imap.39.103.254.405*, i64, i64) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.39.103.254.405* noalias sret(%struct.in_imap.39.103.254.405), %struct.in_imap.39.103.254.405*, i64, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local i32 @_ZZ23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_jENKUlmE_clEm(%class.anon.40.102.253.404*, i64) local_unnamed_addr #13 align 2
@@ -1428,7 +1428,7 @@ declare dso_local zeroext i1 @_ZN17decode_compressed10sparseTSeqI5BFS_FZ26get_em
 declare dso_local zeroext i1 @_ZZ26get_emsparse_no_filter_genIN4pbbs5emptyELi0EEDaPSt5tupleIJjT_EEENKUljjbE_clEjjb(%class.anon.38.105.256.407*, i32, i32, i1 zeroext) local_unnamed_addr #11 align 2
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
-declare dso_local void @_ZSt10make_tupleIJRjN4pbbs5emptyEEESt5tupleIJDpNSt25__strip_reference_wrapperINSt5decayIT_E4typeEE6__typeEEEDpOS6_(%"class.std::tuple.35.101.252.403"* noalias sret, i32* dereferenceable(4), %"struct.pbbs::empty.87.238.389"* dereferenceable(1)) local_unnamed_addr #4
+declare dso_local void @_ZSt10make_tupleIJRjN4pbbs5emptyEEESt5tupleIJDpNSt25__strip_reference_wrapperINSt5decayIT_E4typeEE6__typeEEEDpOS6_(%"class.std::tuple.35.101.252.403"* noalias sret(%"class.std::tuple.35.101.252.403"), i32* dereferenceable(4), %"struct.pbbs::empty.87.238.389"* dereferenceable(1)) local_unnamed_addr #4
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local dereferenceable(4) %"class.std::tuple.35.101.252.403"* @_ZNSt5tupleIJjN4pbbs5emptyEEEaSEOS2_(%"class.std::tuple.35.101.252.403"*, %"class.std::tuple.35.101.252.403"* dereferenceable(4)) local_unnamed_addr #4 align 2
@@ -1551,7 +1551,7 @@ declare dso_local zeroext i1 @_ZN17decode_compressed7sparseTI5BFS_FZ16get_emspar
 declare dso_local void @_ZZ16get_emsparse_genIN4pbbs5emptyELi0EEDaPSt5tupleIJjT_EEENKUljjbE_clEjjb(%class.anon.48.111.262.413*, i32, i32, i1 zeroext) local_unnamed_addr #11 align 2
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
-declare dso_local void @_ZSt10make_tupleIJjN4pbbs5emptyEEESt5tupleIJDpNSt25__strip_reference_wrapperINSt5decayIT_E4typeEE6__typeEEEDpOS5_(%"class.std::tuple.35.101.252.403"* noalias sret, i32* dereferenceable(4), %"struct.pbbs::empty.87.238.389"* dereferenceable(1)) local_unnamed_addr #4
+declare dso_local void @_ZSt10make_tupleIJjN4pbbs5emptyEEESt5tupleIJDpNSt25__strip_reference_wrapperINSt5decayIT_E4typeEE6__typeEEEDpOS5_(%"class.std::tuple.35.101.252.403"* noalias sret(%"class.std::tuple.35.101.252.403"), i32* dereferenceable(4), %"struct.pbbs::empty.87.238.389"* dereferenceable(1)) local_unnamed_addr #4
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local void @_ZNSt5tupleIJjN4pbbs5emptyEEEC2IjS1_Lb1EEEOT_OT0_(%"class.std::tuple.35.101.252.403"*, i32* dereferenceable(4), %"struct.pbbs::empty.87.238.389"* dereferenceable(1)) unnamed_addr #4 align 2
@@ -1608,25 +1608,25 @@ declare dso_local void @_ZN5graphI26compressedAsymmetricVertexEC2EPS0_llP9Deleta
 declare dso_local void @_ZN14Compressed_MemI26compressedAsymmetricVertexE3delEv(%struct.Compressed_Mem.55.117.268.419*) unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z7edgeMapI26compressedAsymmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.2.49.202.353* byval(%struct.graph.2.49.202.353) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z7edgeMapI26compressedAsymmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.2.49.202.353* byval(%struct.graph.2.49.202.353) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.2.49.202.353* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.2.49.202.353* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local i32 @_ZNK26compressedAsymmetricVertex12getOutDegreeEv(%struct.compressedAsymmetricVertex.48.201.352*) local_unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.2.49.202.353* byval(%struct.graph.2.49.202.353) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.2.49.202.353* byval(%struct.graph.2.49.202.353) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.2.49.202.353* byval(%struct.graph.2.49.202.353) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.2.49.202.353* byval(%struct.graph.2.49.202.353) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.2.49.202.353* dereferenceable(48), %struct.compressedAsymmetricVertex.48.201.352*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.2.49.202.353* dereferenceable(48), %struct.compressedAsymmetricVertex.48.201.352*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.2.49.202.353* dereferenceable(48), %struct.compressedAsymmetricVertex.48.201.352*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.2.49.202.353* dereferenceable(48), %struct.compressedAsymmetricVertex.48.201.352*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN26compressedAsymmetricVertex12decodeOutNghI5BFS_FZ23get_emdense_forward_genIN4pbbs5emptyELi0EEDaPSt5tupleIJbT_EEEUljbE_EEvlRS6_RT0_(%struct.compressedAsymmetricVertex.48.201.352*, i64, %struct.BFS_F.62.215.366* dereferenceable(8), %class.anon.19.81.232.383* dereferenceable(8)) local_unnamed_addr #11 align 2
@@ -1662,7 +1662,7 @@ declare dso_local i8* @_ZN26compressedAsymmetricVertex14getInNeighborsEv(%struct
 declare dso_local void @_ZN17decode_compressed21decodeInNghBreakEarlyI26compressedAsymmetricVertex5BFS_FZ24get_emdense_nooutput_genIN4pbbs5emptyELi0EEDavEUljbE_16vertexSubsetDataIS5_EEEvPT_lRT2_RT0_RT1_b(%struct.compressedAsymmetricVertex.48.201.352*, i64, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), %class.anon.32.96.247.398* dereferenceable(1), i1 zeroext) local_unnamed_addr #11
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.56.119.270.421* noalias sret, i64, i32**) local_unnamed_addr #0
+declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.56.119.270.421* noalias sret(%struct.in_imap.56.119.270.421), i64, i32**) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local i64 @_ZN4pbbs13binary_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.56.119.270.421* byval(%struct.in_imap.56.119.270.421) align 8, i32, %class.anon.58.120.271.422* dereferenceable(1)) local_unnamed_addr #0
@@ -1692,7 +1692,7 @@ declare dso_local i32 @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE26co
 declare dso_local i64 @_ZN4pbbs13linear_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.56.119.270.421* byval(%struct.in_imap.56.119.270.421) align 8, i32, %class.anon.58.120.271.422* dereferenceable(1)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.56.119.270.421* noalias sret, %struct.in_imap.56.119.270.421*, i64, i64) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.56.119.270.421* noalias sret(%struct.in_imap.56.119.270.421), %struct.in_imap.56.119.270.421*, i64, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local i32 @_ZZ23edgeMapSparse_no_filterIN4pbbs5emptyE26compressedAsymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_jENKUlmE_clEm(%class.anon.57.118.269.420*, i64) local_unnamed_addr #13 align 2
@@ -1755,7 +1755,7 @@ declare dso_local dereferenceable(8) i8** @_ZSt4moveIRPhEONSt16remove_referenceI
 declare dso_local dereferenceable(4) i32* @_ZSt4moveIRjEONSt16remove_referenceIT_E4typeEOS2_(i32* dereferenceable(4)) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-define linkonce_odr dso_local void @_Z19readGraphFromBinaryI15symmetricVertexE5graphIT_EPcb(%struct.graph.3.51.204.355* noalias sret %agg.result, i8* %iFile, i1 zeroext %isSymmetric) local_unnamed_addr #0 comdat personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) !dbg !4816 {
+define linkonce_odr dso_local void @_Z19readGraphFromBinaryI15symmetricVertexE5graphIT_EPcb(%struct.graph.3.51.204.355* noalias sret(%struct.graph.3.51.204.355) %agg.result, i8* %iFile, i1 zeroext %isSymmetric) local_unnamed_addr #0 comdat personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) !dbg !4816 {
 entry:
   %in = alloca %"class.std::basic_ifstream.36.189.340", align 8
   %n = alloca i64, align 8
@@ -2548,7 +2548,7 @@ unreachable:                                      ; preds = %lpad175
 }
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z17readGraphFromFileI15symmetricVertexE5graphIT_EPcbb(%struct.graph.3.51.204.355* noalias sret, i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
+declare dso_local void @_Z17readGraphFromFileI15symmetricVertexE5graphIT_EPcbb(%struct.graph.3.51.204.355* noalias sret(%struct.graph.3.51.204.355), i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
 
 ; Function Attrs: nounwind
 declare i8* @llvm.stacksave() #26
@@ -2811,22 +2811,22 @@ declare dso_local void @_ZNSt4pairIjlEC2IjRlLb1EEEOT_OT0_(%"struct.std::pair.74.
 declare dso_local dereferenceable(8) i64* @_ZSt7forwardIlEOT_RNSt16remove_referenceIS0_E4typeE(i64* dereferenceable(8)) local_unnamed_addr #4
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z7edgeMapI15symmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.3.51.204.355* byval(%struct.graph.3.51.204.355) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z7edgeMapI15symmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.3.51.204.355* byval(%struct.graph.3.51.204.355) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.3.51.204.355* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.3.51.204.355* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.3.51.204.355* byval(%struct.graph.3.51.204.355) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.3.51.204.355* byval(%struct.graph.3.51.204.355) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.3.51.204.355* byval(%struct.graph.3.51.204.355) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.3.51.204.355* byval(%struct.graph.3.51.204.355) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.3.51.204.355* dereferenceable(48), %struct.symmetricVertex.50.203.354*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.3.51.204.355* dereferenceable(48), %struct.symmetricVertex.50.203.354*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.3.51.204.355* dereferenceable(48), %struct.symmetricVertex.50.203.354*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.3.51.204.355* dereferenceable(48), %struct.symmetricVertex.50.203.354*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN15symmetricVertex12decodeOutNghI5BFS_FZ23get_emdense_forward_genIN4pbbs5emptyELi0EEDaPSt5tupleIJbT_EEEUljbE_EEvlRS6_RT0_(%struct.symmetricVertex.50.203.354*, i64, %struct.BFS_F.62.215.366* dereferenceable(8), %class.anon.19.81.232.383* dereferenceable(8)) local_unnamed_addr #11 align 2
@@ -2859,7 +2859,7 @@ declare dso_local i32 @_ZNK15symmetricVertex13getInNeighborEj(%struct.symmetricV
 declare dso_local void @_ZN19decode_uncompressed21decodeInNghBreakEarlyI15symmetricVertex5BFS_FZ24get_emdense_nooutput_genIN4pbbs5emptyELi0EEDavEUljbE_16vertexSubsetDataIS5_EEEvPT_lRT2_RT0_RT1_b(%struct.symmetricVertex.50.203.354*, i64, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), %class.anon.32.96.247.398* dereferenceable(1), i1 zeroext) local_unnamed_addr #11
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.77.139.290.441* noalias sret, i64, i32**) local_unnamed_addr #0
+declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.77.139.290.441* noalias sret(%struct.in_imap.77.139.290.441), i64, i32**) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local i64 @_ZN4pbbs13binary_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE15symmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.77.139.290.441* byval(%struct.in_imap.77.139.290.441) align 8, i32, %class.anon.79.140.291.442* dereferenceable(1)) local_unnamed_addr #0
@@ -2889,7 +2889,7 @@ declare dso_local i32 @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE15sy
 declare dso_local i64 @_ZN4pbbs13linear_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE15symmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.77.139.290.441* byval(%struct.in_imap.77.139.290.441) align 8, i32, %class.anon.79.140.291.442* dereferenceable(1)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.77.139.290.441* noalias sret, %struct.in_imap.77.139.290.441*, i64, i64) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.77.139.290.441* noalias sret(%struct.in_imap.77.139.290.441), %struct.in_imap.77.139.290.441*, i64, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local i32 @_ZZ23edgeMapSparse_no_filterIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_jENKUlmE_clEm(%class.anon.78.138.289.440*, i64) local_unnamed_addr #13 align 2
@@ -2937,10 +2937,10 @@ declare dso_local i64 @_ZN4pbbs13filter_serialISt5tupleIJjNS_5emptyEEEZ13edgeMap
 declare dso_local zeroext i1 @_ZZ13edgeMapSparseIN4pbbs5emptyE15symmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_jENKUlRSt5tupleIJjS1_EEE_clESK_(%class.anon.85.144.295.446*, %"class.std::tuple.35.101.252.403"* dereferenceable(4)) local_unnamed_addr #13 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z19readGraphFromBinaryI16asymmetricVertexE5graphIT_EPcb(%struct.graph.4.53.206.357* noalias sret, i8*, i1 zeroext) local_unnamed_addr #0
+declare dso_local void @_Z19readGraphFromBinaryI16asymmetricVertexE5graphIT_EPcb(%struct.graph.4.53.206.357* noalias sret(%struct.graph.4.53.206.357), i8*, i1 zeroext) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z17readGraphFromFileI16asymmetricVertexE5graphIT_EPcbb(%struct.graph.4.53.206.357* noalias sret, i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
+declare dso_local void @_Z17readGraphFromFileI16asymmetricVertexE5graphIT_EPcbb(%struct.graph.4.53.206.357* noalias sret(%struct.graph.4.53.206.357), i8*, i1 zeroext, i1 zeroext) local_unnamed_addr #0
 
 ; Function Attrs: nounwind sanitize_cilk uwtable
 declare dso_local void @_ZN16asymmetricVertex12setOutDegreeEj(%struct.asymmetricVertex.52.205.356*, i32) local_unnamed_addr #4 align 2
@@ -2973,22 +2973,22 @@ declare dso_local void @_ZN16Uncompressed_MemI16asymmetricVertexE3delEv(%struct.
 declare dso_local void @_ZN16asymmetricVertex3delEv(%struct.asymmetricVertex.52.205.356*) local_unnamed_addr #4 align 2
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z7edgeMapI16asymmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.4.53.206.357* byval(%struct.graph.4.53.206.357) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z7edgeMapI16asymmetricVertex16vertexSubsetDataIN4pbbs5emptyEE5BFS_FES4_5graphIT_ERT0_T1_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.4.53.206.357* byval(%struct.graph.4.53.206.357) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.4.53.206.357* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
+declare dso_local void @_Z11edgeMapDataIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.4.53.206.357* dereferenceable(48), %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, i32* dereferenceable(4)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.4.53.206.357* byval(%struct.graph.4.53.206.357) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.4.53.206.357* byval(%struct.graph.4.53.206.357) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.4.53.206.357* byval(%struct.graph.4.53.206.357) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.4.53.206.357* byval(%struct.graph.4.53.206.357) align 8, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.4.53.206.357* dereferenceable(48), %struct.asymmetricVertex.52.205.356*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.4.53.206.357* dereferenceable(48), %struct.asymmetricVertex.52.205.356*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret, %struct.graph.4.53.206.357* dereferenceable(48), %struct.asymmetricVertex.52.205.356*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
+declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData.61.214.365* noalias sret(%struct.vertexSubsetData.61.214.365), %struct.graph.4.53.206.357* dereferenceable(48), %struct.asymmetricVertex.52.205.356*, %struct.vertexSubsetData.61.214.365* dereferenceable(40), i32*, i32, %struct.BFS_F.62.215.366* dereferenceable(8), i32) local_unnamed_addr #0
 
 ; Function Attrs: inlinehint sanitize_cilk uwtable
 declare dso_local void @_ZN16asymmetricVertex12decodeOutNghI5BFS_FZ23get_emdense_forward_genIN4pbbs5emptyELi0EEDaPSt5tupleIJbT_EEEUljbE_EEvlRS6_RT0_(%struct.asymmetricVertex.52.205.356*, i64, %struct.BFS_F.62.215.366* dereferenceable(8), %class.anon.19.81.232.383* dereferenceable(8)) local_unnamed_addr #11 align 2
@@ -3021,7 +3021,7 @@ declare dso_local i32 @_ZNK16asymmetricVertex13getInNeighborEj(%struct.asymmetri
 declare dso_local void @_ZN19decode_uncompressed21decodeInNghBreakEarlyI16asymmetricVertex5BFS_FZ24get_emdense_nooutput_genIN4pbbs5emptyELi0EEDavEUljbE_16vertexSubsetDataIS5_EEEvPT_lRT2_RT0_RT1_b(%struct.asymmetricVertex.52.205.356*, i64, %struct.vertexSubsetData.61.214.365* dereferenceable(40), %struct.BFS_F.62.215.366* dereferenceable(8), %class.anon.32.96.247.398* dereferenceable(1), i1 zeroext) local_unnamed_addr #11
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.88.147.298.449* noalias sret, i64, i32**) local_unnamed_addr #0
+declare dso_local void @_Z12make_in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E7in_imapIS7_SA_EmSA_(%struct.in_imap.88.147.298.449* noalias sret(%struct.in_imap.88.147.298.449), i64, i32**) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
 declare dso_local i64 @_ZN4pbbs13binary_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE16asymmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.88.147.298.449* byval(%struct.in_imap.88.147.298.449) align 8, i32, %class.anon.90.148.299.450* dereferenceable(1)) local_unnamed_addr #0
@@ -3051,7 +3051,7 @@ declare dso_local i32 @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE16as
 declare dso_local i64 @_ZN4pbbs13linear_searchI7in_imapIjZ23edgeMapSparse_no_filterINS_5emptyE16asymmetricVertex16vertexSubsetDataIS3_E5BFS_FES5_IT_ER5graphIT0_EPSB_RT1_PjjRT2_jEUlmE_EZS2_IS3_S4_S6_S7_ES9_SD_SE_SG_SH_jSJ_jEUlRKjSN_E_EEmS8_NS8_1TERKSB_(%struct.in_imap.88.147.298.449* byval(%struct.in_imap.88.147.298.449) align 8, i32, %class.anon.90.148.299.450* dereferenceable(1)) local_unnamed_addr #0
 
 ; Function Attrs: sanitize_cilk uwtable
-declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.88.147.298.449* noalias sret, %struct.in_imap.88.147.298.449*, i64, i64) local_unnamed_addr #0 align 2
+declare dso_local void @_ZN7in_imapIjZ23edgeMapSparse_no_filterIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS2_E5BFS_FES4_IT_ER5graphIT0_EPSA_RT1_PjjRT2_jEUlmE_E5sliceEmm(%struct.in_imap.88.147.298.449* noalias sret(%struct.in_imap.88.147.298.449), %struct.in_imap.88.147.298.449*, i64, i64) local_unnamed_addr #0 align 2
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
 declare dso_local i32 @_ZZ23edgeMapSparse_no_filterIN4pbbs5emptyE16asymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_jENKUlmE_clEm(%class.anon.89.146.297.448*, i64) local_unnamed_addr #13 align 2

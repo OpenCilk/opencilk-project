@@ -18,6 +18,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/MDBuilder.h"
@@ -352,6 +353,7 @@ PreservedAnalyses LoopVersioningPass::run(Function &F,
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
+  auto &TI = AM.getResult<TaskAnalysis>(F);
   auto &AA = AM.getResult<AAManager>(F);
   auto &AC = AM.getResult<AssumptionAnalysis>(F);
   MemorySSA *MSSA = EnableMSSALoopDependency
@@ -360,8 +362,8 @@ PreservedAnalyses LoopVersioningPass::run(Function &F,
 
   auto &LAM = AM.getResult<LoopAnalysisManagerFunctionProxy>(F).getManager();
   auto GetLAA = [&](Loop &L) -> const LoopAccessInfo & {
-    LoopStandardAnalysisResults AR = {AA,  AC,  DT,      LI,  SE,
-                                      TLI, TTI, nullptr, MSSA};
+    LoopStandardAnalysisResults AR = {AA,  AC,  DT, LI,      SE,
+                                      TLI, TTI, TI, nullptr, MSSA};
     return LAM.getResult<LoopAccessAnalysis>(L, AR);
   };
 

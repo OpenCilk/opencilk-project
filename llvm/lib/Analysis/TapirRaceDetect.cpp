@@ -293,12 +293,12 @@ public:
   //   DenseMap<MemAccessInfo, SmallPtrSet<Value *, 1>>;
   using AccessToUnderlyingObjMap = RaceInfo::AccessToUnderlyingObjMap;
 
-  AccessPtrAnalysis(const DataLayout &DL, DominatorTree &DT, TaskInfo &TI,
-                    LoopInfo &LI, DependenceInfo &DI, ScalarEvolution &SE,
+  AccessPtrAnalysis(DominatorTree &DT, TaskInfo &TI, LoopInfo &LI,
+                    DependenceInfo &DI, ScalarEvolution &SE,
                     const TargetLibraryInfo *TLI,
                     AccessToUnderlyingObjMap &AccessToObjs)
-      : DL(DL), DT(DT), TI(TI), LI(LI), DI(DI), AA(DI.getAA()), SE(SE),
-        TLI(TLI), AccessToObjs(AccessToObjs), MPTasksInLoop(LI) {
+      : DT(DT), TI(TI), LI(LI), DI(DI), AA(DI.getAA()), SE(SE), TLI(TLI),
+        AccessToObjs(AccessToObjs), MPTasksInLoop(LI) {
     TI.evaluateParallelState<MaybeParallelTasks>(MPTasks);
 
     std::vector<std::string> AllABIListFiles;
@@ -340,7 +340,6 @@ private:
   void recordLocalRace(const GeneralAccess &GA, RaceInfo::ResultTy &Result,
                        RaceInfo::ObjectMRTy &ObjectMRForRace,
                        const GeneralAccess &Competitor);
-  const DataLayout &DL;
   DominatorTree &DT;
   TaskInfo &TI;
   LoopInfo &LI;
@@ -605,7 +604,7 @@ void AccessPtrAnalysis::addAccess(Instruction *I) {
     } else {
       MemoryLocation Loc = MemoryLocation::get(I);
       if (Loc.Ptr) {
-        if (const Value *UnderlyingObj = GetUnderlyingObject(Loc.Ptr, DL, 0)) {
+        if (const Value *UnderlyingObj = getUnderlyingObject(Loc.Ptr, 0)) {
           if (const GlobalVariable *GV =
               dyn_cast<GlobalVariable>(UnderlyingObj))
             if (ABIList.isIn(*GV))
@@ -636,8 +635,7 @@ void AccessPtrAnalysis::addAccess(Instruction *I) {
       SmallVector<const Value *, 1> Objects;
       LLVM_DEBUG(dbgs() << "Getting underlying objects for " << *Acc.getPtr()
                  << "\n");
-      GetUnderlyingObjects(const_cast<Value *>(Acc.getPtr()), Objects, DL, &LI,
-                           0);
+      getUnderlyingObjects(const_cast<Value *>(Acc.getPtr()), Objects, &LI, 0);
       for (const Value *Obj : Objects) {
         LLVM_DEBUG(dbgs() << "  Considering object: " << *Obj << "\n");
         // nullptr never alias, don't join sets for pointer that have "null" in
@@ -1202,14 +1200,16 @@ AccessPtrAnalysis::underlyingObjectsAlias(const GeneralAccess &GAA,
   MemoryLocation LocB = *GAB.Loc;
   // Check the original locations (minus size) for noalias, which can happen for
   // tbaa, incompatible underlying object locations, etc.
-  MemoryLocation LocAS(LocA.Ptr, LocationSize::unknown(), LocA.AATags);
-  MemoryLocation LocBS(LocB.Ptr, LocationSize::unknown(), LocB.AATags);
+  MemoryLocation LocAS =
+      MemoryLocation::getBeforeOrAfter(LocA.Ptr, LocA.AATags);
+  MemoryLocation LocBS =
+      MemoryLocation::getBeforeOrAfter(LocB.Ptr, LocB.AATags);
   if (AA->alias(LocAS, LocBS) == NoAlias)
     return NoAlias;
 
   // Check the underlying objects are the same
-  const Value *AObj = GetUnderlyingObject(LocA.Ptr, DL);
-  const Value *BObj = GetUnderlyingObject(LocB.Ptr, DL);
+  const Value *AObj = getUnderlyingObject(LocA.Ptr);
+  const Value *BObj = getUnderlyingObject(LocB.Ptr);
 
   // If the underlying objects are the same, they must alias
   if (AObj == BObj)
@@ -1933,7 +1933,8 @@ void AccessPtrAnalysis::processAccessPtrs(
                    << "  Arg: " << *ArgPtr << "\n";
           });
         if (!GA.getPtr()) {
-          ModRefInfo MRI = AA->getModRefInfo(GA.I, MemoryLocation(ArgPtr));
+          ModRefInfo MRI =
+              AA->getModRefInfo(GA.I, MemoryLocation::getBeforeOrAfter(ArgPtr));
           Argument *Arg = cast<Argument>(ArgPtr);
           if (isModSet(MRI) && !Arg->onlyReadsMemory()) {
             LLVM_DEBUG(dbgs() << "  Mod is set.\n");
@@ -1948,7 +1949,7 @@ void AccessPtrAnalysis::processAccessPtrs(
           }
         } else {
           MemoryLocation GALoc = *GA.Loc;
-          if (AA->alias(GALoc, MemoryLocation(ArgPtr))) {
+          if (AA->alias(GALoc, MemoryLocation::getBeforeOrAfter(ArgPtr))) {
             Argument *Arg = cast<Argument>(ArgPtr);
             if (GA.isMod() && !Arg->onlyReadsMemory()) {
               LLVM_DEBUG(dbgs() << "  Mod is set.\n");
@@ -2078,12 +2079,10 @@ void RaceInfo::print(raw_ostream &OS) const {
 void RaceInfo::analyzeFunction() {
   LLVM_DEBUG(dbgs() << "Analyzing function '" << F->getName() << "'\n");
 
-  const DataLayout &DL = F->getParent()->getDataLayout();
-
   // At a high level, we need to identify pairs of instructions that might
   // execute in parallel and alias.
 
-  AccessPtrAnalysis APA(DL, DT, TI, LI, DI, SE, TLI, AccessToObjs);
+  AccessPtrAnalysis APA(DT, TI, LI, DI, SE, TLI, AccessToObjs);
   // Record pointer arguments to this function
   for (Argument &Arg : F->args())
     if (Arg.getType()->isPtrOrPtrVectorTy())

@@ -58,10 +58,12 @@ class BasicBlock;
 class CatchPadInst;
 class CatchReturnInst;
 class DominatorTree;
+class DetachInst;
 class FenceInst;
 class Function;
 class InvokeInst;
 class PreservedAnalyses;
+class SyncInst;
 class TargetLibraryInfo;
 class Value;
 

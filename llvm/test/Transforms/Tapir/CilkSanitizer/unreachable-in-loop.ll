@@ -704,7 +704,7 @@ for.body263.lr.ph:                                ; preds = %if.end252
 
 for.cond.cleanup262:                              ; preds = %for.body263
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %6) #2, !dbg !2940
-  invoke void @_ZN15AdjacencyMatrix35sparse_matrix_vector_multiplicationERKSt6vectorIjSaIjEE(%"class.std::vector"* nonnull sret %r1, %class.AdjacencyMatrix* nonnull %matrix, %"class.std::vector"* nonnull dereferenceable(24) %test_vector)
+  invoke void @_ZN15AdjacencyMatrix35sparse_matrix_vector_multiplicationERKSt6vectorIjSaIjEE(%"class.std::vector"* nonnull sret(%"class.std::vector") %r1, %class.AdjacencyMatrix* nonnull %matrix, %"class.std::vector"* nonnull dereferenceable(24) %test_vector)
           to label %invoke.cont274 unwind label %lpad273, !dbg !2941
 
 lpad254:                                          ; preds = %if.end252
@@ -736,7 +736,7 @@ invoke.cont274:                                   ; preds = %for.cond.cleanup262
   %vtable275 = load void (%"class.std::vector"*, %class.OFM*, %"class.std::vector"*)**, void (%"class.std::vector"*, %class.OFM*, %"class.std::vector"*)*** %78, align 8, !dbg !2964, !tbaa !2654
   %vfn276 = getelementptr inbounds void (%"class.std::vector"*, %class.OFM*, %"class.std::vector"*)*, void (%"class.std::vector"*, %class.OFM*, %"class.std::vector"*)** %vtable275, i64 4, !dbg !2964
   %79 = load void (%"class.std::vector"*, %class.OFM*, %"class.std::vector"*)*, void (%"class.std::vector"*, %class.OFM*, %"class.std::vector"*)** %vfn276, align 8, !dbg !2964
-  invoke void %79(%"class.std::vector"* nonnull sret %r2, %class.OFM* nonnull %28, %"class.std::vector"* nonnull dereferenceable(24) %test_vector)
+  invoke void %79(%"class.std::vector"* nonnull sret(%"class.std::vector") %r2, %class.OFM* nonnull %28, %"class.std::vector"* nonnull dereferenceable(24) %test_vector)
           to label %invoke.cont278 unwind label %lpad277, !dbg !2964
 
 invoke.cont278:                                   ; preds = %invoke.cont274
@@ -879,7 +879,7 @@ if.end334:                                        ; preds = %invoke.cont280, %la
   %rem.i902 = urem i32 %call.i901, %.pre, !dbg !3136
   call void @llvm.dbg.value(metadata i32 %rem.i902, metadata !2531, metadata !DIExpression()), !dbg !3137
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %13) #2, !dbg !3138
-  invoke void @_ZN15AdjacencyMatrix3bfsEj(%"class.std::vector"* nonnull sret %r3, %class.AdjacencyMatrix* nonnull %matrix, i32 %rem.i902)
+  invoke void @_ZN15AdjacencyMatrix3bfsEj(%"class.std::vector"* nonnull sret(%"class.std::vector") %r3, %class.AdjacencyMatrix* nonnull %matrix, i32 %rem.i902)
           to label %invoke.cont339 unwind label %lpad338, !dbg !3139
 
 invoke.cont339:                                   ; preds = %if.end334
@@ -888,7 +888,7 @@ invoke.cont339:                                   ; preds = %if.end334
   %vtable340 = load void (%"class.std::vector"*, %class.OFM*, i32)**, void (%"class.std::vector"*, %class.OFM*, i32)*** %98, align 8, !dbg !3141, !tbaa !2654
   %vfn341 = getelementptr inbounds void (%"class.std::vector"*, %class.OFM*, i32)*, void (%"class.std::vector"*, %class.OFM*, i32)** %vtable340, i64 12, !dbg !3141
   %99 = load void (%"class.std::vector"*, %class.OFM*, i32)*, void (%"class.std::vector"*, %class.OFM*, i32)** %vfn341, align 8, !dbg !3141
-  invoke void %99(%"class.std::vector"* nonnull sret %r4, %class.OFM* nonnull %28, i32 %rem.i902)
+  invoke void %99(%"class.std::vector"* nonnull sret(%"class.std::vector") %r4, %class.OFM* nonnull %28, i32 %rem.i902)
           to label %invoke.cont343 unwind label %lpad342, !dbg !3141
 
 invoke.cont343:                                   ; preds = %invoke.cont339
@@ -1101,7 +1101,7 @@ for.body421.lr.ph:                                ; preds = %if.end408
 
 for.cond.cleanup420:                              ; preds = %for.body421
   call void @llvm.lifetime.start.p0i8(i64 24, i8* nonnull %20) #2, !dbg !3404
-  invoke void @_ZN15AdjacencyMatrix8pagerankERKSt6vectorIfSaIfEE(%"class.std::vector.5"* nonnull sret %r5, %class.AdjacencyMatrix* nonnull %matrix, %"class.std::vector.5"* nonnull dereferenceable(24) %test_vector2)
+  invoke void @_ZN15AdjacencyMatrix8pagerankERKSt6vectorIfSaIfEE(%"class.std::vector.5"* nonnull sret(%"class.std::vector.5") %r5, %class.AdjacencyMatrix* nonnull %matrix, %"class.std::vector.5"* nonnull dereferenceable(24) %test_vector2)
           to label %invoke.cont434 unwind label %lpad433, !dbg !3405
 
 lpad412:                                          ; preds = %if.end408
@@ -1135,7 +1135,7 @@ invoke.cont434:                                   ; preds = %for.cond.cleanup420
   %vtable435 = load void (%"class.std::vector.5"*, %class.OFM*, %"class.std::vector.5"*)**, void (%"class.std::vector.5"*, %class.OFM*, %"class.std::vector.5"*)*** %128, align 8, !dbg !3432, !tbaa !2654
   %vfn436 = getelementptr inbounds void (%"class.std::vector.5"*, %class.OFM*, %"class.std::vector.5"*)*, void (%"class.std::vector.5"*, %class.OFM*, %"class.std::vector.5"*)** %vtable435, i64 10, !dbg !3432
   %129 = load void (%"class.std::vector.5"*, %class.OFM*, %"class.std::vector.5"*)*, void (%"class.std::vector.5"*, %class.OFM*, %"class.std::vector.5"*)** %vfn436, align 8, !dbg !3432
-  invoke void %129(%"class.std::vector.5"* nonnull sret %r6, %class.OFM* nonnull %28, %"class.std::vector.5"* nonnull dereferenceable(24) %test_vector2)
+  invoke void %129(%"class.std::vector.5"* nonnull sret(%"class.std::vector.5") %r6, %class.OFM* nonnull %28, %"class.std::vector.5"* nonnull dereferenceable(24) %test_vector2)
           to label %invoke.cont438 unwind label %lpad437, !dbg !3432
 
 invoke.cont438:                                   ; preds = %invoke.cont434
@@ -1766,11 +1766,11 @@ declare void @_ZN15AdjacencyMatrix11print_graphEv(%class.AdjacencyMatrix*) unnam
 
 declare void @_ZN15AdjacencyMatrix15add_edge_updateEjjj(%class.AdjacencyMatrix*, i32, i32, i32) unnamed_addr #0
 
-declare void @_ZN15AdjacencyMatrix35sparse_matrix_vector_multiplicationERKSt6vectorIjSaIjEE(%"class.std::vector"* sret, %class.AdjacencyMatrix*, %"class.std::vector"* dereferenceable(24)) unnamed_addr #0
+declare void @_ZN15AdjacencyMatrix35sparse_matrix_vector_multiplicationERKSt6vectorIjSaIjEE(%"class.std::vector"* sret(%"class.std::vector"), %class.AdjacencyMatrix*, %"class.std::vector"* dereferenceable(24)) unnamed_addr #0
 
-declare void @_ZN15AdjacencyMatrix3bfsEj(%"class.std::vector"* sret, %class.AdjacencyMatrix*, i32) unnamed_addr #0
+declare void @_ZN15AdjacencyMatrix3bfsEj(%"class.std::vector"* sret(%"class.std::vector"), %class.AdjacencyMatrix*, i32) unnamed_addr #0
 
-declare void @_ZN15AdjacencyMatrix8pagerankERKSt6vectorIfSaIfEE(%"class.std::vector.5"* sret, %class.AdjacencyMatrix*, %"class.std::vector.5"* dereferenceable(24)) unnamed_addr #0
+declare void @_ZN15AdjacencyMatrix8pagerankERKSt6vectorIfSaIfEE(%"class.std::vector.5"* sret(%"class.std::vector.5"), %class.AdjacencyMatrix*, %"class.std::vector.5"* dereferenceable(24)) unnamed_addr #0
 
 ; Function Attrs: nounwind
 declare void @_ZN15AdjacencyMatrixD1Ev(%class.AdjacencyMatrix*) unnamed_addr #1

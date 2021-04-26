@@ -44,6 +44,7 @@
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
@@ -330,7 +331,7 @@ static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
     assert(L.hasLoopInvariantOperands(I) &&
            "Insts in a loop's preheader should have loop invariant operands!");
     if (!canSinkOrHoistInst(*I, &AA, &DT, &L, CurAST, MSSAU.get(), false,
-                            LICMFlags.get(), TI))
+                            TI, LICMFlags.get()))
       continue;
     if (sinkInstruction(L, *I, ColdLoopBBs, LoopBlockNumber, LI, DT, BFI,
                         MSSAU.get()))

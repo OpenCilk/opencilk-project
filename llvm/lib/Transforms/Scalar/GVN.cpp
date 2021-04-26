@@ -40,6 +40,7 @@
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/PHITransAddr.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Config/llvm-config.h"
@@ -668,9 +669,10 @@ PreservedAnalyses GVN::run(Function &F, FunctionAnalysisManager &AM) {
   auto *MemDep =
       isMemDepEnabled() ? &AM.getResult<MemoryDependenceAnalysis>(F) : nullptr;
   auto *LI = AM.getCachedResult<LoopAnalysis>(F);
+  auto *TI = AM.getCachedResult<TaskAnalysis>(F);
   auto *MSSA = AM.getCachedResult<MemorySSAAnalysis>(F);
   auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(F);
-  bool Changed = runImpl(F, AC, DT, TLI, AA, MemDep, LI, &ORE,
+  bool Changed = runImpl(F, AC, DT, TLI, AA, MemDep, LI, &ORE, TI,
                          MSSA ? &MSSA->getMSSA() : nullptr);
   if (!Changed)
     return PreservedAnalyses::all();
@@ -681,6 +683,8 @@ PreservedAnalyses GVN::run(Function &F, FunctionAnalysisManager &AM) {
     PA.preserve<MemorySSAAnalysis>();
   if (LI)
     PA.preserve<LoopAnalysis>();
+  if (TI)
+    PA.preserve<TaskAnalysis>();
   return PA;
 }
 
@@ -2454,7 +2458,8 @@ bool GVN::processInstruction(Instruction *I) {
 bool GVN::runImpl(Function &F, AssumptionCache &RunAC, DominatorTree &RunDT,
                   const TargetLibraryInfo &RunTLI, AAResults &RunAA,
                   MemoryDependenceResults *RunMD, LoopInfo *LI,
-                  OptimizationRemarkEmitter *RunORE, MemorySSA *MSSA) {
+                  OptimizationRemarkEmitter *RunORE, TaskInfo *TI,
+                  MemorySSA *MSSA) {
   AC = &RunAC;
   DT = &RunDT;
   VN.setDomTree(DT);
@@ -2514,6 +2519,12 @@ bool GVN::runImpl(Function &F, AssumptionCache &RunAC, DominatorTree &RunDT,
   // Do not cleanup DeadBlocks in cleanupGlobalSets() as it's called for each
   // iteration.
   DeadBlocks.clear();
+
+  if (TI && Changed)
+    // Recompute task info.
+    // FIXME: Figure out a way to update task info that is less computationally
+    // wasteful.
+    TI->recalculate(F, *DT);
 
   if (MSSA && VerifyMemorySSA)
     MSSA->verifyMemorySSA();
@@ -3114,6 +3125,7 @@ public:
 
     auto *LIWP = getAnalysisIfAvailable<LoopInfoWrapperPass>();
 
+    auto *TIWP = getAnalysisIfAvailable<TaskInfoWrapperPass>();
     auto *MSSAWP = getAnalysisIfAvailable<MemorySSAWrapperPass>();
     return Impl.runImpl(
         F, getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F),
@@ -3125,6 +3137,7 @@ public:
             : nullptr,
         LIWP ? &LIWP->getLoopInfo() : nullptr,
         &getAnalysis<OptimizationRemarkEmitterWrapperPass>().getORE(),
+        TIWP ? &TIWP->getTaskInfo() : nullptr,
         MSSAWP ? &MSSAWP->getMSSA() : nullptr);
   }
 
@@ -3141,6 +3154,7 @@ public:
     AU.addPreserved<TargetLibraryInfoWrapperPass>();
     AU.addPreserved<LoopInfoWrapperPass>();
     AU.addRequired<OptimizationRemarkEmitterWrapperPass>();
+    AU.addPreserved<TaskInfoWrapperPass>();
     AU.addPreserved<MemorySSAWrapperPass>();
   }
 
@@ -3155,6 +3169,7 @@ INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
 INITIALIZE_PASS_DEPENDENCY(MemoryDependenceWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(GlobalsAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(OptimizationRemarkEmitterWrapperPass)

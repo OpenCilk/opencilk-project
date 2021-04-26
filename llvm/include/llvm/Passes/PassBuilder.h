@@ -373,7 +373,7 @@ public:
   /// and various LTO pipelines to lower Tapir constructs.  This pipeline is
   /// expected to run late in the parent pipelines.
   ModulePassManager buildTapirLoweringPipeline(OptimizationLevel Level,
-                                               ThinLTOPhase Phase);
+                                               ThinOrFullLTOPhase Phase);
 
   /// Build a per-module default optimization pipeline.
   ///

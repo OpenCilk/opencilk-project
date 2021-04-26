@@ -166,6 +166,7 @@
 ; CHECK-NEXT:         Aggressive Dead Code Elimination
 ; CHECK-NEXT:         Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:         Function Alias Analysis Results
+; CHECK-NEXT:         Tapir Task Information
 ; CHECK-NEXT:         Memory SSA
 ; CHECK-NEXT:         MemCpy Optimization
 ; CHECK-NEXT:         Natural Loop Information
@@ -175,7 +176,6 @@
 ; CHECK-NEXT:         Loop-Closed SSA Form Pass
 ; CHECK-NEXT:         Function Alias Analysis Results
 ; CHECK-NEXT:         Scalar Evolution Analysis
-; CHECK-NEXT:         Tapir Task Information
 ; CHECK-NEXT:         Lazy Branch Probability Analysis
 ; CHECK-NEXT:         Lazy Block Frequency Analysis
 ; CHECK-NEXT:         Loop Pass Manager
@@ -234,6 +234,9 @@
 ; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Simplify loop CFG
 ; CHECK-NEXT:         Induction Variable Simplification
+; CHECK-NEXT:       Lazy Branch Probability Analysis
+; CHECK-NEXT:       Lazy Block Frequency Analysis
+; CHECK-NEXT:       Loop Pass Manager
 ; CHECK-NEXT:         Loop Invariant Code Motion
 ; CHECK-NEXT:       Early CSE
 ; CHECK-NEXT:       Lazy Value Information Analysis
@@ -319,7 +322,6 @@
 ; CHECK-NEXT:       LCSSA Verifier
 ; CHECK-NEXT:       Loop-Closed SSA Form Pass
 ; CHECK-NEXT:       Scalar Evolution Analysis
-; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Lazy Branch Probability Analysis
 ; CHECK-NEXT:       Lazy Block Frequency Analysis
 ; CHECK-NEXT:       Loop Pass Manager
