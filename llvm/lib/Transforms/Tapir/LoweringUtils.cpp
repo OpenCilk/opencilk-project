@@ -69,12 +69,15 @@ findTaskInputsOutputs(const Task *T, ValueSet &Inputs, ValueSet &Outputs,
   NamedRegionTimer NRT("findTaskInputsOutputs", "Find task inputs and outputs",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
-  // Get the sync region for this task's detach, so we can filter it out of
-  // this inputs.
+  // Get the sync region for this task's detach, so we can filter it out of this
+  // task's inputs.
   const Value *SyncRegion = nullptr;
   SmallPtrSet<BasicBlock *, 8> UnwindPHIs;
   if (DetachInst *DI = T->getDetach()) {
     SyncRegion = DI->getSyncRegion();
+    // Ignore PHIs in the unwind destination of the detach.
+    if (DI->hasUnwindDest())
+      UnwindPHIs.insert(DI->getUnwindDest());
     // Get the PHI nodes that directly or indirectly use the landing pad of the
     // unwind destination of this task's detach.
     getDetachUnwindPHIUses(DI, UnwindPHIs);
@@ -725,8 +728,11 @@ Function *llvm::createHelperForTask(
 static void unlinkTaskEHFromParent(Task *T) {
   DetachInst *DI = T->getDetach();
 
-  // Get the PHI's that use the landing pad of the detach's unwind.
   SmallPtrSet<BasicBlock *, 8> UnwindPHIs;
+  if (DI->hasUnwindDest())
+    // Get PHIs in the unwind destination of the detach.
+    UnwindPHIs.insert(DI->getUnwindDest());
+  // Get the PHI's that use the landing pad of the detach's unwind.
   getDetachUnwindPHIUses(DI, UnwindPHIs);
 
   SmallVector<Instruction *, 8> ToRemove;
