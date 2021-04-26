@@ -484,6 +484,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
     }
   }
 
+  DetachInst *DI = cast<DetachInst>(Header->getTerminator());
   // Create new copies of the EH blocks to clone.  We can handle these blocks
   // more simply than the loop blocks.
   for (BasicBlock *BB : ExtraTaskBlocks) {
@@ -503,6 +504,18 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
       else
         DT->addNewBlock(NewBB, cast<BasicBlock>(IDomBB));
     }
+
+    // Update PHI nodes in the detach-unwind destination.  Strictly speaking,
+    // this step isn't necessary, since the epilog loop will be serialized later
+    // and these new entries for the PHI nodes will therefore be removed.  But
+    // the routine for serializing the detach expects valid LLVM, so we update
+    // the PHI nodes here to ensure the resulting LLVM is valid.
+    if (DI->hasUnwindDest())
+      if (isDetachedRethrow(BB->getTerminator(), DI->getSyncRegion())) {
+        InvokeInst *DR = dyn_cast<InvokeInst>(BB->getTerminator());
+        for (PHINode &PN : DR->getUnwindDest()->phis())
+          PN.addIncoming(PN.getIncomingValueForBlock(BB), NewBB);
+      }
   }
 
   // Change the incoming values to the ones defined in the preheader or
@@ -529,6 +542,17 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
         NewPHI->setIncomingValue(idx, V);
     }
   }
+  // Add entries to PHI nodes outside of loop.  Strictly speaking, this step
+  // isn't necessary, since the epilog loop will be serialized later and these
+  // new entries for the PHI nodes will therefore be removed.  But the routine
+  // for serializing the detach expects valid LLVM, so we update the PHI nodes
+  // here to ensure the resulting LLVM is valid.
+  BasicBlock *ClonedHeader = cast<BasicBlock>(VMap[Header]);
+  DetachInst *ClonedDetach = cast<DetachInst>(ClonedHeader->getTerminator());
+  if (BasicBlock *Unwind = ClonedDetach->getUnwindDest())
+    for (PHINode &PN : Unwind->phis())
+      PN.addIncoming(PN.getIncomingValueForBlock(Header), ClonedHeader);
+
   if (CreateRemainderLoop) {
     Loop *NewLoop = NewLoops[L];
     assert(NewLoop && "L should have been cloned");
