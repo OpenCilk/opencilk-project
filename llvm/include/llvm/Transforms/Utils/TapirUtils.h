@@ -78,7 +78,7 @@ Spindle *getTaskFrameForTask(Task *T);
 
 // Removes the given sync.unwind instruction, if it is dead.  Returns true if
 // the sync.unwind was removed, false otherwise.
-bool removeDeadSyncUnwind(CallBase *SyncUnwind, DomTreeUpdater *DTU);
+bool removeDeadSyncUnwind(CallBase *SyncUnwind, DomTreeUpdater *DTU = nullptr);
 
 /// Returns true if the reattach instruction appears to match the given detach
 /// instruction, false otherwise.

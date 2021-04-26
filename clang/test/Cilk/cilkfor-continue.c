@@ -2,7 +2,7 @@
 // the reattach for the loop body, and that the CFG generated for such
 // a loop is valid.
 //
-// RUN: %clang_cc1 %s -std=c99 -triple x86_64-unknown-linux-gnu -O1 -fcilkplus -ftapir=none -verify -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -std=c99 -triple x86_64-unknown-linux-gnu -O1 -fopencilk -ftapir=none -verify -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 
 # 1 "<built-in>"

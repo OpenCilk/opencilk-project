@@ -48,7 +48,7 @@ declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #3
 declare dso_local noalias i8* @malloc(i64) local_unnamed_addr #4
 
 ; Function Attrs: inlinehint nounwind sanitize_cilk uwtable
-declare dso_local fastcc void @boundary_make(%struct.Boundary.28.72.127.138.149* noalias sret, double, double, double) unnamed_addr #5
+declare dso_local fastcc void @boundary_make(%struct.Boundary.28.72.127.138.149* noalias sret(%struct.Boundary.28.72.127.138.149), double, double, double) unnamed_addr #5
 
 declare dso_local %struct.QuadTree.29.73.128.139.150* @quadtree_new(%struct.Boundary.28.72.127.138.149* byval(%struct.Boundary.28.72.127.138.149) align 8, %struct.QuadTree.29.73.128.139.150*) local_unnamed_addr #0
 

@@ -18,6 +18,10 @@
 TLI_DEFINE_STRING_INTERNAL("__cilkrts_get_nworkers")
 /// unsigned __cilkrts_get_worker_number(void);
 TLI_DEFINE_STRING_INTERNAL("__cilkrts_get_worker_number")
+/// void __cilkrts_hyper_create(__cilkrts_hyperobject_base *key);
+TLI_DEFINE_STRING_INTERNAL("__cilkrts_hyper_create")
+/// void __cilkrts_hyper_destroy(__cilkrts_hyperobject_base *key);
+TLI_DEFINE_STRING_INTERNAL("__cilkrts_hyper_destroy")
 /// void *__cilkrts_hyper_lookup(__cilkrts_hyperobject_base *key);
 TLI_DEFINE_STRING_INTERNAL("__cilkrts_hyper_lookup")
 #endif

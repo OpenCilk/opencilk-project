@@ -308,11 +308,12 @@ Function *llvm::CreateHelper(
     if (VectorType *VT = dyn_cast<VectorType>(I->getType())) {
       VectorArg = true;
       ElementCount EC = VT->getElementCount();
-      if (EC.Scalable)
+      if (EC.isScalable())
         // If we have a scalable vector, give up.
         MaxVectorArgWidth = std::numeric_limits<uint64_t>::max();
       else {
-        unsigned VectorArgWidth = EC.Min * VT->getScalarSizeInBits();
+        unsigned VectorArgWidth =
+            EC.getKnownMinValue() * VT->getScalarSizeInBits();
         if (MaxVectorArgWidth < VectorArgWidth)
           MaxVectorArgWidth = VectorArgWidth;
       }

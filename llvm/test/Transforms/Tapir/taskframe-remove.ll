@@ -9284,7 +9284,7 @@ _ZN6miniFE23simple_mesh_descriptionIiED2Ev.exit:  ; preds = %_ZNSt3setIiSt4lessI
 
 declare dso_local %class.YAML_Element* @_ZN12YAML_Element3addERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEd(%class.YAML_Element*, %"class.std::__cxx11::basic_string"* dereferenceable(32), double) local_unnamed_addr #0
 
-declare dso_local void @_ZN8YAML_Doc12generateYAMLB5cxx11Ev(%"class.std::__cxx11::basic_string"* sret, %class.YAML_Doc*) local_unnamed_addr #0
+declare dso_local void @_ZN8YAML_Doc12generateYAMLB5cxx11Ev(%"class.std::__cxx11::basic_string"* sret(%"class.std::__cxx11::basic_string"), %class.YAML_Doc*) local_unnamed_addr #0
 
 declare dso_local void @_ZN6miniFE12finalize_mpiEv() local_unnamed_addr #0
 
@@ -9351,7 +9351,7 @@ declare dso_local void @_ZNSt9basic_iosIcSt11char_traitsIcEE5clearESt12_Ios_Iost
 declare dso_local i64 @strlen(i8* nocapture) local_unnamed_addr #10
 
 ; Function Attrs: uwtable
-declare dso_local void @_ZNKSt7__cxx1115basic_stringbufIcSt11char_traitsIcESaIcEE3strEv(%"class.std::__cxx11::basic_string"* noalias sret, %"class.std::__cxx11::basic_stringbuf"*) local_unnamed_addr #8 align 2
+declare dso_local void @_ZNKSt7__cxx1115basic_stringbufIcSt11char_traitsIcESaIcEE3strEv(%"class.std::__cxx11::basic_string"* noalias sret(%"class.std::__cxx11::basic_string"), %"class.std::__cxx11::basic_stringbuf"*) local_unnamed_addr #8 align 2
 
 ; Function Attrs: uwtable
 declare dso_local dereferenceable(32) %"class.std::__cxx11::basic_string"* @_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE6assignIPcvEERS4_T_S8_(%"class.std::__cxx11::basic_string"*, i8*, i8*) local_unnamed_addr #8 align 2
