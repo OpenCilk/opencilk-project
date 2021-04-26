@@ -29,6 +29,7 @@
 #include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/BasicBlock.h"
@@ -2162,8 +2163,9 @@ void postUnswitch(Loop &L, LPMUpdater &U, StringRef LoopName,
 static void unswitchNontrivialInvariants(
     Loop &L, Instruction &TI, ArrayRef<Value *> Invariants,
     IVConditionInfo &PartialIVInfo, DominatorTree &DT, LoopInfo &LI,
-    AssumptionCache &AC, ScalarEvolution *SE, MemorySSAUpdater *MSSAU,
-    LPMUpdater &LoopUpdater, bool InsertFreeze, bool InjectedCondition) {
+    AssumptionCache &AC, ScalarEvolution *SE, TaskInfo *TaskI,
+    MemorySSAUpdater *MSSAU, LPMUpdater &LoopUpdater, bool InsertFreeze,
+    bool InjectedCondition) {
   auto *ParentBB = TI.getParent();
   BranchInst *BI = dyn_cast<BranchInst>(&TI);
   SwitchInst *SI = BI ? nullptr : cast<SwitchInst>(&TI);
@@ -2322,7 +2324,7 @@ static void unswitchNontrivialInvariants(
       // guaranteed no reach implicit null check after following this branch.
       ICFLoopSafetyInfo SafetyInfo;
       SafetyInfo.computeLoopSafetyInfo(&L);
-      if (!SafetyInfo.isGuaranteedToExecute(TI, &DT, &L))
+      if (!SafetyInfo.isGuaranteedToExecute(TI, &DT, TaskI, &L))
         TI.setMetadata(LLVMContext::MD_make_implicit, nullptr);
     }
   }
@@ -3535,8 +3537,8 @@ static bool unswitchBestCondition(Loop &L, DominatorTree &DT, LoopInfo &LI,
   LLVM_DEBUG(dbgs() << "  Unswitching non-trivial (cost = " << Best.Cost
                     << ") terminator: " << *Best.TI << "\n");
   unswitchNontrivialInvariants(L, *Best.TI, Best.Invariants, PartialIVInfo, DT,
-                               LI, AC, SE, MSSAU, LoopUpdater, InsertFreeze,
-                               InjectedCondition);
+                               LI, AC, SE, TaskI, MSSAU, LoopUpdater,
+                               InsertFreeze, InjectedCondition);
   return true;
 }
 
@@ -3564,7 +3566,7 @@ static bool unswitchBestCondition(Loop &L, DominatorTree &DT, LoopInfo &LI,
 static bool unswitchLoop(Loop &L, DominatorTree &DT, LoopInfo &LI,
                          AssumptionCache &AC, AAResults &AA,
                          TargetTransformInfo &TTI, bool Trivial,
-                         bool NonTrivial, ScalarEvolution *SE,
+                         bool NonTrivial, ScalarEvolution *SE, TaskInfo *TaskI,
                          MemorySSAUpdater *MSSAU, ProfileSummaryInfo *PSI,
                          BlockFrequencyInfo *BFI, LPMUpdater &LoopUpdater) {
   assert(L.isRecursivelyLCSSAForm(DT, LI) &&
@@ -3649,7 +3651,8 @@ static bool unswitchLoop(Loop &L, DominatorTree &DT, LoopInfo &LI,
 
   // Try to unswitch the best invariant condition. We prefer this full unswitch to
   // a partial unswitch when possible below the threshold.
-  if (unswitchBestCondition(L, DT, LI, AC, AA, TTI, SE, MSSAU, LoopUpdater))
+  if (unswitchBestCondition(L, DT, LI, AC, AA, TTI, SE, TaskI, MSSAU,
+                            LoopUpdater))
     return true;
 
   // No other opportunities to unswitch.
@@ -3676,7 +3679,7 @@ PreservedAnalyses SimpleLoopUnswitchPass::run(Loop &L, LoopAnalysisManager &AM,
       AR.MSSA->verifyMemorySSA();
   }
   if (!unswitchLoop(L, AR.DT, AR.LI, AR.AC, AR.AA, AR.TTI, Trivial, NonTrivial,
-                    &AR.SE, MSSAU ? &*MSSAU : nullptr, PSI, AR.BFI, U))
+                    &AR.SE, &AR.TI, MSSAU ? &*MSSAU : nullptr, PSI, AR.BFI, U))
     return PreservedAnalyses::all();
 
   if (AR.MSSA && VerifyMemorySSA)

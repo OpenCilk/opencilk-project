@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %s -std=c++11 -triple x86_64-unknown-linux-gnu -fcilkplus -ftapir=none -verify -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -std=c++11 -triple x86_64-unknown-linux-gnu -fopencilk -ftapir=none -verify -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 
 typedef __SIZE_TYPE__ size_t;
@@ -10,7 +10,7 @@ void up(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z2upmm(
+// CHECK-LABEL: define {{.*}}void @_Z2upmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -58,7 +58,7 @@ void up_leq(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z6up_leqmm(
+// CHECK-LABEL: define {{.*}}void @_Z6up_leqmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -104,7 +104,7 @@ void up_flip(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z7up_flipmm(
+// CHECK-LABEL: define {{.*}}void @_Z7up_flipmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -152,7 +152,7 @@ void up_flip_geq(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z11up_flip_geqmm(
+// CHECK-LABEL: define {{.*}}void @_Z11up_flip_geqmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -198,7 +198,7 @@ void up_stride(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z9up_stridemmm(
+// CHECK-LABEL: define {{.*}}void @_Z9up_stridemmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -248,7 +248,7 @@ void up_stride_leq(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z13up_stride_leqmmm(
+// CHECK-LABEL: define {{.*}}void @_Z13up_stride_leqmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -296,7 +296,7 @@ void up_stride_flip(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z14up_stride_flipmmm(
+// CHECK-LABEL: define {{.*}}void @_Z14up_stride_flipmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -346,7 +346,7 @@ void up_stride_flip_geq(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z18up_stride_flip_geqmmm(
+// CHECK-LABEL: define {{.*}}void @_Z18up_stride_flip_geqmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -394,7 +394,7 @@ void up_ne_stride(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z12up_ne_stridemmm(
+// CHECK-LABEL: define {{.*}}void @_Z12up_ne_stridemmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -442,7 +442,7 @@ void up_ne_stride_flip(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z17up_ne_stride_flipmmm(
+// CHECK-LABEL: define {{.*}}void @_Z17up_ne_stride_flipmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -490,7 +490,7 @@ void down(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z4downmm(
+// CHECK-LABEL: define {{.*}}void @_Z4downmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -538,7 +538,7 @@ void down_geq(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z8down_geqmm(
+// CHECK-LABEL: define {{.*}}void @_Z8down_geqmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -584,7 +584,7 @@ void down_flip(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z9down_flipmm(
+// CHECK-LABEL: define {{.*}}void @_Z9down_flipmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -632,7 +632,7 @@ void down_flip_leq(size_t start, size_t end) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z13down_flip_leqmm(
+// CHECK-LABEL: define {{.*}}void @_Z13down_flip_leqmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -678,7 +678,7 @@ void down_stride(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z11down_stridemmm(
+// CHECK-LABEL: define {{.*}}void @_Z11down_stridemmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -728,7 +728,7 @@ void down_stride_geq(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z15down_stride_geqmmm(
+// CHECK-LABEL: define {{.*}}void @_Z15down_stride_geqmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -776,7 +776,7 @@ void down_stride_flip(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z16down_stride_flipmmm(
+// CHECK-LABEL: define {{.*}}void @_Z16down_stride_flipmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -826,7 +826,7 @@ void down_stride_flip_leq(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z20down_stride_flip_leqmmm(
+// CHECK-LABEL: define {{.*}}void @_Z20down_stride_flip_leqmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -874,7 +874,7 @@ void down_ne_stride(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z14down_ne_stridemmm(
+// CHECK-LABEL: define {{.*}}void @_Z14down_ne_stridemmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8
@@ -922,7 +922,7 @@ void down_ne_stride_flip(size_t start, size_t end, size_t stride) {
     bar(i);
 }
 
-// CHECK-LABEL: define void @_Z19down_ne_stride_flipmmm(
+// CHECK-LABEL: define {{.*}}void @_Z19down_ne_stride_flipmmm(
 
 // CHECK: %[[START:.+]] = load i64, i64*
 // CHECK-NEXT: store i64 %[[START]], i64* %[[INIT:.+]], align 8

@@ -60,7 +60,7 @@ $_ZN4pbbs10sliced_forIZNS_4scanI10array_imapImES3_ZNS_8scan_addIS3_S3_EENT_1TES5
 @__csi_func_id__ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc = weak global i64 -1
 
 ; Function Attrs: uwtable
-define linkonce_odr dso_local void @_Z11edgeMapDataIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData* noalias sret %agg.result, %struct.graph* dereferenceable(48) %GA, %struct.vertexSubsetData* dereferenceable(40) %vs, i32* %f.coerce, i32 %threshold, i32* dereferenceable(4) %fl) local_unnamed_addr #7 comdat personality i32 (...)* @__gcc_personality_v0 {
+define linkonce_odr dso_local void @_Z11edgeMapDataIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_ERT1_T2_iRKj(%struct.vertexSubsetData* noalias sret(%struct.vertexSubsetData) %agg.result, %struct.graph* dereferenceable(48) %GA, %struct.vertexSubsetData* dereferenceable(40) %vs, i32* %f.coerce, i32 %threshold, i32* dereferenceable(4) %fl) local_unnamed_addr #7 comdat personality i32 (...)* @__gcc_personality_v0 {
 entry:
   %0 = load i64, i64* @__csi_unit_detach_base_id, align 8, !invariant.load !2
   %1 = add i64 %0, 52
@@ -1131,7 +1131,7 @@ cond.true:                                        ; preds = %375
   %394 = load i64, i64* @__csi_unit_callsite_base_id, align 8, !invariant.load !2
   %395 = add i64 %394, 217
   call void @__csan_before_call(i64 %395, i64 %393, i8 4, i64 0)
-  invoke void @_Z19edgeMapDenseForwardIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* sret %agg.result, %struct.graph* nonnull byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %376)
+  invoke void @_Z19edgeMapDenseForwardIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* sret(%struct.vertexSubsetData) %agg.result, %struct.graph* nonnull byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %376)
           to label %.noexc208 unwind label %csi.cleanup.csi-split
 
 .noexc208:                                        ; preds = %cond.true
@@ -1147,7 +1147,7 @@ cond.false:                                       ; preds = %375
   %397 = load i64, i64* @__csi_unit_callsite_base_id, align 8, !invariant.load !2
   %398 = add i64 %397, 218
   call void @__csan_before_call(i64 %398, i64 %396, i8 4, i64 0)
-  invoke void @_Z12edgeMapDenseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* sret %agg.result, %struct.graph* nonnull byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %376)
+  invoke void @_Z12edgeMapDenseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* sret(%struct.vertexSubsetData) %agg.result, %struct.graph* nonnull byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %376)
           to label %.noexc209 unwind label %csi.cleanup.csi-split
 
 .noexc209:                                        ; preds = %cond.false
@@ -1202,7 +1202,7 @@ cond.true52:                                      ; preds = %405
   %428 = load i64, i64* @__csi_unit_callsite_base_id, align 8, !invariant.load !2
   %429 = add i64 %428, 219
   call void @__csan_before_call(i64 %429, i64 %427, i8 6, i64 0)
-  invoke void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* sret %agg.result, %struct.graph* nonnull dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices.0, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, i32* %degrees.0, i32 %conv57, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %210)
+  invoke void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* sret(%struct.vertexSubsetData) %agg.result, %struct.graph* nonnull dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices.0, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, i32* %degrees.0, i32 %conv57, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %210)
           to label %.noexc207 unwind label %csi.cleanup.csi-split
 
 .noexc207:                                        ; preds = %cond.true52
@@ -1220,7 +1220,7 @@ cond.false55:                                     ; preds = %405
   %431 = load i64, i64* @__csi_unit_callsite_base_id, align 8, !invariant.load !2
   %432 = add i64 %431, 220
   call void @__csan_before_call(i64 %432, i64 %430, i8 6, i64 0)
-  invoke void @_Z13edgeMapSparseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* sret %agg.result, %struct.graph* nonnull dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices.0, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, i32* %degrees.0, i32 %conv57, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %210)
+  invoke void @_Z13edgeMapSparseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* sret(%struct.vertexSubsetData) %agg.result, %struct.graph* nonnull dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices.0, %struct.vertexSubsetData* nonnull dereferenceable(40) %vs, i32* %degrees.0, i32 %conv57, %struct.BFS_F* nonnull dereferenceable(8) %f, i32 %210)
           to label %.noexc unwind label %csi.cleanup.csi-split
 
 .noexc:                                           ; preds = %cond.false55
@@ -1266,16 +1266,16 @@ csi.cleanup:                                      ; preds = %csi.cleanup.csi-spl
 }
 
 ; Function Attrs: uwtable
-declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* noalias sret %agg.result, %struct.graph* byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* dereferenceable(40) %vertexSubset, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
+declare dso_local void @_Z12edgeMapDenseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* noalias sret(%struct.vertexSubsetData) %agg.result, %struct.graph* byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* dereferenceable(40) %vertexSubset, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
 
 ; Function Attrs: uwtable
-declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* noalias sret %agg.result, %struct.graph* dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices, %struct.vertexSubsetData* dereferenceable(40) %indices, i32* %degrees, i32 %m, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
+declare dso_local void @_Z13edgeMapSparseIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* noalias sret(%struct.vertexSubsetData) %agg.result, %struct.graph* dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices, %struct.vertexSubsetData* dereferenceable(40) %indices, i32* %degrees, i32 %m, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
 
 ; Function Attrs: uwtable
-declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* noalias sret %agg.result, %struct.graph* byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* dereferenceable(40) %vertexSubset, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
+declare dso_local void @_Z19edgeMapDenseForwardIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_E5graphIT0_ERT1_RT2_j(%struct.vertexSubsetData* noalias sret(%struct.vertexSubsetData) %agg.result, %struct.graph* byval(%struct.graph) align 8 %GA, %struct.vertexSubsetData* dereferenceable(40) %vertexSubset, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
 
 ; Function Attrs: uwtable
-declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* noalias sret %agg.result, %struct.graph* dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices, %struct.vertexSubsetData* dereferenceable(40) %indices, i32* %offsets, i32 %m, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
+declare dso_local void @_Z23edgeMapSparse_no_filterIN4pbbs5emptyE25compressedSymmetricVertex16vertexSubsetDataIS1_E5BFS_FES3_IT_ER5graphIT0_EPS9_RT1_PjjRT2_j(%struct.vertexSubsetData* noalias sret(%struct.vertexSubsetData) %agg.result, %struct.graph* dereferenceable(48) %GA, %struct.compressedSymmetricVertex* %frontierVertices, %struct.vertexSubsetData* dereferenceable(40) %indices, i32* %offsets, i32 %m, %struct.BFS_F* dereferenceable(8) %f, i32 %fl) local_unnamed_addr #7
 
 ; Function Attrs: uwtable
 declare dso_local void @_ZN16vertexSubsetDataIN4pbbs5emptyEE8toSparseEv(%struct.vertexSubsetData* %this) local_unnamed_addr #7

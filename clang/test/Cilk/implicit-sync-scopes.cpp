@@ -1,8 +1,8 @@
 // Verify that a sync is added implicitly at the end of appropriate scopes and
 // before destructors.
 //
-// RUN: %clang_cc1 %s -triple x86_64-unknown-linux-gnu -fcilkplus -fcxx-exceptions -fexceptions -ftapir=none -S -emit-llvm -o - | FileCheck %s --check-prefixes=CHECK,CHECK-O0
-// RUN: %clang_cc1 %s -O1 -mllvm -simplify-taskframes=false -triple x86_64-unknown-linux-gnu -fcilkplus -fcxx-exceptions -fexceptions -ftapir=none -S -emit-llvm -o - | FileCheck %s --check-prefixes=CHECK,CHECK-O1
+// RUN: %clang_cc1 %s -triple x86_64-unknown-linux-gnu -fopencilk -fcxx-exceptions -fexceptions -ftapir=none -S -emit-llvm -o - | FileCheck %s --check-prefixes=CHECK,CHECK-O0
+// RUN: %clang_cc1 %s -O1 -mllvm -simplify-taskframes=false -triple x86_64-unknown-linux-gnu -fopencilk -fcxx-exceptions -fexceptions -ftapir=none -S -emit-llvm -o - | FileCheck %s --check-prefixes=CHECK,CHECK-O1
 // expected-no-diagnostics
 
 class Bar {
@@ -1197,8 +1197,6 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1: [[B1CLEANUPLPAD_SPLIT]]:
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
-// CHECK-O1: br label %[[B1CLEANUP_MERGE:.+]]
-// CHECK-O1: [[B1CLEANUP_MERGE]]:
 // CHECK-O1: br label %[[B1CLEANUP:.+]]
 
 // CHECK-O1: [[B2CONSTRLPAD]]:
@@ -1223,8 +1221,6 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-// CHECK-O1: br label %[[CATCHLPAD_MERGE:.+]]
-// CHECK-O1: [[CATCHLPAD_MERGE]]:
 // CHECK-O1: br label %[[B2CLEANUP:.+]]
 
 // CHECK-O1: detach within %[[PFORSYNCREG]], label %[[PFORBODY:.+]], label %[[PFORINC:.+]] unwind label %[[PFORUNW:.+]]
@@ -1253,10 +1249,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
 // CHECK-O1-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-// CHECK-O1-NEXT: br label %[[PFORLPADJOIN:.+]]
-
-// CHECK-O1: [[PFORLPADJOIN]]:
-// CHECK-O1: br label %[[B2CLEANUP]]
+// CHECK-O1-NEXT: br label %[[B2CLEANUP]]
 
 // CHECK-O1: [[PFORSYNCCONT]]:
 // CHECK-O1: call void @_Z9nothrowfni(i32 4)
@@ -1359,7 +1352,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O0-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK-O0: [[TRYSYNCCONT]]:
-// CHECK-O0: call void @_ZN3BarD1Ev(%class.Bar* %[[B2]])
+// CHECK-O0: call void @_ZN3BarD1Ev(%class.Bar* nonnull dereferenceable(1) %[[B2]])
 // CHECK-O0-NEXT: br label %[[TRYCONT]]
 
 // CHECK-O1: [[B3LIFETIMEENDLPAD]]:
@@ -1720,17 +1713,11 @@ int spawn_trycatch_destructors(int a) {
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME1]],
-// CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1:.+]]
-// CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1_SPLIT:.+]]
-
-// CHECK-O1: [[TFUNWIND1_SPLIT]]:
-// CHECK-O1-NEXT: landingpad
-// CHECK-O1-NEXT: cleanup
-// CHECK-O1: br label %[[TFUNWIND1:.+]]
+// CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFUNWIND1:.+]]
 
 // CHECK: [[TFUNWIND1]]:
-// CHECK-O0-NEXT: landingpad
-// CHECK-O0-NEXT: cleanup
+// CHECK-NEXT: landingpad
+// CHECK-NEXT: cleanup
 // CHECK: br label %[[EHCLEANUP:.+]]
 
 // CHECK: [[B2CONSTRLPAD]]:
@@ -2364,9 +2351,6 @@ int parfor_trycatch_destructors(int a) {
 // CHECK-O1: [[PFORDU1]]:
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
-// CHECK-O1-NEXT: br label %[[PFORLPAD1:.+]]
-
-// CHECK-O1: [[PFORLPAD1]]:
 // CHECK-O1: br label %[[TASKCLEANUP1]]
 
 // CHECK-O0: [[PFORSYNCCONT1]]:
@@ -2470,9 +2454,6 @@ int parfor_trycatch_destructors(int a) {
 // CHECK-O1: [[PFORDU2]]:
 // CHECK-O1-NEXT: landingpad
 // CHECK-O1-NEXT: cleanup
-// CHECK-O1-NEXT: br label %[[PFORLPAD2:.+]]
-
-// CHECK-O1: [[PFORLPAD2]]:
 // CHECK-O1: br label %[[TASKCLEANUP1]]
 
 // CHECK-O0: [[PFORSYNCCONT2]]:

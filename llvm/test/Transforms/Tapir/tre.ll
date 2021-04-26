@@ -1,10 +1,10 @@
-; Test to verify that TRE will not erroneously eliminate a sync if it
-; fails.
+; Test TRE when a sync separates the tail call and return.
 ;
 ; Credit to I-Ting Angelina Lee for the original source code for this
 ; test.
 ;
 ; RUN: opt < %s -tailcallelim -S | FileCheck %s
+; RUN: opt < %s -passes='tailcallelim' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -19,6 +19,13 @@ entry:
   %0 = load i64, i64* @merge_grain, align 8, !tbaa !2
   %cmp = icmp slt i64 %add, %0
   br i1 %cmp, label %if.then, label %if.end
+
+; CHECK: entry:
+; CHECK: %[[SYNCREG:.+]] = {{.*}}call token @llvm.syncregion.start()
+; CHECK: br label %[[TAILRECURSE:.+]]
+
+; CHECK: [[TAILRECURSE]]:
+; br i1 %cmp, label %if.then, label %if.end
 
 if.then:                                          ; preds = %entry
   %call = call i64* @seq_merge(i64* %source_1, i64 %size_1, i64* %source_2, i64 %size_2, i64* %target)
@@ -65,13 +72,21 @@ det.cont:                                         ; preds = %det.achd, %if.end7
   %add.ptr15 = getelementptr inbounds i64, i64* %target, i64 %add14
   %call16 = call i64* @cilk_merge(i64* %add.ptr, i64 %sub11, i64* %add.ptr12, i64 %sub13, i64* %add.ptr15)
   sync within %syncreg, label %cleanup
+
 ; CHECK: det.cont:
-; CHECK: tail call i64* @cilk_merge
-; CHECK-NOT: ret i64* %target
-; CHECK: sync within %syncreg
+; CHECK-NOT: call i64* @cilk_merge(
+; CHECK-NOT: sync
+; CHECK: br label %[[TAILRECURSE]]
 
 cleanup:                                          ; preds = %det.cont, %if.then6, %if.then2, %if.then
   ret i64* %target
+
+; CHECK: cleanup:
+; CHECK-NEXT: sync within %[[SYNCREG]], label %[[CLEANUP_SPLIT:.+]]
+
+; CHECK: [[CLEANUP_SPLIT]]:
+; CHECK-NEXT: %[[CURRENT_RET:.+]] = select i1 %{{.+}}, i64* %{{.+}}, i64* %{{.+}}
+; CHECK-NEXT: ret i64* %[[CURRENT_RET]]
 }
 
 ; Function Attrs: argmemonly nounwind
