@@ -983,8 +983,10 @@ Instruction *llvm::replaceTaskFrameWithCallToOutline(
     TopCall = InvokeInst::Create(Out.Outline, Out.ReplRet, Out.ReplUnwind,
                                  OutlineInputs, "", ToReplace->getParent());
     if (TFResumeBB) {
+      // Update PHI nodes in the unwind destination of TFResumeBB.
       for (PHINode &PN : Out.ReplUnwind->phis())
         PN.replaceIncomingBlockWith(TFResumeBB, ToReplace->getParent());
+      // Replace the terminator of TFResumeBB with an unreachable.
       IRBuilder<> B(TFResumeBB->getTerminator());
       B.CreateUnreachable()->setDebugLoc(
           TFResumeBB->getTerminator()->getDebugLoc());
