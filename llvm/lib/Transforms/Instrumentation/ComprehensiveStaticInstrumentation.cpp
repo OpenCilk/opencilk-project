@@ -739,7 +739,14 @@ static BasicBlock *SplitOffPreds(BasicBlock *BB,
     return NewBBs[1];
   }
 
-  SplitBlockPredecessors(BB, Preds, ".csi-split", DT, LI);
+  BasicBlock *NewBB = SplitBlockPredecessors(BB, Preds, ".csi-split", DT, LI);
+  if (isa<UnreachableInst>(BB->getFirstNonPHIOrDbg()))
+    // If the block being split is simply contains an unreachable, then replace
+    // the terminator of the new block with an unreachable.  This helps preserve
+    // invariants on the CFG structure for Tapir placeholder blocks following
+    // detached.rethrow and taskframe.resume terminators.
+    ReplaceInstWithInst(NewBB->getTerminator(),
+                        new UnreachableInst(BB->getContext()));
   return BB;
 }
 
