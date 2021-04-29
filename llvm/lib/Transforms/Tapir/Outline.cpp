@@ -49,10 +49,12 @@ Value *OutlineMaterializer::materialize(Value *V) {
   return nullptr;
 }
 
-// Clone Blocks into NewFunc, transforming the old arguments into references to
-// VMap values.
-//
-/// TODO: Fix the std::vector part of the type of this function.
+/// Clone Blocks into NewFunc, transforming the old arguments into references to
+/// VMap values.
+///
+/// This logic is based on CloneFunctionInto, defined in
+/// Transforms/Utils/CloneFunction, but with additional functionality specific
+/// to Tapir outlining.
 void llvm::CloneIntoFunction(Function *NewFunc, const Function *OldFunc,
                              std::vector<BasicBlock *> Blocks,
                              ValueToValueMapTy &VMap, bool ModuleLevelChanges,
@@ -176,6 +178,10 @@ void llvm::CloneIntoFunction(Function *NewFunc, const Function *OldFunc,
     }
   }
 
+  {
+  NamedRegionTimer NRT("MapMetadata", "Map function metadata",
+                       TimerGroupName, TimerGroupDescription,
+                       TimePassesIsEnabled);
   for (DISubprogram *ISP : DIFinder.subprograms())
     if (ISP != SP)
       VMap.MD()[ISP].reset(ISP);
@@ -185,6 +191,20 @@ void llvm::CloneIntoFunction(Function *NewFunc, const Function *OldFunc,
 
   for (DIType *Type : DIFinder.types())
     VMap.MD()[Type].reset(Type);
+
+  // Duplicate the metadata that is attached to the cloned function.
+  // Subprograms/CUs/types that were already mapped to themselves won't be
+  // duplicated.
+  SmallVector<std::pair<unsigned, MDNode *>, 1> MDs;
+  OldFunc->getAllMetadata(MDs);
+  for (auto MD : MDs) {
+    NewFunc->addMetadata(
+        MD.first,
+        *MapMetadata(MD.second, VMap,
+                     ModuleLevelChanges ? RF_None : RF_NoModuleLevelChanges,
+                     TypeMapper, Materializer));
+  }
+  } // end timed region
 
   // Loop over all of the instructions in the function, fixing up operand
   // references as we go.  This uses VMap to do all the hard work.
@@ -240,7 +260,9 @@ void llvm::CloneIntoFunction(Function *NewFunc, const Function *OldFunc,
 /// Create a helper function whose signature is based on Inputs and
 /// Outputs as follows: f(in0, ..., inN, out0, ..., outN)
 ///
-/// TODO: Fix the std::vector part of the type of this function.
+/// This logic is based on CloneFunctionInto, defined in
+/// Transforms/Utils/CloneFunction, but with additional functionality specific
+/// to Tapir outlining.
 Function *llvm::CreateHelper(
     const ValueSet &Inputs, const ValueSet &Outputs,
     std::vector<BasicBlock *> Blocks, BasicBlock *Header,
@@ -394,8 +416,7 @@ Function *llvm::CreateHelper(
   }
 
   // Clone the metadata from the old function into the new.
-  bool MustCloneSP =
-      OldFunc->getParent() && OldFunc->getParent() == NewFunc->getParent();
+  bool MustCloneSP = OldFunc->getParent() && OldFunc->getParent() == DestM;
   DISubprogram *SP = OldFunc->getSubprogram();
   if (SP) {
     assert(!MustCloneSP || ModuleLevelChanges);
@@ -410,21 +431,6 @@ Function *llvm::CreateHelper(
     if (!MustCloneSP)
       MD[SP].reset(SP);
   }
-
-  {
-  NamedRegionTimer NRT("MapMetadata", "Map function metadata",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
-  SmallVector<std::pair<unsigned, MDNode *>, 1> MDs;
-  OldFunc->getAllMetadata(MDs);
-  for (auto MD : MDs) {
-    NewFunc->addMetadata(
-        MD.first,
-        *MapMetadata(MD.second, VMap,
-                     ModuleLevelChanges ? RF_None : RF_NoModuleLevelChanges,
-                     TypeMapper, Materializer));
-  }
-  } // end timed region
 
   // We assume that the Helper reads and writes its arguments.  If the parent
   // function had stronger attributes on memory access -- specifically, if the
