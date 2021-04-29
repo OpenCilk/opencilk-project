@@ -260,6 +260,7 @@ bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
     case Intrinsic::var_annotation:
     case Intrinsic::experimental_gc_result:
     case Intrinsic::experimental_gc_relocate:
+    case Intrinsic::experimental_noalias_scope_decl:
     case Intrinsic::coro_alloc:
     case Intrinsic::coro_begin:
     case Intrinsic::coro_free:
