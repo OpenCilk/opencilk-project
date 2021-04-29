@@ -414,7 +414,10 @@ static bool checkInstructionForRace(const Instruction *I,
     }
 
     // Ignore other intrinsics.
-    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I))
+    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I)) {
+      // Ignore intrinsics that do not access memory.
+      if (II->doesNotAccessMemory())
+        return false;
       // TODO: Exclude all intrinsics for which
       // TTI::getIntrinsicCost() == TCC_Free?
       switch (II->getIntrinsicID()) {
@@ -425,12 +428,11 @@ static bool checkInstructionForRace(const Instruction *I,
       case Intrinsic::invariant_end:
       case Intrinsic::launder_invariant_group:
       case Intrinsic::strip_invariant_group:
-      case Intrinsic::is_constant:
       case Intrinsic::lifetime_start:
       case Intrinsic::lifetime_end:
-      case Intrinsic::objectsize:
       case Intrinsic::ptr_annotation:
       case Intrinsic::var_annotation:
+      case Intrinsic::experimental_noalias_scope_decl:
       case Intrinsic::syncregion_start:
       case Intrinsic::taskframe_create:
       case Intrinsic::taskframe_use:
@@ -439,6 +441,7 @@ static bool checkInstructionForRace(const Instruction *I,
       case Intrinsic::sync_unwind:
         return false;
       }
+    }
 
     // We can assume allocation functions are safe.
     if (AssumeSafeMalloc && isAllocationFn(I, TLI)) {
@@ -988,6 +991,9 @@ bool AccessPtrAnalysis::PointerCapturedBefore(const Value *Ptr,
                                               unsigned MaxUsesToExplore =
                                               MaxUsesToExploreCapture) const {
   const Value *StrippedPtr = Ptr->stripInBoundsOffsets();
+  // Do not treat NULL pointers as captured.
+  if (isa<ConstantPointerNull>(StrippedPtr))
+    return false;
   auto CaptureQuery = std::make_pair(StrippedPtr, I);
   if (MayBeCapturedCache.count(CaptureQuery))
     return MayBeCapturedCache[CaptureQuery];
