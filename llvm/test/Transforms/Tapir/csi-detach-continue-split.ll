@@ -52,7 +52,7 @@ if.else:                                          ; preds = %entry
 ; CHECK: br label %if.end
 
 if.end:                                           ; preds = %if.else, %det.achd1.tf.tf.tf.tf, %det.cont.tf
-  unreachable
+  ret void
 }
 
 ; Function Attrs: argmemonly nounwind willreturn
