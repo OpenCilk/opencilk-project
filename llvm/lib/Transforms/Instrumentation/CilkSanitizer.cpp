@@ -600,6 +600,18 @@ uint64_t ObjectTable::add(Instruction &I, Value *Obj) {
     return ID;
   }
 
+  // Otherwise, if the underlying object is a function, get that function's
+  // debug information.
+  if (Function *F = dyn_cast<Function>(Obj)) {
+    if (DISubprogram *SP = F->getSubprogram()) {
+      add(ID, SP->getLine(), SP->getFilename(), SP->getDirectory(),
+          SP->getName());
+      return ID;
+    }
+    add(ID, -1, "", "", Obj->getName());
+    return ID;
+  }
+
   // Next, if this is an alloca instruction, look for a llvm.dbg.declare
   // intrinsic.
   if (AllocaInst *AI = dyn_cast<AllocaInst>(Obj)) {
