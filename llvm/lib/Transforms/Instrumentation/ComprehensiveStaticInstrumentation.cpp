@@ -2057,7 +2057,18 @@ void CSIImpl::finalizeCsi() {
   // In JIT mode, we rely on the JIT compiler to call the constructor as
   // a self-standing function.
   if (!Options.jitMode) {
-    appendToGlobalCtors(M, Ctor, CsiUnitCtorPriority);
+    // Add the ctor to llvm.global_ctors via appendToGlobalCtors() if either
+    // llvm.global_ctors does not exist or it exists with an initializer.  One
+    // of these two conditions should always hold for modules compiled normally,
+    // but appendToGlobalCtors can crash if a tool, such as bugpoint, removes
+    // the initializer from llvm.global_ctors.  This change facilitates
+    // using bugpoint to debug crashes involving CSI.
+    if (GlobalVariable *GVCtor = M.getNamedGlobal("llvm.global_ctors")) {
+      if (GVCtor->hasInitializer())
+        appendToGlobalCtors(M, Ctor, CsiUnitCtorPriority);
+    } else {
+      appendToGlobalCtors(M, Ctor, CsiUnitCtorPriority);
+    }
 
     CallGraphNode *CNCtor = CG->getOrInsertFunction(Ctor);
     CallGraphNode *CNFunc =
