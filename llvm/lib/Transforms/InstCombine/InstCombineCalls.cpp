@@ -2358,12 +2358,16 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     int NumUsers = 0;
     for (User *U : II->users()) {
       // Check for any Tapir instructions using this syncregion.
-      if (isa<DetachInst>(U) || isa<ReattachInst>(U) || isa<SyncInst>(U))
+      if (isa<DetachInst>(U) || isa<ReattachInst>(U) || isa<SyncInst>(U)) {
         ++NumUsers;
+        break;
+      }
       // Check for any Tapir intrinsics using this syncregion.
       if (CallBase *CB = dyn_cast<CallBase>(U))
-        if (isSyncUnwind(CB) || isDetachedRethrow(CB))
+        if (isSyncUnwind(CB) || isDetachedRethrow(CB)) {
           ++NumUsers;
+          break;
+        }
     }
     // If we have no users, it's safe to delete this syncregion.
     if (!NumUsers)
@@ -2396,8 +2400,10 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
       if (Instruction *I = dyn_cast<Instruction>(U))
         if (isTapirIntrinsic(Intrinsic::taskframe_use, I) ||
             isTapirIntrinsic(Intrinsic::taskframe_end, I) ||
-            isTaskFrameResume(I))
+            isTaskFrameResume(I)) {
           ++NumUsers;
+          break;
+        }
     }
     if (!NumUsers)
       return eraseInstFromFunction(CI);
