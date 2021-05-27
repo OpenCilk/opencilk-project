@@ -139,13 +139,15 @@ protected:
 class DefaultInstrumentationConfig : public InstrumentationConfig {
 public:
   virtual bool DoesFunctionRequireInstrumentationForPoint(
-      const StringRef &functionName, const InstrumentationPoint &point) {
+      const StringRef &functionName,
+      const InstrumentationPoint &point) override {
     return true;
   }
 
-  virtual bool DoesAnyFunctionRequireInterposition() { return false; }
+  virtual bool DoesAnyFunctionRequireInterposition() override { return false; }
 
-  virtual bool DoesFunctionRequireInterposition(const StringRef &functionName) {
+  virtual bool
+  DoesFunctionRequireInterposition(const StringRef &functionName) override {
     return false;
   }
 };
