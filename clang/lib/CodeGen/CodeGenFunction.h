@@ -1229,7 +1229,7 @@ public:
     ImplicitSyncCleanup(llvm::Instruction *SyncRegion = nullptr)
         : SyncRegion(SyncRegion) {}
 
-    void Emit(CodeGenFunction &CGF, Flags F) {
+    void Emit(CodeGenFunction &CGF, Flags F) override {
       if (SyncRegion)
         CGF.EmitImplicitSyncCleanup(SyncRegion);
     }
