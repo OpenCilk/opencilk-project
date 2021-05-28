@@ -787,6 +787,20 @@ public:
   virtual Optional<std::string>
   getOpenCilkRuntimePath(const llvm::opt::ArgList &Args) const;
 
+  virtual std::string getOpenCilkBCBasename(const llvm::opt::ArgList &Args,
+                                            StringRef Component,
+                                            bool AddArch) const;
+
+  virtual Optional<std::string> getOpenCilkBC(const llvm::opt::ArgList &Args,
+                                              StringRef Component) const;
+
+  virtual std::string getOpenCilkRTBasename(const llvm::opt::ArgList &Args,
+                                            StringRef Component, FileType Type,
+                                            bool AddArch) const;
+
+  virtual std::string getOpenCilkRT(const llvm::opt::ArgList &Args,
+                                    StringRef Component, FileType Type) const;
+
   /// AddOpenCilkBitcodeABI - Add compiler arguments for linking against the
   /// OpenCilk runtime ABI bitcode file.
   virtual void AddOpenCilkABIBitcode(const llvm::opt::ArgList &Args,
