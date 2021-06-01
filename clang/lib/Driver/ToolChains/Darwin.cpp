@@ -3350,15 +3350,18 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
         << A->getAsString(Args);
   }
 
-  SmallString<128> OpenCilkABIBCFilename("libopencilk-abi.bc");
+  SmallString<128> BitcodeFilename("libopencilk-abi");
   // If pedigrees are enabled, use the pedigree-enabled ABI bitcode instead.
   if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
-    OpenCilkABIBCFilename.assign("libopencilk-pedigrees-abi.bc");
+    BitcodeFilename.assign("libopencilk-pedigrees-abi");
+  BitcodeFilename += "_";
+  BitcodeFilename += getOSLibraryNameSuffix();
+  BitcodeFilename += ".bc";
 
   if (auto RuntimePath = getOpenCilkRuntimePath(Args)) {
     SmallString<128> P;
     P.assign(*RuntimePath);
-    llvm::sys::path::append(P, OpenCilkABIBCFilename);
+    llvm::sys::path::append(P, BitcodeFilename);
     if (getVFS().exists(P)) {
       CmdArgs.push_back("-mllvm");
       CmdArgs.push_back(Args.MakeArgString(("-use-opencilk-runtime-bc=true")));
@@ -3368,7 +3371,7 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
     }
   }
   getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
-      << OpenCilkABIBCFilename;
+      << BitcodeFilename;
 }
 
 void DarwinClang::AddLinkTapirRuntimeLib(const ArgList &Args,
@@ -3378,7 +3381,9 @@ void DarwinClang::AddLinkTapirRuntimeLib(const ArgList &Args,
                                          bool IsShared) const {
   SmallString<64> DarwinLibName = StringRef("lib");
   DarwinLibName += LibName;
-  DarwinLibName += IsShared ? ".dylib" : ".a";
+  DarwinLibName += "_";
+  DarwinLibName += getOSLibraryNameSuffix();
+  DarwinLibName += IsShared ? "_dynamic.dylib" : ".a";
   SmallString<128> Dir(getDriver().ResourceDir);
   if (Args.hasArg(options::OPT_opencilk_resource_dir_EQ)) {
     if (auto OpenCilkRuntimeDir = getOpenCilkRuntimePath(Args))
@@ -3432,7 +3437,6 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
   switch (TapirTarget) {
   case TapirTargetID::Cheetah:
     CmdArgs.push_back("-lcheetah");
-    CmdArgs.push_back("-lpthread");
     break;
   case TapirTargetID::OpenCilk: {
     bool StaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk);
@@ -3458,8 +3462,6 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
     // function, to ensure that symbols are resolved correctly when using static
     // linking.
     AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk", RLO, !StaticOpenCilk);
-
-    CmdArgs.push_back("-lpthread");
     break;
   }
   case TapirTargetID::Cilk:
