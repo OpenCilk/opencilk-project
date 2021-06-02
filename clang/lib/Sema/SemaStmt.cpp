@@ -3510,23 +3510,39 @@ StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
 
   CXXForRangeStmt *CXXForRange = cast<CXXForRangeStmt>(ForRange.get());
 
+  if (isa<NullStmt>(CXXForRange->getBody())) {
+    Diag(CXXForRange->getForLoc(), diag::warn_empty_cilk_for_body);
+    getCurCompoundScope().setHasEmptyLoopBodies();
+  }
+
+  SearchForReturnInStmt(*this, CXXForRange->getBody());
+
+  if (BreakContinueFinder(*this, CXXForRange->getBody()).BreakFound())
+    Diag(CXXForRange->getForLoc(), diag::err_cilk_for_cannot_break);
+
   VarDecl *BeginVar =
       cast<VarDecl>(CXXForRange->getBeginStmt()->getSingleDecl());
   QualType BeginType = BeginVar->getType();
   const QualType BeginRefNonRefType = BeginType.getNonReferenceType();
   ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
                                          VK_LValue, CXXForRange->getColonLoc());
+  if (BeginRef.isInvalid())
+    return StmtError();
 
   VarDecl *LoopIndex = CilkForRange->getLocalLoopIndex();
   QualType LoopIndexType = LoopIndex->getType();
   const QualType LoopIndexRefNonRefType = LoopIndexType.getNonReferenceType();
   ExprResult LoopIndexRef = BuildDeclRefExpr(
       LoopIndex, LoopIndexRefNonRefType, VK_LValue, CXXForRange->getColonLoc());
+  if (LoopIndexRef.isInvalid())
+    return StmtError();
 
   VarDecl *LoopVar = CXXForRange->getLoopVariable();
   SourceLocation LoopVarLoc = LoopVar->getBeginLoc();
   ExprResult NewLoopVarInit = ActOnBinOp(getCurScope(), LoopVarLoc, tok::plus,
                                          BeginRef.get(), LoopIndexRef.get());
+  if (NewLoopVarInit.isInvalid())
+    return StmtError();
 
   ExprResult DerefExpr =
       ActOnUnaryOp(getCurScope(), LoopVarLoc, tok::star, NewLoopVarInit.get());
@@ -3555,8 +3571,9 @@ StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc,
   if (ForRangeStmt.isInvalid())
     return ForRangeStmt;
 
-  return BuildCilkForRangeStmt(
-      cast_or_null<CXXForRangeStmt>(ForRangeStmt.get()));
+  CXXForRangeStmt *ForRange = cast_or_null<CXXForRangeStmt>(ForRangeStmt.get());
+
+  return BuildCilkForRangeStmt(ForRange);
 }
 
 StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
@@ -3570,12 +3587,18 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   const QualType BeginRefNonRefType = BeginType.getNonReferenceType();
   ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
                                          VK_LValue, ForRange->getColonLoc());
+  if (BeginRef.isInvalid()) {
+    return StmtError();
+  }
 
   VarDecl *EndVar = cast<VarDecl>(ForRange->getEndStmt()->getSingleDecl());
   QualType EndType = EndVar->getType();
   const QualType EndRefNonRefType = EndType.getNonReferenceType();
   ExprResult EndRef = BuildDeclRefExpr(EndVar, EndRefNonRefType, VK_LValue,
                                        ForRange->getColonLoc());
+  if (EndRef.isInvalid()) {
+    return StmtError();
+  }
   ExprResult LimitExpr = ActOnBinOp(S, ForRange->getColonLoc(), tok::minus,
                                     EndRef.get(), BeginRef.get());
   if (LimitExpr.isInvalid()) {

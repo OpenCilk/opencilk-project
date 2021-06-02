@@ -1379,6 +1379,9 @@ public:
     return getSema().BuildCilkForRangeStmt(
         cast_or_null<CXXForRangeStmt>(ForRange));
   }
+  StmtResult FinishCilkForRangeStmt(Stmt *ForRange, Stmt *Body) {
+    return getSema().FinishCilkForRangeStmt(ForRange, Body);
+  }
 
   /// Build a new goto statement.
   ///
@@ -13880,7 +13883,13 @@ TreeTransform<Derived>::TransformCilkForRangeStmt(CilkForRangeStmt *S) {
   if (ForRange.isInvalid())
     return StmtError();
 
-  return getDerived().RebuildCilkForRangeStmt(ForRange.get());
+  StmtResult CilkForRange =
+      getDerived().RebuildCilkForRangeStmt(ForRange.get());
+  if (CilkForRange.isInvalid())
+    return StmtError();
+
+  return getDerived().FinishCilkForRangeStmt(
+      CilkForRange.get(), cast<CXXForRangeStmt>(ForRange.get())->getBody());
 }
 
 } // end namespace clang
