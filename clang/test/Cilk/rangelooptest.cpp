@@ -110,8 +110,7 @@ int range_pragma_tests(int n) {
   _Cilk_for(auto i : v) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
       foo(i);
 
-#pragma cilk grainsize = 4
-  // expected-warning{{'#pragma cilk grainsize' no longer requires '='}}
+#pragma cilk grainsize = 4 // expected-warning{{'#pragma cilk grainsize' no longer requires '='}}
   _Cilk_for(int i : v) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
       foo(i);
 
