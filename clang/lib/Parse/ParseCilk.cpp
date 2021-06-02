@@ -57,9 +57,19 @@ StmtResult Parser::ParseCilkSpawnStatement() {
 ///       cilk_for-statement:
 ///         '_Cilk_for' '(' expr ';' expr ';' expr ')' statement
 ///         '_Cilk_for' '(' declaration expr ';' expr ';' expr ')' statement
+/// [C++0x] '_Cilk_for'
+///             '(' for-range-declaration ':' for-range-initializer ')'
+///             statement
+///
+/// [C++0x] for-range-declaration:
+/// [C++0x]   attribute-specifier-seq[opt] type-specifier-seq declarator
+/// [C++0x] for-range-initializer:
+/// [C++0x]   expression
+/// [C++0x]   braced-init-list
+
 StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   assert(Tok.is(tok::kw__Cilk_for) && "Not a _Cilk_for stmt!");
-  SourceLocation ForLoc = ConsumeToken();  // eat the '_Cilk_for'.
+  SourceLocation ForLoc = ConsumeToken(); // eat the '_Cilk_for'.
 
   // SourceLocation CoawaitLoc;
   // if (Tok.is(tok::kw_co_await))
@@ -71,8 +81,8 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
     return StmtError();
   }
 
-  bool C99orCXXorObjC = getLangOpts().C99 || getLangOpts().CPlusPlus ||
-    getLangOpts().ObjC;
+  bool C99orCXXorObjC =
+      getLangOpts().C99 || getLangOpts().CPlusPlus || getLangOpts().ObjC;
 
   // A _Cilk_for statement is a block.  Start the loop scope.
   //
@@ -97,11 +107,11 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
 
   ExprResult Value;
 
-  bool ForEach = false, ForRange = false;
+  bool ForEach = false;
   StmtResult FirstPart;
   Sema::ConditionResult SecondPart;
   ExprResult Collection;
-  ForRangeInit ForRangeInit;
+  ForRangeInfo ForRangeInfo;
   FullExprArg ThirdPart(Actions);
 
   if (Tok.is(tok::code_completion)) {
@@ -113,8 +123,10 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   ParsedAttributesWithRange attrs(AttrFactory);
   MaybeParseCXX11Attributes(attrs);
 
+  SourceLocation EmptyInitStmtSemiLoc;
+
   // Parse the first part of the for specifier.
-  if (Tok.is(tok::semi)) {  // _Cilk_for (;
+  if (Tok.is(tok::semi)) { // _Cilk_for (;
     ProhibitAttributes(attrs);
     // We disallow this syntax for now.
     Diag(Tok, diag::err_cilk_for_missing_control_variable) << ";";
@@ -126,23 +138,22 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
     SourceLocation Loc = ConsumeToken();
     MaybeParseCXX11Attributes(attrs);
 
-    ForRangeInit.ColonLoc = ConsumeToken();
+    ForRangeInfo.ColonLoc = ConsumeToken();
     if (Tok.is(tok::l_brace))
-      ForRangeInit.RangeExpr = ParseBraceInitializer();
+      ForRangeInfo.RangeExpr = ParseBraceInitializer();
     else
-      ForRangeInit.RangeExpr = ParseExpression();
+      ForRangeInfo.RangeExpr = ParseExpression();
 
     Diag(Loc, diag::err_for_range_identifier)
-      << ((getLangOpts().CPlusPlus11 && !getLangOpts().CPlusPlus17)
-              ? FixItHint::CreateInsertion(Loc, "auto &&")
-              : FixItHint());
+        << ((getLangOpts().CPlusPlus11 && !getLangOpts().CPlusPlus17)
+                ? FixItHint::CreateInsertion(Loc, "auto &&")
+                : FixItHint());
 
-    FirstPart = Actions.ActOnCXXForRangeIdentifier(getCurScope(), Loc, Name,
-                                                   attrs, attrs.Range.getEnd());
-    ForRange = true;
-  } else if (isForInitDeclaration()) {  // _Cilk_for (int X = 4;
+    ForRangeInfo.LoopVar = Actions.ActOnCXXForRangeIdentifier(
+        getCurScope(), Loc, Name, attrs, attrs.Range.getEnd());
+  } else if (isForInitDeclaration()) { // _Cilk_for (int X = 4;
     // Parse declaration, which eats the ';'.
-    if (!C99orCXXorObjC)   // Use of C99-style for loops in C90 mode?
+    if (!C99orCXXorObjC) // Use of C99-style for loops in C90 mode?
       Diag(Tok, diag::ext_c99_variable_decl_in_for_loop);
 
     // In C++0x, "for (T NS:a" might not be a typo for ::
@@ -152,14 +163,15 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
     SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
     DeclGroupPtrTy DG = ParseSimpleDeclaration(
         DeclaratorContext::ForContext, DeclEnd, attrs, false,
-        MightBeForRangeStmt ? &ForRangeInit : nullptr);
+        MightBeForRangeStmt ? &ForRangeInfo : nullptr);
     FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
-    if (ForRangeInit.ParsedForRangeDecl()) {
-      Diag(ForRangeInit.ColonLoc, getLangOpts().CPlusPlus11 ?
-           diag::warn_cxx98_compat_for_range : diag::ext_for_range);
-
-      ForRange = true;
-    } else if (Tok.is(tok::semi)) {  // for (int x = 4;
+    if (ForRangeInfo.ParsedForRangeDecl()) {
+      Diag(ForRangeInfo.ColonLoc, getLangOpts().CPlusPlus11
+                                      ? diag::warn_cxx98_compat_for_range
+                                      : diag::ext_for_range);
+      ForRangeInfo.LoopVar = FirstPart;
+      FirstPart = StmtResult();
+    } else if (Tok.is(tok::semi)) { // for (int x = 4;
       ConsumeToken();
     } else if ((ForEach = isTokIdentifier_in())) {
       Actions.ActOnForEachDeclStmt(DG);
@@ -185,8 +197,16 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
     if (!Value.isInvalid()) {
       if (ForEach)
         FirstPart = Actions.ActOnForEachLValueExpr(Value.get());
-      else
-        FirstPart = Actions.ActOnExprStmt(Value);
+      else {
+        // We already know this is not an init-statement within a for loop, so
+        // if we are parsing a C++11 range-based for loop, we should treat this
+        // expression statement as being a discarded value expression because
+        // we will err below. This way we do not warn on an unused expression
+        // that was an error in the first place, like with: for (expr : expr);
+        bool IsRangeBasedFor =
+            getLangOpts().CPlusPlus11 && !ForEach && Tok.is(tok::colon);
+        FirstPart = Actions.ActOnExprStmt(Value, !IsRangeBasedFor);
+      }
     }
 
     if (Tok.is(tok::semi)) {
@@ -200,11 +220,12 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
         return StmtError();
       }
       Collection = ParseExpression();
-    } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::colon) && FirstPart.get()) {
+    } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::colon) &&
+               FirstPart.get()) {
       // User tried to write the reasonable, but ill-formed, for-range-statement
       //   for (expr : expr) { ... }
       Diag(Tok, diag::err_for_range_expected_decl)
-        << FirstPart.get()->getSourceRange();
+          << FirstPart.get()->getSourceRange();
       SkipUntil(tok::r_paren, StopBeforeMatch);
       SecondPart = Sema::ConditionError();
     } else {
@@ -221,21 +242,41 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
 
   // Parse the second part of the for specifier.
   getCurScope()->AddFlags(Scope::BreakScope | Scope::ContinueScope);
-  if (!ForEach && !ForRange && !SecondPart.isInvalid()) {
+  if (!ForEach && !ForRangeInfo.ParsedForRangeDecl() &&
+      !SecondPart.isInvalid()) {
     // Parse the second part of the for specifier.
-    if (Tok.is(tok::semi)) {  // for (...;;
+    if (Tok.is(tok::semi)) { // for (...;;
       // no second part.
       Diag(Tok, diag::err_cilk_for_missing_condition)
-        << FirstPart.get()->getSourceRange();
+          << FirstPart.get()->getSourceRange();
     } else if (Tok.is(tok::r_paren)) {
       // missing both semicolons.
       Diag(Tok, diag::err_cilk_for_missing_condition)
-        << FirstPart.get()->getSourceRange();
+          << FirstPart.get()->getSourceRange();
     } else {
-      if (getLangOpts().CPlusPlus)
+      if (getLangOpts().CPlusPlus) {
+        // C++2a: We've parsed an init-statement; we might have a
+        // for-range-declaration next.
+        bool MightBeForRangeStmt = !ForRangeInfo.ParsedForRangeDecl();
+        ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
         SecondPart =
             ParseCXXCondition(nullptr, ForLoc, Sema::ConditionKind::Boolean);
-      else {
+
+        if (ForRangeInfo.ParsedForRangeDecl()) {
+          Diag(FirstPart.get() ? FirstPart.get()->getBeginLoc()
+                               : ForRangeInfo.ColonLoc,
+               getLangOpts().CPlusPlus2a
+                   ? diag::warn_cxx17_compat_for_range_init_stmt
+                   : diag::ext_for_range_init_stmt)
+              << (FirstPart.get() ? FirstPart.get()->getSourceRange()
+                                  : SourceRange());
+          if (EmptyInitStmtSemiLoc.isValid()) {
+            Diag(EmptyInitStmtSemiLoc, diag::warn_empty_init_statement)
+                << /*for-loop*/ 2
+                << FixItHint::CreateRemoval(EmptyInitStmtSemiLoc);
+          }
+        }
+      } else {
         ExprResult SecondExpr = ParseExpression();
         if (SecondExpr.isInvalid())
           SecondPart = Sema::ConditionError();
@@ -246,27 +287,29 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
       }
     }
 
-    if (Tok.isNot(tok::semi)) {
-      if (!SecondPart.isInvalid())
-        Diag(Tok, diag::err_expected_semi_for);
-      else
-        // Skip until semicolon or rparen, don't consume it.
-        SkipUntil(tok::r_paren, StopAtSemi | StopBeforeMatch);
-    }
+    if (!ForEach && !ForRangeInfo.ParsedForRangeDecl()) {
+      if (Tok.isNot(tok::semi)) {
+        if (!SecondPart.isInvalid())
+          Diag(Tok, diag::err_expected_semi_for);
+        else
+          // Skip until semicolon or rparen, don't consume it.
+          SkipUntil(tok::r_paren, StopAtSemi | StopBeforeMatch);
+      }
 
-    if (Tok.is(tok::semi)) {
-      ConsumeToken();
-    }
+      if (Tok.is(tok::semi)) {
+        ConsumeToken();
+      }
 
-    // Parse the third part of the _Cilk_for specifier.
-    if (Tok.isNot(tok::r_paren)) {   // for (...;...;)
-      ExprResult Third = ParseExpression();
-      // FIXME: The C++11 standard doesn't actually say that this is a
-      // discarded-value expression, but it clearly should be.
-      ThirdPart = Actions.MakeFullDiscardedValueExpr(Third.get());
-    } else
-      Diag(Tok, diag::err_cilk_for_missing_increment)
-        << FirstPart.get()->getSourceRange();      
+      // Parse the third part of the _Cilk_for specifier.
+      if (Tok.isNot(tok::r_paren)) { // for (...;...;)
+        ExprResult Third = ParseExpression();
+        // FIXME: The C++11 standard doesn't actually say that this is a
+        // discarded-value expression, but it clearly should be.
+        ThirdPart = Actions.MakeFullDiscardedValueExpr(Third.get());
+      } else
+        Diag(Tok, diag::err_cilk_for_missing_increment)
+            << FirstPart.get()->getSourceRange();
+    }
   }
   // Match the ')'.
   T.consumeClose();
@@ -278,25 +321,23 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   //   CoawaitLoc = SourceLocation();
   // }
 
-  // // We need to perform most of the semantic analysis for a C++0x for-range
-  // // statememt before parsing the body, in order to be able to deduce the type
-  // // of an auto-typed loop variable.
-  // StmtResult ForRangeStmt;
+  // We need to perform most of the semantic analysis for a C++0x for-range
+  // statement before parsing the body, in order to be able to deduce the type
+  // of an auto-typed loop variable.
+  StmtResult ForRangeStmt;
   // StmtResult ForEachStmt;
 
-  // TODO: Extend _Cilk_for to support these.
-  if (ForRange) {
-    Diag(ForLoc, diag::err_cilk_for_forrange_loop_not_supported);
-    // ExprResult CorrectedRange =
-    //     Actions.CorrectDelayedTyposInExpr(ForRangeInit.RangeExpr.get());
-    // ForRangeStmt = Actions.ActOnCXXForRangeStmt(
-    //     getCurScope(), ForLoc, CoawaitLoc, FirstPart.get(),
-    //     ForRangeInit.ColonLoc, CorrectedRange.get(),
-    //     T.getCloseLocation(), Sema::BFRK_Build);
+  if (ForRangeInfo.ParsedForRangeDecl()) {
+    Diag(ForLoc, diag::warn_cilk_for_forrange_loop_experimental);
+    ExprResult CorrectedRange =
+        Actions.CorrectDelayedTyposInExpr(ForRangeInfo.RangeExpr.get());
+    ForRangeStmt = Actions.ActOnCilkForRangeStmt(
+        getCurScope(), ForLoc, FirstPart.get(), ForRangeInfo.LoopVar.get(),
+        ForRangeInfo.ColonLoc, CorrectedRange.get(), T.getCloseLocation(),
+        Sema::BFRK_Build);
 
-
-  // Similarly, we need to do the semantic analysis for a for-range
-  // statement immediately in order to close over temporaries correctly.
+    // Similarly, we need to do the semantic analysis for a for-range
+    // statement immediately in order to close over temporaries correctly.
   } else if (ForEach) {
     Diag(ForLoc, diag::err_cilk_for_foreach_loop_not_supported);
     // ForEachStmt = Actions.ActOnObjCForCollectionStmt(ForLoc,
@@ -349,8 +390,8 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
   //  return Actions.FinishObjCForCollectionStmt(ForEachStmt.get(),
   //                                             Body.get());
 
-  // if (ForRange)
-  //   return Actions.FinishCXXForRangeStmt(ForRangeStmt.get(), Body.get());
+  if (ForRangeInfo.ParsedForRangeDecl())
+    return Actions.FinishCilkForRangeStmt(ForRangeStmt.get(), Body.get());
 
   return Actions.ActOnCilkForStmt(ForLoc, T.getOpenLocation(), FirstPart.get(),
                                   nullptr, Sema::ConditionResult(), nullptr,

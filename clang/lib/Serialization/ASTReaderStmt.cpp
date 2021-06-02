@@ -2573,6 +2573,11 @@ void ASTStmtReader::VisitCilkForStmt(CilkForStmt *S) {
   S->setRParenLoc(readSourceLocation());
 }
 
+void ASTStmtReader::VisitCilkForRangeStmt(CilkForRangeStmt *S) {
+  VisitStmt(S);
+  S->setForRange(Record.readSubStmt());
+}
+
 //===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//
@@ -2786,6 +2791,10 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
 
     case STMT_CILKFOR:
       S = new (Context) CilkForStmt(Empty);
+      break;
+
+    case STMT_CILKFORRANGE:
+      S = new (Context) CilkForRangeStmt(Empty);
       break;
 
     case EXPR_PREDEFINED:

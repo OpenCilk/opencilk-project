@@ -9519,7 +9519,13 @@ def note_exits_cilk_for : Note<
   "jump exits the scope of a '_Cilk_for'">;
 def err_jump_out_of_cilk_for : Error<
   "cannot jump out of '_Cilk_for' statement">;
-} // end of Cilk category
+
+// Cilk For Range errors
+
+def err_cilk_for_range_end_minus_begin : Error<
+  "Cannot determine length with '__end - __begin'. Please use a random access iterator.">;
+} 
+// end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {
 // OpenMP support.

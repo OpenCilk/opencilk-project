@@ -215,6 +215,7 @@ def CilkSyncStmt : StmtNode<Stmt>;
 def CilkSpawnStmt : StmtNode<Stmt>;
 def CilkSpawnExpr : StmtNode<Expr>;
 def CilkForStmt : StmtNode<Stmt>;
+def CilkForRangeStmt: StmtNode<Stmt>;
 
 // OpenMP Directives.
 def OMPExecutableDirective : StmtNode<Stmt, 1>;

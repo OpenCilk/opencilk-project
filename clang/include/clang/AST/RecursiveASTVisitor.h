@@ -2669,6 +2669,7 @@ DEF_TRAVERSE_STMT(CilkSpawnStmt, {})
 DEF_TRAVERSE_STMT(CilkSpawnExpr, {})
 DEF_TRAVERSE_STMT(CilkSyncStmt, {})
 DEF_TRAVERSE_STMT(CilkForStmt, {})
+DEF_TRAVERSE_STMT(CilkForRangeStmt, {})
 
 // These operators (all of them) do not need any action except
 // iterating over the children.

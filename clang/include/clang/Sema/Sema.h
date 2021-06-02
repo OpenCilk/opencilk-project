@@ -12093,6 +12093,13 @@ public:
     ConstructorDestructor,
     BuiltinFunction
   };
+  StmtResult ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc,
+                                   Stmt *InitStmt, Stmt *First,
+                                   SourceLocation ColonLoc, Expr *Range,
+                                   SourceLocation RParenLoc,
+                                   BuildForRangeKind Kind);
+  StmtResult BuildCilkForRangeStmt(CXXForRangeStmt *S);
+  StmtResult FinishCilkForRangeStmt(Stmt *S, Stmt *B);
 };
 
 /// RAII object that enters a new expression evaluation context.

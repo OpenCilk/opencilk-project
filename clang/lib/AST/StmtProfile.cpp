@@ -1982,6 +1982,10 @@ void StmtProfiler::VisitCilkForStmt(const CilkForStmt *S) {
   VisitStmt(S);
 }
 
+void StmtProfiler::VisitCilkForRangeStmt(const CilkForRangeStmt *S) {
+  VisitStmt(S);
+}
+
 void StmtProfiler::VisitCilkSpawnStmt(const CilkSpawnStmt *S) {
   VisitStmt(S);
 }
