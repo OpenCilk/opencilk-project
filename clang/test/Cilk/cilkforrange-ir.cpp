@@ -25,8 +25,7 @@ struct C {
 void bar(int i);
 
 void iterate(X::C c) {
-  _Cilk_for(int x
-            : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
+  _Cilk_for(int x : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
       bar(x);
 }
 
@@ -86,8 +85,7 @@ void iterate(X::C c) {
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
 void iterate_ref(X::C c) {
-  _Cilk_for(int &x
-            : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
+  _Cilk_for(int &x : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
       bar(x);
 }
 
@@ -146,8 +144,7 @@ void iterate_ref(X::C c) {
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
 void iterate_auto(X::C c) {
-  _Cilk_for(auto x
-            : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
+  _Cilk_for(auto x : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
       bar(x);
 }
 
@@ -207,8 +204,7 @@ void iterate_auto(X::C c) {
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
 void iterate_autoref(X::C c) {
-  _Cilk_for(auto &x
-            : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
+  _Cilk_for(auto &x : c) // expected-warning {{'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!}}
       bar(x);
 }
 
