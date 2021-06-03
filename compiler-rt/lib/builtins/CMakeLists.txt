@@ -556,6 +556,7 @@ set(aarch64_SOURCES
 )
 
 # Generate outline atomics helpers from lse.S base
+set(atomic_helpers)
 set(OA_HELPERS_DIR "${CMAKE_CURRENT_BINARY_DIR}/outline_atomic_helpers.dir")
 file(MAKE_DIRECTORY "${OA_HELPERS_DIR}")
 
@@ -577,11 +578,14 @@ foreach(pat cas swp ldadd ldclr ldeor ldset)
           COMPILE_DEFINITIONS "L_${pat};SIZE=${size};MODEL=${model}"
           INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}"
         )
+        list(APPEND atomic_helpers "${helper_asm}")
         list(APPEND aarch64_SOURCES "${helper_asm}")
       endif()
     endforeach(model)
   endforeach(size)
 endforeach(pat)
+
+add_custom_target(outline_atomic_helpers DEPENDS ${atomic_helpers})
 
 if (MINGW)
   set(aarch64_SOURCES

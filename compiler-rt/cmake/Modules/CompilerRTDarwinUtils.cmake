@@ -325,6 +325,10 @@ macro(darwin_add_builtin_library name suffix)
   set_target_properties(${libname} PROPERTIES
     OSX_ARCHITECTURES ${LIB_ARCH})
 
+  if (${arch} STREQUAL arm64 OR ${arch} STREQUAL arm64e)
+    add_dependencies(${libname} outline_atomic_helpers)
+  endif()
+
   if(LIB_PARENT_TARGET)
     add_dependencies(${LIB_PARENT_TARGET} ${libname})
   endif()
