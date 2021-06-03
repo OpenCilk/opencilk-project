@@ -1,4 +1,3 @@
-; RUN: llc < %s -o /dev/null 2>&1 | FileCheck %s --check-prefix=TAPIRCLEANUP
 ; RUN: opt < %s -tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 
