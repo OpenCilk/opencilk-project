@@ -1,4 +1,5 @@
 ; RUN: llc %s -o - | FileCheck %s
+; REQUIRES: x86-registered-target
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux_gnu"
 
