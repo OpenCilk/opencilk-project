@@ -92,19 +92,17 @@ void TapirLoopInfo::addInductionPhi(PHINode *Phi,
   Type *PhiTy = Phi->getType();
   const DataLayout &DL = Phi->getModule()->getDataLayout();
 
-  // Get the widest type.
-  if (!PhiTy->isFloatingPointTy()) {
-    if (!WidestIndTy)
-      WidestIndTy = convertPointerToIntegerType(DL, PhiTy);
-    else
-      WidestIndTy = getWiderType(DL, PhiTy, WidestIndTy);
-  }
-
   // Int inductions are special because we only allow one IV.
   if (ID.getKind() == InductionDescriptor::IK_IntInduction &&
       ID.getConstIntStepValue() && ID.getConstIntStepValue()->isOne() &&
       isa<Constant>(ID.getStartValue()) &&
       cast<Constant>(ID.getStartValue())->isNullValue()) {
+
+    // Get the widest type.
+    if (!WidestIndTy)
+      WidestIndTy = convertPointerToIntegerType(DL, PhiTy);
+    else
+      WidestIndTy = getWiderType(DL, PhiTy, WidestIndTy);
 
     // Use the phi node with the widest type as induction. Use the last
     // one if there are multiple (no good reason for doing this other
