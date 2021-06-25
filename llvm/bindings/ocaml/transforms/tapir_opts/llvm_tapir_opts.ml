@@ -11,10 +11,10 @@ type tapir_target
 
 (** Tapir pass to install Cilky stuff in place of detach/sync instructions. *)
 external add_lower_tapir_to_cilk :
-  [ `Module ] Llvm.PassManager.t -> tapir_target -> unit
-  = "llvm_add_lower_tapir_to_cilk"
+  [ `Module ] Llvm.PassManager.t -> unit
+  = "llvm_add_lower_tapir_to_target"
 
 (** Tapir pass to spawn loops with recursive divide-and-conquer. *)
 external add_loop_spawning :
-  [ `Module ] Llvm.PassManager.t -> tapir_target -> unit
+  [ `Module ] Llvm.PassManager.t -> unit
   = "llvm_add_loop_spawning"
