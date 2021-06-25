@@ -16,22 +16,18 @@
 #include "llvm-c/Transforms/PassManagerBuilder.h"
 #include "llvm-c/Transforms/Tapir.h"
 
-#define TapirTarget_val(v) (*(TapirTargetRef *)(Data_custom_val(v)))
-
 /* [`Module] Llvm.PassManager.t -> unit
  */
-CAMLprim value llvm_add_lower_tapir_to_cilk(LLVMPassManagerRef PM,
-                                            TapirTargetRef tt)
+CAMLprim value llvm_add_lower_tapir_to_target(LLVMPassManagerRef PM)
 {
-    LLVMAddLowerTapirToCilk(PM, TapirTarget_val(tt));
+    LLVMAddLowerTapirToTargetPass(PM);
     return Val_unit;
 }
 
 /* [`Module] Llvm.PassManager.t -> unit
  */
-CAMLprim value llvm_add_loop_spawning(LLVMPassManagerRef PM,
-                                      TapirTargetRef tt)
+CAMLprim value llvm_add_loop_spawning(LLVMPassManagerRef PM)
 {
-    LLVMAddLoopSpawning(PM, TapirTarget_val(tt));
+    LLVMAddLoopSpawningPass(PM);
     return Val_unit;
 }
