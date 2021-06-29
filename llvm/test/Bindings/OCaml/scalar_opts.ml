@@ -8,10 +8,12 @@
 
 (* Note: It takes several seconds for ocamlopt to link an executable with
          libLLVMCore.a, so it's better to write a big test than a bunch of
-         little ones. *)
+         little ones. For the same reason, the Tapir tests are added here
+         instead of in their own test suite. *)
 
 open Llvm
 open Llvm_scalar_opts
+open Llvm_tapir_opts
 open Llvm_target
 
 let context = global_context ()
@@ -77,6 +79,8 @@ let test_transforms () =
            ++ add_type_based_alias_analysis
            ++ add_scoped_no_alias_alias_analysis
            ++ add_basic_alias_analysis
+           ++ add_loop_spawning
+           ++ add_lower_tapir_to_target
            ++ PassManager.initialize
            ++ PassManager.run_function fn
            ++ PassManager.finalize
