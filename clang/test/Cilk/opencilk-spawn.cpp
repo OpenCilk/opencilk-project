@@ -16,6 +16,9 @@ int return_spawn_test(int i){
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
+// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK: [[SYNCCONT2]]
+// CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: %[[RETVALLOAD:.+]] = load i32
 // CHECK: ret i32 %[[RETVALLOAD]]
 
@@ -68,6 +71,9 @@ void spawn_infinite_loop() {
 // CHECK: [[CONTINUE]]
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]
+// CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
+// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK: [[SYNCCONT2]]
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: %[[RETVALLOAD:.+]] = load i32
 // CHECK: ret i32 %[[RETVALLOAD]]

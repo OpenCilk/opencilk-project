@@ -1095,12 +1095,16 @@ bool CodeGenFunction::isObviouslyBranchWithoutCleanups(JumpDest Dest) const {
 /// be known, in which case this will require a fixup.
 ///
 /// As a side-effect, this method clears the insertion point.
-void CodeGenFunction::EmitBranchThroughCleanup(JumpDest Dest) {
+void CodeGenFunction::EmitBranchThroughCleanup(JumpDest Dest, bool AfterSync) {
   assert(Dest.getScopeDepth().encloses(EHStack.stable_begin())
          && "stale jump destination");
 
   if (!HaveInsertPoint())
     return;
+
+  // If needed, insert an implicit _Cilk_sync before the cleanups.
+  if (AfterSync)
+    EmitImplicitSyncCleanup();
 
   // Create the branch.
   llvm::BranchInst *BI = Builder.CreateBr(Dest.getBlock());
