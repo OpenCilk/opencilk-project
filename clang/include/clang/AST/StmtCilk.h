@@ -30,11 +30,11 @@ public:
   CilkSpawnStmt(SourceLocation SL, Stmt *S)
       : Stmt(CilkSpawnStmtClass), SpawnLoc(SL), SpawnedStmt(S) { }
 
-  // \brief Build an empty _Cilk_spawn statement.
+  // Build an empty _Cilk_spawn statement.
   explicit CilkSpawnStmt(EmptyShell Empty) : Stmt(CilkSpawnStmtClass, Empty) {}
 
-  const Stmt *getSpawnedStmt() const;
-  Stmt *getSpawnedStmt();
+  const Stmt *getSpawnedStmt() const { return SpawnedStmt; }
+  Stmt *getSpawnedStmt() { return SpawnedStmt; }
   void setSpawnedStmt(Stmt *S) { SpawnedStmt = S; }
 
   SourceLocation getSpawnLoc() const { return SpawnLoc; }
