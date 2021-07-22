@@ -1259,9 +1259,6 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     Builder.ClearInsertionPoint();
   }
 
-  if (getLangOpts().getCilk() != LangOptions::Cilk_none)
-    EmitImplicitSyncCleanup();
-
   // Emit the result value, even if unused, to evaluate the side effects.
   const Expr *RV = S.getRetValue();
 
@@ -1354,7 +1351,9 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     IsSpawned = false;
     PopDetachScope();
   }
-  EmitBranchThroughCleanup(ReturnBlock);
+
+  bool CompilingCilk = (getLangOpts().getCilk() != LangOptions::Cilk_none);
+  EmitBranchThroughCleanup(ReturnBlock, CompilingCilk);
 }
 
 void CodeGenFunction::EmitDeclStmt(const DeclStmt &S) {
