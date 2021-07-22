@@ -15502,8 +15502,7 @@ TreeTransform<Derived>::TransformCilkSpawnStmt(CilkSpawnStmt *S) {
   if (Child.isInvalid())
     return StmtError();
 
-  if (!getDerived().AlwaysRebuild() &&
-      Child.get() == S->getSpawnedStmt())
+  if (!getDerived().AlwaysRebuild() && Child.get() == S->getSpawnedStmt())
     return S;
 
   return getDerived().RebuildCilkSpawnStmt(S->getSpawnLoc(), Child.get());
