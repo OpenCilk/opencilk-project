@@ -1421,15 +1421,6 @@ bool CapturedStmt::capturesVariable(const VarDecl *Var) const {
   return false;
 }
 
-// CilkSpawnStmt
-const Stmt* CilkSpawnStmt::getSpawnedStmt() const {
-  return SpawnedStmt;
-}
-
-Stmt* CilkSpawnStmt::getSpawnedStmt() {
-  return SpawnedStmt;
-}
-
 // CilkForStmt
 CilkForStmt::CilkForStmt(Stmt *Init, DeclStmt *Limit, Expr *InitCond,
                          DeclStmt *BeginStmt, DeclStmt *EndStmt, Expr *Cond,
