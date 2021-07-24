@@ -2082,6 +2082,10 @@ void StmtProfiler::VisitCilkSyncStmt(const CilkSyncStmt *S) {
   VisitStmt(S);
 }
 
+void StmtProfiler::VisitCilkScopeStmt(const CilkScopeStmt *S) {
+  VisitStmt(S);
+}
+
 void StmtProfiler::VisitOpaqueValueExpr(const OpaqueValueExpr *E) {
   VisitExpr(E);
 }
