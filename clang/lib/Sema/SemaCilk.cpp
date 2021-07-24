@@ -105,3 +105,24 @@ ExprResult Sema::ActOnCilkSpawnExpr(SourceLocation Loc, Expr *E) {
 
   return Result;
 }
+
+StmtResult
+Sema::ActOnCilkScopeStmt(SourceLocation ScopeLoc, Stmt *SubStmt) {
+  if (!checkCilkContext(*this, ScopeLoc, "_Cilk_scope"))
+    return StmtError();
+
+  DiagnoseUnusedExprResult(SubStmt);
+
+  setFunctionHasBranchProtectedScope();
+
+  PushFunctionScope();
+  PushExpressionEvaluationContext(
+      ExpressionEvaluationContext::PotentiallyEvaluated);
+
+  StmtResult Result = new (Context) CilkScopeStmt(ScopeLoc, SubStmt);
+
+  PopExpressionEvaluationContext();
+  PopFunctionScopeInfo();
+
+  return Result;
+}

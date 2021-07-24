@@ -357,3 +357,33 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
                                   nullptr, SecondPart, ThirdPart,
                                   T.getCloseLocation(), Body.get());
 }
+
+/// ParseCilkScopeStatement
+///       cilk_scope-statement:
+///         '_Cilk_scope' statement
+StmtResult Parser::ParseCilkScopeStatement() {
+  assert(Tok.is(tok::kw__Cilk_scope) && "Not a _Cilk_scope stmt!");
+  SourceLocation ScopeLoc = ConsumeToken();  // eat the '_Cilk_scope'.
+
+  unsigned ScopeFlags = Scope::BlockScope | Scope::FnScope | Scope::DeclScope;
+
+  if (Tok.is(tok::l_brace)) {
+    StmtResult SubStmt = ParseCompoundStatement(false, ScopeFlags |
+                                                Scope::CompoundStmtScope);
+    if (SubStmt.isInvalid())
+      return StmtError();
+
+    return Actions.ActOnCilkScopeStmt(ScopeLoc, SubStmt.get());
+  }
+
+  ParseScope CilkScopeScope(this, ScopeFlags);
+
+  // Parse statement of spawned child
+  StmtResult SubStmt = ParseStatement();
+  CilkScopeScope.Exit();
+
+  if (SubStmt.isInvalid())
+    return StmtError();
+
+  return Actions.ActOnCilkScopeStmt(ScopeLoc, SubStmt.get());
+}
