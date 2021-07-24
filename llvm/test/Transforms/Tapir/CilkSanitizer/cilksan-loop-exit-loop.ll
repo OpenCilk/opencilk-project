@@ -456,6 +456,7 @@ lpad.i.i31.i.i.i:                                 ; preds = %call.i.i.i.i.i.noex
 ; CHECK: lpad.i.i31.i.i.i:
 ; CHECK: %[[CALL_ID_PHI:.+]] = phi i64 [ %[[CALL_ID2]], %call.i.i.i.i.i.noexc.i.i29.i.i.i ], [ %[[CALL_ID1]], %{{.+}} ]
 ; CHECK: landingpad
+; CHECK-NEXT: cleanup
 ; CHECK-NEXT: catch i8* null
 ; CHECK-NEXT: call void @__csan_after_call(i64 %[[CALL_ID_PHI]],
 

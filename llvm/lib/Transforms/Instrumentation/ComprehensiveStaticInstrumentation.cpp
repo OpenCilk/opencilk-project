@@ -1227,6 +1227,7 @@ CSIImpl::getFirstInsertionPtInDetachedBlock(BasicBlock *Detached) {
 void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
                                LoopInfo &LI,
                                const DenseMap<Value *, Value *> &TrackVars) {
+  LLVMContext &Ctx = DI->getContext();
   BasicBlock *TaskEntryBlock = TI.getTaskFor(DI->getParent())->getEntry();
   IRBuilder<> IDBuilder(&*TaskEntryBlock->getFirstInsertionPt());
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
@@ -1238,8 +1239,7 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     DetachID = DetachFED.localToGlobalId(LocalID, IDBuilder);
     Value *TrackVar = TrackVars.lookup(DI->getSyncRegion());
     IRB.CreateStore(
-        Constant::getIntegerValue(IntegerType::getInt32Ty(DI->getContext()),
-                                  APInt(32, 1)),
+        Constant::getIntegerValue(IntegerType::getInt32Ty(Ctx), APInt(32, 1)),
         TrackVar);
     insertHookCall(DI, CsiDetach, {DetachID, TrackVar});
   }
@@ -1291,9 +1291,9 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
       insertHookCallAtSharedEHSpindleExits(
           SharedEH, T, CsiTaskExit, TaskExitFED,
-          {TaskID, DetachID, ExitProp.getValueImpl(DI->getContext())},
+          {TaskID, DetachID, ExitProp.getValueImpl(Ctx)},
           {DefaultID, DefaultID,
-           CsiTaskExitProperty::getDefaultValueImpl(DI->getContext())});
+           CsiTaskExitProperty::getDefaultValueImpl(Ctx)});
     }
   }
 
@@ -1308,9 +1308,8 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     uint64_t LocalID = DetachContinueFED.add(*ContinueBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
     CsiDetachContinueProperty ContProp;
-    Instruction *Call =
-        IRB.CreateCall(CsiDetachContinue, {ContinueID, DetachID,
-                                           ContProp.getValue(IRB)});
+    Instruction *Call = IRB.CreateCall(
+        CsiDetachContinue, {ContinueID, DetachID, ContProp.getValue(IRB)});
     setInstrumentationDebugLoc(*ContinueBlock, Call);
   }
   // Instrument the unwind of the detach, if it exists.
@@ -1330,17 +1329,17 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     uint64_t LocalID = DetachContinueFED.add(*UnwindBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
     CsiDetachContinueProperty ContProp;
-    LLVMContext &C = M.getContext();
-    Value *DefaultPropVal = ContProp.getValueImpl(C);
+    Value *DefaultPropVal = ContProp.getValueImpl(Ctx);
     ContProp.setIsUnwind();
     insertHookCallInSuccessorBB(UnwindBlock, PredBlock, CsiDetachContinue,
-                                {ContinueID, DetachID, ContProp.getValue(C)},
+                                {ContinueID, DetachID, ContProp.getValue(Ctx)},
                                 {DefaultID, DefaultID, DefaultPropVal});
     for (BasicBlock *DRPred : predecessors(UnwindBlock))
       if (isDetachedRethrow(DRPred->getTerminator(), DI->getSyncRegion()))
-        insertHookCallInSuccessorBB(UnwindBlock, DRPred, CsiDetachContinue,
-                                    {ContinueID, DetachID, ContProp.getValue(C)},
-                                    {DefaultID, DefaultID, DefaultPropVal});
+        insertHookCallInSuccessorBB(
+            UnwindBlock, DRPred, CsiDetachContinue,
+            {ContinueID, DetachID, ContProp.getValue(Ctx)},
+            {DefaultID, DefaultID, DefaultPropVal});
   }
 }
 

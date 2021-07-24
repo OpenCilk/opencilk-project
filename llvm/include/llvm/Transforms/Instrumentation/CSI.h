@@ -743,6 +743,7 @@ public:
     // Must match the definition of property type in csi.h
     return CsiProperty::getCoercedType(
         C, StructType::get(IntegerType::get(C, PropBits.IsIndirect),
+                           IntegerType::get(C, PropBits.IsUnwind),
                            IntegerType::get(C, PropBits.Padding)));
   }
   /// Get the default value for this property.
@@ -767,13 +768,16 @@ public:
 
   /// Set the value of the IsIndirect property.
   void setIsIndirect(bool v) { PropValue.Fields.IsIndirect = v; }
+  /// Set the value of the IsIndirect property.
+  void setIsUnwind(bool v = true) { PropValue.Fields.IsUnwind = v; }
 
 private:
   typedef union {
     // Must match the definition of property type in csi.h
     struct {
       unsigned IsIndirect : 1;
-      uint64_t Padding : 63;
+      unsigned IsUnwind : 1;
+      uint64_t Padding : 62;
     } Fields;
     uint64_t Bits;
   } Property;
@@ -783,11 +787,12 @@ private:
 
   typedef struct {
     int IsIndirect;
+    int IsUnwind;
     int Padding;
   } PropertyBits;
 
   /// The number of bits representing each property.
-  static constexpr PropertyBits PropBits = {1, (64 - 1)};
+  static constexpr PropertyBits PropBits = {1, 1, (64 - 1 - 1)};
 };
 
 class CsiLoadStoreProperty : public CsiProperty {
