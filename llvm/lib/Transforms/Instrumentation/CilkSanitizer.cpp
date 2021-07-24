@@ -854,6 +854,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   Type *LoopPropertyTy = CsiLoopProperty::getType(C);
   Type *AllocFnPropertyTy = CsiAllocFnProperty::getType(C);
   Type *FreePropertyTy = CsiFreeProperty::getType(C);
+  Type *DetContPropertyTy = CsiDetachContinueProperty::getType(C);
   Type *RetType = IRB.getVoidTy();
   Type *AddrType = IRB.getInt8PtrTy();
   Type *NumBytesType = IRB.getInt32Ty();
@@ -963,7 +964,9 @@ void CilkSanitizerImpl::initializeCsanHooks() {
     CsanDetachContinue = M.getOrInsertFunction("__csan_detach_continue",
                                                FnAttrs, RetType,
                                                /* detach_continue_id */ IDType,
-                                               /* detach_id */ IDType);
+                                               /* detach_id */ IDType,
+                                               /* sync_reg */ IRB.getInt8Ty(),
+                                               DetContPropertyTy);
   }
   {
     AttributeList FnAttrs = GeneralFnAttrs;
@@ -1063,6 +1066,12 @@ static BasicBlock *SplitOffPreds(
 // space.
 static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
                        const TargetLibraryInfo *TLI) {
+  if (BB->isLandingPad()) {
+    LandingPadInst *LPad = BB->getLandingPadInst();
+    if (!LPad->isCleanup())
+      LPad->setCleanup(true);
+  }
+
   if (BB->getUniquePredecessor())
     return;
 
@@ -3854,25 +3863,31 @@ bool CilkSanitizerImpl::instrumentCallsite(Instruction *I,
   insertHookCall(I, CsanBeforeCallsite, {CallsiteId, FuncId, NumMVVal,
                                          PropVal});
 
-  // Don't bother adding after_call instrumentation for function calls that
-  // don't return.
-  if (CB->doesNotReturn())
-    return true;
-
   BasicBlock::iterator Iter(I);
   if (IsInvoke) {
     // There are two "after" positions for invokes: the normal block and the
     // exception block.
     InvokeInst *II = cast<InvokeInst>(I);
-    insertHookCallInSuccessorBB(
-        II->getNormalDest(), II->getParent(), CsanAfterCallsite,
-        {CallsiteId, FuncId, NumMVVal, PropVal},
-        {DefaultID, DefaultID, IRB.getInt8(0), DefaultPropVal});
+    if (!CB->doesNotReturn()) {
+      // If this function can return normally, insert an after_call hook at the
+      // normal destination.
+      insertHookCallInSuccessorBB(
+          II->getNormalDest(), II->getParent(), CsanAfterCallsite,
+          {CallsiteId, FuncId, NumMVVal, PropVal},
+          {DefaultID, DefaultID, IRB.getInt8(0), DefaultPropVal});
+    }
+    CsiCallProperty Prop;
+    Prop.setIsIndirect(!Called);
+    Prop.setIsUnwind();
+    Value *PropVal = Prop.getValue(IRB);
     insertHookCallInSuccessorBB(
         II->getUnwindDest(), II->getParent(), CsanAfterCallsite,
         {CallsiteId, FuncId, NumMVVal, PropVal},
         {DefaultID, DefaultID, IRB.getInt8(0), DefaultPropVal});
-  } else {
+  } else if (!CB->doesNotReturn()) {
+    // If this function can return normally, insert an after_call hook at the
+    // normal destination.
+
     // Simple call instruction; there is only one "after" position.
     Iter++;
     IRB.SetInsertPoint(&*Iter);
@@ -4054,6 +4069,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   if (!(InstrumentationSet & SERIESPARALLEL))
     return true;
 
+  LLVMContext &Ctx = DI->getContext();
   BasicBlock *TaskEntryBlock = TI.getTaskFor(DI->getParent())->getEntry();
   IRBuilder<> IDBuilder(&*TaskEntryBlock->getFirstInsertionPt());
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
@@ -4076,6 +4092,9 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   SmallVector<BasicBlock *, 8> TaskExits, TaskResumes;
   SmallVector<Spindle *, 2> SharedEHExits;
   getTaskExits(DI, TaskExits, TaskResumes, SharedEHExits, TI);
+
+  ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt8Ty(Ctx), SyncRegNum);
+  ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt8Ty(Ctx), 0);
 
   // Instrument the entry and exit points of the detached task.
   {
@@ -4104,9 +4123,9 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
       Value *TaskExitID = TaskExitFED.localToGlobalId(LocalID, IDBuilder);
       CsiTaskExitProperty ExitProp;
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
-      Instruction *Call = IRB.CreateCall(
-          CsanTaskExit, {TaskExitID, TaskID, DetachID, IRB.getInt8(SyncRegNum),
-                         ExitProp.getValue(IRB)});
+      Instruction *Call =
+          IRB.CreateCall(CsanTaskExit, {TaskExitID, TaskID, DetachID,
+                                        SyncRegVal, ExitProp.getValue(IRB)});
       IRB.SetInstDebugLocation(Call);
       NumInstrumentedDetachExits++;
     }
@@ -4117,9 +4136,9 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
       Value *TaskExitID = TaskExitFED.localToGlobalId(LocalID, IDBuilder);
       CsiTaskExitProperty ExitProp;
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
-      Instruction *Call = IRB.CreateCall(
-          CsanTaskExit, {TaskExitID, TaskID, DetachID, IRB.getInt8(SyncRegNum),
-                         ExitProp.getValue(IRB)});
+      Instruction *Call =
+          IRB.CreateCall(CsanTaskExit, {TaskExitID, TaskID, DetachID,
+                                        SyncRegVal, ExitProp.getValue(IRB)});
       IRB.SetInstDebugLocation(Call);
       NumInstrumentedDetachExits++;
     }
@@ -4130,10 +4149,9 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
       insertHookCallAtSharedEHSpindleExits(
           SharedEH, T, CsanTaskExit, TaskExitFED,
-          {TaskID, DetachID, IRB.getInt8(SyncRegNum),
-           ExitProp.getValueImpl(DI->getContext())},
-          {DefaultID, DefaultID, IRB.getInt8(0),
-           CsiTaskExitProperty::getDefaultValueImpl(DI->getContext())});
+          {TaskID, DetachID, SyncRegVal, ExitProp.getValueImpl(Ctx)},
+          {DefaultID, DefaultID, DefaultSyncRegVal,
+           CsiTaskExitProperty::getDefaultValueImpl(Ctx)});
     }
   }
 
@@ -4147,8 +4165,10 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
     IRBuilder<> IRB(&*ContinueBlock->getFirstInsertionPt());
     uint64_t LocalID = DetachContinueFED.add(*ContinueBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
-    Instruction *Call = IRB.CreateCall(CsanDetachContinue,
-                                       {ContinueID, DetachID});
+    CsiDetachContinueProperty ContProp;
+    Instruction *Call =
+        IRB.CreateCall(CsanDetachContinue, {ContinueID, DetachID, SyncRegVal,
+                                            ContProp.getValue(IRB)});
     IRB.SetInstDebugLocation(Call);
   }
   // Instrument the unwind of the detach, if it exists.
@@ -4167,14 +4187,19 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
     Value *DefaultID = getDefaultID(IDBuilder);
     uint64_t LocalID = DetachContinueFED.add(*UnwindBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
-    insertHookCallInSuccessorBB(UnwindBlock, PredBlock,
-                                CsanDetachContinue, {ContinueID, DetachID},
-                                {DefaultID, DefaultID});
+    CsiDetachContinueProperty ContProp;
+    Value *DefaultPropVal = ContProp.getValueImpl(Ctx);
+    ContProp.setIsUnwind();
+    insertHookCallInSuccessorBB(
+        UnwindBlock, PredBlock, CsanDetachContinue,
+        {ContinueID, DetachID, SyncRegVal, ContProp.getValue(Ctx)},
+        {DefaultID, DefaultID, DefaultSyncRegVal, DefaultPropVal});
     for (BasicBlock *DRPred : predecessors(UnwindBlock))
       if (isDetachedRethrow(DRPred->getTerminator(), DI->getSyncRegion()))
-        insertHookCallInSuccessorBB(UnwindBlock, DRPred, CsanDetachContinue,
-                                    {ContinueID, DetachID},
-                                    {DefaultID, DefaultID});
+        insertHookCallInSuccessorBB(
+            UnwindBlock, DRPred, CsanDetachContinue,
+            {ContinueID, DetachID, SyncRegVal, ContProp.getValue(Ctx)},
+            {DefaultID, DefaultID, DefaultSyncRegVal, DefaultPropVal});
   }
   return true;
 }
@@ -4190,6 +4215,12 @@ bool CilkSanitizerImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
   Value *SyncID = SyncFED.localToGlobalId(LocalID, IRB);
   // Insert instrumentation before the sync.
   insertHookCall(SI, CsanSync, {SyncID, IRB.getInt8(SyncRegNum)});
+
+  // NOTE: Because Cilksan executes serially, any exceptions thrown before this
+  // sync will appear to be thrown from their respective spawns or calls, not
+  // the sync or the Cilk personality function.  Hence we don't need
+  // instrumentation in the unwind destination of the sync.
+
   NumInstrumentedSyncs++;
   return true;
 }
