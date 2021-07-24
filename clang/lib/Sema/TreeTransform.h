@@ -1448,6 +1448,14 @@ public:
     return getSema().ActOnCilkSpawnExpr(SpawnLoc, E);
   }
 
+  /// Build a new Cilk scope statment.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
+  StmtResult RebuildCilkScopeStmt(SourceLocation ScopeLoc, Stmt *S) {
+    return getSema().ActOnCilkScopeStmt(ScopeLoc, S);
+  }
+
   /// Build a new declaration statement.
   ///
   /// By default, performs semantic analysis to build the new statement.
@@ -14934,6 +14942,19 @@ template<typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformCilkSyncStmt(CilkSyncStmt *S) {
   return S;
+}
+
+template<typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformCilkScopeStmt(CilkScopeStmt *S) {
+  StmtResult Child = getDerived().TransformStmt(S->getBody());
+  if (Child.isInvalid())
+    return StmtError();
+
+  if (!getDerived().AlwaysRebuild() && Child.get() == S->getBody())
+    return S;
+
+  return getDerived().RebuildCilkScopeStmt(S->getScopeLoc(), Child.get());
 }
 
 template<typename Derived>

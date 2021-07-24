@@ -2095,6 +2095,7 @@ private:
   StmtResult ParseCilkSpawnStatement();
   StmtResult ParseCilkSyncStatement();
   StmtResult ParseCilkForStatement(SourceLocation *TrailingElseLoc);
+  StmtResult ParseCilkScopeStatement();
   StmtResult ParseAsmStatement(bool &msAsm);
   StmtResult ParseMicrosoftAsmStatement(SourceLocation AsmLoc);
   StmtResult ParsePragmaLoopHint(StmtVector &Stmts,
