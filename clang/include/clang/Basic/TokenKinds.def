@@ -469,6 +469,7 @@ TYPE_TRAIT_1(__is_sealed, IsSealed, KEYMS)
 KEYWORD(_Cilk_spawn                 , KEYALL)
 KEYWORD(_Cilk_sync                  , KEYALL)
 KEYWORD(_Cilk_for                   , KEYALL)
+KEYWORD(_Cilk_scope                 , KEYALL)
 
 // MSVC12.0 / VS2013 Type Traits
 TYPE_TRAIT_1(__is_destructible, IsDestructible, KEYALL)

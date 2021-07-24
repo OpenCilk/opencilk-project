@@ -7416,6 +7416,12 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
   case Intrinsic::sync_unwind:
     // Discard any sync.unwinds.
     return;
+  case Intrinsic::tapir_runtime_start:
+    // Discard any tapir.runtime.starts.
+    return;
+  case Intrinsic::tapir_runtime_end:
+    // Discard any tapir.runtime.ends.
+    return;
   }
 }
 

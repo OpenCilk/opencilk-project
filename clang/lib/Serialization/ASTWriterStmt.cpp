@@ -2169,6 +2169,13 @@ void ASTStmtWriter::VisitCilkSyncStmt(CilkSyncStmt *S) {
   Code = serialization::STMT_CILKSYNC;
 }
 
+void ASTStmtWriter::VisitCilkScopeStmt(CilkScopeStmt *S) {
+  VisitStmt(S);
+  Record.AddSourceLocation(S->getScopeLoc());
+  Record.AddStmt(S->getBody());
+  Code = serialization::STMT_CILKSCOPE;
+}
+
 void ASTStmtWriter::VisitCilkForStmt(CilkForStmt *S) {
   VisitStmt(S);
   Record.AddStmt(S->getInit());

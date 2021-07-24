@@ -448,6 +448,29 @@ void CodeGenFunction::EmitCilkSyncStmt(const CilkSyncStmt &S) {
                      { SRStart });
 }
 
+void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
+  LexicalScope CilkScope(*this, S.getSourceRange());
+  Builder.CreateCall(CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_start));
+  // Ensure that the runtime is stopped on exit.
+  EHStack.pushCleanup<TapirRuntimeEndCleanup>(NormalAndEHCleanup);
+  {
+    // Add a taskframe around this scope in case there are other spawns outside
+    // of this scope, which would need to be synced separately.
+    TaskFrameScope TFScope(*this);
+    // Create a nested synced scope.
+    SyncedScopeRAII SyncedScp(*this);
+    PushSyncRegion()->addImplicitSync();
+    bool BodyIsCompoundStmt = isa<CompoundStmt>(S.getBody());
+    if (BodyIsCompoundStmt)
+      ScopeIsSynced = true;
+
+    // Emit the spawned statement.
+    EmitStmt(S.getBody());
+
+    PopSyncRegion();
+  }
+}
+
 static const Stmt *IgnoreImplicitAndCleanups(const Stmt *S) {
   const Stmt *Current = S;
   if (auto *E = dyn_cast_or_null<Expr>(S))

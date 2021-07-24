@@ -1235,6 +1235,17 @@ public:
     }
   };
 
+  /// Cleanup to ensure a tapir.runtime.end intrinsic is inserted.
+  struct TapirRuntimeEndCleanup final : public EHScopeStack::Cleanup {
+  public:
+    TapirRuntimeEndCleanup() {}
+
+    void Emit(CodeGenFunction &CGF, Flags F) override {
+      CGF.Builder.CreateCall(
+          CGF.CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_end));
+    }
+  };
+
   // Subclass of RunCleanupsScope that ensures an implicit sync is emitted
   // before cleanups.
   class ImplicitSyncScope : public RunCleanupsScope {
@@ -3795,6 +3806,7 @@ public:
   void EmitCaseStmtRange(const CaseStmt &S, ArrayRef<const Attr *> Attrs);
   void EmitAsmStmt(const AsmStmt &S);
 
+  void EmitCilkScopeStmt(const CilkScopeStmt &S);
   void EmitCilkSpawnStmt(const CilkSpawnStmt &S);
   void EmitCilkSyncStmt(const CilkSyncStmt &S);
   void EmitCilkForStmt(const CilkForStmt &S,

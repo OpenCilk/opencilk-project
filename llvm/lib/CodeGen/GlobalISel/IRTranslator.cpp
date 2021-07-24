@@ -2391,6 +2391,10 @@ bool IRTranslator::translateKnownIntrinsic(const CallInst &CI, Intrinsic::ID ID,
     // Discard any taskframe.ends.
   case Intrinsic::sync_unwind:
     // Discard any sync.unwinds.
+  case Intrinsic::tapir_runtime_start:
+    // Discard any tapir.runtime.starts.
+  case Intrinsic::tapir_runtime_end:
+    // Discard any tapir.runtime.ends.
     return true;
 #define INSTRUCTION(NAME, NARG, ROUND_MODE, INTRINSIC)  \
   case Intrinsic::INTRINSIC:

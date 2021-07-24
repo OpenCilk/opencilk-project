@@ -2789,6 +2789,18 @@ void StmtPrinter::VisitCilkForStmt(CilkForStmt *Node) {
     Indent() << "}";
 }
 
+void StmtPrinter::VisitCilkScopeStmt(CilkScopeStmt *Node) {
+  Indent() << "_Cilk_scope ";
+
+  if (CompoundStmt *CS = dyn_cast<CompoundStmt>(Node->getBody())) {
+    PrintRawCompoundStmt(CS);
+    OS << "\n";
+  } else {
+    OS << "\n";
+    PrintStmt(Node->getBody());
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Stmt method implementations
 //===----------------------------------------------------------------------===//

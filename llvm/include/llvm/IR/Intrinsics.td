@@ -1360,6 +1360,12 @@ def int_coro_subfn_addr : DefaultAttrsIntrinsic<
 def int_syncregion_start
     : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly, IntrWillReturn]>;
 
+def int_tapir_runtime_start
+    : Intrinsic<[], [], [IntrArgMemOnly, IntrWillReturn]>;
+
+def int_tapir_runtime_end
+    : Intrinsic<[], [], [IntrArgMemOnly, IntrWillReturn]>;
+
 // Intrinsics for taskframes.
 
 // Marker for the start of a taskframe.

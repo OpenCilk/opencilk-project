@@ -198,6 +198,43 @@ public:
   }
 };
 
+/// CilkScopeStmt - This represents a _Cilk_scope.
+///
+class CilkScopeStmt : public Stmt {
+  SourceLocation ScopeLoc;
+  Stmt *Body;
+
+public:
+  explicit CilkScopeStmt(SourceLocation SL) : CilkScopeStmt(SL, nullptr) {}
+
+  CilkScopeStmt(SourceLocation SL, Stmt *S)
+      : Stmt(CilkScopeStmtClass), ScopeLoc(SL), Body(S) {}
+
+  // Build an empty _Cilk_scope statement.
+  explicit CilkScopeStmt(EmptyShell Empty) : Stmt(CilkScopeStmtClass, Empty) {}
+
+  const Stmt *getBody() const { return Body; }
+  Stmt *getBody() { return Body; }
+  void setBody(Stmt *S) { Body = S; }
+
+  SourceLocation getScopeLoc() const { return ScopeLoc; }
+  void setScopeLoc(SourceLocation L) { ScopeLoc = L; }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return ScopeLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY {
+    return Body->getEndLoc();
+  }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == CilkScopeStmtClass;
+  }
+
+  // Iterators
+  child_range children() {
+    return child_range(&Body, &Body+1);
+  }
+};
+
 }  // end namespace clang
 
 #endif

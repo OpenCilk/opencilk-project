@@ -611,6 +611,7 @@ namespace clang {
     ExpectedStmt VisitCilkSpawnStmt(CilkSpawnStmt *S);
     ExpectedStmt VisitCilkSyncStmt(CilkSyncStmt *S);
     ExpectedStmt VisitCilkForStmt(CilkForStmt *S);
+    ExpectedStmt VisitCilkScopeStmt(CilkScopeStmt *S);
 
     // Importing expressions
     ExpectedStmt VisitExpr(Expr *E);
@@ -6934,6 +6935,17 @@ ExpectedStmt ASTNodeImporter::VisitCilkForStmt(CilkForStmt *S) {
   return new (Importer.getToContext()) CilkForStmt(
       ToInit, ToLimitStmt, ToInitCond, ToBeginStmt, ToEndStmt, ToCond, ToInc,
       ToLoopVarStmt, ToBody, ToCilkForLoc, ToLParenLoc, ToRParenLoc);
+}
+
+ExpectedStmt ASTNodeImporter::VisitCilkScopeStmt(CilkScopeStmt *S) {
+  ExpectedSLoc ToScopeLocOrErr = import(S->getScopeLoc());
+  if (!ToScopeLocOrErr)
+    return ToScopeLocOrErr.takeError();
+  ExpectedStmt ToChildOrErr = import(S->getBody());
+  if (!ToChildOrErr)
+    return ToChildOrErr.takeError();
+  return new (Importer.getToContext()) CilkScopeStmt(*ToScopeLocOrErr,
+                                                     *ToChildOrErr);
 }
 
 //----------------------------------------------------------------------------

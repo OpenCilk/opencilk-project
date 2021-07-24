@@ -487,6 +487,14 @@ Retry:
     // }
     return ParseCilkForStatement(TrailingElseLoc);
 
+  case tok::kw__Cilk_scope:              // [CP] _Cilk_scope statement
+    // if (!getLangOpts().Cilk) {
+    //   Diag(Tok, diag::err_cilkplus_disable);
+    //   SkipUntil(tok::semi);
+    //   return StmtError();
+    // }
+    return ParseCilkScopeStatement();
+
   case tok::annot_pragma_openmp:
     // Prohibit attributes that are not OpenMP attributes, but only before
     // processing a #pragma omp clause.
