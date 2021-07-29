@@ -223,6 +223,9 @@ public:
   /// for the containing function, i.e., after the task has been outlined.
   virtual void lowerTaskFrameAddrCall(CallInst *TaskFrameAddrCall);
 
+  /// Lower a call to the tapir.runtime.start/end intrinsic.
+  virtual void lowerTapirRTCall(CallInst *TapirRTCall);
+
   /// Lower a Tapir sync instruction SI.
   virtual void lowerSync(SyncInst &SI) = 0;
 
