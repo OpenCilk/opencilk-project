@@ -450,9 +450,18 @@ void CodeGenFunction::EmitCilkSyncStmt(const CilkSyncStmt &S) {
 
 void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
   LexicalScope CilkScope(*this, S.getSourceRange());
-  Builder.CreateCall(CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_start));
-  // Ensure that the runtime is stopped on exit.
-  EHStack.pushCleanup<TapirRuntimeEndCleanup>(NormalAndEHCleanup);
+
+  // If this _Cilk_scope is outermost in the function, emit
+  // tapir_runtime_{start,end} intrinsics around the scope.
+  bool ThisScopeIsOutermost = false;
+  if (!WithinCilkScope) {
+    WithinCilkScope = true;
+    ThisScopeIsOutermost = true;
+    Builder.CreateCall(CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_start));
+    // Mark the end of the _Cilk_scope with tapir_runtime_end.
+    EHStack.pushCleanup<TapirRuntimeEndCleanup>(NormalAndEHCleanup);
+  }
+
   {
     // Add a taskframe around this scope in case there are other spawns outside
     // of this scope, which would need to be synced separately.
@@ -469,6 +478,11 @@ void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
 
     PopSyncRegion();
   }
+
+  // If this _Cilk_scope is outermost in the function, mark that CodeGen is no
+  // longer emitting within a _Cilk_scope.
+  if (ThisScopeIsOutermost)
+    WithinCilkScope = false;
 }
 
 static const Stmt *IgnoreImplicitAndCleanups(const Stmt *S) {
