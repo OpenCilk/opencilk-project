@@ -1179,6 +1179,9 @@ bool TapirTarget::shouldProcessFunction(const Function &F) const {
         return true;
       if (Intrinsic::task_frameaddress == II->getIntrinsicID())
         return true;
+      if (Intrinsic::tapir_runtime_start == II->getIntrinsicID() ||
+          Intrinsic::tapir_runtime_end == II->getIntrinsicID())
+        return true;
     }
 
   return false;
@@ -1189,4 +1192,9 @@ void TapirTarget::lowerTaskFrameAddrCall(CallInst *TaskFrameAddrCall) {
   // frameaddress intrinsic.
   TaskFrameAddrCall->setCalledFunction(Intrinsic::getDeclaration(
       &M, Intrinsic::frameaddress, PointerType::getInt8PtrTy(M.getContext())));
+}
+
+void TapirTarget::lowerTapirRTCall(CallInst *TapirRTCall) {
+  // By default, do nothing with tapir_runtime_{start,end} calls.
+  return;
 }
