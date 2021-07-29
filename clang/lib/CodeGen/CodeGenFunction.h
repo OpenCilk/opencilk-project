@@ -1235,6 +1235,10 @@ public:
     }
   };
 
+  // Flag indicating whether CodeGen is currently emitting within a some
+  // _Cilk_scope.
+  bool WithinCilkScope = false;
+
   /// Cleanup to ensure a tapir.runtime.end intrinsic is inserted.
   struct TapirRuntimeEndCleanup final : public EHScopeStack::Cleanup {
   public:
