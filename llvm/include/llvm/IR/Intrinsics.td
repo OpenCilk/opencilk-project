@@ -1312,10 +1312,10 @@ def int_syncregion_start
     : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly, IntrWillReturn]>;
 
 def int_tapir_runtime_start
-    : Intrinsic<[], [], [IntrArgMemOnly, IntrWillReturn]>;
+    : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly, IntrWillReturn]>;
 
 def int_tapir_runtime_end
-    : Intrinsic<[], [], [IntrArgMemOnly, IntrWillReturn]>;
+    : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly, IntrWillReturn]>;
 
 // Intrinsics for taskframes.
 
