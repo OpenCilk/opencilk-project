@@ -457,15 +457,19 @@ void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
   if (!WithinCilkScope) {
     WithinCilkScope = true;
     ThisScopeIsOutermost = true;
-    Builder.CreateCall(CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_start));
-    // Mark the end of the _Cilk_scope with tapir_runtime_end.
-    EHStack.pushCleanup<TapirRuntimeEndCleanup>(NormalAndEHCleanup);
   }
 
   {
     // Add a taskframe around this scope in case there are other spawns outside
     // of this scope, which would need to be synced separately.
     TaskFrameScope TFScope(*this);
+    if (ThisScopeIsOutermost && !CurSyncRegion) {
+      llvm::Instruction *TapirRTStart = Builder.CreateCall(
+          CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_start));
+      // Mark the end of the _Cilk_scope with tapir_runtime_end.
+      EHStack.pushCleanup<TapirRuntimeEndCleanup>(NormalAndEHCleanup,
+                                                  TapirRTStart);
+    }
     // Create a nested synced scope.
     SyncedScopeRAII SyncedScp(*this);
     PushSyncRegion()->addImplicitSync();

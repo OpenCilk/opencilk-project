@@ -1241,12 +1241,16 @@ public:
 
   /// Cleanup to ensure a tapir.runtime.end intrinsic is inserted.
   struct TapirRuntimeEndCleanup final : public EHScopeStack::Cleanup {
+    llvm::Instruction *TapirRuntimeStart;
+
   public:
-    TapirRuntimeEndCleanup() {}
+    TapirRuntimeEndCleanup(llvm::Instruction *TapirRuntimeStart)
+        : TapirRuntimeStart(TapirRuntimeStart) {}
 
     void Emit(CodeGenFunction &CGF, Flags F) override {
       CGF.Builder.CreateCall(
-          CGF.CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_end));
+          CGF.CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_end),
+          {TapirRuntimeStart});
     }
   };
 
