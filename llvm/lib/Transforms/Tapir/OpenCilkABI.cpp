@@ -1443,7 +1443,7 @@ void OpenCilkABI::lowerSync(SyncInst &SI) {
 
 void OpenCilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                          Instruction *TaskFrameCreate,
-                                         bool IsSpawner) {
+                                         bool IsSpawner, BasicBlock *TFEntry) {
   // If the outlined task F itself performs spawns, set up F to support stealing
   // continuations.
   if (IsSpawner)
@@ -1456,7 +1456,7 @@ void OpenCilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
 
 void OpenCilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                           Instruction *TaskFrameCreate,
-                                          bool IsSpawner) {
+                                          bool IsSpawner, BasicBlock *TFEntry) {
   // Because F is a spawned task, we want to insert landingpads for all calls
   // that can throw, so we can pop the stackframe correctly if they do throw.
   // In particular, popping the stackframe of a spawned task may discover that
@@ -1471,7 +1471,7 @@ void OpenCilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
   // pop in the personality function.
 }
 
-void OpenCilkABI::preProcessRootSpawner(Function &F) {
+void OpenCilkABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
   MarkSpawner(F);
   InsertStackFramePush(F);
   Value *SF = DetachCtxToStackFrame[&F];
@@ -1493,7 +1493,7 @@ void OpenCilkABI::preProcessRootSpawner(Function &F) {
   }
 }
 
-void OpenCilkABI::postProcessRootSpawner(Function &F) {
+void OpenCilkABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
   // F is a root spawner, not itself a spawned task.  We don't need to promote
   // calls to invokes, since the Cilk personality function will take care of
   // popping the frame if no landingpad exists for a given call.
