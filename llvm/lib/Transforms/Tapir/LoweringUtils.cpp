@@ -938,7 +938,7 @@ TaskOutlineInfo llvm::outlineTaskFrame(
   Function *Helper = createHelperForTaskFrame(F, TF, HelperArgs, DestM, VMap,
                                               ReturnType, AC, DT);
   Instruction *ClonedTF = cast<Instruction>(VMap[TF->getTaskFrameCreate()]);
-  return TaskOutlineInfo(Helper, nullptr, ClonedTF, Inputs,
+  return TaskOutlineInfo(Helper, Entry, nullptr, ClonedTF, Inputs,
                          ArgsStart, StorePt, Continue, Unwind);
 }
 
@@ -1038,10 +1038,10 @@ TaskOutlineInfo llvm::outlineTask(
   Function *Helper = createHelperForTask(F, T, HelperArgs, DestM, VMap,
                                          ReturnType, AC, DT);
   Value *ClonedTFCreate = TFCreate ? VMap[TFCreate] : nullptr;
-  return TaskOutlineInfo(
-      Helper, dyn_cast_or_null<Instruction>(VMap[DI]),
-      dyn_cast_or_null<Instruction>(ClonedTFCreate), Inputs,
-      ArgsStart, StorePt, DI->getContinue(), Unwind);
+  return TaskOutlineInfo(Helper, T->getEntry(),
+                         dyn_cast_or_null<Instruction>(VMap[DI]),
+                         dyn_cast_or_null<Instruction>(ClonedTFCreate), Inputs,
+                         ArgsStart, StorePt, DI->getContinue(), Unwind);
 }
 
 //----------------------------------------------------------------------------//
@@ -1175,13 +1175,15 @@ bool TapirTarget::shouldProcessFunction(const Function &F) const {
 
   for (const Instruction &I : instructions(&F))
     if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
-      if (Intrinsic::tapir_loop_grainsize == II->getIntrinsicID())
+      switch(II->getIntrinsicID()) {
+      case Intrinsic::tapir_loop_grainsize:
+      case Intrinsic::task_frameaddress:
+      case Intrinsic::tapir_runtime_start:
+      case Intrinsic::tapir_runtime_end:
         return true;
-      if (Intrinsic::task_frameaddress == II->getIntrinsicID())
-        return true;
-      if (Intrinsic::tapir_runtime_start == II->getIntrinsicID() ||
-          Intrinsic::tapir_runtime_end == II->getIntrinsicID())
-        return true;
+      default:
+        break;
+      }
     }
 
   return false;
@@ -1194,7 +1196,16 @@ void TapirTarget::lowerTaskFrameAddrCall(CallInst *TaskFrameAddrCall) {
       &M, Intrinsic::frameaddress, PointerType::getInt8PtrTy(M.getContext())));
 }
 
-void TapirTarget::lowerTapirRTCall(CallInst *TapirRTCall) {
+void TapirTarget::lowerTapirRTCalls(SmallVectorImpl<CallInst *> &TapirRTCalls,
+                                    Function &F, BasicBlock *TFEntry) {
   // By default, do nothing with tapir_runtime_{start,end} calls.
   return;
+}
+
+/// Process the Tapir instructions in an ordinary (non-spawning and not spawned)
+/// function \p F directly.
+bool TapirTarget::processOrdinaryFunction(Function &F, BasicBlock *TFEntry) {
+  // By default, do no special processing for ordinary functions.  Instead, the
+  // function will be processed using TapirToTargetImpl::processSimpleABI().
+  return false;
 }

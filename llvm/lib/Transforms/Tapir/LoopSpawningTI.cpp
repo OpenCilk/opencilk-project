@@ -1518,7 +1518,7 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
         OutlineProcessors[TL]->getLimitArgIndex(F, LoopArgs[L]),
         &OutlineProcessors[TL]->getDestinationModule(), VMap, InputMap);
     TaskToOutline[T] = TaskOutlineInfo(
-        Outline, cast<Instruction>(VMap[T->getDetach()]),
+        Outline, T->getEntry(), cast<Instruction>(VMap[T->getDetach()]),
         dyn_cast_or_null<Instruction>(VMap[T->getTaskFrameUsed()]),
         LoopInputSets[L], LoopArgStarts[L],
         L->getLoopPreheader()->getTerminator(), TL->getExitBlock(),
