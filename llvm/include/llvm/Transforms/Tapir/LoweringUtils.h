@@ -85,14 +85,22 @@ struct TaskOutlineInfo {
   // unwind block.
   BasicBlock *ReplUnwind = nullptr;
 
+  // Pointer to the basic block corresponding with the entry of this outlined
+  // taskframe in the function from which this taskframe was outlined.  This
+  // pointer is maintained to help Tapir targets use taskframe-entry blocks as
+  // keys for target-specific maps.
+  BasicBlock *OriginalTFEntry = nullptr;
+
   TaskOutlineInfo() = default;
-  TaskOutlineInfo(Function *Outline, Instruction *DetachPt,
-                  Instruction *TaskFrameCreate, ValueSet &InputSet,
-                  Instruction *ReplStart, Instruction *ReplCall,
-                  BasicBlock *ReplRet, BasicBlock *ReplUnwind = nullptr)
+  TaskOutlineInfo(Function *Outline, BasicBlock *OriginalTFEntry,
+                  Instruction *DetachPt, Instruction *TaskFrameCreate,
+                  ValueSet &InputSet, Instruction *ReplStart,
+                  Instruction *ReplCall, BasicBlock *ReplRet,
+                  BasicBlock *ReplUnwind = nullptr)
       : Outline(Outline), DetachPt(DetachPt), TaskFrameCreate(TaskFrameCreate),
         InputSet(InputSet), ReplStart(ReplStart), ReplCall(ReplCall),
-        ReplRet(ReplRet), ReplUnwind(ReplUnwind) {}
+        ReplRet(ReplRet), ReplUnwind(ReplUnwind),
+        OriginalTFEntry(OriginalTFEntry) {}
 
   // Replaces the stored call or invoke instruction to the outlined function
   // with \p NewReplCall, and updates other information in this TaskOutlineInfo
@@ -223,11 +231,14 @@ public:
   /// for the containing function, i.e., after the task has been outlined.
   virtual void lowerTaskFrameAddrCall(CallInst *TaskFrameAddrCall);
 
-  /// Lower a call to the tapir.runtime.start/end intrinsic.
-  virtual void lowerTapirRTCall(CallInst *TapirRTCall);
-
   /// Lower a Tapir sync instruction SI.
   virtual void lowerSync(SyncInst &SI) = 0;
+
+  /// Lower calls to the tapir.runtime.{start,end} intrinsics.  Only
+  /// tapir.runtime.start intrinsics are stored; uses of those intrinsics
+  /// identify the tapir.runtime.end intrinsics to lower.
+  virtual void lowerTapirRTCalls(SmallVectorImpl<CallInst *> &TapirRTCalls,
+                                 Function &F, BasicBlock *TFEntry);
 
   // TODO: Add more options to control outlining.
 
@@ -259,25 +270,30 @@ public:
   // Add attributes to the Function Helper produced from outlining a task.
   virtual void addHelperAttributes(Function &Helper) {}
 
+  // Remap any Target-local structures after taskframe starting at TFEntry is
+  // outlined.
+  virtual void remapAfterOutlining(BasicBlock *TFEntry,
+                                   ValueToValueMapTy &VMap) {}
+
   // Pre-process the Function F that has just been outlined from a task.  This
   // routine is executed on each outlined function by traversing in post-order
   // the tasks in the original function.
   virtual void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                       Instruction *TaskFrameCreate,
-                                      bool IsSpawner) = 0;
+                                      bool IsSpawner, BasicBlock *TFEntry) = 0;
 
   // Post-process the Function F that has just been outlined from a task.  This
   // routine is executed on each outlined function by traversing in post-order
   // the tasks in the original function.
   virtual void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                        Instruction *TaskFrameCreate,
-                                       bool IsSpawner) = 0;
+                                       bool IsSpawner, BasicBlock *TFEntry) = 0;
 
   // Pre-process the root Function F as a function that can spawn subtasks.
-  virtual void preProcessRootSpawner(Function &F) = 0;
+  virtual void preProcessRootSpawner(Function &F, BasicBlock *TFEntry) = 0;
 
   // Post-process the root Function F as a function that can spawn subtasks.
-  virtual void postProcessRootSpawner(Function &F) = 0;
+  virtual void postProcessRootSpawner(Function &F, BasicBlock *TFEntry) = 0;
 
   // Process the invocation of a task for an outlined function.  This routine is
   // invoked after processSpawner once for each child subtask.
@@ -290,6 +306,8 @@ public:
   // Process a generated helper Function F produced via outlining, at the end of
   // the lowering process.
   virtual void postProcessHelper(Function &F) = 0;
+
+  virtual bool processOrdinaryFunction(Function &F, BasicBlock *TFEntry);
 
   // Get the LoopOutlineProcessor associated with this Tapir target.
   virtual LoopOutlineProcessor *
