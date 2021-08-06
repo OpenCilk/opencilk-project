@@ -655,7 +655,8 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
         createSpindleWithEntry(&B, Spindle::SPType::Phi);
         SpindleCount++;
       }
-    } else if (endsUnassociatedTaskFrame(&B)) {
+    }
+    if (endsUnassociatedTaskFrame(&B)) {
       BasicBlock *SPEntry = B.getSingleSuccessor();
       // This block ends with a taskframe.end.  Mark its successor as a spindle
       // entry.
