@@ -52,15 +52,15 @@ void CudaABI::postProcessHelper(Function &F) {}
 
 void CudaABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                      Instruction *TaskFrameCreate,
-                                     bool IsSpawner) {}
+                                     bool IsSpawner, BasicBlock *TFEntry) {}
 
 void CudaABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                       Instruction *TaskFrameCreate,
-                                      bool IsSpawner) {}
+                                      bool IsSpawner, BasicBlock *TFEntry) {}
 
-void CudaABI::preProcessRootSpawner(Function &F) {}
+void CudaABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {}
 
-void CudaABI::postProcessRootSpawner(Function &F) {}
+void CudaABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {}
 
 void CudaABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {}
 

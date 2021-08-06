@@ -116,13 +116,13 @@ public:
   void postProcessHelper(Function &F) override final;
 
   void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                              Instruction *TaskFrameCreate,
-                              bool IsSpawner) override final;
+                              Instruction *TaskFrameCreate, bool IsSpawner,
+                              BasicBlock *TFEntry) override final;
   void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                               Instruction *TaskFrameCreate,
-                               bool IsSpaner) override final;
-  void preProcessRootSpawner(Function &F) override final;
-  void postProcessRootSpawner(Function &F) override final;
+                               Instruction *TaskFrameCreate, bool IsSpaner,
+                               BasicBlock *TFEntry) override final;
+  void preProcessRootSpawner(Function &F, BasicBlock *TFEntry) override final;
+  void postProcessRootSpawner(Function &F, BasicBlock *TFEntry) override final;
   void processSubTaskCall(TaskOutlineInfo &TOI,
                           DominatorTree &DT) override final;
 
