@@ -64,7 +64,7 @@ private:
                                  SmallVectorImpl<Spindle *> &AllTaskFrames,
                                  DominatorTree &DT, AssumptionCache &AC,
                                  TaskInfo &TI);
-  bool processSimpleABI(Function &F);
+  bool processSimpleABI(Function &F, BasicBlock *TFEntry);
   bool processRootTask(Function &F, TFOutlineMapTy &TFToOutline,
                        DominatorTree &DT, AssumptionCache &AC, TaskInfo &TI);
   bool processSpawnerTaskFrame(Spindle *TF, TFOutlineMapTy &TFToOutline,
@@ -169,6 +169,9 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
         TFToOutline[TF].Outline->setDoesNotThrow();
       Target->addHelperAttributes(*TFToOutline[TF].Outline);
 
+      // Allow the Target to update any internal structures after outlining.
+      Target->remapAfterOutlining(TF->getEntry(), VMap);
+
       // Update subtaskframe outline info to reflect the fact that their parent
       // taskframe was outlined.
       for (Spindle *SubTF : TF->subtaskframes())
@@ -208,7 +211,7 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
 }
 
 /// Process the Tapir instructions in function \p F directly.
-bool TapirToTargetImpl::processSimpleABI(Function &F) {
+bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
   NamedRegionTimer NRT("processSimpleABI", "Process simple ABI", TimerGroupName,
                        TimerGroupDescription, TimePassesIsEnabled);
 
@@ -230,10 +233,10 @@ bool TapirToTargetImpl::processSimpleABI(Function &F) {
         if (Intrinsic::task_frameaddress == II->getIntrinsicID())
           TaskFrameAddrCalls.push_back(II);
 
-      // Record calls to tapir_runtime_start/stop intrinsics.
+      // Record calls to tapir_runtime_start intrinsics.  We rely on analyzing
+      // uses of these intrinsic calls to find calls to tapir_runtime_end.
       if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
-        if (Intrinsic::tapir_runtime_start == II->getIntrinsicID() ||
-            Intrinsic::tapir_runtime_end == II->getIntrinsicID())
+        if (Intrinsic::tapir_runtime_start == II->getIntrinsicID())
           TapirRTCalls.push_back(II);
 
       // Record sync instructions in this function.
@@ -262,14 +265,7 @@ bool TapirToTargetImpl::processSimpleABI(Function &F) {
     Target->lowerTaskFrameAddrCall(TaskFrameAddrCall);
     Changed = true;
   }
-
-  while (!TapirRTCalls.empty()) {
-    CallInst *TapirRTCall = TapirRTCalls.pop_back_val();
-    LLVM_DEBUG(dbgs() << "Lowering tapir_runtime call " << *TapirRTCall
-                      << "\n");
-    Target->lowerTapirRTCall(TapirRTCall);
-    Changed = true;
-  }
+  Target->lowerTapirRTCalls(TapirRTCalls, F, TFEntry);
 
   // Process the set of syncs.
   while (!Syncs.empty()) {
@@ -299,17 +295,17 @@ bool TapirToTargetImpl::processRootTask(
   if (PerformsSpawn) {
     Changed = true;
     // Process root-task function F as a spawner.
-    Target->preProcessRootSpawner(F);
+    Target->preProcessRootSpawner(F, &F.getEntryBlock());
 
     // Process each call to a subtask.
     for (Spindle *TF : TI.getRootTask()->taskframe_roots())
       if (TF->getTaskFromTaskFrame())
         Target->processSubTaskCall(TFToOutline[TF], DT);
 
-    Target->postProcessRootSpawner(F);
+    Target->postProcessRootSpawner(F, &F.getEntryBlock());
   }
   // Process the Tapir instructions in F directly.
-  Changed |= processSimpleABI(F);
+  Changed |= processSimpleABI(F, &F.getEntryBlock());
   return Changed;
 }
 
@@ -322,17 +318,17 @@ bool TapirToTargetImpl::processSpawnerTaskFrame(
   Function &F = *TFToOutline[TF].Outline;
 
   // Process function F as a spawner.
-  Target->preProcessRootSpawner(F);
+  Target->preProcessRootSpawner(F, TF->getEntry());
 
   // Process each call to a subtask.
   for (Spindle *SubTF : TF->subtaskframes())
     if (SubTF->getTaskFromTaskFrame())
       Target->processSubTaskCall(TFToOutline[SubTF], DT);
 
-  Target->postProcessRootSpawner(F);
+  Target->postProcessRootSpawner(F, TF->getEntry());
 
   // Process the Tapir instructions in F directly.
-  processSimpleABI(F);
+  processSimpleABI(F, TF->getEntry());
   return true;
 }
 
@@ -348,18 +344,18 @@ bool TapirToTargetImpl::processOutlinedTask(
   Instruction *DetachPt = TFToOutline[TF].DetachPt;
   Instruction *TaskFrameCreate = TFToOutline[TF].TaskFrameCreate;
 
-  Target->preProcessOutlinedTask(F, DetachPt, TaskFrameCreate,
-                                 !T->isSerial());
+  Target->preProcessOutlinedTask(F, DetachPt, TaskFrameCreate, !T->isSerial(),
+                                 TF->getEntry());
   // Process each call to a subtask.
   for (Spindle *SubTF : TF->subtaskframes())
     if (SubTF->getTaskFromTaskFrame())
       Target->processSubTaskCall(TFToOutline[SubTF], DT);
 
-  Target->postProcessOutlinedTask(F, DetachPt, TaskFrameCreate,
-                                  !T->isSerial());
+  Target->postProcessOutlinedTask(F, DetachPt, TaskFrameCreate, !T->isSerial(),
+                                  TF->getEntry());
 
   // Process the Tapir instructions in F directly.
-  processSimpleABI(F);
+  processSimpleABI(F, TF->getEntry());
   return true;
 }
 
@@ -397,7 +393,8 @@ void TapirToTargetImpl::processFunction(
   // If we don't need to do outlining, then just handle the simple ABI.
   if (!Target->shouldDoOutlining(F)) {
     // Process the Tapir instructions in F directly.
-    processSimpleABI(F);
+    if (!Target->processOrdinaryFunction(F, &F.getEntryBlock()))
+      processSimpleABI(F, &F.getEntryBlock());
     return;
   }
 
@@ -424,7 +421,9 @@ void TapirToTargetImpl::processFunction(
     else if (isSpawnedTaskFrame(TF))
       processOutlinedTask(TF->getTaskFromTaskFrame(), TFToOutline, DT, AC, TI);
     else
-      processSimpleABI(*TFToOutline[TF].Outline);
+      if (!Target->processOrdinaryFunction(*TFToOutline[TF].Outline,
+                                           TF->getEntry()))
+        processSimpleABI(*TFToOutline[TF].Outline, TF->getEntry());
     NewHelpers.push_back(TFToOutline[TF].Outline);
   }
   // Process the root task
