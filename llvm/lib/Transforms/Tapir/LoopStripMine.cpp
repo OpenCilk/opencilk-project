@@ -330,8 +330,11 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
         }
 
   // TODO: Generalize this condition to support stripmining with a prolog.
-  assert(isEpilogProfitable(L) &&
-         "Stripmining loop with unprofitable epilog.");
+#ifndef NDEBUG
+  if (!isEpilogProfitable(L)) {
+    dbgs() << "Stripmining loop with unprofitable epilog.\n";
+  }
+#endif
 
   // Get the task for this loop.
   return T;
@@ -417,7 +420,8 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
                 BasicBlock *InsertTop, BasicBlock *InsertBot,
                 BasicBlock *Preheader, std::vector<BasicBlock *> &NewBlocks,
                 LoopBlocksDFS &LoopBlocks,
-                std::vector<BasicBlock *> &ExtraTaskBlocks,
+                SmallVectorImpl<BasicBlock *> &ExtraTaskBlocks,
+                SmallVectorImpl<BasicBlock *> &SharedEHTaskBlocks,
                 ValueToValueMapTy &VMap, DominatorTree *DT, LoopInfo *LI) {
   StringRef suffix = UseEpilogRemainder ? "epil" : "prol";
   BasicBlock *Header = L->getHeader();
@@ -496,26 +500,61 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
       addClonedBlockToLoopInfo(BB, NewBB, LI, NewLoops);
 
     VMap[BB] = NewBB;
-    if (DT) {
-      // Copy information from original loop to the clone.
-      BasicBlock *IDomBB = DT->getNode(BB)->getIDom()->getBlock();
-      if (VMap.lookup(IDomBB))
-        DT->addNewBlock(NewBB, cast<BasicBlock>(VMap[IDomBB]));
-      else
-        DT->addNewBlock(NewBB, cast<BasicBlock>(IDomBB));
-    }
 
     // Update PHI nodes in the detach-unwind destination.  Strictly speaking,
     // this step isn't necessary, since the epilog loop will be serialized later
     // and these new entries for the PHI nodes will therefore be removed.  But
     // the routine for serializing the detach expects valid LLVM, so we update
     // the PHI nodes here to ensure the resulting LLVM is valid.
-    if (DI->hasUnwindDest())
+    if (DI->hasUnwindDest()) {
       if (isDetachedRethrow(BB->getTerminator(), DI->getSyncRegion())) {
         InvokeInst *DR = dyn_cast<InvokeInst>(BB->getTerminator());
         for (PHINode &PN : DR->getUnwindDest()->phis())
           PN.addIncoming(PN.getIncomingValueForBlock(BB), NewBB);
       }
+    }
+  }
+
+  // Update PHI nodes in successors of ExtraTaskBlocks, based on the cloned
+  // values.
+  for (BasicBlock *BB : ExtraTaskBlocks) {
+    for (BasicBlock *Succ : successors(BB)) {
+      if (VMap.count(Succ))
+        continue;
+
+      for (PHINode &PN : Succ->phis()) {
+        Value *Val = PN.getIncomingValueForBlock(BB);
+        Value *NewVal = VMap.count(Val) ? cast<Value>(VMap[Val]) : Val;
+        PN.addIncoming(NewVal, cast<BasicBlock>(VMap[BB]));
+      }
+    }
+  }
+
+  // Update DT to accommodate cloned ExtraTaskBlocks.
+  if (DT) {
+    for (BasicBlock *BB : ExtraTaskBlocks) {
+      BasicBlock *NewBB = cast<BasicBlock>(VMap[BB]);
+      // Copy information from original loop to the clone, if it's available.
+      BasicBlock *IDomBB = DT->getNode(BB)->getIDom()->getBlock();
+      if (VMap.count(IDomBB)) {
+        DT->addNewBlock(NewBB, cast<BasicBlock>(VMap[IDomBB]));
+      } else {
+        BasicBlock *NewIDom = nullptr;
+        // Get the idom of BB's predecessors.
+        for (BasicBlock *Pred : predecessors(BB))
+          if (VMap.count(Pred)) {
+            if (NewIDom)
+              NewIDom = DT->findNearestCommonDominator(NewIDom, Pred);
+            else
+              NewIDom = Pred;
+          }
+        // Use this computed idom (or its clone) as the idom of the cloned BB.
+        if (VMap.count(NewIDom))
+          DT->addNewBlock(NewBB, cast<BasicBlock>(VMap[NewIDom]));
+        else
+          DT->addNewBlock(NewBB, NewIDom);
+      }
+    }
   }
 
   // Change the incoming values to the ones defined in the preheader or
@@ -542,6 +581,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
         NewPHI->setIncomingValue(idx, V);
     }
   }
+
   // Add entries to PHI nodes outside of loop.  Strictly speaking, this step
   // isn't necessary, since the epilog loop will be serialized later and these
   // new entries for the PHI nodes will therefore be removed.  But the routine
@@ -930,13 +970,35 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
 
   // Collect extra blocks in the task that LoopInfo does not consider to be part
   // of the loop, e.g., exception-handling code for the task.
-  std::vector<BasicBlock *> ExtraTaskBlocks;
-  for (Task *SubT : depth_first(T))
-    for (Spindle *S : depth_first<InTask<Spindle *>>(SubT->getEntrySpindle()))
-      for (BasicBlock *BB : S->blocks())
-        // Skip blocks in the loop.
-        if (!L->contains(BB))
-          ExtraTaskBlocks.push_back(BB);
+  SmallVector<BasicBlock *, 8> ExtraTaskBlocks;
+  SmallVector<BasicBlock *, 8> SharedEHTaskBlocks;
+  SmallPtrSet<BasicBlock *, 8> SharedEHBlockPreds;
+  {
+    SmallPtrSet<Spindle *, 8> Visited;
+    for (Task *SubT : depth_first(T)) {
+      for (Spindle *S :
+           depth_first<InTask<Spindle *>>(SubT->getEntrySpindle())) {
+        // Only visit shared-eh spindles once a piece.
+        if (S->isSharedEH() && !Visited.insert(S).second)
+          continue;
+
+        for (BasicBlock *BB : S->blocks()) {
+          // Skip blocks in the loop.
+          if (!L->contains(BB)) {
+            ExtraTaskBlocks.push_back(BB);
+
+            if (!T->simplyEncloses(BB) && S->isSharedEH()) {
+              SharedEHTaskBlocks.push_back(BB);
+              if (S->getEntry() == BB)
+                for (BasicBlock *Pred : predecessors(BB))
+                  if (T->simplyEncloses(Pred))
+                    SharedEHBlockPreds.insert(Pred);
+            }
+          }
+        }
+      }
+    }
+  }
 
   SmallVector<Instruction *, 1> Reattaches;
   SmallVector<BasicBlock *, 4> EHBlocksToClone;
@@ -978,7 +1040,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   *RemainderLoop =
       CloneLoopBlocks(L, ModVal, CreateRemainderLoop, true, UnrollRemainder,
                       InsertTop, InsertBot, NewPreheader, NewBlocks, LoopBlocks,
-                      ExtraTaskBlocks, VMap, DT, LI);
+                      ExtraTaskBlocks, SharedEHTaskBlocks, VMap, DT, LI);
 
   // Insert the cloned blocks into the function.
   F->getBasicBlockList().splice(InsertBot->getIterator(),
@@ -1017,6 +1079,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     SmallPtrSet<BasicBlock *, 4> ClonedEHBlockPreds;
     for (BasicBlock *B : EHBlockPreds)
       ClonedEHBlockPreds.insert(cast<BasicBlock>(VMap[B]));
+    SmallVector<BasicBlock *, 4> ClonedEHBlocks;
+    for (BasicBlock *B : EHBlocksToClone)
+      ClonedEHBlocks.push_back(cast<BasicBlock>(VMap[B]));
     // Landing pads and detached-rethrow instructions may or may not have been
     // cloned.
     SmallPtrSet<LandingPadInst *, 1> ClonedInlinedLPads;
@@ -1036,8 +1101,8 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     DetachInst *ClonedDI = cast<DetachInst>(VMap[DI]);
     // Serialize the new task.
     SerializeDetach(ClonedDI, ParentEntry, EHCont, EHContLPadVal,
-                    ClonedReattaches, &EHBlocksToClone, &ClonedEHBlockPreds,
-                    &ClonedInlinedLPads, &ClonedDetachedRethrows, DT);
+                    ClonedReattaches, &ClonedEHBlocks, &ClonedEHBlockPreds,
+                    &ClonedInlinedLPads, &ClonedDetachedRethrows, DT, LI);
   }
 
   // Detach the stripmined loop.
@@ -1069,6 +1134,12 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     }
     LoopReattach = SplitEdge(Latch, NewExit, DT, LI);
     LoopReattach->setName(Header->getName() + ".strpm.detachloop.reattach");
+
+    // Clone any shared-EH spindles in the stripmined loop to prevent tasks at
+    // different nesting levels from sharing an EH spindle.
+    if (!SharedEHTaskBlocks.empty())
+      cloneEHBlocks(F, SharedEHTaskBlocks, SharedEHBlockPreds, ".strpm",
+                    nullptr, nullptr, DT, LI);
 
     // Insert new detach instructions
     if (DI->hasUnwindDest()) {
@@ -1481,7 +1552,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   if (TI)
     // FIXME: Recalculating TaskInfo for the whole function is wasteful.
     // Optimize this routine in the future.
-    TI->recalculate(*Header->getParent(), *DT);
+    TI->recalculate(*F, *DT);
 
   return NewLoop;
 }
