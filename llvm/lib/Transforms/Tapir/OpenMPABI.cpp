@@ -542,12 +542,12 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
 
 void OpenMPABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                        Instruction *TaskFrameCreate,
-                                       bool IsSpawner) {}
+                                       bool IsSpawner, BasicBlock *TFEntry) {}
 void OpenMPABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                         Instruction *TaskFrameCreate,
-                                        bool IsSpawner) {}
-void OpenMPABI::preProcessRootSpawner(Function &F) {}
-void OpenMPABI::postProcessRootSpawner(Function &F) {}
+                                        bool IsSpawner, BasicBlock *TFEntry) {}
+void OpenMPABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {}
+void OpenMPABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {}
 
 void OpenMPABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Function *Outline = TOI.Outline;
