@@ -24,6 +24,7 @@ class BasicBlock;
 class DominatorTree;
 class DomTreeUpdater;
 class Loop;
+class LoopInfo;
 class Spindle;
 class Task;
 class TaskInfo;
@@ -96,6 +97,18 @@ bool MoveStaticAllocasInBlock(BasicBlock *Entry, BasicBlock *Block,
 /// \p DT is provided, then it will be updated to reflect the CFG changes.
 void InlineTaskFrameResumes(Value *TaskFrame, DominatorTree *DT = nullptr);
 
+/// Clone exception-handling blocks EHBlocksToClone, with predecessors
+/// EHBlockPreds in a given task.  Updates EHBlockPreds to point at the cloned
+/// blocks.  If the given pointers are non-null, updates blocks in *InlinedLPads
+/// and *DetachedRethrows to refer to cloned blocks, and updates DT and LI to
+/// reflect CFG updates.
+void cloneEHBlocks(Function *F, SmallVectorImpl<BasicBlock *> &EHBlocksToClone,
+                   SmallPtrSetImpl<BasicBlock *> &EHBlockPreds,
+                   const char *Suffix,
+                   SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
+                   SmallVectorImpl<Instruction *> *DetachedRethrows,
+                   DominatorTree *DT = nullptr, LoopInfo *LI = nullptr);
+
 /// Serialize the detach DI.  \p ParentEntry should be the entry block of the
 /// task that contains DI.  \p Reattaches, \p InlinedLPads, and \p
 /// DetachedRethrows identify the reattaches, landing pads, and detached
@@ -109,7 +122,7 @@ void SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
                      SmallPtrSetImpl<BasicBlock *> *EHBlockPreds,
                      SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
                      SmallVectorImpl<Instruction *> *DetachedRethrows,
-                     DominatorTree *DT = nullptr);
+                     DominatorTree *DT = nullptr, LoopInfo *LI = nullptr);
 
 /// Analyze a task T for serialization.  Gets the reattaches, landing pads, and
 /// detached rethrows that need special handling during serialization.

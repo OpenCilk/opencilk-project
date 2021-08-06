@@ -23,6 +23,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/UnrollLoop.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
 using namespace llvm;
@@ -288,7 +289,7 @@ bool llvm::MoveStaticAllocasInBlock(
   // Leave lifetime markers for the static alloca's, scoping them to the
   // from cloned block to cloned exit.
   if (!StaticAllocas.empty()) {
-    IRBuilder<> Builder(&Block->front());
+    IRBuilder<> Builder(&*Block->getFirstInsertionPt());
     for (unsigned ai = 0, ae = StaticAllocas.size(); ai != ae; ++ai) {
       AllocaInst *AI = StaticAllocas[ai];
       // Don't mark swifterror allocas. They can't have bitcast uses.
@@ -507,18 +508,15 @@ void LandingPadInliningInfo::forwardTaskResume(InvokeInst *TR) {
 
   // Update the DT
   BasicBlock *NormalDest = nullptr, *UnwindDest = nullptr;
+  SmallVector<DominatorTree::UpdateType, 8> Updates;
   if (DT) {
-    if (TR->getNormalDest()->getSinglePredecessor()) {
+    if (TR->getNormalDest()->getSinglePredecessor())
       NormalDest = TR->getNormalDest();
-      DT->eraseNode(TR->getNormalDest());
-    } else
-      DT->deleteEdge(Src, TR->getNormalDest());
+    Updates.push_back({DominatorTree::Delete, Src, TR->getNormalDest()});
 
-    if (TR->getUnwindDest()->getSinglePredecessor()) {
+    if (TR->getUnwindDest()->getSinglePredecessor())
       UnwindDest = TR->getUnwindDest();
-      DT->eraseNode(TR->getUnwindDest());
-    } else
-      DT->deleteEdge(Src, TR->getUnwindDest());
+    Updates.push_back({DominatorTree::Delete, Src, TR->getUnwindDest()});
   }
 
   // Remove the TR
@@ -528,6 +526,11 @@ void LandingPadInliningInfo::forwardTaskResume(InvokeInst *TR) {
     TR->getUnwindDest()->removePredecessor(Src);
 
   TR->eraseFromParent();
+
+  if (DT) {
+    DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
+    DTU.applyUpdates(Updates);
+  }
 
   if (NormalDest) {
     for (BasicBlock *Succ : successors(NormalDest))
@@ -565,25 +568,40 @@ static void handleDetachedLandingPads(
     DetUnwind.forwardTaskResume(cast<InvokeInst>(DR));
 }
 
-static void cloneEHBlocks(Function *F, Value *SyncRegion,
-                          SmallVectorImpl<BasicBlock *> &EHBlocksToClone,
-                          SmallPtrSetImpl<BasicBlock *> &EHBlockPreds,
-                          SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
-                          SmallVectorImpl<Instruction *> *DetachedRethrows,
-                          DominatorTree *DT = nullptr) {
+void llvm::cloneEHBlocks(Function *F,
+                         SmallVectorImpl<BasicBlock *> &EHBlocksToClone,
+                         SmallPtrSetImpl<BasicBlock *> &EHBlockPreds,
+                         const char *Suffix,
+                         SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
+                         SmallVectorImpl<Instruction *> *DetachedRethrows,
+                         DominatorTree *DT, LoopInfo *LI) {
   ValueToValueMapTy VMap;
   SmallVector<BasicBlock *, 8> NewBlocks;
   SmallPtrSet<BasicBlock *, 8> NewBlocksSet;
   SmallPtrSet<LandingPadInst *, 4> NewInlinedLPads;
   SmallPtrSet<Instruction *, 4> NewDetachedRethrows;
+  NewLoopsMap NewLoops;
   for (BasicBlock *BB : EHBlocksToClone) {
-    BasicBlock *New = CloneBasicBlock(BB, VMap, ".sd", F);
+    BasicBlock *New = CloneBasicBlock(BB, VMap, Suffix, F);
     VMap[BB] = New;
     if (DT)
       DT->addNewBlock(New, DT->getRoot());
+
+    // If the cloned block is inside of a loop, update LoopInfo.
+    if (LI && LI->getLoopFor(BB)) {
+      Loop *OldLoop = LI->getLoopFor(BB);
+      Loop *ParentLoop = OldLoop->getParentLoop();
+      if (ParentLoop && !NewLoops.count(ParentLoop))
+        NewLoops[ParentLoop] = ParentLoop;
+      addClonedBlockToLoopInfo(BB, New, LI, NewLoops);
+    }
+
     NewBlocks.push_back(New);
     NewBlocksSet.insert(New);
   }
+
+  // Remap instructions in the cloned blocks based on VMap.
+  remapInstructionsInBlocks(NewBlocks, VMap);
 
   SmallPtrSet<BasicBlock *, 8> NewSuccSet;
   // For all old successors, remove the predecessors in EHBlockPreds.
@@ -609,18 +627,44 @@ static void cloneEHBlocks(Function *F, Value *SyncRegion,
     }
   }
 
+  // Update the dominator tree and edges from EHBlockPreds to cloned EHBlocks.
   for (BasicBlock *EHBlock : EHBlocksToClone) {
-    BasicBlock *NewEHBlock = cast<BasicBlock>(VMap[EHBlock]);
     BasicBlock *IDomBB = nullptr;
     if (DT) {
-      BasicBlock *IDomBB = DT->getNode(EHBlock)->getIDom()->getBlock();
-      if (VMap.lookup(IDomBB))
+      IDomBB = DT->getNode(EHBlock)->getIDom()->getBlock();
+      if (VMap.count(IDomBB)) {
         DT->changeImmediateDominator(cast<BasicBlock>(VMap[EHBlock]),
                                      cast<BasicBlock>(VMap[IDomBB]));
-      else
-        DT->changeImmediateDominator(cast<BasicBlock>(VMap[EHBlock]), IDomBB);
+      } else {
+        IDomBB = nullptr;
+        // Get the idom of EHBlock's predecessors.
+        for (BasicBlock *Pred : predecessors(EHBlock)) {
+          if (EHBlockPreds.contains(Pred)) {
+            if (IDomBB)
+              IDomBB = DT->findNearestCommonDominator(IDomBB, Pred);
+            else
+              IDomBB = Pred;
+          }
+        }
+        assert(IDomBB && "Found no predecessors of EHBlock in EHBlockPreds.");
+        // Use this computed idom (or its clone) as the idom of the cloned
+        // EHBlock.
+        if (VMap.count(IDomBB)) {
+          DT->changeImmediateDominator(cast<BasicBlock>(VMap[EHBlock]),
+                                       cast<BasicBlock>(VMap[IDomBB]));
+        } else {
+          DT->changeImmediateDominator(cast<BasicBlock>(VMap[EHBlock]),
+                                       IDomBB);
+        }
+      }
     }
-    // Move the edges from Preds to point to NewBB instead of BB.
+  }
+
+  // Move the edges from Preds to point to NewEHBlock instead of EHBlock.
+  for (BasicBlock *EHBlock : EHBlocksToClone) {
+    BasicBlock *NewEHBlock = cast<BasicBlock>(VMap[EHBlock]);
+    DomTreeNodeBase<BasicBlock> *Node = DT ? DT->getNode(EHBlock) : nullptr;
+    BasicBlock *EHBlockIDom = Node ? Node->getIDom()->getBlock() : nullptr;
     for (BasicBlock *Pred : EHBlockPreds) {
       // This is slightly more strict than necessary; the minimum requirement is
       // that there be no more than one indirectbr branching to BB. And all
@@ -628,23 +672,40 @@ static void cloneEHBlocks(Function *F, Value *SyncRegion,
       assert(!isa<IndirectBrInst>(Pred->getTerminator()) &&
              "Cannot split an edge from an IndirectBrInst");
       Pred->getTerminator()->replaceUsesOfWith(EHBlock, NewEHBlock);
-      if (DT && Pred == IDomBB)
+      if (DT && EHBlockIDom)
         DT->deleteEdge(Pred, EHBlock);
     }
   }
 
-  // Remap instructions in the cloned blocks based on VMap.
-  remapInstructionsInBlocks(NewBlocks, VMap);
-
   // Update all successors of the cloned EH blocks.
   for (BasicBlock *BB : EHBlocksToClone) {
     for (BasicBlock *Succ : successors(BB)) {
-      if (NewBlocksSet.count(Succ)) continue;
+      if (NewBlocksSet.count(Succ) || VMap.count(Succ))
+        continue;
+
       // Update the PHI's in the successor of the cloned EH block.
       for (PHINode &PN : Succ->phis()) {
         Value *Val = PN.getIncomingValueForBlock(BB);
         Value *NewVal = VMap.count(Val) ? cast<Value>(VMap[Val]) : Val;
         PN.addIncoming(NewVal, cast<BasicBlock>(VMap[BB]));
+      }
+    }
+  }
+
+  if (DT && LI) {
+    // If any EHBlocks become unreachable, update LoopInfo to remove the
+    // relevant loops.
+    for (BasicBlock *EHBlock : EHBlocksToClone) {
+      if (!DT->isReachableFromEntry(EHBlock)) {
+        if (LI->isLoopHeader(EHBlock)) {
+          // Delete the whole loop.
+          Loop *L = LI->getLoopFor(EHBlock);
+          if (Loop *ParentL = L->getParentLoop())
+            ParentL->removeChildLoop(llvm::find(*ParentL, L));
+          else
+            LI->removeLoop(llvm::find(*LI, L));
+        }
+        LI->removeBlock(EHBlock);
       }
     }
   }
@@ -758,7 +819,7 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
                            SmallPtrSetImpl<BasicBlock *> *EHBlockPreds,
                            SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
                            SmallVectorImpl<Instruction *> *DetachedRethrows,
-                           DominatorTree *DT) {
+                           DominatorTree *DT, LoopInfo *LI) {
   BasicBlock *Spawner = DI->getParent();
   BasicBlock *TaskEntry = DI->getDetached();
   BasicBlock *Continue = DI->getContinue();
@@ -773,8 +834,8 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   if (EHBlocksToClone) {
     assert(EHBlockPreds &&
            "Given EH blocks to clone, but not blocks exiting to them.");
-    cloneEHBlocks(Spawner->getParent(), SyncRegion, *EHBlocksToClone,
-                  *EHBlockPreds, InlinedLPads, DetachedRethrows, DT);
+    cloneEHBlocks(Spawner->getParent(), *EHBlocksToClone, *EHBlockPreds, ".sd",
+                  InlinedLPads, DetachedRethrows, DT, LI);
   }
 
   // Collect the exit points into a single vector.
@@ -865,12 +926,14 @@ void llvm::AnalyzeTaskForSerialization(
 	// Skip basic blocks that are placeholder successors
 	if (isPlaceholderSuccessor(BB))
 	  continue;
+
         EHBlocksToClone.push_back(BB);
         if (S->getEntry() == BB)
           for (BasicBlock *Pred : predecessors(BB))
             if (T->simplyEncloses(Pred))
               EHBlockPreds.insert(Pred);
       }
+
       if (InvokeInst *II = dyn_cast<InvokeInst>(BB->getTerminator())) {
         if (!isDetachedRethrow(BB->getTerminator(), SyncRegion)) {
           assert(!isDetachedRethrow(BB->getTerminator()) &&
