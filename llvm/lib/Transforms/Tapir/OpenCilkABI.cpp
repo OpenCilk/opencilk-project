@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Dominators.h"
@@ -512,7 +513,15 @@ void OpenCilkABI::addHelperAttributes(Function &Helper) {
 
 void OpenCilkABI::remapAfterOutlining(BasicBlock *TFEntry,
                                       ValueToValueMapTy &VMap) {
+  if (TapirRTCalls[TFEntry].empty())
+    return;
 
+  // Update the set of tapir.runtime.{start,end} intrinsics in the taskframe
+  // rooted at TFEntry to process.
+  SmallVector<IntrinsicInst *, 4> OldTapirRTCalls(TapirRTCalls[TFEntry]);
+  TapirRTCalls[TFEntry].clear();
+  for (IntrinsicInst *II : OldTapirRTCalls)
+    TapirRTCalls[TFEntry].push_back(cast<IntrinsicInst>(VMap[II]));
 }
 
 // Check whether the allocation of a __cilkrts_stack_frame can be inserted after
@@ -681,6 +690,27 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   }
 }
 
+// Lower any calls to tapir.runtime.{start,end} that need to be processed.
+void OpenCilkABI::LowerTapirRTCalls(Function &F, BasicBlock *TFEntry) {
+  Instruction *SF = cast<Instruction>(GetOrCreateCilkStackFrame(F));
+  for (IntrinsicInst *II : TapirRTCalls[TFEntry]) {
+    IRBuilder<> Builder(II);
+    if (Intrinsic::tapir_runtime_start == II->getIntrinsicID()) {
+      // Lower calls to tapir.runtime.start to __cilkrts_enter_frame.
+      Builder.CreateCall(CILKRTS_FUNC(enter_frame), {SF});
+
+      // Find all tapir.runtime.ends that use this tapir.runtime.start, and
+      // lower them to calls to __cilk_parent_epilogue.
+      for (Use &U : II->uses())
+        if (IntrinsicInst *UII = dyn_cast<IntrinsicInst>(U.getUser()))
+          if (Intrinsic::tapir_runtime_end == UII->getIntrinsicID()) {
+            Builder.SetInsertPoint(UII);
+            Builder.CreateCall(GetCilkParentEpilogueFn(), {SF});
+          }
+    }
+  }
+}
+
 void OpenCilkABI::MarkSpawner(Function &F) {
   // If the spawner F might throw, then we mark F with the Cilk personality
   // function, which ensures that the Cilk stack frame of F is properly unwound.
@@ -810,7 +840,11 @@ void OpenCilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
 
 void OpenCilkABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
   MarkSpawner(F);
-  InsertStackFramePush(F);
+  if (TapirRTCalls[TFEntry].empty()) {
+    InsertStackFramePush(F);
+  } else {
+    LowerTapirRTCalls(F, TFEntry);
+  }
   Value *SF = DetachCtxToStackFrame[&F];
   for (BasicBlock &BB : F) {
     if (BB.isLandingPad()) {
@@ -828,8 +862,9 @@ void OpenCilkABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
   // F is a root spawner, not itself a spawned task.  We don't need to promote
   // calls to invokes, since the Cilk personality function will take care of
   // popping the frame if no landingpad exists for a given call.
-  InsertStackFramePop(F, /*PromoteCallsToInvokes*/false,
-                      /*InsertPauseFrame*/false, /*Helper*/false);
+  if (TapirRTCalls[TFEntry].empty())
+    InsertStackFramePop(F, /*PromoteCallsToInvokes*/ false,
+                        /*InsertPauseFrame*/ false, /*Helper*/ false);
 }
 
 void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
@@ -884,11 +919,182 @@ static inline void inlineCilkFunctions(
   CallsToInline.clear();
 }
 
+// For the taskframe at \p TFEntry containing blocks \p TFBlocks, find all
+// outermost tapir.runtime.{start,end} intrinsics, which are not enclosed
+// between other tapir.runtime.{start,end} intrinsics in this traksframe.
+// Furthermore, record and successor taskframes in \p SuccessorTFs that are not
+// enclosed between tapir.runtime.{start,end} intrinsics.
+static bool findOutermostTapirRTCallsForTaskFrame(
+    SmallVectorImpl<IntrinsicInst *> &TapirRTCalls, BasicBlock *TFEntry,
+    SmallPtrSetImpl<BasicBlock *> &TFBlocks,
+    SmallPtrSetImpl<Spindle *> &SuccessorTFs, TaskInfo &TI) {
+  SmallVector<BasicBlock::iterator, 8> Worklist;
+  SmallPtrSet<BasicBlock *, 8> Visited;
+  Worklist.push_back(TFEntry->begin());
+
+  while (!Worklist.empty()) {
+    BasicBlock::iterator Iter = Worklist.pop_back_val();
+    BasicBlock *BB = Iter->getParent();
+
+    bool FoundTapirRTStart = false;
+    bool FoundTapirRTEnd = false;
+    SmallVector<BasicBlock::iterator, 4> EndIters;
+    // Scan the BB for tapir_runtime calls.
+    for (BasicBlock::iterator It = Iter, E = BB->end(); It != E; ++It) {
+      Instruction *I = &*It;
+      if (isTapirIntrinsic(Intrinsic::tapir_runtime_start, I)) {
+        FoundTapirRTStart = true;
+        TapirRTCalls.push_back(cast<IntrinsicInst>(I));
+        // Examine corresponding tapir_runtime_end intrinsics to find blocks
+        // from which to continue search.
+        for (Use &U : I->uses()) {
+          if (Instruction *UI = dyn_cast<Instruction>(U.getUser())) {
+            FoundTapirRTEnd = true;
+            BasicBlock *EndBB = UI->getParent();
+            assert(TFBlocks.count(EndBB) && "tapir_runtime_end not in same "
+                                            "taskframe as tapir_runtime_begin");
+            EndIters.push_back(++UI->getIterator());
+          }
+        }
+
+        if (FoundTapirRTEnd)
+          // We found a tapir_runtime_begin in this block, so stop searching.
+          break;
+      }
+    }
+
+    // If we didn't find a tapir_runtime_start in this block, treat this block
+    // as an end block, so we examine its direct successors.
+    if (!FoundTapirRTStart)
+      EndIters.push_back(BB->getTerminator()->getIterator());
+
+    // Examine all end blocks to 1) check if a spawn occurs, and 2) add
+    // successors within the taskframe for further search.
+    for (BasicBlock::iterator Iter : EndIters) {
+      if (isa<DetachInst>(*Iter)) {
+        // We found a spawn terminating a block in this taskframe.  This spawn
+        // is not contained between outermost tapir_runtime_{start,end} calls in
+        // the taskframe.  Therefore, we should fall back to default behavior
+        // for inserting enter_frame and leave_frame calls for this taskframe.
+        TapirRTCalls.clear();
+        return true;
+      }
+
+      BasicBlock *EndBB = Iter->getParent();
+      if (EndBB->getTerminator() != &*Iter) {
+        Worklist.push_back(Iter);
+        continue;
+      }
+
+      // Add the successors of this block for further search.
+      for (BasicBlock *Succ : successors(EndBB)) {
+        if (TFBlocks.count(Succ) && Visited.insert(Succ).second)
+          // For successors within the taskframe, add them to the search.
+          Worklist.push_back(Succ->begin());
+        else {
+          // For successors in other taskframes, add the subtaskframe for
+          // processing.
+          Spindle *SuccSpindle = TI.getSpindleFor(Succ);
+          if (SuccSpindle->getTaskFrameCreate())
+            SuccessorTFs.insert(SuccSpindle);
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+// Find all tapir.runtime.{start,end} intrinsics to process for the taskframe
+// rooted at spindle \p TaskFrame and any subtaskframes thereof.
+void OpenCilkABI::GetTapirRTCalls(Spindle *TaskFrame, bool IsRootTask,
+                                  TaskInfo &TI) {
+  BasicBlock *TFEntry = TaskFrame->getEntry();
+  SmallPtrSet<BasicBlock *, 8> TFBlocks;
+  SmallVector<Spindle *, 4> SubTFs;
+  if (IsRootTask) {
+    // We have to compute the effective taskframe blocks for the root task,
+    // since these blocks are not automatically identified by TapirTaskInfo.
+    //
+    // Note: We could generalize TapirTaskInfo to compute these taskframe blocks
+    // directly, but this computation seems to be the only place that set of
+    // blocks is needed.
+    SmallPtrSet<Spindle *, 4> ExcludedSpindles;
+    // Exclude all spindles in unassociated taskframes under the root task.
+    for (Spindle *TFRoot : TI.getRootTask()->taskframe_roots()) {
+      if (!TFRoot->getTaskFromTaskFrame())
+        SubTFs.push_back(TFRoot);
+      for (Spindle *TFSpindle : depth_first<TaskFrames<Spindle *>>(TFRoot)) {
+        if (TFSpindle->getTaskFromTaskFrame())
+          continue;
+
+        for (Spindle *S : TFSpindle->taskframe_spindles())
+          ExcludedSpindles.insert(S);
+      }
+    }
+
+    // Iterate over the spindles in the root task, and add all spindle blocks to
+    // TFBlocks as long as those blocks don't belong to a nested taskframe.
+    for (Spindle *S :
+         depth_first<InTask<Spindle *>>(TI.getRootTask()->getEntrySpindle())) {
+      if (ExcludedSpindles.count(S))
+        continue;
+
+      TFBlocks.insert(S->block_begin(), S->block_end());
+    }
+  } else {
+    // Add all blocks in all spindles associated with this taskframe.
+    for (Spindle *S : TaskFrame->taskframe_spindles())
+      TFBlocks.insert(S->block_begin(), S->block_end());
+
+    for (Spindle *SubTF : TaskFrame->subtaskframes())
+      if (!SubTF->getTaskFromTaskFrame())
+        SubTFs.push_back(SubTF);
+  }
+
+  // Find the outermost tapir_runtime_{start,end} calls in this taskframe.
+  // Record in SuccessorTFs any subtaskframes that are not enclosed in
+  // tapir.runtime.{start,end} intrinsics.
+  SmallPtrSet<Spindle *, 4> SuccessorTFs;
+  bool TaskFrameSpawns = findOutermostTapirRTCallsForTaskFrame(
+      TapirRTCalls[TFEntry], TFEntry, TFBlocks, SuccessorTFs, TI);
+
+  // If this taskframe spawns outside of tapir_runtime_{start,end} pairs, then
+  // the taskframe will start/end the runtime when executed.  Hence there's no
+  // need to evaluate subtaskframes.
+  if (TaskFrameSpawns)
+    return;
+
+  // Process subtaskframes recursively.
+  for (Spindle *SubTF : SubTFs) {
+    // Skip any subtaskframes that are already enclosed in
+    // tapir.runtime.{start,end} intrinsics.
+    if (!SuccessorTFs.count(SubTF))
+      continue;
+
+    // Skip any taskframes that are associated with subtasks.
+    assert(!SubTF->getTaskFromTaskFrame() &&
+           "Should not be processing spawned taskframes.");
+
+    GetTapirRTCalls(SubTF, false, TI);
+  }
+}
+
 void OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
                                      bool ProcessingTapirLoops) {
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
+
+  // Find all Tapir-runtime calls in this function that may be translated to
+  // enter_frame/leave_frame calls.
+  GetTapirRTCalls(TI.getRootTask()->getEntrySpindle(), true, TI);
+
+  if (!TI.isSerial() || TapirRTCalls[&F.getEntryBlock()].empty())
+    return;
+
+  MarkSpawner(F);
+  LowerTapirRTCalls(F, &F.getEntryBlock());
 }
 
 void OpenCilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
@@ -898,6 +1104,56 @@ void OpenCilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
 
   if (!DebugABICalls)
     inlineCilkFunctions(F, CallsToInline);
+}
+
+/// Process the Tapir instructions in an ordinary (non-spawning and not spawned)
+/// function \p F directly.
+bool OpenCilkABI::processOrdinaryFunction(Function &F, BasicBlock *TFEntry) {
+  // Get the simple Tapir instructions to process, including syncs and
+  // loop-grainsize calls.
+  SmallVector<CallInst *, 8> GrainsizeCalls;
+  SmallVector<CallInst *, 8> TaskFrameAddrCalls;
+  for (BasicBlock &BB : F) {
+    for (Instruction &I : BB) {
+      // Record calls to get Tapir-loop grainsizes.
+      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+        if (Intrinsic::tapir_loop_grainsize == II->getIntrinsicID())
+          GrainsizeCalls.push_back(II);
+
+      // Record calls to task_frameaddr intrinsics.
+      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+        if (Intrinsic::task_frameaddress == II->getIntrinsicID())
+          TaskFrameAddrCalls.push_back(II);
+    }
+  }
+
+  // Lower simple Tapir instructions in this function.  Collect the set of
+  // helper functions generated by this process.
+  bool Changed = false;
+
+  // Lower calls to get Tapir-loop grainsizes.
+  while (!GrainsizeCalls.empty()) {
+    CallInst *GrainsizeCall = GrainsizeCalls.pop_back_val();
+    LLVM_DEBUG(dbgs() << "Lowering grainsize call " << *GrainsizeCall << "\n");
+    lowerGrainsizeCall(GrainsizeCall);
+    Changed = true;
+  }
+
+  // Lower calls to task_frameaddr intrinsics.
+  while (!TaskFrameAddrCalls.empty()) {
+    CallInst *TaskFrameAddrCall = TaskFrameAddrCalls.pop_back_val();
+    LLVM_DEBUG(dbgs() << "Lowering task_frameaddr call " << *TaskFrameAddrCall
+                      << "\n");
+    lowerTaskFrameAddrCall(TaskFrameAddrCall);
+    Changed = true;
+  }
+
+  // If any calls to tapir.runtime.{start,end} were found in this taskframe that
+  // need processing, lower them now.
+  if (!TapirRTCalls[TFEntry].empty())
+    LowerTapirRTCalls(F, TFEntry);
+
+  return true;
 }
 
 void OpenCilkABI::postProcessHelper(Function &F) {}
