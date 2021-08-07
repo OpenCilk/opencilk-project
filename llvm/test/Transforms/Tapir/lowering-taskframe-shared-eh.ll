@@ -1,8 +1,8 @@
 ; Check that Tapir lowering properly handles PHI nodes in shared-EH
 ; spindles when outlining taskframes.
 ;
-; RUN: opt < %s -tapir2target -S -o - -use-opencilk-runtime-bc=false | FileCheck %s
-; RUN: opt < %s -passes='tapir2target' -S -o - -use-opencilk-runtime-bc=false | FileCheck %s
+; RUN: opt < %s -tapir2target -S -use-opencilk-runtime-bc=false -debug-abi-calls | FileCheck %s
+; RUN: opt < %s -passes='tapir2target' -S -use-opencilk-runtime-bc=false -debug-abi-calls | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
