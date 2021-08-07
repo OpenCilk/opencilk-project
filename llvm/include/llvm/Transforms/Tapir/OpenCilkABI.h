@@ -24,6 +24,7 @@ class TapirLoopInfo;
 class OpenCilkABI : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
   SmallPtrSet<CallBase *, 8> CallsToInline;
+  DenseMap<BasicBlock *, SmallVector<IntrinsicInst *, 4>> TapirRTCalls;
 
   // Cilk RTS data types
   StructType *StackFrameTy = nullptr;
@@ -69,6 +70,9 @@ class OpenCilkABI : public TapirTarget {
   FunctionCallee GetCilkHelperEpilogueFn();
   FunctionCallee GetCilkHelperEpilogueExnFn();
 
+  void GetTapirRTCalls(Spindle *TaskFrame, bool IsRootTask, TaskInfo &TI);
+  void LowerTapirRTCalls(Function &F, BasicBlock *TFEntry);
+
   Value *CreateStackFrame(Function &F);
   Value *GetOrCreateCilkStackFrame(Function &F);
 
@@ -93,6 +97,9 @@ public:
     return ArgStructMode::None;
   }
   void addHelperAttributes(Function &F) override final;
+
+  void remapAfterOutlining(BasicBlock *TFEntry,
+                           ValueToValueMapTy &VMap) override final;
 
   void preProcessFunction(Function &F, TaskInfo &TI,
                           bool ProcessingTapirLoops) override final;
