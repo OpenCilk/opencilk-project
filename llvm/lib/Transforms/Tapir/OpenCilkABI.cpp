@@ -37,7 +37,6 @@ using namespace llvm;
 #define DEBUG_TYPE "opencilk"
 
 extern cl::opt<bool> DebugABICalls;
-extern cl::opt<bool> UseExternalABIFunctions;
 
 static cl::opt<bool> UseOpenCilkRuntimeBC(
     "use-opencilk-runtime-bc", cl::init(true),
@@ -47,64 +46,46 @@ static cl::opt<std::string> OpenCilkRuntimeBCPath(
     cl::desc("Path to the bitcode file for the OpenCilk runtime ABI"),
     cl::Hidden);
 
-enum {
-  __CILKRTS_ABI_VERSION_OPENCILK = 3
-};
-
-enum {
-  CILK_FRAME_STOLEN            =    0x01,
-  CILK_FRAME_UNSYNCHED         =    0x02,
-  CILK_FRAME_DETACHED          =    0x04,
-  CILK_FRAME_EXCEPTION_PENDING =    0x08,
-  CILK_FRAME_EXCEPTING         =    0x10,
-  CILK_FRAME_LAST              =    0x80,
-  CILK_FRAME_EXITING           =  0x0100,
-  CILK_FRAME_SUSPENDED         =  0x8000,
-  CILK_FRAME_UNWINDING         = 0x10000
-};
-
-#define CILK_FRAME_VERSION_MASK  0xFF000000
-#define CILK_FRAME_FLAGS_MASK    0x00FFFFFF
-#define CILK_FRAME_MBZ  (~ (CILK_FRAME_STOLEN            |       \
-                            CILK_FRAME_UNSYNCHED         |       \
-                            CILK_FRAME_DETACHED          |       \
-                            CILK_FRAME_EXCEPTION_PENDING |       \
-                            CILK_FRAME_EXCEPTING         |       \
-                            CILK_FRAME_LAST              |       \
-                            CILK_FRAME_EXITING           |       \
-                            CILK_FRAME_SUSPENDED         |       \
-                            CILK_FRAME_UNWINDING         |       \
-                            CILK_FRAME_VERSION_MASK))
-
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
 
-/// Helper to find a function with the given name, creating it if it doesn't
-/// already exist. Returns false if the function was inserted, indicating that
-/// the body of the function has yet to be defined.
-static bool GetOrCreateFunction(Module &M, const StringRef FnName,
-                                FunctionType *FTy, Function *&Fn) {
-  // If the function already exists then let the caller know.
-  if ((Fn = M.getFunction(FnName)))
-    return true;
-
-  // Otherwise we have to create it.
-  Fn = cast<Function>(M.getOrInsertFunction(FnName, FTy).getCallee());
-
-  // Let the caller know that the function is incomplete and the body still
-  // needs to be added.
-  return false;
-}
+static const StringRef StackFrameName = "__cilkrts_sf";
 
 OpenCilkABI::OpenCilkABI(Module &M) : TapirTarget(M) {}
 
+// Helper function to fix the implementation of __cilk_sync.  In particular,
+// this fixup ensures that __cilk_sync, and specific __cilkrts method calls
+// therein, appear that they may throw an exception.  Since the bitcode-ABI file
+// is built from C code, it won't necessarily be marked appropriately for
+// exception handling.
+static void fixCilkSyncFn(Module &M, Function *Fn) {
+  Fn->removeFnAttr(Attribute::NoUnwind);
+  Function *ExceptionRaiseFn = M.getFunction("__cilkrts_check_exception_raise");
+  Function *ExceptionResumeFn = M.getFunction("__cilkrts_check_exception_resume");
+  for (Instruction &I : instructions(Fn))
+    if (CallBase *CB = dyn_cast<CallBase>(&I))
+      if (CB->getCalledFunction() == ExceptionRaiseFn ||
+          CB->getCalledFunction() == ExceptionResumeFn)
+        CB->removeAttribute(AttributeList::FunctionIndex, Attribute::NoUnwind);
+}
+
+// Structure recording information about Cilk ABI functions.
+struct CilkRTSFnDesc {
+  StringRef FnName;
+  FunctionType *FnType;
+  FunctionCallee &FnCallee;
+};
+
 void OpenCilkABI::prepareModule() {
   LLVMContext &C = M.getContext();
-  Type *VoidPtrTy = Type::getInt8PtrTy(C);
+  Type *Int8Ty = Type::getInt8Ty(C);
+  Type *Int16Ty = Type::getInt16Ty(C);
   Type *Int32Ty = Type::getInt32Ty(C);
+  Type *Int64Ty = Type::getInt64Ty(C);
 
   if (UseOpenCilkRuntimeBC) {
-    assert("" != OpenCilkRuntimeBCPath &&
-           "Missing path to OpenCilk runtime bitcode file.");
+    if ("" == OpenCilkRuntimeBCPath)
+      C.emitError("OpenCilkABI: No OpenCilk bitcode ABI file given.");
+
     LLVM_DEBUG(dbgs() << "Using external bitcode file for OpenCilk ABI: "
                       << OpenCilkRuntimeBCPath << "\n");
     SMDiagnostic SMD;
@@ -113,6 +94,10 @@ void OpenCilkABI::prepareModule() {
     // function definitions.
     std::unique_ptr<Module> ExternalModule =
         parseIRFile(OpenCilkRuntimeBCPath.getValue(), SMD, C);
+
+    if (!ExternalModule)
+      C.emitError("OpenCilkABI: Failed to parse bitcode ABI file: " +
+                  Twine(OpenCilkRuntimeBCPath));
 
     // Strip any debug info from the external module.  For convenience, this
     // Tapir target synthesizes some helper functions, like
@@ -136,7 +121,9 @@ void OpenCilkABI::prepareModule() {
                                          << "\n";
                               });
                             });
-    assert(!Fail && "Failed to link OpenCilk runtime bitcode module.\n");
+    if (Fail)
+      C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
+                  Twine(OpenCilkRuntimeBCPath));
   }
 
   // Get or create local definitions of Cilk RTS structure types.
@@ -145,149 +132,196 @@ void OpenCilkABI::prepareModule() {
   WorkerTy = StructType::lookupOrCreate(C, "struct.__cilkrts_worker");
 
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
-  ArrayType *ContextTy = ArrayType::get(VoidPtrTy, 5);
   if (UseOpenCilkRuntimeBC) {
     Type *VoidTy = Type::getVoidTy(C);
     FunctionType *CilkRTSFnTy =
         FunctionType::get(VoidTy, {StackFramePtrTy}, false);
-    SmallVector<std::pair<StringRef, FunctionType *>, 5> CilkRTSFunctions({
-        std::make_pair("__cilkrts_enter_frame", CilkRTSFnTy),
-        std::make_pair("__cilkrts_enter_frame_fast", CilkRTSFnTy),
-        std::make_pair("__cilkrts_detach", CilkRTSFnTy),
-        std::make_pair("__cilkrts_pop_frame", CilkRTSFnTy),
-        std::make_pair("__cilkrts_save_fp_ctrl_state", CilkRTSFnTy),
+    FunctionType *CilkPrepareSpawnFnTy =
+        FunctionType::get(Int32Ty, {StackFramePtrTy}, false);
+    FunctionType *CilkRTSEnterLandingpadFnTy =
+        FunctionType::get(VoidTy, {StackFramePtrTy, Int32Ty}, false);
+    FunctionType *CilkRTSPauseFrameFnTy = FunctionType::get(
+        VoidTy, {StackFramePtrTy, PointerType::getInt8PtrTy(C)}, false);
+    FunctionType *Grainsize8FnTy =
+        FunctionType::get(Int8Ty, {Int8Ty}, false);
+    FunctionType *Grainsize16FnTy =
+        FunctionType::get(Int16Ty, {Int16Ty}, false);
+    FunctionType *Grainsize32FnTy =
+        FunctionType::get(Int32Ty, {Int32Ty}, false);
+    FunctionType *Grainsize64FnTy =
+        FunctionType::get(Int64Ty, {Int64Ty}, false);
+
+    SmallVector<CilkRTSFnDesc, 17> CilkRTSFunctions({
+        {"__cilkrts_enter_frame", CilkRTSFnTy, CilkRTSEnterFrame},
+        {"__cilkrts_enter_frame_helper", CilkRTSFnTy, CilkRTSEnterFrameHelper},
+        {"__cilkrts_detach", CilkRTSFnTy, CilkRTSDetach},
+        {"__cilkrts_leave_frame", CilkRTSFnTy, CilkRTSLeaveFrame},
+        {"__cilkrts_leave_frame_helper", CilkRTSFnTy, CilkRTSLeaveFrameHelper},
+        {"__cilk_prepare_spawn", CilkPrepareSpawnFnTy, CilkPrepareSpawn},
+        {"__cilk_sync", CilkRTSFnTy, CilkSync},
+        {"__cilk_sync_nothrow", CilkRTSFnTy, CilkSyncNoThrow},
+        {"__cilk_parent_epilogue", CilkRTSFnTy, CilkParentEpilogue},
+        {"__cilk_helper_epilogue", CilkRTSFnTy, CilkHelperEpilogue},
+        {"__cilkrts_enter_landingpad", CilkRTSEnterLandingpadFnTy,
+         CilkRTSEnterLandingpad},
+        {"__cilkrts_pause_frame", CilkRTSPauseFrameFnTy, CilkRTSPauseFrame},
+        {"__cilk_helper_epilogue_exn", CilkRTSPauseFrameFnTy,
+         CilkHelperEpilogueExn},
+        {"__cilkrts_cilk_for_grainsize_8", Grainsize8FnTy,
+         CilkRTSCilkForGrainsize8},
+        {"__cilkrts_cilk_for_grainsize_16", Grainsize16FnTy,
+         CilkRTSCilkForGrainsize16},
+        {"__cilkrts_cilk_for_grainsize_32", Grainsize32FnTy,
+         CilkRTSCilkForGrainsize32},
+        {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
+         CilkRTSCilkForGrainsize64},
     });
 
-    // Add attributes to internalized functions
-    for (auto CilkRTSFnProto : CilkRTSFunctions) {
-      Function *Fn;
-      if (GetOrCreateFunction(M, CilkRTSFnProto.first, CilkRTSFnProto.second,
-                              Fn)) {
+    // Add attributes to internalized functions.
+    for (CilkRTSFnDesc FnDesc : CilkRTSFunctions) {
+      assert(!FnDesc.FnCallee && "Redefining Cilk function");
+      FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
+      assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
+             "Cilk function is not a function");
+      Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
+      if (!Fn->isDeclaration())
         Fn->setLinkage(Function::AvailableExternallyLinkage);
+      // Because __cilk_sync is a C function that can throw an exception,
+      // update its attributes specially.
+      if ("__cilk_sync" == FnDesc.FnName)
+        fixCilkSyncFn(M, Fn);
+      else
         Fn->setDoesNotThrow();
-        if (!DebugABICalls && !UseExternalABIFunctions)
-          Fn->addFnAttr(Attribute::AlwaysInline);
-      }
+      // Unless we're debugging, mark the function as always_inline.  This
+      // attribute is required for some functions, but is helpful for all
+      // functions.
+      if (!DebugABICalls)
+        Fn->addFnAttr(Attribute::AlwaysInline);
+      else
+        Fn->removeFnAttr(Attribute::AlwaysInline);
     }
+  } else if (DebugABICalls) {
+    if (StackFrameTy->isOpaque()) {
+      // Create a dummy __cilkrts_stack_frame structure, for debugging purposes
+      // only.
+      StackFrameTy->setBody(Int64Ty);
+    }
+  } else {
+    // The OpenCilkABI target requires the use of a bitcode ABI file to generate
+    // correct code.
+    C.emitError(
+        "OpenCilkABI: Bitcode ABI file required for correct code generation.");
   }
-
-  Triple T(M.getTargetTriple());
-  bool HasSSE = T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64;
-  if (HasSSE) {
-    if (StackFrameTy->isOpaque())
-      StackFrameTy->setBody(Int32Ty, // flags
-                            Int32Ty, // magic
-                            StackFramePtrTy, // call_parent
-                            WorkerPtrTy, // worker
-                            // VoidPtrTy, // except_data
-                            ContextTy, // ctx
-                            Int32Ty // mxcsr
-                            );
-  }
-  else {
-    if (StackFrameTy->isOpaque())
-      StackFrameTy->setBody(Int32Ty, // flags
-                            Int32Ty, // magic
-                            StackFramePtrTy, // call_parent
-                            WorkerPtrTy, // worker
-                            // VoidPtrTy, // except_data
-                            ContextTy // ctx
-                            );
-  }
-
-  unsigned StackFields = StackFrameTy->getNumElements();
-  if (StackFields > 127)
-    StackFields = 127;
-  for (unsigned i = 0; i < StackFields; ++i) {
-    Type *E = StackFrameTy->getElementType(i);
-    if (E == Int32Ty) {
-      if (StackFrameFieldFlags < 0)
-	StackFrameFieldFlags = i;
-      else if (StackFrameFieldMagic < 0)
-	StackFrameFieldMagic = i;
-      else if (HasSSE && StackFrameFieldMXCSR < 0)
-	StackFrameFieldMXCSR = i;
-      continue;
-    }
-    if (E == StackFramePtrTy) {
-      if (StackFrameFieldParent < 0)
-	StackFrameFieldParent = i;
-      continue;
-    }
-    if (E == WorkerPtrTy) {
-      if (StackFrameFieldWorker < 0) {
-	StackFrameFieldWorker = i;
-      }
-      continue;
-    }
-    if (E == ContextTy) {
-      if (StackFrameFieldContext < 0)
-	StackFrameFieldContext = i;
-      continue;
-    }
-  }
-
-  /* These four fields are mandatory. TODO: Proper error message. */
-  assert(StackFrameFieldContext >= 0 && "__cilkrts_stack_frame lacks context");
-  assert(StackFrameFieldFlags >= 0 && "__cilkrts_stack_frame lacks flags");
-  assert(StackFrameFieldParent >= 0 && "__cilkrts_stack_frame lacks parent");
-  assert(StackFrameFieldWorker >= 0 && "__cilkrts_stack_frame lacks worker");
-
-  if (StackFrameFieldMagic >= 0) {
-    const StructLayout *StackLayout =
-      M.getDataLayout().getStructLayout(StackFrameTy);
-    /* This must match the runtime. */
-    uint32_t StackFieldHash = __CILKRTS_ABI_VERSION_OPENCILK;
-    StackFieldHash *= 13;
-    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldWorker);
-    StackFieldHash *= 13;
-    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldContext);
-    StackFieldHash *= 13;
-    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldMagic);
-    StackFieldHash *= 13;
-    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldFlags);
-    StackFieldHash *= 13;
-    StackFieldHash += StackLayout->getElementOffset(StackFrameFieldParent);
-    if (StackFrameFieldMXCSR >= 0) {
-      StackFieldHash *= 13;
-      StackFieldHash += StackLayout->getElementOffset(StackFrameFieldMXCSR);
-    }
-    FrameMagic = StackFieldHash;
-  }
-
-  PointerType *StackFramePtrPtrTy = PointerType::getUnqual(StackFramePtrTy);
-  if (WorkerTy->isOpaque())
-    WorkerTy->setBody(StackFramePtrPtrTy, // tail
-                      StackFramePtrPtrTy, // head
-                      StackFramePtrPtrTy, // exc
-                      StackFramePtrPtrTy, // ltq_limit
-                      Int32Ty, // self
-                      VoidPtrTy, // g
-                      VoidPtrTy, // l
-                      StackFramePtrTy, // current_stack_frame
-                      VoidPtrTy // reducer_map
-                      );
-
-  /* TODO: If worker comes from program, verify that fields
-     have correct types. */
 }
 
-// Accessors for opaque Cilk RTS functions
+// Accessors for CilkRTS ABI functions.  When a bitcode file is loaded, these
+// functions should return the function defined in the bitcode file.  Otherwise,
+// these functions will return FunctionCallees for placeholder declarations of
+// these functions.  The latter case is intended for debugging ABI-call
+// insertion.
 
-FunctionCallee OpenCilkABI::Get__cilkrts_get_nworkers() {
-  if (CilkRTSGetNworkers)
-    return CilkRTSGetNworkers;
+FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_8() {
+  if (CilkRTSCilkForGrainsize8)
+    return CilkRTSCilkForGrainsize8;
+
+  LLVMContext &C = M.getContext();
+  Type *CountTy = Type::getInt8Ty(C);
+  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
+  CilkRTSCilkForGrainsize8 =
+      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_8", FTy);
+
+  return CilkRTSCilkForGrainsize8;
+}
+
+FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_16() {
+  if (CilkRTSCilkForGrainsize16)
+    return CilkRTSCilkForGrainsize16;
+
+  LLVMContext &C = M.getContext();
+  Type *CountTy = Type::getInt16Ty(C);
+  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
+  CilkRTSCilkForGrainsize16 =
+      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_16", FTy);
+
+  return CilkRTSCilkForGrainsize16;
+}
+
+FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_32() {
+  if (CilkRTSCilkForGrainsize32)
+    return CilkRTSCilkForGrainsize32;
+
+  LLVMContext &C = M.getContext();
+  Type *CountTy = Type::getInt32Ty(C);
+  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
+  CilkRTSCilkForGrainsize32 =
+      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_32", FTy);
+
+  return CilkRTSCilkForGrainsize32;
+}
+
+FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_64() {
+  if (CilkRTSCilkForGrainsize64)
+    return CilkRTSCilkForGrainsize64;
+
+  LLVMContext &C = M.getContext();
+  Type *CountTy = Type::getInt64Ty(C);
+  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
+  CilkRTSCilkForGrainsize64 =
+      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_64", FTy);
+
+  return CilkRTSCilkForGrainsize64;
+}
+
+FunctionCallee OpenCilkABI::Get__cilkrts_enter_frame() {
+  if (CilkRTSEnterFrame)
+    return CilkRTSEnterFrame;
+
+  const char *name = "__cilkrts_enter_frame";
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::ReadNone);
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkRTSEnterFrame = M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
+
+  return CilkRTSEnterFrame;
+}
+
+FunctionCallee OpenCilkABI::Get__cilkrts_enter_frame_helper() {
+  if (CilkRTSEnterFrameHelper)
+    return CilkRTSEnterFrameHelper;
+
+  const char *name = "__cilkrts_enter_frame_helper";
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
                        Attribute::NoUnwind);
-  FunctionType *FTy = FunctionType::get(Type::getInt32Ty(C), {}, false);
-  CilkRTSGetNworkers = M.getOrInsertFunction("__cilkrts_get_nworkers", FTy, AL);
-  return CilkRTSGetNworkers;
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkRTSEnterFrameHelper =
+      M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
+
+  return CilkRTSEnterFrameHelper;
+}
+
+FunctionCallee OpenCilkABI::Get__cilkrts_detach() {
+  if (CilkRTSDetach)
+    return CilkRTSDetach;
+
+  const char *name = "__cilkrts_detach";
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkRTSDetach = M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
+
+  return CilkRTSDetach;
 }
 
 FunctionCallee OpenCilkABI::Get__cilkrts_leave_frame() {
@@ -307,6 +341,43 @@ FunctionCallee OpenCilkABI::Get__cilkrts_leave_frame() {
   return CilkRTSLeaveFrame;
 }
 
+FunctionCallee OpenCilkABI::Get__cilkrts_leave_frame_helper() {
+  if (CilkRTSLeaveFrameHelper)
+    return CilkRTSLeaveFrameHelper;
+
+  const char *name = "__cilkrts_leave_frame_helper";
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkRTSLeaveFrameHelper =
+      M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
+
+  return CilkRTSLeaveFrameHelper;
+}
+
+FunctionCallee OpenCilkABI::Get__cilkrts_enter_landingpad() {
+  if (CilkRTSEnterLandingpad)
+    return CilkRTSEnterLandingpad;
+
+  const char *name = "__cilkrts_enter_landingpad";
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  Type *SelTy = Type::getInt32Ty(C);
+  CilkRTSEnterLandingpad =
+      M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy, SelTy);
+
+  return CilkRTSEnterLandingpad;
+}
+
 FunctionCallee OpenCilkABI::Get__cilkrts_pause_frame() {
   if (CilkRTSPauseFrame)
     return CilkRTSPauseFrame;
@@ -324,54 +395,38 @@ FunctionCallee OpenCilkABI::Get__cilkrts_pause_frame() {
   return CilkRTSPauseFrame;
 }
 
-FunctionCallee OpenCilkABI::Get__cilkrts_check_exception_resume() {
-  if (CilkRTSCheckExceptionResume)
-    return CilkRTSCheckExceptionResume;
-
-  LLVMContext &C = M.getContext();
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSCheckExceptionResume = M.getOrInsertFunction(
-                                            "__cilkrts_check_exception_resume",
-                                            VoidTy, StackFramePtrTy);
-
-  return CilkRTSCheckExceptionResume;
-}
-FunctionCallee OpenCilkABI::Get__cilkrts_check_exception_raise() {
-  if (CilkRTSCheckExceptionRaise)
-    return CilkRTSCheckExceptionRaise;
-
-  LLVMContext &C = M.getContext();
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSCheckExceptionRaise = M.getOrInsertFunction(
-                                            "__cilkrts_check_exception_raise",
-                               VoidTy, StackFramePtrTy);
-
-  return CilkRTSCheckExceptionRaise;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_cleanup_fiber() {
-  if (CilkRTSCleanupFiber)
-    return CilkRTSCleanupFiber;
+FunctionCallee OpenCilkABI::GetCilkPrepareSpawnFn() {
+  if (CilkPrepareSpawn)
+    return CilkPrepareSpawn;
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
                        Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Type *Int32Ty = Type::getInt32Ty(C);
-  CilkRTSCleanupFiber = M.getOrInsertFunction(
-                                            "__cilkrts_cleanup_fiber",
-                        VoidTy, StackFramePtrTy, Int32Ty);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkPrepareSpawn = M.getOrInsertFunction("__cilk_prepare_spawn", AL, Int32Ty,
+                                           StackFramePtrTy);
 
-  return CilkRTSCleanupFiber;
+  return CilkPrepareSpawn;
 }
 
-FunctionCallee OpenCilkABI::Get__cilkrts_sync() {
-  if (CilkRTSSync)
-    return CilkRTSSync;
+FunctionCallee OpenCilkABI::GetCilkSyncFn() {
+  if (CilkSync)
+    return CilkSync;
+
+  LLVMContext &C = M.getContext();
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkSync =
+      M.getOrInsertFunction("__cilk_sync", VoidTy, StackFramePtrTy);
+
+  return CilkSync;
+}
+
+FunctionCallee OpenCilkABI::GetCilkSyncNoThrowFn() {
+  if (CilkSyncNoThrow)
+    return CilkSyncNoThrow;
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
@@ -379,25 +434,58 @@ FunctionCallee OpenCilkABI::Get__cilkrts_sync() {
                        Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSSync = M.getOrInsertFunction("__cilkrts_sync", AL, VoidTy,
-                                      StackFramePtrTy);
+  CilkSyncNoThrow =
+      M.getOrInsertFunction("__cilk_sync_nothrow", AL, VoidTy, StackFramePtrTy);
 
-  return CilkRTSSync;
+  return CilkSyncNoThrow;
 }
 
-FunctionCallee OpenCilkABI::Get__cilkrts_get_tls_worker() {
-  if (CilkRTSGetTLSWorker)
-    return CilkRTSGetTLSWorker;
+FunctionCallee OpenCilkABI::GetCilkParentEpilogueFn() {
+  if (CilkParentEpilogue)
+    return CilkParentEpilogue;
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
   AL = AL.addAttribute(C, AttributeList::FunctionIndex,
                        Attribute::NoUnwind);
-  PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
-  CilkRTSGetTLSWorker = M.getOrInsertFunction("__cilkrts_get_tls_worker", AL,
-                                              WorkerPtrTy);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkParentEpilogue = M.getOrInsertFunction("__cilk_parent_epilogue", AL,
+                                             VoidTy, StackFramePtrTy);
 
-  return CilkRTSGetTLSWorker;
+  return CilkParentEpilogue;
+}
+
+FunctionCallee OpenCilkABI::GetCilkHelperEpilogueFn() {
+  if (CilkHelperEpilogue)
+    return CilkHelperEpilogue;
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
+                       Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  CilkHelperEpilogue = M.getOrInsertFunction("__cilk_helper_epilogue", AL,
+                                             VoidTy, StackFramePtrTy);
+
+  return CilkHelperEpilogue;
+}
+
+FunctionCallee OpenCilkABI::GetCilkHelperEpilogueExnFn() {
+  if (CilkHelperEpilogueExn)
+    return CilkHelperEpilogueExn;
+
+  LLVMContext &C = M.getContext();
+  AttributeList AL;
+  AL = AL.addAttribute(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
+  Type *VoidTy = Type::getVoidTy(C);
+  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
+  CilkHelperEpilogueExn = M.getOrInsertFunction(
+      "__cilk_helper_epilogue_exn", AL, VoidTy, StackFramePtrTy, ExnPtrTy);
+
+  return CilkHelperEpilogueExn;
 }
 
 void OpenCilkABI::addHelperAttributes(Function &Helper) {
@@ -415,834 +503,84 @@ void OpenCilkABI::addHelperAttributes(Function &Helper) {
   }
   // Note that the address of the helper is unimportant.
   Helper.setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-  // The helper is private to this module.
-  Helper.setLinkage(GlobalValue::PrivateLinkage);
+
+  // The helper is internal to this module.  We use internal linkage, rather
+  // than private linkage, so that tools can still reference the helper
+  // function.
+  Helper.setLinkage(GlobalValue::InternalLinkage);
 }
 
-/// Helper methods for storing to and loading from struct fields.
-static Value *GEP(IRBuilder<> &B, Value *Base, int field) {
-  // return B.CreateStructGEP(cast<PointerType>(Base->getType()),
-  //                          Base, field);
-  return B.CreateConstInBoundsGEP2_32(nullptr, Base, 0, field);
+void OpenCilkABI::remapAfterOutlining(BasicBlock *TFEntry,
+                                      ValueToValueMapTy &VMap) {
+
 }
 
-static Align GetAlignment(const DataLayout &DL, StructType *STy, int field) {
-  return DL.getPrefTypeAlign(STy->getElementType(field));
-}
-
-static void StoreSTyField(IRBuilder<> &B, const DataLayout &DL, StructType *STy,
-                          Value *Val, Value *Dst, int field,
-                          bool isVolatile = false,
-                          AtomicOrdering Ordering = AtomicOrdering::NotAtomic) {
-  StoreInst *S = B.CreateAlignedStore(Val, GEP(B, Dst, field),
-                                      GetAlignment(DL, STy, field), isVolatile);
-  S->setOrdering(Ordering);
-}
-
-static Value *LoadSTyField(
-    IRBuilder<> &B, const DataLayout &DL, StructType *STy, Value *Src,
-    int field, bool isVolatile = false,
-    AtomicOrdering Ordering = AtomicOrdering::NotAtomic) {
-  LoadInst *L =  B.CreateAlignedLoad(GEP(B, Src, field),
-                                     GetAlignment(DL, STy, field), isVolatile);
-  L->setOrdering(Ordering);
-  return L;
-}
-
-/// Emit a call to the CILK_SETJMP function.
-CallInst *OpenCilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
-  LLVMContext &Ctx = M.getContext();
-
-  // We always want to save the floating point state too
-  B.CreateCall(CILKRTS_FUNC(save_fp_ctrl_state), SF);
-
-  Type *Int32Ty = Type::getInt32Ty(Ctx);
-  Type *Int8PtrTy = Type::getInt8PtrTy(Ctx);
-
-  // Get the buffer to store program state
-  // Buffer is a void**.
-  Value *Buf = GEP(B, SF, StackFrameFieldContext);
-
-  // Store the frame pointer in the 0th slot
-  Value *FrameAddr = B.CreateCall(
-      Intrinsic::getDeclaration(&M, Intrinsic::frameaddress, Int8PtrTy),
-      ConstantInt::get(Int32Ty, 0));
-
-  Value *FrameSaveSlot = GEP(B, Buf, 0);
-  B.CreateStore(FrameAddr, FrameSaveSlot, /*isVolatile=*/true);
-
-  // Store stack pointer in the 2nd slot
-  Value *StackAddr = B.CreateCall(
-      Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
-
-  Value *StackSaveSlot = GEP(B, Buf, 2);
-  B.CreateStore(StackAddr, StackSaveSlot, /*isVolatile=*/true);
-
-  Buf = B.CreateBitCast(Buf, Int8PtrTy);
-
-  // Call LLVM's EH setjmp, which is lightweight.
-  Function *F = Intrinsic::getDeclaration(&M, Intrinsic::eh_sjlj_setjmp);
-
-  CallInst *SetjmpCall = B.CreateCall(F, Buf);
-  SetjmpCall->setCanReturnTwice();
-
-  return SetjmpCall;
-}
-
-/// Get or create a LLVM function for __cilkrts_pop_frame.  It is equivalent to
-/// the following C code:
-///
-/// __cilkrts_pop_frame(__cilkrts_stack_frame *sf) {
-///   sf->worker->current_stack_frame = sf->call_parent;
-///   sf->call_parent = nullptr;
-/// }
-Function *OpenCilkABI::Get__cilkrts_pop_frame() {
-  // Get or create the __cilkrts_pop_frame function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilkrts_pop_frame",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
-
-  // Create the body of __cilkrts_pop_frame.
-  const DataLayout &DL = M.getDataLayout();
-
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
-  IRBuilder<> B(Entry);
-
-  // TODO(jfc): Relaxed memory order is probably allowed for all
-  // operations here.  All communication with other threads is
-  // gated by the Dekker protocol which has a store-load memory barrier.
-  // The compiler does need to be aware that values of the apparently
-  // local stack frame can not be saved in registers across calls that
-  // might cause the frame to be stolen.
-  // sf->worker->current_stack_frame = sf->call_parent;
-  StoreSTyField(B, DL, WorkerTy,
-                LoadSTyField(B, DL, StackFrameTy, SF,
-                             StackFrameFieldParent,
-                             /*isVolatile=*/false,
-                             AtomicOrdering::Unordered),
-                LoadSTyField(B, DL, StackFrameTy, SF,
-                             StackFrameFieldWorker,
-                             /*isVolatile=*/false,
-                             AtomicOrdering::Unordered),
-                WorkerFieldFrame,
-                /*isVolatile=*/false,
-                AtomicOrdering::Unordered);
-
-  // sf->call_parent = nullptr;
-  StoreSTyField(B, DL, StackFrameTy,
-                Constant::getNullValue(PointerType::getUnqual(StackFrameTy)),
-                SF, StackFrameFieldParent, /*isVolatile=*/false,
-                AtomicOrdering::Release);
-
-  B.CreateRetVoid();
-
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->setDoesNotThrow();
-  if (!DebugABICalls && !UseExternalABIFunctions)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
-}
-
-/// Get or create a LLVM function for __cilkrts_detach.  It is equivalent to the
-/// following C code:
-///
-/// void __cilkrts_detach(struct __cilkrts_stack_frame *sf) {
-///   struct __cilkrts_worker *w = sf->worker;
-///   struct __cilkrts_stack_frame *parent = sf->call_parent;
-///   struct __cilkrts_stack_frame *volatile *tail = w->tail;
-///
-///   StoreStore_fence();
-///
-///   *tail++ = parent;
-///   w->tail = tail;
-///
-///   sf->flags |= CILK_FRAME_DETACHED;
-/// }
-Function *OpenCilkABI::Get__cilkrts_detach() {
-  // Get or create the __cilkrts_detach function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilkrts_detach",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
-
-  // Create the body of __cilkrts_detach.
-  const DataLayout &DL = M.getDataLayout();
-
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
-  IRBuilder<> B(Entry);
-
-  // struct __cilkrts_worker *w = sf->worker;
-  Value *W = LoadSTyField(B, DL, StackFrameTy, SF,
-                          StackFrameFieldWorker, /*isVolatile=*/false,
-                          AtomicOrdering::Unordered);
-
-  // __cilkrts_stack_frame *parent = sf->call_parent;
-  Value *Parent = LoadSTyField(B, DL, StackFrameTy, SF,
-                               StackFrameFieldParent,
-                               /*isVolatile=*/false,
-                               AtomicOrdering::Unordered);
-
-  // sf->flags |= CILK_FRAME_DETACHED;
-  {
-    // This change is not visible until the store-with-release of tail.
-    // It may not even need to be volatile.
-    Value *F = LoadSTyField(B, DL, StackFrameTy, SF,
-                            StackFrameFieldFlags, /*isVolatile=*/false,
-                            AtomicOrdering::Unordered);
-    F = B.CreateOr(F, ConstantInt::get(F->getType(), CILK_FRAME_DETACHED));
-    StoreSTyField(B, DL, StackFrameTy, F, SF,
-                  StackFrameFieldFlags, /*isVolatile=*/true,
-                  AtomicOrdering::Unordered);
-  }
-
-  // __cilkrts_stack_frame *volatile *tail = w->tail;
-  Value *Tail = LoadSTyField(B, DL, WorkerTy, W,
-                             WorkerFieldTail, /*isVolatile=*/false,
-                             AtomicOrdering::Unordered);
-
-  // *tail++ = parent;
-  B.CreateStore(Parent, Tail, /*isVolatile=*/false);
-  Tail = B.CreateConstGEP1_32(Tail, 1);
-
-  // This store has release ordering to ensure the store above
-  // completes before it is published by incrementing tail.
-  // w->tail = tail;
-  StoreSTyField(B, DL, WorkerTy, Tail, W, WorkerFieldTail,
-                /*isVolatile=*/false, AtomicOrdering::Release);
-
-  B.CreateRetVoid();
-
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->setDoesNotThrow();
-  if (!DebugABICalls && !UseExternalABIFunctions)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
-}
-
-// Call system-dependent function to save floating-point state
-Function *OpenCilkABI::Get__cilkrts_save_fp_ctrl_state() {
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilkrts_save_fp_ctrl_state",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
-
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
-  IRBuilder<> B(Entry);
-
-  if (StackFrameFieldMXCSR >= 0) {
-    FunctionType *FTy = FunctionType::get(
-        VoidTy, {PointerType::getUnqual(Type::getInt32Ty(Ctx))}, false);
-    InlineAsm *Asm =
-        InlineAsm::get(FTy, "stmxcsr $0", "*m", /*sideeffects*/ true);
-    Value *Args[1] = {
-        GEP(B, SF, StackFrameFieldMXCSR),
-    };
-    B.CreateCall(Asm, Args);
-  }
-
-  B.CreateRetVoid();
-
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->setDoesNotThrow();
-  if (!DebugABICalls && !UseExternalABIFunctions)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
-}
-
-/// Get or create a LLVM function for __cilk_sync.  Calls to this function are
-/// always inlined, as it saves the current stack/frame pointer values. This
-/// function must be marked as returns_twice to allow it to be inlined, since
-/// the call to setjmp is marked returns_twice.
-///
-/// It is equivalent to the following C code:
-///
-/// void __cilk_sync(struct __cilkrts_stack_frame *sf) {
-///   if (sf->flags & CILK_FRAME_UNSYNCHED) {
-///     SAVE_FLOAT_STATE(*sf);
-///     if (!CILK_SETJMP(sf->ctx))
-///       __cilkrts_sync(sf);
-///     else if (sf->flags & CILK_FRAME_EXCEPTION_PENDING)
-///       __cilkrts_check_exception_raise(sf);
-///   }
-/// }
-///
-/// With exceptions disabled in the compiler, the function
-/// does not call __cilkrts_rethrow()
-Function *OpenCilkABI::GetCilkSyncFn() {
-  // Get or create the __cilk_sync function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilk_sync",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
-
-  // Create the body of __cilk_sync.
-  const DataLayout &DL = M.getDataLayout();
-
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.sync.test", Fn);
-  BasicBlock *SaveState = BasicBlock::Create(Ctx, "cilk.sync.savestate", Fn);
-  BasicBlock *SyncCall = BasicBlock::Create(Ctx, "cilk.sync.runtimecall", Fn);
-  BasicBlock *ExnCheck = BasicBlock::Create(Ctx, "cilk.sync.exn.check", Fn);
-  BasicBlock *Rethrow = BasicBlock::Create(Ctx, "cilk.sync.rethrow", Fn);
-  BasicBlock *Exit = BasicBlock::Create(Ctx, "cilk.sync.end", Fn);
-
-  // Entry
-  {
-    IRBuilder<> B(Entry);
-
-    // JFC: I removed Acquire here.  The runtime has a fence in any path
-    // between setting and reading the bit.  The compiler should know that
-    // memory changes at the setjmp that precedes this test.
-    // if (sf->flags & CILK_FRAME_UNSYNCHED)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFieldFlags, /*isVolatile=*/false,
-                                AtomicOrdering::Unordered);
-    Flags = B.CreateAnd(Flags,
-                        ConstantInt::get(Flags->getType(),
-                                         CILK_FRAME_UNSYNCHED));
-    Value *Zero = ConstantInt::get(Flags->getType(), 0);
-    Value *Unsynced = B.CreateICmpEQ(Flags, Zero);
-    B.CreateCondBr(Unsynced, Exit, SaveState);
-  }
-
-  // SaveState
-  {
-    IRBuilder<> B(SaveState);
-
-    // if (!CILK_SETJMP(sf.ctx))
-    Value *C = EmitCilkSetJmp(B, SF);
-    C = B.CreateICmpEQ(C, ConstantInt::get(C->getType(), 0));
-    // B.CreateCondBr(C, SyncCall, Exit);
-    B.CreateCondBr(C, SyncCall, ExnCheck);
-  }
-
-  // SyncCall
-  {
-    IRBuilder<> B(SyncCall);
-
-    // __cilkrts_sync(&sf);
-    B.CreateCall(CILKRTS_FUNC(sync), SF);
-    // B.CreateBr(Exit);
-    B.CreateBr(ExnCheck);
-  }
-
-  // Excepting
-  {
-    IRBuilder<> B(ExnCheck);
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFieldFlags,
-                                /*isVolatile=*/false,
-                                AtomicOrdering::Unordered);
-    Flags = B.CreateAnd(Flags,
-                        ConstantInt::get(Flags->getType(),
-                                         CILK_FRAME_EXCEPTION_PENDING));
-    Value *Zero = ConstantInt::get(Flags->getType(), 0);
-    Value *HasNoException = B.CreateICmpEQ(Flags, Zero);
-    B.CreateCondBr(HasNoException, Exit, Rethrow);
-  }
-
-  // Rethrow
-  {
-    IRBuilder<> B(Rethrow);
-    // __cilkrts_check_exception_raise(sf);
-    B.CreateCall(CILKRTS_FUNC(check_exception_raise), {SF});
-    // B.CreateUnreachable();
-    B.CreateBr(Exit);
-  }
-
-  // Exit
-  {
-    IRBuilder<> B(Exit);
-    B.CreateRetVoid();
-  }
-
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->addFnAttr(Attribute::ReturnsTwice);
-  if (!DebugABICalls)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
-}
-
-/// Get or create a LLVM function for __cilk_sync_nothrow.  Calls to this
-/// function are always inlined, as it saves the current stack/frame pointer
-/// values. This function must be marked as returns_twice to allow it to be
-/// inlined, since the call to setjmp is marked returns_twice.
-///
-/// It is equivalent to the following C code:
-///
-/// void __cilk_sync_nothrow(struct __cilkrts_stack_frame *sf) {
-///   if (sf->flags & CILK_FRAME_UNSYNCHED) {
-///     SAVE_FLOAT_STATE(*sf);
-///     if (!CILK_SETJMP(sf->ctx))
-///       __cilkrts_sync(sf);
-///   }
-/// }
-///
-/// With exceptions disabled in the compiler, the function
-/// does not call __cilkrts_rethrow()
-Function *OpenCilkABI::GetCilkSyncNoThrowFn() {
-  // Get or create the __cilk_sync_nothrow function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilk_sync_nothrow",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
-
-  // Create the body of __cilk_sync.
-  const DataLayout &DL = M.getDataLayout();
-
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.sync.test", Fn);
-  BasicBlock *SaveState = BasicBlock::Create(Ctx, "cilk.sync.savestate", Fn);
-  BasicBlock *SyncCall = BasicBlock::Create(Ctx, "cilk.sync.runtimecall", Fn);
-  BasicBlock *Exit = BasicBlock::Create(Ctx, "cilk.sync.end", Fn);
-
-  // Entry
-  {
-    IRBuilder<> B(Entry);
-
-    // JFC: I removed Acquire here.  The runtime has a fence in any path
-    // between setting and reading the bit.  The compiler should know that
-    // memory changes at the setjmp that precedes this test.
-    // if (sf->flags & CILK_FRAME_UNSYNCHED)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFieldFlags, /*isVolatile=*/false,
-                                AtomicOrdering::Unordered);
-    Flags = B.CreateAnd(Flags,
-                        ConstantInt::get(Flags->getType(),
-                                         CILK_FRAME_UNSYNCHED));
-    Value *Zero = ConstantInt::get(Flags->getType(), 0);
-    Value *Unsynced = B.CreateICmpEQ(Flags, Zero);
-    B.CreateCondBr(Unsynced, Exit, SaveState);
-  }
-
-  // SaveState
-  {
-    IRBuilder<> B(SaveState);
-
-    // if (!CILK_SETJMP(sf.ctx))
-    Value *C = EmitCilkSetJmp(B, SF);
-    C = B.CreateICmpEQ(C, ConstantInt::get(C->getType(), 0));
-    B.CreateCondBr(C, SyncCall, Exit);
-  }
-
-  // SyncCall
-  {
-    IRBuilder<> B(SyncCall);
-
-    // __cilkrts_sync(&sf);
-    B.CreateCall(CILKRTS_FUNC(sync), SF);
-    B.CreateBr(Exit);
-  }
-
-  // Exit
-  {
-    IRBuilder<> B(Exit);
-    B.CreateRetVoid();
-  }
-
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->addFnAttr(Attribute::ReturnsTwice);
-  if (!DebugABICalls)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
-}
-
-/// Get or create a LLVM function for __cilk_pause_frame. Calls to this function
-/// uRways inlined, as it saves the current stack/frame pointer values. This
-/// function must be marked as returns_twice to allow it to be inlined, since
-/// the call to setjmp is marked returns_twice.
-///
-/// It is equivalent to the following C code:
-///
-/// void __cilk_pause_frame(struct __cilkrts_stack_frame *sf) {
-///   if (!CILK_SETJMP(sf->ctx))
-///     __cilkrts_pause_frame(sf);
-///   __cilkrts_check_exception_resume(sf);
-/// }
-///
-/// With exceptions disabled in the compiler, the function
-/// does not call __cilkrts_rethrow()
-Function *OpenCilkABI::GetCilkPauseFrameFn() {
-  // Get or create the __cilk_sync function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  PointerType *ExnPtrTy = Type::getInt8PtrTy(Ctx);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilk_pause_frame",
-                          FunctionType::get(VoidTy, {StackFramePtrTy, ExnPtrTy}, false),
-                          Fn))
-    return Fn;
-
-  // Create the body of __cilk_pause_frame.
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-  ++Args;
-  Value *Exn = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "cilk.pause.frame.test", Fn);
-  BasicBlock *PauseFrameCall = BasicBlock::Create(Ctx, "cilk.pause.frame.runtimecall", Fn);
-  BasicBlock *Exit = BasicBlock::Create(Ctx, "cilk.pause.frame.end", Fn);
-
-  // Entry
-  {
-    IRBuilder<> B(Entry);
-
-    // if (!CILK_SETJMP(sf.ctx))
-    Value *C = EmitCilkSetJmp(B, SF);
-    C = B.CreateICmpEQ(C, ConstantInt::get(C->getType(), 0));
-    B.CreateCondBr(C, PauseFrameCall, Exit);
-  }
-
-  // PauseFrameCall
-  {
-    IRBuilder<> B(PauseFrameCall);
-
-    // __cilkrts_pause_frame(&sf, &exn);
-    B.CreateCall(CILKRTS_FUNC(pause_frame), {SF, Exn});
-    B.CreateBr(Exit);
-  }
-
-  // Exit
-  {
-    IRBuilder<> B(Exit);
-
-    //B.CreateCall(CILKRTS_FUNC(check_exception_resume), {SF});
-    B.CreateRetVoid();
-  }
-
-  Fn->setLinkage(Function::InternalLinkage);
-  Fn->addFnAttr(Attribute::AlwaysInline);
-  Fn->addFnAttr(Attribute::ReturnsTwice);
-
-  return Fn;
-}
-
-
-/// Get or create a LLVM function for __cilkrts_enter_frame.  It is equivalent
-/// to the following C code:
-///
-/// void __cilkrts_enter_frame(struct __cilkrts_stack_frame *sf)
-/// {
-///     struct __cilkrts_worker *w = __cilkrts_get_tls_worker();
-///     // if (w == 0) { /* slow path, rare */
-///     //     w = __cilkrts_bind_thread_1();
-///     //     sf->flags = CILK_FRAME_LAST | CILK_FRAME_VERSION;
-///     // } else {
-///         sf->flags = CILK_FRAME_VERSION;
-///     // }
-///     sf->call_parent = w->current_stack_frame;
-///     sf->worker = w;
-///     /* sf->except_data is only valid when CILK_FRAME_EXCEPTING is set */
-///     w->current_stack_frame = sf;
-/// }
-Function *OpenCilkABI::Get__cilkrts_enter_frame() {
-  // Get or create the __cilkrts_enter_frame function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilkrts_enter_frame",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
-
-  // Create the body of __cilkrts_enter_frame.
-  const DataLayout &DL = M.getDataLayout();
-
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
-  // BasicBlock *SlowPath = BasicBlock::Create(Ctx, "slowpath", Fn);
-  BasicBlock *FastPath = BasicBlock::Create(Ctx, "fastpath", Fn);
-  BasicBlock *Cont = BasicBlock::Create(Ctx, "cont", Fn);
-
-  PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
-  StructType *SFTy = StackFrameTy;
-
-  // Block  (Entry)
-  CallInst *W = nullptr;
-  {
-    IRBuilder<> B(Entry);
-    // struct __cilkrts_worker *w = __cilkrts_get_tls_worker();
-    W = B.CreateCall(CILKRTS_FUNC(get_tls_worker));
-
-    // // if (w == 0)
-    // Value *Cond = B.CreateICmpEQ(W, ConstantPointerNull::get(WorkerPtrTy));
-    // B.CreateCondBr(Cond, SlowPath, FastPath);
-    B.CreateBr(FastPath);
-  }
-  // // Block  (SlowPath)
-  // CallInst *Wslow = nullptr;
-  // {
-  //   IRBuilder<> B(SlowPath);
-  //   // w = __cilkrts_bind_thread_1();
-  //   Wslow = B.CreateCall(CILKRTS_FUNC(bind_thread_1));
-  //   // sf->flags = CILK_FRAME_LAST | CILK_FRAME_VERSION;
-  //   Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
-  //   StoreSTyField(B, DL, StackFrameTy,
-  //                 ConstantInt::get(Ty, CILK_FRAME_LAST | CILK_FRAME_VERSION),
-  //                 SF, StackFrameFieldFlags, /*isVolatile=*/false,
-  //                 AtomicOrdering::Release);
-  //   B.CreateBr(Cont);
-  // }
-  // Block  (FastPath)
-  {
-    IRBuilder<> B(FastPath);
-    // sf->flags = 0
-    // sf->magic = (magic)
-    Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
-    StoreSTyField(B, DL, StackFrameTy,
-                  ConstantInt::get(Ty, 0),
-                  SF, StackFrameFieldFlags, /*isVolatile=*/false,
-                  AtomicOrdering::Unordered);
-    if (StackFrameFieldMagic >= 0) {
-      StoreSTyField(B, DL, StackFrameTy,
-		    ConstantInt::get(Ty, FrameMagic),
-		    SF, StackFrameFieldMagic, /*isVolatile=*/false,
-		    AtomicOrdering::Unordered);
+// Check whether the allocation of a __cilkrts_stack_frame can be inserted after
+// instruction \p I.
+static bool skipInstruction(const Instruction &I) {
+  if (isa<AllocaInst>(I))
+    return true;
+
+  if (isa<DbgInfoIntrinsic>(I))
+    return true;
+
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
+    // Skip simple intrinsics
+    switch(II->getIntrinsicID()) {
+    case Intrinsic::annotation:
+    case Intrinsic::assume:
+    case Intrinsic::sideeffect:
+    case Intrinsic::invariant_start:
+    case Intrinsic::invariant_end:
+    case Intrinsic::launder_invariant_group:
+    case Intrinsic::strip_invariant_group:
+    case Intrinsic::is_constant:
+    case Intrinsic::lifetime_start:
+    case Intrinsic::lifetime_end:
+    case Intrinsic::objectsize:
+    case Intrinsic::ptr_annotation:
+    case Intrinsic::var_annotation:
+    case Intrinsic::experimental_gc_result:
+    case Intrinsic::experimental_gc_relocate:
+    case Intrinsic::experimental_noalias_scope_decl:
+    case Intrinsic::syncregion_start:
+    case Intrinsic::taskframe_create:
+      return true;
+    default:
+      return false;
     }
-    B.CreateBr(Cont);
-  }
-  // Block  (Cont)
-  {
-    IRBuilder<> B(Cont);
-    // Value *Wfast = W;
-    // PHINode *W  = B.CreatePHI(WorkerPtrTy, 2);
-    // W->addIncoming(Wslow, SlowPath);
-    // W->addIncoming(Wfast, FastPath);
-    Value *Wkr = B.CreatePointerCast(W, WorkerPtrTy);
-    // sf->call_parent = w->current_stack_frame;
-    StoreSTyField(B, DL, StackFrameTy,
-                  LoadSTyField(B, DL, WorkerTy, Wkr,
-                               WorkerFieldFrame,
-                               /*isVolatile=*/false,
-                               AtomicOrdering::Unordered),
-                  SF, StackFrameFieldParent, /*isVolatile=*/false,
-                  AtomicOrdering::Unordered);
-    // sf->worker = w;
-    StoreSTyField(B, DL, StackFrameTy, Wkr, SF,
-                  StackFrameFieldWorker, /*isVolatile=*/false,
-                  AtomicOrdering::Unordered);
-    // w->current_stack_frame = sf;
-    StoreSTyField(B, DL, WorkerTy, SF, Wkr,
-                  WorkerFieldFrame, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
-
-    B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->setDoesNotThrow();
-  if (!DebugABICalls && !UseExternalABIFunctions)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
+  return false;
 }
 
-/// Get or create a LLVM function for __cilkrts_enter_frame_fast.  It is
-/// equivalent to the following C code:
-///
-/// void __cilkrts_enter_frame_fast(struct __cilkrts_stack_frame *sf)
-/// {
-///     struct __cilkrts_worker *w = __cilkrts_get_tls_worker();
-///     sf->flags = CILK_FRAME_VERSION;
-///     sf->call_parent = w->current_stack_frame;
-///     sf->worker = w;
-///     /* sf->except_data is only valid when CILK_FRAME_EXCEPTING is set */
-///     w->current_stack_frame = sf;
-/// }
-Function *OpenCilkABI::Get__cilkrts_enter_frame_fast() {
-  // Get or create the __cilkrts_enter_frame_fast function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilkrts_enter_frame_fast",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
+// Scan the basic block \p B to find a point to insert the allocation of a
+// __cilkrts_stack_frame.
+static Instruction *getStackFrameInsertPt(BasicBlock &B) {
+  BasicBlock::iterator BI(B.getFirstInsertionPt());
+  BasicBlock::const_iterator BE(B.end());
 
-  // Create the body of __cilkrts_enter_frame_fast.
-  const DataLayout &DL = M.getDataLayout();
+  // Scan the basic block for the first instruction we should not skip.
+  while (BI != BE) {
+    if (!skipInstruction(*BI)) {
+      return &*BI;
+    }
+    ++BI;
+  }
 
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn);
-
-  IRBuilder<> B(Entry);
-  Value *W;
-
-  // struct __cilkrts_worker *w = __cilkrts_get_tls_worker();
-  // if (fastCilk)
-  //   W = B.CreateCall(CILKRTS_FUNC(get_tls_worker_fast));
-  // else
-    W = B.CreateCall(CILKRTS_FUNC(get_tls_worker));
-
-  StructType *SFTy = StackFrameTy;
-  Type *Ty = SFTy->getElementType(StackFrameFieldFlags);
-
-  // sf->flags = 0
-  StoreSTyField(B, DL, StackFrameTy,
-                ConstantInt::get(Ty, 0),
-                SF, StackFrameFieldFlags, /*isVolatile=*/false,
-                AtomicOrdering::Unordered);
-  // sf->magic = (magic)
-    StoreSTyField(B, DL, StackFrameTy,
-                ConstantInt::get(Ty, FrameMagic),
-                SF, StackFrameFieldMagic, /*isVolatile=*/false,
-                AtomicOrdering::Unordered);
-  // sf->call_parent = w->current_stack_frame;
-  StoreSTyField(B, DL, StackFrameTy,
-                LoadSTyField(B, DL, WorkerTy, W,
-                             WorkerFieldFrame,
-                             /*isVolatile=*/false,
-                             AtomicOrdering::Unordered),
-                SF, StackFrameFieldParent, /*isVolatile=*/false,
-                AtomicOrdering::Unordered);
-  // sf->worker = w;
-  StoreSTyField(B, DL, StackFrameTy, W, SF, StackFrameFieldWorker,
-                /*isVolatile=*/false, AtomicOrdering::Unordered);
-  // w->current_stack_frame = sf;
-  StoreSTyField(B, DL, WorkerTy, SF, W, WorkerFieldFrame, /*isVolatile=*/false,
-                AtomicOrdering::Release);
-
-  B.CreateRetVoid();
-
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->setDoesNotThrow();
-  if (!DebugABICalls && !UseExternalABIFunctions)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
+  // We reached the end of the basic block; return the terminator.
+  return B.getTerminator();
 }
-
-/// Get or create a LLVM function for __cilk_parent_epilogue.  It is equivalent
-/// to the following C code:
-///
-/// void __cilk_parent_epilogue(__cilkrts_stack_frame *sf) {
-///   __cilkrts_pop_frame(sf);
-///   if (sf->flags != CILK_FRAME_VERSION)
-///     __cilkrts_leave_frame(sf);
-/// }
-Function *OpenCilkABI::GetCilkParentEpilogueFn() {
-  // Get or create the __cilk_parent_epilogue function.
-  LLVMContext &Ctx = M.getContext();
-  Type *VoidTy = Type::getVoidTy(Ctx);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilk_parent_epilogue",
-                          FunctionType::get(VoidTy, {StackFramePtrTy}, false),
-                          Fn))
-    return Fn;
-
-  // Create the body of __cilk_parent_epilogue.
-  const DataLayout &DL = M.getDataLayout();
-
-  Function::arg_iterator Args = Fn->arg_begin();
-  Value *SF = &*Args;
-
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn),
-    *B1 = BasicBlock::Create(Ctx, "body", Fn),
-    *Exit  = BasicBlock::Create(Ctx, "exit", Fn);
-  CallInst *PopFrame;
-
-  // Entry
-  {
-    IRBuilder<> B(Entry);
-
-    // __cilkrts_pop_frame(sf)
-    PopFrame = B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
-
-    // JFC: I removed AtomicOrdering::Acquire here.  If flags have been
-    // changed at least one change was in this function.
-    // if (sf->flags != CILK_FRAME_VERSION)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFieldFlags, /*isVolatile=*/false,
-                                AtomicOrdering::Unordered);
-    Value *Cond = B.CreateICmpNE(Flags, ConstantInt::get(Flags->getType(), 0));
-    B.CreateCondBr(Cond, B1, Exit);
-  }
-
-  // B1
-  {
-    IRBuilder<> B(B1);
-
-    // __cilkrts_leave_frame(sf);
-    B.CreateCall(CILKRTS_FUNC(leave_frame), SF);
-    B.CreateBr(Exit);
-  }
-
-  // Exit
-  {
-    IRBuilder<> B(Exit);
-    B.CreateRetVoid();
-  }
-
-  // Inline the pop_frame call.
-  if (!DebugABICalls && !UseExternalABIFunctions)
-    CallsToInline.insert(PopFrame);
-
-  Fn->setLinkage(Function::AvailableExternallyLinkage);
-  Fn->setDoesNotThrow();
-  if (!DebugABICalls)
-    Fn->addFnAttr(Attribute::AlwaysInline);
-
-  return Fn;
-}
-
-static const StringRef stack_frame_name = "__cilkrts_sf";
 
 /// Create the __cilkrts_stack_frame for the spawning function.
-AllocaInst *OpenCilkABI::CreateStackFrame(Function &F) {
+Value *OpenCilkABI::CreateStackFrame(Function &F) {
   const DataLayout &DL = F.getParent()->getDataLayout();
   Type *SFTy = StackFrameTy;
 
-  IRBuilder<> B(&*F.getEntryBlock().getFirstInsertionPt());
+  IRBuilder<> B(getStackFrameInsertPt(F.getEntryBlock()));
   AllocaInst *SF = B.CreateAlloca(SFTy, DL.getAllocaAddrSpace(),
-                                  /*ArraySize*/nullptr,
-                                  /*Name*/stack_frame_name);
+                                  /*ArraySize*/ nullptr,
+                                  /*Name*/ StackFrameName);
   SF->setAlignment(Align(8));
 
   return SF;
@@ -1252,40 +590,38 @@ Value* OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
   if (DetachCtxToStackFrame.count(&F))
     return DetachCtxToStackFrame[&F];
 
-  AllocaInst *SF = CreateStackFrame(F);
+  Value *SF = CreateStackFrame(F);
   DetachCtxToStackFrame[&F] = SF;
 
   return SF;
 }
 
+// Insert a call in Function F to __cilkrts_detach at DetachPt, which must be
+// after the allocation of the __cilkrts_stack_frame in F.
 void OpenCilkABI::InsertDetach(Function &F, Instruction *DetachPt) {
-  /*
-    __cilkrts_stack_frame sf;
-    ...
-    __cilkrts_detach(sf);
-    *x = f(y);
-  */
-
-  AllocaInst *SF = cast<AllocaInst>(GetOrCreateCilkStackFrame(F));
+  Instruction *SF = cast<Instruction>(GetOrCreateCilkStackFrame(F));
   assert(SF && "No Cilk stack frame for Cilk function.");
-  Value *Args[1] = { SF };
+  Value *Args[1] = {SF};
 
   // Scan function to see if it detaches.
   LLVM_DEBUG({
-      bool SimpleHelper = !canDetach(&F);
-      if (!SimpleHelper)
-        dbgs() << "NOTE: Detachable helper function itself detaches.\n";
-    });
+    bool SimpleHelper = !canDetach(&F);
+    if (!SimpleHelper)
+      dbgs() << "NOTE: Detachable helper function itself detaches.\n";
+  });
 
   // Call __cilkrts_detach
   IRBuilder<> IRB(DetachPt);
   IRB.CreateCall(CILKRTS_FUNC(detach), Args);
 }
 
+// Insert a call in Function F to __cilkrts_enter_frame{_helper} to initialize
+// the __cilkrts_stack_frame in F.  If TaskFrameCreate is nonnull, the call to
+// __cilkrts_enter_frame{_helper} is inserted at TaskFramecreate.
 CallInst *OpenCilkABI::InsertStackFramePush(Function &F,
                                             Instruction *TaskFrameCreate,
                                             bool Helper) {
-  AllocaInst *SF = cast<AllocaInst>(GetOrCreateCilkStackFrame(F));
+  Instruction *SF = cast<Instruction>(GetOrCreateCilkStackFrame(F));
 
   BasicBlock::iterator InsertPt = ++SF->getIterator();
   IRBuilder<> B(&(F.getEntryBlock()), InsertPt);
@@ -1294,11 +630,25 @@ CallInst *OpenCilkABI::InsertStackFramePush(Function &F,
 
   Value *Args[1] = {SF};
   if (Helper)
-    return B.CreateCall(CILKRTS_FUNC(enter_frame_fast), Args);
+    return B.CreateCall(CILKRTS_FUNC(enter_frame_helper), Args);
   else
     return B.CreateCall(CILKRTS_FUNC(enter_frame), Args);
 }
 
+// Insert a call in Function F to the appropriate epilogue function.
+//
+//   - A call to __cilk_parent_epilogue() is inserted at a return from a
+//   spawning function.
+//
+//   - A call to __cilk_helper_epilogue() is inserted at a return from a
+//   spawn-helper function.
+//
+//   - A call to __cilk_helper_epiluge_exn() is inserted at a resume from a
+//   spawn-helper function.
+//
+// PromoteCallsToInvokes dictates whether call instructions that can throw are
+// promoted to invoke instructions prior to inserting the epilogue-function
+// calls.
 void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
                                       bool InsertPauseFrame, bool Helper) {
   Value *SF = GetOrCreateCilkStackFrame(F);
@@ -1316,8 +666,7 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
 
   for (ReturnInst *RI : Returns) {
     if (Helper) {
-      CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-      CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+      CallInst::Create(GetCilkHelperEpilogueFn(), {SF}, "", RI);
     } else {
       CallInst::Create(GetCilkParentEpilogueFn(), {SF}, "", RI);
     }
@@ -1325,14 +674,9 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   for (ResumeInst *RI : Resumes) {
     if (InsertPauseFrame) {
       Value *Exn = ExtractValueInst::Create(RI->getValue(), {0}, "", RI);
-      CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-      // If throwing an exception, store the exception object and selector value
-      // in the closure, call setjmp, and call pause_frame.
-      CallInst::Create(GetCilkPauseFrameFn(), {SF, Exn}, "", RI);
-      // CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
-      // } else {
-      //   CallInst::Create(CILKRTS_FUNC(pop_frame), {SF}, "", RI);
-      //   CallInst::Create(CILKRTS_FUNC(leave_frame), {SF}, "", RI);
+      // If throwing an exception, pass the exception object to the epilogue
+      // function.
+      CallInst::Create(GetCilkHelperEpilogueExnFn(), {SF, Exn}, "", RI);
     }
   }
 }
@@ -1355,38 +699,32 @@ void OpenCilkABI::MarkSpawner(Function &F) {
   F.addFnAttr(Attribute::Stealable);
 }
 
-/// Lower a call to get the grainsize of this Tapir loop.
-///
-/// The grainsize is computed by the following equation:
-///
-///     Grainsize = min(2048, ceil(Limit / (8 * workers)))
-///
-/// This computation is inserted into the preheader of the loop.
+/// Lower a call to get the grainsize of a Tapir loop.
 Value *OpenCilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Limit = GrainsizeCall->getArgOperand(0);
   IRBuilder<> Builder(GrainsizeCall);
 
-  // Get 8 * workers
-  Value *Workers = Builder.CreateCall(CILKRTS_FUNC(get_nworkers));
-  Value *WorkersX8 = Builder.CreateIntCast(
-      Builder.CreateMul(Workers, ConstantInt::get(Workers->getType(), 8)),
-      Limit->getType(), false);
-  // Compute ceil(limit / 8 * workers) =
-  //           (limit + 8 * workers - 1) / (8 * workers)
-  Value *SmallLoopVal =
-    Builder.CreateUDiv(Builder.CreateSub(Builder.CreateAdd(Limit, WorkersX8),
-                                         ConstantInt::get(Limit->getType(), 1)),
-                       WorkersX8);
-  // Compute min
-  Value *LargeLoopVal = ConstantInt::get(Limit->getType(), 2048);
-  Value *Cmp = Builder.CreateICmpULT(LargeLoopVal, SmallLoopVal);
-  Value *Grainsize = Builder.CreateSelect(Cmp, LargeLoopVal, SmallLoopVal);
+  // Select the appropriate __cilkrts_grainsize function, based on the type.
+  FunctionCallee CilkRTSGrainsizeCall;
+  if (GrainsizeCall->getType()->isIntegerTy(8))
+    CilkRTSGrainsizeCall = CILKRTS_FUNC(cilk_for_grainsize_8);
+  else if (GrainsizeCall->getType()->isIntegerTy(16))
+    CilkRTSGrainsizeCall = CILKRTS_FUNC(cilk_for_grainsize_16);
+  else if (GrainsizeCall->getType()->isIntegerTy(32))
+    CilkRTSGrainsizeCall = CILKRTS_FUNC(cilk_for_grainsize_32);
+  else if (GrainsizeCall->getType()->isIntegerTy(64))
+    CilkRTSGrainsizeCall = CILKRTS_FUNC(cilk_for_grainsize_64);
+  else
+    llvm_unreachable("No CilkRTSGrainsize call matches type for Tapir loop.");
+
+  Value *Grainsize = Builder.CreateCall(CilkRTSGrainsizeCall, Limit);
 
   // Replace uses of grainsize intrinsic call with this grainsize value.
   GrainsizeCall->replaceAllUsesWith(Grainsize);
   return Grainsize;
 }
 
+// Lower a sync instruction SI.
 void OpenCilkABI::lowerSync(SyncInst &SI) {
   Function &Fn = *SI.getFunction();
   if (!DetachCtxToStackFrame[&Fn])
@@ -1401,14 +739,13 @@ void OpenCilkABI::lowerSync(SyncInst &SI) {
   Instruction *SyncUnwind = nullptr;
   BasicBlock *SyncCont = SI.getSuccessor(0);
   BasicBlock *SyncUnwindDest = nullptr;
+  // Determine whether a sync.unwind immediately follows SI.
   if (InvokeInst *II =
           dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
-    if (const Function *Called = II->getCalledFunction()) {
-      if (Intrinsic::sync_unwind == Called->getIntrinsicID()) {
-        SyncUnwind = II;
-        SyncCont = II->getNormalDest();
-        SyncUnwindDest = II->getUnwindDest();
-      }
+    if (isSyncUnwind(II)) {
+      SyncUnwind = II;
+      SyncCont = II->getNormalDest();
+      SyncUnwindDest = II->getUnwindDest();
     }
   }
 
@@ -1482,13 +819,7 @@ void OpenCilkABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
       IRBuilder<> Builder(InsertPt);
 
       Value *Sel = Builder.CreateExtractValue(LPad, 1, "sel");
-      CallInst *SetjmpCall = EmitCilkSetJmp(Builder, SF);
-
-      Value *Cond = Builder.CreateICmpEQ(
-          SetjmpCall, ConstantInt::get(SetjmpCall->getType(), 0));
-      Instruction *ThenTerm = SplitBlockAndInsertIfThen(Cond, InsertPt, false);
-      Builder.SetInsertPoint(ThenTerm);
-      Builder.CreateCall(CILKRTS_FUNC(cleanup_fiber), {SF, Sel});
+      Builder.CreateCall(CILKRTS_FUNC(enter_landingpad), {SF, Sel});
     }
   }
 }
@@ -1514,11 +845,14 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   BasicBlock *DetBlock = ReplStart->getParent();
   BasicBlock *CallBlock = SplitBlock(DetBlock, ReplStart, &DT);
 
-  // Emit a Cilk setjmp at the end of the block preceding the split-off detach
-  // replacement.
-  Instruction *SetJmpPt = DetBlock->getTerminator();
-  IRBuilder<> B(SetJmpPt);
-  Value *SetJmpRes = EmitCilkSetJmp(B, SF);
+  // Emit a __cilk_spawn_prepare at the end of the block preceding the split-off
+  // detach replacement.
+  Instruction *SpawnPt = DetBlock->getTerminator();
+  IRBuilder<> B(SpawnPt);
+  CallBase *SpawnPrepCall = B.CreateCall(GetCilkPrepareSpawnFn(), {SF});
+
+  // Remember to inline this call later.
+  CallsToInline.insert(SpawnPrepCall);
 
   // Get the ordinary continuation of the detach.
   BasicBlock *CallCont;
@@ -1527,15 +861,15 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   else // isa<CallInst>(CallSite)
     CallCont = CallBlock->getSingleSuccessor();
 
-  // Insert a conditional branch, based on the result of the setjmp, to either
-  // the detach replacement or the continuation.
-  SetJmpRes = B.CreateICmpEQ(SetJmpRes,
-                             ConstantInt::get(SetJmpRes->getType(), 0));
-  B.CreateCondBr(SetJmpRes, CallBlock, CallCont);
+  // Insert a conditional branch, based on the result of the
+  // __cilk_spawn_prepare, to either the detach replacement or the continuation.
+  Value *SpawnPrepRes = B.CreateICmpEQ(
+      SpawnPrepCall, ConstantInt::get(SpawnPrepCall->getType(), 0));
+  B.CreateCondBr(SpawnPrepRes, CallBlock, CallCont);
   for (PHINode &PN : CallCont->phis())
     PN.addIncoming(PN.getIncomingValueForBlock(CallBlock), DetBlock);
 
-  SetJmpPt->eraseFromParent();
+  SpawnPt->eraseFromParent();
 }
 
 // Helper function to inline calls to compiler-generated Cilk Plus runtime

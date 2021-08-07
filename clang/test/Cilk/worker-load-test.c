@@ -67,12 +67,12 @@ void detectLocalizedCollisions(int32_t l, int32_t r, uint8_t h) {
 
 // CHECK-LABEL: define {{.*}}void @detectLocalizedCollisions(
 // CHECK: %[[CILKRTS_SF:.+]] = alloca %struct.__cilkrts_stack_frame
-// CHECK: %[[WORKER_CALL:.+]] = call %struct.__cilkrts_worker* @__cilkrts_get_tls_worker()
+// CHECK: %[[WORKER_LOAD:.+]] = load %struct.__cilkrts_worker*, %struct.__cilkrts_worker** @tls_worker
 // CHECK: %[[WORKER_PHI:.+]] = phi %struct.__cilkrts_worker*
 // CHECK: %[[WORKER_PTR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %[[CILKRTS_SF]], i64 0, i32 3
-// CHECK: %[[WORKER_CALL_VAL:.+]] = ptrtoint %struct.__cilkrts_worker* %[[WORKER_PHI]] to [[WORKER_INT_TY:i[0-9]+]]
-// CHECK: %[[WORKER_PTR_CST:.+]] = bitcast %struct.__cilkrts_worker** %[[WORKER_PTR]] to [[WORKER_INT_TY]]*
-// CHECK: store atomic [[WORKER_INT_TY]] %[[WORKER_CALL_VAL]], [[WORKER_INT_TY]]* %[[WORKER_PTR_CST]]
+// CHECK: %[[WORKER_PTR_CST:.+]] = bitcast %struct.__cilkrts_worker** %[[WORKER_PTR]] to [[WORKER_INT_TY:i[0-9]+]]*
+// CHECK: %[[WORKER_LOAD_VAL:.+]] = ptrtoint %struct.__cilkrts_worker* %[[WORKER_PHI]] to [[WORKER_INT_TY]]
+// CHECK: store atomic [[WORKER_INT_TY]] %[[WORKER_LOAD_VAL]], [[WORKER_INT_TY]]* %[[WORKER_PTR_CST]]
 // CHECK: icmp
 // CHECK-NEXT: or
 // CHECK-NEXT: icmp
@@ -91,8 +91,8 @@ void detectLocalizedCollisions(int32_t l, int32_t r, uint8_t h) {
 // CHECK-NEXT: br label %[[CLEANUP_CONT:.+]]
 
 // CHECK: [[CLEANUP_CONT]]:
-// CHECK: load atomic [[WORKER_INT_TY]], [[WORKER_INT_TY]]* %[[WORKER_PTR_CST]]
-// CHECK: call void @__cilkrts_leave_frame(
+// CHECK: %[[WORKER_RELOAD:.+]] = load %struct.__cilkrts_worker*, %struct.__cilkrts_worker** @tls_worker
+// CHECK: call void @Cilk_set_return(%struct.__cilkrts_worker* nonnull %[[WORKER_RELOAD]])
 // CHECK: ret void
 
 // CHECK-LABEL: define {{.*}}void @detectLocalizedCollisions.outline_det.achd.otd1(
