@@ -589,6 +589,16 @@ void JumpScopeChecker::BuildScopeInformation(Stmt *S,
     break;
   }
 
+  case Stmt::CilkScopeStmtClass: {
+    // Disallow jumps into _Cilk_scope statements.
+    CilkScopeStmt *CS = cast<CilkScopeStmt>(S);
+    unsigned NewParentScope = Scopes.size();
+    Scopes.push_back(GotoScope(ParentScope, diag::note_protected_by_cilk_scope,
+                               0, CS->getBeginLoc()));
+    BuildScopeInformation(CS->getBody(), NewParentScope);
+    return;
+  }
+
   case Stmt::CilkSpawnStmtClass: {
     // Disallow jumps into or out of _Cilk_spawn statements.
     CilkSpawnStmt *CS = cast<CilkSpawnStmt>(S);
