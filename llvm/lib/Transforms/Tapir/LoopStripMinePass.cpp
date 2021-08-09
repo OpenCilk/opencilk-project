@@ -55,6 +55,11 @@ static cl::opt<bool> IncludeNestedSync(
   cl::desc("If the epilog is allowed to execute in parallel, include a sync "
            "instruction in the nested task."));
 
+static cl::opt<bool> RequireParallelEpilog(
+    "require-parallel-epilog", cl::Hidden, cl::init(false),
+    cl::desc("Require stripmined Tapir loops to execute their epilogs in "
+             "parallel.  Intended for debugging."));
+
 /// Create an analysis remark that explains why stripmining failed
 ///
 /// \p RemarkName is the identifier for the remark.  If \p I is passed it is an
@@ -263,12 +268,13 @@ static bool tryToStripMineLoop(
   // encode the result in ParallelEpilog.
   Instruction *DetachI = L->getHeader()->getTerminator();
   bool ParallelEpilog =
-      AllowParallelEpilog &&
-      ((SMP.Count < SMP.DefaultCoarseningFactor) ||
-       (LoopCost >=
-        static_cast<unsigned>(
-            2 * TTI.getUserCost(DetachI,
-                                TargetTransformInfo::TCK_SizeAndLatency))));
+      RequireParallelEpilog ||
+      (AllowParallelEpilog &&
+       ((SMP.Count < SMP.DefaultCoarseningFactor) ||
+        (LoopCost >=
+         static_cast<unsigned>(
+             2 * TTI.getUserCost(DetachI,
+                                 TargetTransformInfo::TCK_SizeAndLatency)))));
 
   // Some parallel runtimes, such as Cilk, require nested parallel tasks to be
   // synchronized.
