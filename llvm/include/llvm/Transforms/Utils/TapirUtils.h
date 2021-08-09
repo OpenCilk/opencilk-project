@@ -152,6 +152,10 @@ BasicBlock *GetDetachedCtx(BasicBlock *BB);
 // traversal of the CFG, and as such, produces a conservative result.
 bool mayBeUnsynced(const BasicBlock *BB);
 
+/// isDetachContinueEdge - Return true if the edge from terminator instruction
+/// TI to successor basic block Succ is a detach-continue edge.
+bool isDetachContinueEdge(const Instruction *TI, const BasicBlock *Succ);
+
 /// isCriticalContinueEdge - Return true if the specified edge is a critical
 /// detach-continue edge.  Critical detach-continue edges are critical edges -
 /// from a block with multiple successors to a block with multiple predecessors
