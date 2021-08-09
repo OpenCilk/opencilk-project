@@ -73,6 +73,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/VNCoercion.h"
 #include <algorithm>
 #include <cassert>
@@ -3155,6 +3156,12 @@ void GVNPass::addDeadBlock(BasicBlock *BB) {
 
       if (llvm::is_contained(successors(P), B) &&
           isCriticalEdge(P->getTerminator(), B)) {
+
+        // Don't bother splitting critical edges to a detach-continue block,
+        // since both the detach and reattach predecessors must be dead.
+        if (isDetachContinueEdge(P->getTerminator(), B))
+          continue;
+
         if (BasicBlock *S = splitCriticalEdges(P, B))
           DeadBlocks.insert(P = S);
       }

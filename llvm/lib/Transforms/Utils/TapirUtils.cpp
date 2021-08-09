@@ -1267,6 +1267,19 @@ bool llvm::mayBeUnsynced(const BasicBlock *BB) {
   return false;
 }
 
+/// isDetachedContinueEdge - Return true if the edge from terminator instruction
+/// TI to successor basic block Succ is a detach-continue edge.
+bool llvm::isDetachContinueEdge(const Instruction *TI, const BasicBlock *Succ) {
+  if (isa<ReattachInst>(TI))
+    return true;
+  if (isDetachedRethrow(TI))
+    return Succ == cast<InvokeInst>(TI)->getUnwindDest();
+  if (const DetachInst *DI = dyn_cast<DetachInst>(TI))
+    return Succ == DI->getContinue() ||
+           (DI->hasUnwindDest() && Succ == DI->getUnwindDest());
+  return false;
+}
+
 /// isCriticalContinueEdge - Return true if the specified edge is a critical
 /// detach-continue edge.  Critical detach-continue edges are critical edges -
 /// from a block with multiple successors to a block with multiple predecessors
