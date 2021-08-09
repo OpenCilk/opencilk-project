@@ -10451,6 +10451,10 @@ def err_cilk_spawn_invalid_func_context : Error<
 def err_pragma_cilk_precedes_noncilk : Error<
   "expected a Cilk keyword to follow '%0'">;
 
+// cilk_scope
+def note_protected_by_cilk_scope: Note<
+  "jump bypasses '_Cilk_scope'">;
+
 // cilk_spawn
 def err_not_a_call : Error<
   "the argument to _Cilk_spawn must be a function call">;
