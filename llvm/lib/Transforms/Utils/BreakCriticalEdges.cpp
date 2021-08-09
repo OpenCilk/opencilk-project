@@ -33,6 +33,7 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 using namespace llvm;
 
@@ -145,7 +146,9 @@ BasicBlock *llvm::SplitCriticalEdge(Instruction *TI, unsigned SuccNum,
   assert(!isa<ReattachInst>(TI) &&
          "Cannot split critical edge from ReattachInst");
 
-  bool SplittingDetachContinue = isa<DetachInst>(TI) && (1 == SuccNum);
+  bool SplittingDetachContinue =
+      isa<ReattachInst>(TI) || (isDetachedRethrow(TI) && (1 == SuccNum)) ||
+      (isa<DetachInst>(TI) && ((1 == SuccNum) || (2 == SuccNum)));
   if (SplittingDetachContinue)
     assert((Options.SplitDetachContinue && Options.DT) &&
            "Cannot split critical continuation edge from a detach");
