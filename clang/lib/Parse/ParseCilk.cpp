@@ -365,7 +365,8 @@ StmtResult Parser::ParseCilkScopeStatement() {
   assert(Tok.is(tok::kw__Cilk_scope) && "Not a _Cilk_scope stmt!");
   SourceLocation ScopeLoc = ConsumeToken();  // eat the '_Cilk_scope'.
 
-  unsigned ScopeFlags = Scope::BlockScope | Scope::FnScope | Scope::DeclScope;
+  // TODO: Decide whether to allow break statements in _Cilk_scopes.
+  unsigned ScopeFlags = Scope::FnScope | Scope::DeclScope;
 
   if (Tok.is(tok::l_brace)) {
     StmtResult SubStmt = ParseCompoundStatement(false, ScopeFlags |
