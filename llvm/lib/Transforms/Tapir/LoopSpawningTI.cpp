@@ -585,6 +585,10 @@ void DACSpawning::implementDACIterSpawnOnHelper(
 
   PHINode *PrimaryIV = cast<PHINode>(VMap[TL.getPrimaryInduction().first]);
 
+  // Remove the norecurse attribute from Helper.
+  if (Helper->doesNotRecurse())
+    Helper->removeFnAttr(Attribute::NoRecurse);
+
   // Convert the cloned loop into the strip-mined loop body.
   assert(Preheader->getParent() == Helper &&
          "Preheader does not belong to helper function.");
@@ -1301,6 +1305,9 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   // cannot throw.
   if (F.doesNotThrow() && !TL->getUnwindDest())
     Helper->setDoesNotThrow();
+  // Don't inherit the noreturn attribute from the caller.
+  if (F.doesNotReturn())
+    Helper->removeFnAttr(Attribute::NoReturn);
 
   // Update cloned loop condition to use the end-iteration argument.
   unsigned TripCountIdx = 0;
