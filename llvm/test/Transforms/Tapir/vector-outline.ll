@@ -1,5 +1,5 @@
-; RUN: opt < %s -loop-spawning-ti -S -o - | FileCheck %s
-; RUN: opt < %s -passes='loop-spawning' -S -o - | FileCheck %s
+; RUN: opt < %s -loop-spawning-ti -S | FileCheck %s
+; RUN: opt < %s -passes='loop-spawning' -S | FileCheck %s
 
 ; ModuleID = 'vectoroutline.cpp'
 source_filename = "vectoroutline.cpp"
@@ -151,14 +151,18 @@ cleanup:                                          ; preds = %pfor.cond.cleanup, 
   ret void
 }
 
-; CHECK: define dso_local void @_Z14vectorlooptestPjll(i32* nocapture %SA12, i64 %n1, i64 %n12) local_unnamed_addr [[ATTRIBUTE:#.+]] {
+; CHECK: define dso_local void @_Z14vectorlooptestPjll(i32* nocapture %SA12, i64 %n1, i64 %n12) local_unnamed_addr [[ATTRIBUTE:#[0-9]+]] {
 ; CHECK: call {{.*}}void @_Z14vectorlooptestPjll.outline_pfor.cond.strpm.outer.ls1(
 ; CHECK: <8 x i64> %{{.+}}, i32* %{{.+}})
 
 ; CHECK: define {{.*}}void @_Z14vectorlooptestPjll.outline_pfor.cond.strpm.outer.ls1(
-; CHECK: [[ATTRIBUTE]] {
+; CHECK: [[ATTRIBUTE_HELPER:#[0-9]+]] {
 
 ; CHECK: attributes [[ATTRIBUTE]] = {
+; CHECK-NOT: "min-legal-vector-width"="0"
+; CHECK: }
+
+; CHECK: attributes [[ATTRIBUTE_HELPER]] = {
 ; CHECK-NOT: "min-legal-vector-width"="0"
 ; CHECK: }
 
