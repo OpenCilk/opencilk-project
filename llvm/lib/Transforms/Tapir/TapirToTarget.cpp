@@ -167,6 +167,9 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
       // then the outlined function cannot throw.
       if (F.doesNotThrow() && !getTaskFrameResume(TF->getTaskFrameCreate()))
         TFToOutline[TF].Outline->setDoesNotThrow();
+      // Don't inherit the noreturn attribute from the caller.
+      if (F.doesNotReturn())
+        TFToOutline[TF].Outline->removeFnAttr(Attribute::NoReturn);
       Target->addHelperAttributes(*TFToOutline[TF].Outline);
 
       // Allow the Target to update any internal structures after outlining.
