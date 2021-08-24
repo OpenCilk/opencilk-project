@@ -470,8 +470,12 @@ bool TapirToTargetImpl::run() {
     if (F.empty())
       continue;
     // TODO: Use per-function Tapir targets?
-    if (!Target)
-      Target = getTapirTargetFromID(M, GetTLI(F).getTapirTarget());
+    if (!Target) {
+      TargetLibraryInfo &TLI = GetTLI(F);
+      Target = getTapirTargetFromID(M, TLI.getTapirTarget());
+      if (TapirTargetOptions *Options = TLI.getTapirTargetOptions())
+        Target->setOptions(*Options);
+    }
     assert(Target && "Missing Tapir target");
     if (Target->shouldProcessFunction(F))
       WorkList.push_back(&F);
