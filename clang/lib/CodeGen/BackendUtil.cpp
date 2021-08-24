@@ -607,6 +607,8 @@ static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
   }
 
   TLII->setTapirTarget(CodeGenOpts.getTapirTarget());
+  TLII->setTapirTargetOptions(
+      std::make_unique<OpenCilkABIOptions>(CodeGenOpts.OpenCilkABIBitcodeFile));
   TLII->addTapirTargetLibraryFunctions();
 
   return TLII;
