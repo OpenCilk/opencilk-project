@@ -902,7 +902,8 @@ static void generateMachineCodeOrAssemblyImpl(clang::DiagnosticsEngine &diags,
 
   llvm::Triple triple(llvmModule.getTargetTriple());
   llvm::TargetLibraryInfoImpl *tlii = llvm::driver::createTLII(
-      triple, codeGenOpts.getVecLib(), codeGenOpts.getTapirTarget());
+      triple, codeGenOpts.getVecLib(), codeGenOpts.getTapirTarget(),
+      codeGenOpts.OpenCilkABIBitcodeFile);
   codeGenPasses.add(new llvm::TargetLibraryInfoWrapperPass(*tlii));
 
   llvm::CodeGenFileType cgft = (act == BackendActionTy::Backend_EmitAssembly)
@@ -959,8 +960,9 @@ void CodeGenAction::runOptimizationPipeline(llvm::raw_pwrite_stream &os) {
   // Register the target library analysis directly and give it a customized
   // preset TLI depending on -fveclib
   llvm::Triple triple(llvmModule->getTargetTriple());
-  llvm::TargetLibraryInfoImpl *tlii = llvm::driver::createTLII(
-      triple, opts.getVecLib(), opts.getTapirTarget());
+  llvm::TargetLibraryInfoImpl *tlii =
+      llvm::driver::createTLII(triple, opts.getVecLib(), opts.getTapirTarget(),
+                               opts.OpenCilkABIBitcodeFile);
   fam.registerPass([&] { return llvm::TargetLibraryAnalysis(*tlii); });
 
   // Register all the basic analyses with the managers.
