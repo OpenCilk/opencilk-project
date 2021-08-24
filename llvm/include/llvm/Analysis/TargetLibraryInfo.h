@@ -57,6 +57,7 @@ class TargetLibraryInfoImpl {
   bool ShouldExtI32Param, ShouldExtI32Return, ShouldSignExtI32Param, ShouldSignExtI32Return;
   unsigned SizeOfInt;
   TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
+  std::unique_ptr<TapirTargetOptions> TTOptions = nullptr;
 
   enum AvailabilityState {
     StandardName = 3, // (memset to all ones)
@@ -244,6 +245,16 @@ public:
   bool hasTapirTarget() const {
     return (TapirTarget != TapirTargetID::Last_TapirTargetID) &&
       (TapirTarget != TapirTargetID::None);
+  }
+
+  /// Set options for Tapir lowering.
+  void setTapirTargetOptions(std::unique_ptr<TapirTargetOptions> Options) {
+    std::swap(TTOptions, Options);
+  }
+
+  /// Return any options for Tapir lowering.
+  TapirTargetOptions *getTapirTargetOptions() const {
+    return TTOptions.get();
   }
 
   /// Records known library functions associated with the specified Tapir
@@ -552,6 +563,11 @@ public:
   /// \copydoc TargetLibraryInfoImpl::hasTapirTarget()
   bool hasTapirTarget() const {
     return Impl->hasTapirTarget();
+  }
+
+  /// \copydoc TargetLibraryInfoImpl::getTapirTarget()
+  TapirTargetOptions *getTapirTargetOptions() const {
+    return Impl->getTapirTargetOptions();
   }
 
   /// \copydoc TargetLibraryInfoImpl::isTapirTargetLibFunc()
