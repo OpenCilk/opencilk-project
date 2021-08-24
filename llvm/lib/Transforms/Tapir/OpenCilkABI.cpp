@@ -42,7 +42,7 @@ extern cl::opt<bool> DebugABICalls;
 static cl::opt<bool> UseOpenCilkRuntimeBC(
     "use-opencilk-runtime-bc", cl::init(true),
     cl::desc("Use a bitcode file for the OpenCilk runtime ABI"), cl::Hidden);
-static cl::opt<std::string> OpenCilkRuntimeBCPath(
+static cl::opt<std::string> ClOpenCilkRuntimeBCPath(
     "opencilk-runtime-bc-path", cl::init(""),
     cl::desc("Path to the bitcode file for the OpenCilk runtime ABI"),
     cl::Hidden);
@@ -76,6 +76,16 @@ struct CilkRTSFnDesc {
   FunctionCallee &FnCallee;
 };
 
+void OpenCilkABI::setOptions(const TapirTargetOptions &Options) {
+  if (!isa<OpenCilkABIOptions>(Options))
+    return;
+
+  const OpenCilkABIOptions &OptionsCast = cast<OpenCilkABIOptions>(Options);
+
+  // Get the path to the runtime bitcode file.
+  RuntimeBCPath = OptionsCast.getRuntimeBCPath();
+}
+
 void OpenCilkABI::prepareModule() {
   LLVMContext &C = M.getContext();
   Type *Int8Ty = Type::getInt8Ty(C);
@@ -84,21 +94,24 @@ void OpenCilkABI::prepareModule() {
   Type *Int64Ty = Type::getInt64Ty(C);
 
   if (UseOpenCilkRuntimeBC) {
-    if ("" == OpenCilkRuntimeBCPath)
+    // If a runtime bitcode path is given via the command line, use it.
+    if ("" != ClOpenCilkRuntimeBCPath)
+      RuntimeBCPath = ClOpenCilkRuntimeBCPath;
+
+    if ("" == RuntimeBCPath)
       C.emitError("OpenCilkABI: No OpenCilk bitcode ABI file given.");
 
     LLVM_DEBUG(dbgs() << "Using external bitcode file for OpenCilk ABI: "
-                      << OpenCilkRuntimeBCPath << "\n");
+                      << RuntimeBCPath << "\n");
     SMDiagnostic SMD;
 
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
-    std::unique_ptr<Module> ExternalModule =
-        parseIRFile(OpenCilkRuntimeBCPath.getValue(), SMD, C);
+    std::unique_ptr<Module> ExternalModule = parseIRFile(RuntimeBCPath, SMD, C);
 
     if (!ExternalModule)
       C.emitError("OpenCilkABI: Failed to parse bitcode ABI file: " +
-                  Twine(OpenCilkRuntimeBCPath));
+                  Twine(RuntimeBCPath));
 
     // Strip any debug info from the external module.  For convenience, this
     // Tapir target synthesizes some helper functions, like
@@ -124,7 +137,7 @@ void OpenCilkABI::prepareModule() {
                             });
     if (Fail)
       C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
-                  Twine(OpenCilkRuntimeBCPath));
+                  Twine(RuntimeBCPath));
   }
 
   // Get or create local definitions of Cilk RTS structure types.
