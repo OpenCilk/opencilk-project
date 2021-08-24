@@ -36,4 +36,5 @@ add_llvm_component_library(LLVMTapirOpts
   Scalar
   Support
   TransformUtils
+  Vectorize
   )
