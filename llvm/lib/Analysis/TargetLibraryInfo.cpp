@@ -55,6 +55,17 @@ StringLiteral const TargetLibraryInfoImpl::StandardNames[LibFunc::NumLibFuncs] =
 #include "llvm/Analysis/TargetLibraryInfo.def"
 };
 
+TapirTargetOptions *TapirTargetOptions::clone() const {
+  TapirTargetOptions *New = nullptr;
+  switch (getKind()) {
+  default:
+    llvm_unreachable("Unhandled TapirTargetOption.");
+  case TTO_OpenCilk:
+    New = cast<OpenCilkABIOptions>(this)->cloneImpl();
+  }
+  return New;
+}
+
 static bool hasSinCosPiStret(const Triple &T) {
   // Only Darwin variants have _stret versions of combined trig functions.
   if (!T.isOSDarwin())
@@ -602,6 +613,8 @@ TargetLibraryInfoImpl::TargetLibraryInfoImpl(const TargetLibraryInfoImpl &TLI)
       ShouldExtI32Return(TLI.ShouldExtI32Return),
       ShouldSignExtI32Param(TLI.ShouldSignExtI32Param),
       TapirTarget(TLI.TapirTarget) {
+  if (TLI.TTOptions)
+    TTOptions = std::unique_ptr<TapirTargetOptions>(TLI.TTOptions->clone());
   memcpy(AvailableArray, TLI.AvailableArray, sizeof(AvailableArray));
   VectorDescs = TLI.VectorDescs;
   ScalarDescs = TLI.ScalarDescs;
@@ -613,7 +626,7 @@ TargetLibraryInfoImpl::TargetLibraryInfoImpl(TargetLibraryInfoImpl &&TLI)
       ShouldExtI32Param(TLI.ShouldExtI32Param),
       ShouldExtI32Return(TLI.ShouldExtI32Return),
       ShouldSignExtI32Param(TLI.ShouldSignExtI32Param),
-      TapirTarget(TLI.TapirTarget) {
+      TapirTarget(TLI.TapirTarget), TTOptions(std::move(TLI.TTOptions)) {
   std::move(std::begin(TLI.AvailableArray), std::end(TLI.AvailableArray),
             AvailableArray);
   VectorDescs = TLI.VectorDescs;
@@ -627,6 +640,8 @@ TargetLibraryInfoImpl &TargetLibraryInfoImpl::operator=(const TargetLibraryInfoI
   ShouldExtI32Return = TLI.ShouldExtI32Return;
   ShouldSignExtI32Param = TLI.ShouldSignExtI32Param;
   TapirTarget = TLI.TapirTarget;
+  if (TLI.TTOptions)
+    TTOptions = std::unique_ptr<TapirTargetOptions>(TLI.TTOptions->clone());
   memcpy(AvailableArray, TLI.AvailableArray, sizeof(AvailableArray));
   return *this;
 }
@@ -637,6 +652,7 @@ TargetLibraryInfoImpl &TargetLibraryInfoImpl::operator=(TargetLibraryInfoImpl &&
   ShouldExtI32Return = TLI.ShouldExtI32Return;
   ShouldSignExtI32Param = TLI.ShouldSignExtI32Param;
   TapirTarget = TLI.TapirTarget;
+  TTOptions = std::move(TLI.TTOptions);
   std::move(std::begin(TLI.AvailableArray), std::end(TLI.AvailableArray),
             AvailableArray);
   return *this;

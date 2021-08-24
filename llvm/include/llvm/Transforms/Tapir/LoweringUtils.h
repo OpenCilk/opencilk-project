@@ -220,6 +220,8 @@ public:
   TapirTarget(Module &M) : M(M), DestM(M) {}
   virtual ~TapirTarget() {}
 
+  virtual void setOptions(const TapirTargetOptions &Options) {}
+
   // Prepare the module for final Tapir lowering.
   virtual void prepareModule() {}
 
