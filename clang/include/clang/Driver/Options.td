@@ -2471,7 +2471,8 @@ def opencilk_resource_dir_EQ : Joined<["--"], "opencilk-resource-dir=">,
   Flags<[NoXarchOption]>,
   HelpText<"The directory that holds OpenCilk resource files">;
 def opencilk_abi_bitcode_EQ : Joined<["--"], "opencilk-abi-bitcode=">,
-  Flags<[CC1Option]>, HelpText<"Path to OpenCilk ABI bitcode file">;
+  Flags<[CC1Option]>, HelpText<"Path to OpenCilk ABI bitcode file">,
+  MarshallingInfoString<CodeGenOpts<"OpenCilkABIBitcodeFile">>;
 def fopencilk_enable_pedigrees : Flag<["-"], "fopencilk-enable-pedigrees">,
   Group<f_Group>, Flags<[CC1Option]>, HelpText<"Enable OpenCilk pedigrees">;
 

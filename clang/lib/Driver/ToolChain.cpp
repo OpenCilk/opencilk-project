@@ -1495,15 +1495,10 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
   if (Args.hasArg(options::OPT_opencilk_abi_bitcode_EQ)) {
     const Arg *A = Args.getLastArg(options::OPT_opencilk_abi_bitcode_EQ);
     SmallString<128> P(A->getValue());
-    if (getVFS().exists(P)) {
-      CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back(Args.MakeArgString(("-use-opencilk-runtime-bc=true")));
-      CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back(Args.MakeArgString(("-opencilk-runtime-bc-path=" + P)));
-      return;
+    if (!getVFS().exists(P)) {
+      getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
+          << A->getAsString(Args);
     }
-    getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
-        << A->getAsString(Args);
   }
 
   StringRef OpenCilkBCName =
@@ -1511,11 +1506,8 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
           ? "opencilk-pedigrees-abi"
           : "opencilk-abi";
   if (auto OpenCilkABIBCFilename = getOpenCilkBC(Args, OpenCilkBCName)) {
-    CmdArgs.push_back("-mllvm");
-    CmdArgs.push_back(Args.MakeArgString(("-use-opencilk-runtime-bc=true")));
-    CmdArgs.push_back("-mllvm");
-    CmdArgs.push_back(Args.MakeArgString(
-        ("-opencilk-runtime-bc-path=" + *OpenCilkABIBCFilename)));
+    CmdArgs.push_back(
+        Args.MakeArgString("--opencilk-abi-bitcode=" + *OpenCilkABIBCFilename));
     return;
   }
 

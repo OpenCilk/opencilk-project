@@ -3339,15 +3339,9 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
   if (Args.hasArg(options::OPT_opencilk_abi_bitcode_EQ)) {
     const Arg *A = Args.getLastArg(options::OPT_opencilk_abi_bitcode_EQ);
     SmallString<128> P(A->getValue());
-    if (getVFS().exists(P)) {
-      CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back(Args.MakeArgString(("-use-opencilk-runtime-bc=true")));
-      CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back(Args.MakeArgString(("-opencilk-runtime-bc-path=" + P)));
-      return;
-    }
-    getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
-        << A->getAsString(Args);
+    if (!getVFS().exists(P))
+      getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
+          << A->getAsString(Args);
   }
 
   SmallString<128> BitcodeFilename("libopencilk-abi");
@@ -3363,10 +3357,7 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
     P.assign(*RuntimePath);
     llvm::sys::path::append(P, BitcodeFilename);
     if (getVFS().exists(P)) {
-      CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back(Args.MakeArgString(("-use-opencilk-runtime-bc=true")));
-      CmdArgs.push_back("-mllvm");
-      CmdArgs.push_back(Args.MakeArgString(("-opencilk-runtime-bc-path=" + P)));
+      CmdArgs.push_back(Args.MakeArgString("--opencilk-abi-bitcode=" + P));
       return;
     }
   }

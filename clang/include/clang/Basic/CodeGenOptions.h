@@ -423,6 +423,9 @@ public:
   /// passed on the command line.
   std::string StackUsageOutput;
 
+  // Path to OpenCilk runtime bitcode file.
+  std::string OpenCilkABIBitcodeFile;
+
   /// Executable and command-line used to create a given CompilerInvocation.
   /// Most of the time this will be the full -cc1 command.
   const char *Argv0 = nullptr;
