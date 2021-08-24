@@ -15,9 +15,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Instrumentation/CilkSanitizer.h"
 #include "llvm/Transforms/Scalar.h"
@@ -863,16 +866,19 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 // Code Generation
 //===----------------------------------------------------------------------===//
 
-static LLVMContext TheContext;
-static IRBuilder<> Builder(TheContext);
+static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
+static std::unique_ptr<IRBuilder<>> Builder;
 // static std::map<std::string, AllocaInst *> NamedValues;
 static std::map<std::string, Value *> NamedValues;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 static std::unique_ptr<legacy::PassManager> TheMPM;
 static std::unique_ptr<KaleidoscopeJIT> TheJIT;
 static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+static ExitOnError ExitOnErr;
+
 static TapirTargetID TheTapirTarget;
+static std::string OpenCilkRuntimeBCPath;
 static bool Optimize = true;
 static bool RunCilksan = false;
 // Variables for codegen for the current task scope.
@@ -902,19 +908,19 @@ Function *getFunction(std::string Name) {
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
 static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
-                                          const std::string &VarName) {
+                                          StringRef VarName) {
   IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
                    TheFunction->getEntryBlock().begin());
-  return TmpB.CreateAlloca(Type::getDoubleTy(TheContext), nullptr, VarName);
+  return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
 }
 
 /// CreateTaskEntryBlockAlloca - Create an alloca instruction in the entry block
 /// of the current task.  This is used for mutable variables etc.
 ///
 /// Requires the CFG of the function to be constructed up to BB.
-static AllocaInst *CreateTaskEntryBlockAlloca(const std::string &VarName,
+static AllocaInst *CreateTaskEntryBlockAlloca(StringRef VarName,
                                               Type *AllocaTy =
-                                              Type::getDoubleTy(TheContext)) {
+                                              Type::getDoubleTy(*TheContext)) {
   // BasicBlock *TaskEntry = GetDetachedCtx(BB);
   BasicBlock *TaskEntry = TaskScopeEntry;
   if (!TaskEntry) {
@@ -926,11 +932,11 @@ static AllocaInst *CreateTaskEntryBlockAlloca(const std::string &VarName,
 }
 
 Value *IntegerExprAST::codegen() {
-  return ConstantInt::get(TheContext, APSInt::get(Val));
+  return ConstantInt::get(*TheContext, APSInt::get(Val));
 }
 
 Value *NumberExprAST::codegen() {
-  return ConstantFP::get(TheContext, APFloat(Val));
+  return ConstantFP::get(*TheContext, APFloat(Val));
 }
 
 Value *VariableExprAST::codegen() {
@@ -943,7 +949,7 @@ Value *VariableExprAST::codegen() {
     return V;
 
   // Load the value.
-  return Builder.CreateLoad(V, Name.c_str());
+  return Builder->CreateLoad(V, Name.c_str());
 }
 
 Value *UnaryExprAST::codegen() {
@@ -955,7 +961,7 @@ Value *UnaryExprAST::codegen() {
   if (!F)
     return LogErrorV("Unknown unary operator");
 
-  return Builder.CreateCall(F, OperandV, "unop");
+  return Builder->CreateCall(F, OperandV, "unop");
 }
 
 Value *BinaryExprAST::codegen() {
@@ -978,7 +984,7 @@ Value *BinaryExprAST::codegen() {
     if (!Variable)
       return LogErrorV("Unknown variable name");
 
-    Builder.CreateStore(Val, Variable);
+    Builder->CreateStore(Val, Variable);
     return Val;
   }
 
@@ -993,37 +999,37 @@ Value *BinaryExprAST::codegen() {
   // Cast the operand types if necessary
   if (!IntegerOp) {
     if (LTy->isIntegerTy())
-      L = Builder.CreateSIToFP(L, Type::getDoubleTy(TheContext));
+      L = Builder->CreateSIToFP(L, Type::getDoubleTy(*TheContext));
     if (RTy->isIntegerTy())
-      R = Builder.CreateSIToFP(R, Type::getDoubleTy(TheContext));
+      R = Builder->CreateSIToFP(R, Type::getDoubleTy(*TheContext));
   } else if (IntegerRes) {
     if (!LTy->isIntegerTy())
-      L = Builder.CreateFPToSI(L, Type::getInt64Ty(TheContext));
+      L = Builder->CreateFPToSI(L, Type::getInt64Ty(*TheContext));
     if (!RTy->isIntegerTy())
-      R = Builder.CreateFPToSI(R, Type::getInt64Ty(TheContext));
+      R = Builder->CreateFPToSI(R, Type::getInt64Ty(*TheContext));
   }
   // Create the appropriate operation
   switch (Op) {
   case '+':
     if (IntegerOp)
-      return Builder.CreateAdd(L, R, "addtmp");
-    return Builder.CreateFAdd(L, R, "addtmp");
+      return Builder->CreateAdd(L, R, "addtmp");
+    return Builder->CreateFAdd(L, R, "addtmp");
   case '-':
     if (IntegerOp)
-      return Builder.CreateSub(L, R, "subtmp");
-    return Builder.CreateFSub(L, R, "subtmp");
+      return Builder->CreateSub(L, R, "subtmp");
+    return Builder->CreateFSub(L, R, "subtmp");
   case '*':
     if (IntegerOp)
-      return Builder.CreateMul(L, R, "multmp");
-    return Builder.CreateFMul(L, R, "multmp");
+      return Builder->CreateMul(L, R, "multmp");
+    return Builder->CreateFMul(L, R, "multmp");
   case '<':
     if (IntegerOp) {
-      L = Builder.CreateICmpSLT(L, R, "cmptmp");
-      return Builder.CreateZExt(L, Type::getInt64Ty(TheContext), "booltmp");
+      L = Builder->CreateICmpSLT(L, R, "cmptmp");
+      return Builder->CreateZExt(L, Type::getInt64Ty(*TheContext), "booltmp");
     }
-    L = Builder.CreateFCmpULT(L, R, "cmptmp");
+    L = Builder->CreateFCmpULT(L, R, "cmptmp");
     // Convert bool 0/1 to double 0.0 or 1.0
-    return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext), "booltmp");
+    return Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
   default:
     break;
   }
@@ -1034,7 +1040,7 @@ Value *BinaryExprAST::codegen() {
   assert(F && "binary operator not found!");
 
   Value *Ops[] = {L, R};
-  return Builder.CreateCall(F, Ops, "binop");
+  return Builder->CreateCall(F, Ops, "binop");
 }
 
 Value *CallExprAST::codegen() {
@@ -1051,13 +1057,13 @@ Value *CallExprAST::codegen() {
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     Value *ArgVal = Args[i]->codegen();
     if (ArgVal->getType()->isIntegerTy())
-      ArgVal = Builder.CreateSIToFP(ArgVal, Type::getDoubleTy(TheContext));
+      ArgVal = Builder->CreateSIToFP(ArgVal, Type::getDoubleTy(*TheContext));
     ArgsV.push_back(ArgVal);
     if (!ArgsV.back())
       return nullptr;
   }
 
-  return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
+  return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
 Value *IfExprAST::codegen() {
@@ -1066,55 +1072,55 @@ Value *IfExprAST::codegen() {
     return nullptr;
 
   // Convert condition to a bool by comparing non-equal to 0.0.
-  CondV = Builder.CreateFCmpONE(
-      CondV, ConstantFP::get(TheContext, APFloat(0.0)), "ifcond");
+  CondV = Builder->CreateFCmpONE(
+      CondV, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
 
-  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
   // Create blocks for the then and else cases.  Insert the 'then' block at the
   // end of the function.
-  BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
-  BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
-  BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
+  BasicBlock *ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
+  BasicBlock *ElseBB = BasicBlock::Create(*TheContext, "else");
+  BasicBlock *MergeBB = BasicBlock::Create(*TheContext, "ifcont");
 
-  Builder.CreateCondBr(CondV, ThenBB, ElseBB);
+  Builder->CreateCondBr(CondV, ThenBB, ElseBB);
 
   // Emit then value.
-  Builder.SetInsertPoint(ThenBB);
+  Builder->SetInsertPoint(ThenBB);
 
   Value *ThenV = Then->codegen();
   if (!ThenV)
     return nullptr;
 
-  Builder.CreateBr(MergeBB);
+  Builder->CreateBr(MergeBB);
   // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-  ThenBB = Builder.GetInsertBlock();
+  ThenBB = Builder->GetInsertBlock();
 
   // Emit else block.
   TheFunction->getBasicBlockList().push_back(ElseBB);
-  Builder.SetInsertPoint(ElseBB);
+  Builder->SetInsertPoint(ElseBB);
 
   Value *ElseV = Else->codegen();
   if (!ElseV)
     return nullptr;
 
-  Builder.CreateBr(MergeBB);
+  Builder->CreateBr(MergeBB);
   // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
-  ElseBB = Builder.GetInsertBlock();
+  ElseBB = Builder->GetInsertBlock();
 
   // Emit merge block.
   TheFunction->getBasicBlockList().push_back(MergeBB);
-  Builder.SetInsertPoint(MergeBB);
+  Builder->SetInsertPoint(MergeBB);
   bool IntegerType = (ThenV->getType()->isIntegerTy() &&
                       ElseV->getType()->isIntegerTy());
-  Type *PNTy = IntegerType ? Type::getInt64Ty(TheContext) :
-    Type::getDoubleTy(TheContext);
-  PHINode *PN = Builder.CreatePHI(PNTy, 2, "iftmp");
+  Type *PNTy = IntegerType ? Type::getInt64Ty(*TheContext) :
+    Type::getDoubleTy(*TheContext);
+  PHINode *PN = Builder->CreatePHI(PNTy, 2, "iftmp");
   if (!IntegerType) {
     if (ThenV->getType()->isIntegerTy())
-      ThenV = Builder.CreateSIToFP(ThenV, Type::getDoubleTy(TheContext));
+      ThenV = Builder->CreateSIToFP(ThenV, Type::getDoubleTy(*TheContext));
     if (ElseV->getType()->isIntegerTy())
-      ElseV = Builder.CreateSIToFP(ElseV, Type::getDoubleTy(TheContext));
+      ElseV = Builder->CreateSIToFP(ElseV, Type::getDoubleTy(*TheContext));
   }
   PN->addIncoming(ThenV, ThenBB);
   PN->addIncoming(ElseV, ElseBB);
@@ -1142,7 +1148,7 @@ Value *IfExprAST::codegen() {
 //   br cond
 // afterloop:
 Value *ForExprAST::codegen() {
-  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
   // Create an alloca for the variable in the entry block.
   AllocaInst *Alloca = CreateTaskEntryBlockAlloca(VarName);
@@ -1152,22 +1158,22 @@ Value *ForExprAST::codegen() {
   if (!StartVal)
     return nullptr;
   if (StartVal->getType()->isIntegerTy())
-    StartVal = Builder.CreateSIToFP(StartVal, Type::getDoubleTy(TheContext));
+    StartVal = Builder->CreateSIToFP(StartVal, Type::getDoubleTy(*TheContext));
 
   // Store the value into the alloca.
-  Builder.CreateStore(StartVal, Alloca);
+  Builder->CreateStore(StartVal, Alloca);
 
   // Make the new basic block for the loop header, inserting after current
   // block.
-  BasicBlock *CondBB = BasicBlock::Create(TheContext, "cond", TheFunction);
-  BasicBlock *LoopBB = BasicBlock::Create(TheContext, "loop", TheFunction);
-  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop");
+  BasicBlock *CondBB = BasicBlock::Create(*TheContext, "cond", TheFunction);
+  BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "loop", TheFunction);
+  BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterloop");
 
   // Insert an explicit fall through from the current block to the CondBB.
-  Builder.CreateBr(CondBB);
+  Builder->CreateBr(CondBB);
 
   // Start insertion in CondBB.
-  Builder.SetInsertPoint(CondBB);
+  Builder->SetInsertPoint(CondBB);
 
   // Within the loop, the variable is defined equal to the PHI node.  If it
   // shadows an existing variable, we have to restore it, so save it now.
@@ -1180,14 +1186,14 @@ Value *ForExprAST::codegen() {
     return nullptr;
 
   // Convert condition to a bool by comparing non-equal to 0.0.
-  EndCond = Builder.CreateFCmpONE(
-      EndCond, ConstantFP::get(TheContext, APFloat(0.0)), "loopcond");
+  EndCond = Builder->CreateFCmpONE(
+      EndCond, ConstantFP::get(*TheContext, APFloat(0.0)), "loopcond");
 
   // Insert the conditional branch into the end of LoopEndBB.
-  Builder.CreateCondBr(EndCond, LoopBB, AfterBB);
+  Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
 
   // Start insertion in LoopBB.
-  Builder.SetInsertPoint(LoopBB);
+  Builder->SetInsertPoint(LoopBB);
 
   // Emit the body of the loop.  This, like any other expr, can change the
   // current BB.  Note that we ignore the value computed by the body, but don't
@@ -1203,23 +1209,23 @@ Value *ForExprAST::codegen() {
       return nullptr;
   } else {
     // If not specified, use 1.0.
-    StepVal = ConstantFP::get(TheContext, APFloat(1.0));
+    StepVal = ConstantFP::get(*TheContext, APFloat(1.0));
   }
 
   // Reload, increment, and restore the alloca.  This handles the case where
   // the body of the loop mutates the variable.
-  Value *CurVar = Builder.CreateLoad(Alloca, VarName.c_str());
-  Value *NextVar = Builder.CreateFAdd(CurVar, StepVal, "nextvar");
-  Builder.CreateStore(NextVar, Alloca);
+  Value *CurVar = Builder->CreateLoad(Alloca, VarName.c_str());
+  Value *NextVar = Builder->CreateFAdd(CurVar, StepVal, "nextvar");
+  Builder->CreateStore(NextVar, Alloca);
 
   // Insert a back edge to CondBB.
-  Builder.CreateBr(CondBB);
+  Builder->CreateBr(CondBB);
 
   // Emit the "after loop" block.
   TheFunction->getBasicBlockList().push_back(AfterBB);
 
   // Any new code will be inserted in AfterBB.
-  Builder.SetInsertPoint(AfterBB);
+  Builder->SetInsertPoint(AfterBB);
 
   // Restore the unshadowed variable.
   if (OldVal)
@@ -1228,14 +1234,14 @@ Value *ForExprAST::codegen() {
     NamedValues.erase(VarName);
 
   // for expr always returns 0.0.
-  return Constant::getNullValue(Type::getDoubleTy(TheContext));
+  return Constant::getNullValue(Type::getDoubleTy(*TheContext));
 }
 
 Value *VarExprAST::codegen() {
   // std::vector<AllocaInst *> OldBindings;
   std::vector<Value *> OldBindings;
 
-  // Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  // Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
   // Register all variables and emit their initializer.
   for (unsigned i = 0, e = VarNames.size(); i != e; ++i) {
@@ -1253,11 +1259,11 @@ Value *VarExprAST::codegen() {
       if (!InitVal)
         return nullptr;
     } else { // If not specified, use 0.0.
-      InitVal = ConstantFP::get(TheContext, APFloat(0.0));
+      InitVal = ConstantFP::get(*TheContext, APFloat(0.0));
     }
 
-    AllocaInst *Alloca = CreateTaskEntryBlockAlloca(VarName);
-    Builder.CreateStore(InitVal, Alloca);
+    AllocaInst *Alloca = CreateTaskEntryBlockAlloca(VarName, InitVal->getType());
+    Builder->CreateStore(InitVal, Alloca);
 
     // Remember the old variable binding so that we can restore the binding when
     // we unrecurse.
@@ -1323,18 +1329,18 @@ Value *SpawnExprAST::codegen() {
   if (!TaskScopeSyncRegion)
     TaskScopeSyncRegion = CreateSyncRegion(*TheModule);
   Value *SyncRegion = TaskScopeSyncRegion;
-  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
   // Create the detach and continue blocks.  Insert the continue block at the
   // end of the function.
-  BasicBlock *DetachBB = BasicBlock::Create(TheContext, "detachbb",
+  BasicBlock *DetachBB = BasicBlock::Create(*TheContext, "detachbb",
                                             TheFunction);
-  BasicBlock *ContinBB = BasicBlock::Create(TheContext, "continbb");
+  BasicBlock *ContinBB = BasicBlock::Create(*TheContext, "continbb");
 
   // Create the detach and prepare to emit the spawned expression starting in
   // the detach block.
-  Builder.CreateDetach(DetachBB, ContinBB, SyncRegion);
-  Builder.SetInsertPoint(DetachBB);
+  Builder->CreateDetach(DetachBB, ContinBB, SyncRegion);
+  Builder->SetInsertPoint(DetachBB);
 
   // Emit the spawned computation.
   {
@@ -1345,14 +1351,14 @@ Value *SpawnExprAST::codegen() {
       return nullptr;
 
     // Emit a reattach to the continue block.
-    Builder.CreateReattach(ContinBB, SyncRegion);
+    Builder->CreateReattach(ContinBB, SyncRegion);
   }
 
   TheFunction->getBasicBlockList().push_back(ContinBB);
-  Builder.SetInsertPoint(ContinBB);
+  Builder->SetInsertPoint(ContinBB);
 
   // Return a default value of 0.0.
-  return Constant::getNullValue(Type::getDoubleTy(TheContext));
+  return Constant::getNullValue(Type::getDoubleTy(*TheContext));
 }
 
 Value *SyncExprAST::codegen() {
@@ -1360,18 +1366,18 @@ Value *SyncExprAST::codegen() {
   if (!TaskScopeSyncRegion)
     TaskScopeSyncRegion = CreateSyncRegion(*TheModule);
   Value *SyncRegion = TaskScopeSyncRegion;
-  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
   // Create a continuation block for the sync.
-  BasicBlock *SyncContinueBB = BasicBlock::Create(TheContext, "sync.continue",
+  BasicBlock *SyncContinueBB = BasicBlock::Create(*TheContext, "sync.continue",
                                                   TheFunction);
 
   // Create the sync, and set the insert point to the continue block.
-  Builder.CreateSync(SyncContinueBB, SyncRegion);
-  Builder.SetInsertPoint(SyncContinueBB);
+  Builder->CreateSync(SyncContinueBB, SyncRegion);
+  Builder->SetInsertPoint(SyncContinueBB);
 
   // Return a default value of 0.0.
-  return Constant::getNullValue(Type::getDoubleTy(TheContext));
+  return Constant::getNullValue(Type::getDoubleTy(*TheContext));
 }
 
 static std::vector<Metadata *> GetTapirLoopMetadata() {
@@ -1380,11 +1386,11 @@ static std::vector<Metadata *> GetTapirLoopMetadata() {
   std::vector<Metadata *> Result;
 
   // Add the DAC loop-spawning strategy for Tapir loops.
-  Result.push_back(MDNode::get(TheContext,
-                               { MDString::get(TheContext,
+  Result.push_back(MDNode::get(*TheContext,
+                               { MDString::get(*TheContext,
                                                TapirLoopSpawningStrategy),
                                  ConstantAsMetadata::get(
-                                     Builder.getInt32(DACLoopSpawning)) }));
+                                     Builder->getInt32(DACLoopSpawning)) }));
 
   return Result;
 }
@@ -1419,7 +1425,7 @@ Value *ParForExprAST::codegen() {
 #if BUG
   // Create an alloca for the variable in the entry block.
   AllocaInst *Alloca =
-    CreateTaskEntryBlockAlloca(VarName, Type::getInt64Ty(TheContext));
+    CreateTaskEntryBlockAlloca(VarName, Type::getInt64Ty(*TheContext));
 #endif // BUG
 
   // Emit the start code first, without 'variable' in scope.
@@ -1429,31 +1435,31 @@ Value *ParForExprAST::codegen() {
 
 #if BUG
   // Store the value into the alloca.
-  Builder.CreateStore(StartVal, Alloca);
+  Builder->CreateStore(StartVal, Alloca);
 #endif // BUG
 
   // Make the new basic block for the loop header, inserting after current
   // block.
-  Function *TheFunction = Builder.GetInsertBlock()->getParent();
-  BasicBlock *PreheaderBB = Builder.GetInsertBlock();
-  BasicBlock *CondBB = BasicBlock::Create(TheContext, "pcond", TheFunction);
-  BasicBlock *LoopBB = BasicBlock::Create(TheContext, "ploop", TheFunction);
-  BasicBlock *AfterBB = BasicBlock::Create(TheContext, "afterloop");
+  Function *TheFunction = Builder->GetInsertBlock()->getParent();
+  BasicBlock *PreheaderBB = Builder->GetInsertBlock();
+  BasicBlock *CondBB = BasicBlock::Create(*TheContext, "pcond", TheFunction);
+  BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "ploop", TheFunction);
+  BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterloop");
 
   // Create a sync region just for the loop, so we can sync the loop iterations
   // separately from other computation.
   Value *SyncRegion = CreateSyncRegion(*TheFunction->getParent());
 
   // Insert an explicit fall through from the current block to the CondBB.
-  Builder.CreateBr(CondBB);
+  Builder->CreateBr(CondBB);
 
   // Start insertion in CondBB.
-  Builder.SetInsertPoint(CondBB);
+  Builder->SetInsertPoint(CondBB);
 
 #if !BUG
   // Start the PHI node with an entry for Start.
   PHINode *Variable =
-      Builder.CreatePHI(Type::getInt64Ty(TheContext), 2, VarName);
+      Builder->CreatePHI(Type::getInt64Ty(*TheContext), 2, VarName);
   Variable->addIncoming(StartVal, PreheaderBB);
 #endif // !BUG
 
@@ -1474,28 +1480,28 @@ Value *ParForExprAST::codegen() {
   if (!EndCond)
     return nullptr;
   if (!EndCond->getType()->isIntegerTy())
-    EndCond = Builder.CreateFPToSI(EndCond, Type::getInt64Ty(TheContext));
+    EndCond = Builder->CreateFPToSI(EndCond, Type::getInt64Ty(*TheContext));
 
   // Convert condition to a bool by comparing non-equal to 0.
-  EndCond = Builder.CreateICmpNE(
-      EndCond, ConstantInt::get(TheContext, APSInt::get(0)), "loopcond");
+  EndCond = Builder->CreateICmpNE(
+      EndCond, ConstantInt::get(*TheContext, APSInt::get(0)), "loopcond");
 
   // Insert the conditional branch to either LoopBB or AfterBB.
-  Builder.CreateCondBr(EndCond, LoopBB, AfterBB);
+  Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
 
   // Start insertion in LoopBB.
-  Builder.SetInsertPoint(LoopBB);
+  Builder->SetInsertPoint(LoopBB);
 
   // Create a block for detaching the loop body and a block for the continuation
   // of the detach.
   BasicBlock *DetachBB =
-    BasicBlock::Create(TheContext, "ploop.bodyentry", TheFunction);
+    BasicBlock::Create(*TheContext, "ploop.bodyentry", TheFunction);
   BasicBlock *ContinueBB =
-    BasicBlock::Create(TheContext, "ploop.continue");
+    BasicBlock::Create(*TheContext, "ploop.continue");
 
   // Insert a detach to spawn the loop body.
-  Builder.CreateDetach(DetachBB, ContinueBB, SyncRegion);
-  Builder.SetInsertPoint(DetachBB);
+  Builder->CreateDetach(DetachBB, ContinueBB, SyncRegion);
+  Builder->SetInsertPoint(DetachBB);
 
   // Emit the spawned loop body.
   {
@@ -1507,9 +1513,9 @@ Value *ParForExprAST::codegen() {
     // in a task-local allocation. Create an alloca in the task's entry block
     // for this version of the variable.
     AllocaInst *VarAlloca =
-      CreateTaskEntryBlockAlloca(VarName, Type::getInt64Ty(TheContext));
+      CreateTaskEntryBlockAlloca(VarName, Type::getInt64Ty(*TheContext));
     // Store the value into the alloca.
-    Builder.CreateStore(Variable, VarAlloca);
+    Builder->CreateStore(Variable, VarAlloca);
     NamedValues[VarName] = VarAlloca;
 #endif // !BUG
 
@@ -1521,14 +1527,14 @@ Value *ParForExprAST::codegen() {
 
     // Emit the reattach to terminate the task containing the body of the
     // parallel loop.
-    Builder.CreateReattach(ContinueBB, SyncRegion);
+    Builder->CreateReattach(ContinueBB, SyncRegion);
   }
 
   // Emit the continue block of the detach.
   TheFunction->getBasicBlockList().push_back(ContinueBB);
 
   // Set the insertion point to the continue block of the detach.
-  Builder.SetInsertPoint(ContinueBB);
+  Builder->SetInsertPoint(ContinueBB);
 
   // Emit the step value.
   Value *StepVal = nullptr;
@@ -1538,25 +1544,25 @@ Value *ParForExprAST::codegen() {
       return nullptr;
   } else {
     // If not specified, use 1.
-    StepVal = ConstantInt::get(TheContext, APSInt::get(1));
+    StepVal = ConstantInt::get(*TheContext, APSInt::get(1));
   }
 #if BUG
-  Value *CurVar = Builder.CreateLoad(Alloca, VarName.c_str());
-  Value *NextVar = Builder.CreateAdd(CurVar, StepVal, "nextvar");
-  Builder.CreateStore(NextVar, Alloca);
+  Value *CurVar = Builder->CreateLoad(Alloca, VarName.c_str());
+  Value *NextVar = Builder->CreateAdd(CurVar, StepVal, "nextvar");
+  Builder->CreateStore(NextVar, Alloca);
 #else
-  Value *NextVar = Builder.CreateAdd(Variable, StepVal, "nextvar");
+  Value *NextVar = Builder->CreateAdd(Variable, StepVal, "nextvar");
 #endif // BUG
 
   // Insert a back edge to CondBB
-  BranchInst *BackEdge = Builder.CreateBr(CondBB);
+  BranchInst *BackEdge = Builder->CreateBr(CondBB);
 
   // Emit loop metadata
   std::vector<Metadata *> LoopMetadata = GetTapirLoopMetadata();
   if (!LoopMetadata.empty()) {
-    auto TempNode = MDNode::getTemporary(TheContext, None);
+    auto TempNode = MDNode::getTemporary(*TheContext, None);
     LoopMetadata.insert(LoopMetadata.begin(), TempNode.get());
-    auto LoopID = MDNode::get(TheContext, LoopMetadata);
+    auto LoopID = MDNode::get(*TheContext, LoopMetadata);
     LoopID->replaceOperandWith(0, LoopID);
     BackEdge->setMetadata(LLVMContext::MD_loop, LoopID);
   }
@@ -1570,15 +1576,15 @@ Value *ParForExprAST::codegen() {
   TheFunction->getBasicBlockList().push_back(AfterBB);
 
   // Any new code will be inserted in AfterBB.
-  Builder.SetInsertPoint(AfterBB);
+  Builder->SetInsertPoint(AfterBB);
 
   // Create the "after loop" block and insert it.
   BasicBlock *AfterSync =
-      BasicBlock::Create(TheContext, "aftersync", TheFunction);
+      BasicBlock::Create(*TheContext, "aftersync", TheFunction);
 
   // Insert a sync for the loop.
-  Builder.CreateSync(AfterSync, SyncRegion);
-  Builder.SetInsertPoint(AfterSync);
+  Builder->CreateSync(AfterSync, SyncRegion);
+  Builder->SetInsertPoint(AfterSync);
 
   // Restore the unshadowed variable.
   if (OldVal)
@@ -1587,14 +1593,14 @@ Value *ParForExprAST::codegen() {
     NamedValues.erase(VarName);
 
   // parfor expr always returns 0.0.
-  return Constant::getNullValue(Type::getDoubleTy(TheContext));
+  return Constant::getNullValue(Type::getDoubleTy(*TheContext));
 }
 
 Function *PrototypeAST::codegen() {
   // Make the function type:  double(double,double) etc.
-  std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(TheContext));
+  std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(*TheContext));
   FunctionType *FT =
-      FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
+      FunctionType::get(Type::getDoubleTy(*TheContext), Doubles, false);
 
   Function *F =
       Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
@@ -1621,8 +1627,8 @@ Function *FunctionAST::codegen() {
     BinopPrecedence[P.getOperatorName()] = P.getBinaryPrecedence();
 
   // Create a new basic block to start insertion into.
-  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-  Builder.SetInsertPoint(BB);
+  BasicBlock *BB = BasicBlock::Create(*TheContext, "entry", TheFunction);
+  Builder->SetInsertPoint(BB);
 
   // Record the function arguments in the NamedValues map.
   NamedValues.clear();
@@ -1631,18 +1637,18 @@ Function *FunctionAST::codegen() {
     AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName());
 
     // Store the initial value into the alloca.
-    Builder.CreateStore(&Arg, Alloca);
+    Builder->CreateStore(&Arg, Alloca);
 
     // Add arguments to variable symbol table.
-    NamedValues[Arg.getName()] = Alloca;
+    NamedValues[std::string(Arg.getName())] = Alloca;
   }
 
   TaskScopeRAII TaskScope(BB);
   if (Value *RetVal = Body->codegen()) {
     // Finish off the function.
     if (RetVal->getType()->isIntegerTy())
-      RetVal = Builder.CreateSIToFP(RetVal, Type::getDoubleTy(TheContext));
-    Builder.CreateRet(RetVal);
+      RetVal = Builder->CreateSIToFP(RetVal, Type::getDoubleTy(*TheContext));
+    Builder->CreateRet(RetVal);
 
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction);
@@ -1691,31 +1697,38 @@ static void AddTapirLoweringPasses() {
 
     // Transform Tapir loops to ensure that iterations are spawned efficiently
     // in parallel.
-    if (TheTapirTarget != TapirTargetID::None)
+    if (TheTapirTarget != TapirTargetID::None) {
       TheMPM->add(createLoopSpawningTIPass());
-    // The LoopSpawning pass may leave cruft around.  Clean it up.
-    TheMPM->add(createCFGSimplificationPass());
+      // The LoopSpawning pass may leave cruft around.  Clean it up.
+      TheMPM->add(createCFGSimplificationPass());
+    }
   }
 
   // Second, lower Tapir constructs in general to some parallel runtime system,
   // as specified in TargetLibraryInfo.
 
   // Add pass to lower Tapir to the target runtime.
-  if (TheTapirTarget != TapirTargetID::None)
+  if (TheTapirTarget != TapirTargetID::None) {
     TheMPM->add(createLowerTapirToTargetPass());
-  // Perform some cleanup after the lowering pass.
-  TheMPM->add(createCFGSimplificationPass());
+    // Perform some cleanup after the lowering pass.
+    TheMPM->add(createCFGSimplificationPass());
+    TheMPM->add(createAlwaysInlinerLegacyPass());
+  }
 }
 
 static void InitializeModuleAndPassManager() {
   // Open a new module.
-  TheModule = std::make_unique<Module>("my cool jit", TheContext);
+  TheContext = std::make_unique<LLVMContext>();
+  TheModule = std::make_unique<Module>("my cool jit", *TheContext);
 
   // Set the target triple to match the system.
   auto SysTargetTriple = sys::getDefaultTargetTriple();
   TheModule->setTargetTriple(SysTargetTriple);
   // Set an appropriate data layout
-  TheModule->setDataLayout(TheJIT->getTargetMachine().createDataLayout());
+  TheModule->setDataLayout(TheJIT->getDataLayout());
+
+  // Create a new builder for the module.
+  Builder = std::make_unique<IRBuilder<>>(*TheContext);
 
   // Create a new pass manager attached to it.
   TheMPM = std::make_unique<legacy::PassManager>();
@@ -1727,6 +1740,9 @@ static void InitializeModuleAndPassManager() {
 
   // Set the target for Tapir lowering to the Cilk runtime system.
   TLII.setTapirTarget(TheTapirTarget);
+  if (TapirTargetID::OpenCilk == TheTapirTarget)
+    TLII.setTapirTargetOptions(
+        std::make_unique<OpenCilkABIOptions>(OpenCilkRuntimeBCPath));
 
   // Add the TargetLibraryInfo to the pass manager.
   TheMPM->add(new TargetLibraryInfoWrapperPass(TLII));
@@ -1761,15 +1777,14 @@ static void HandleDefinition() {
       fprintf(stderr, "Read function definition:");
       FnIR->print(errs());
       fprintf(stderr, "\n");
-      auto K = TheJIT->addModule(std::move(TheModule));
+      ExitOnErr(TheJIT->addModule(
+          ThreadSafeModule(std::move(TheModule), std::move(TheContext))));
       InitializeModuleAndPassManager();
 
       if (RunCilksan) {
         // Run the CSI constructor
-        auto ExprSymbol = TheJIT->findSymbolInModule(K, "csirt.unit_ctor");
-        assert(ExprSymbol && "Function not found");
-        void (*CSICtor)() =
-          (void (*)())(intptr_t)cantFail(ExprSymbol.getAddress());
+        auto ExprSymbol = ExitOnErr(TheJIT->lookup("csirt.unit_ctor"));
+        void (*CSICtor)() = (void (*)())(intptr_t)ExprSymbol.getAddress();
         CSICtor();
       }
     }
@@ -1797,21 +1812,21 @@ static void HandleTopLevelExpression() {
   // Evaluate a top-level expression into an anonymous function.
   if (auto FnAST = ParseTopLevelExpr()) {
     if (FnAST->codegen()) {
-      // JIT the module containing the anonymous expression, keeping a handle so
-      // we can free it later.
-      auto H = TheJIT->addModule(std::move(TheModule));
+      // Create a ResourceTracker to track JIT'd memory allocated to our
+      // anonymous expression -- that way we can free it after executing.
+      auto RT = TheJIT->getMainJITDylib().createResourceTracker();
+
+      auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
+      ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
       InitializeModuleAndPassManager();
 
       // Search the JIT for the __anon_expr symbol.
-      auto ExprSymbol = TheJIT->findSymbol("__anon_expr");
-      assert(ExprSymbol && "Function not found");
+      auto ExprSymbol = ExitOnErr(TheJIT->lookup("__anon_expr"));
 
       if (RunCilksan) {
         // Run the CSI constructor
-        auto ExprSymbol = TheJIT->findSymbolInModule(H, "csirt.unit_ctor");
-        assert(ExprSymbol && "Function not found");
-        void (*CSICtor)() =
-          (void (*)())(intptr_t)cantFail(ExprSymbol.getAddress());
+        auto ExprSymbol = ExitOnErr(TheJIT->lookup("csirt.unit_ctor"));
+        void (*CSICtor)() = (void (*)())(intptr_t)ExprSymbol.getAddress();
         CSICtor();
       }
 
@@ -1819,14 +1834,14 @@ static void HandleTopLevelExpression() {
         std::make_unique<Timer>("__anon_expr", "Top-level expression");
       // Get the symbol's address and cast it to the right type (takes no
       // arguments, returns a double) so we can call it as a native function.
-      double (*FP)() = (double (*)())(intptr_t)cantFail(ExprSymbol.getAddress());
+      double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();
       T->startTimer();
       double Result = FP();
       T->stopTimer();
       fprintf(stderr, "Evaluated to %f\n", Result);
 
       // Delete the anonymous expression module from the JIT.
-      TheJIT->removeModule(H);
+      ExitOnErr(RT->remove());
     }
   } else {
     // Skip token for error recovery.
@@ -1870,15 +1885,15 @@ static int usage(char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-  // Set the default Tapir target to be Cilk.
-  TheTapirTarget = TapirTargetID::Cilk;
+  // Set the default Tapir target to be OpenCilk.
+  TheTapirTarget = TapirTargetID::OpenCilk;
 
   // Parse command-line arguments
   for (int i = 1; i < argc; ++i) {
     if (std::string(argv[i]) == "--lower-tapir-to") {
       std::string targetStr = std::string(argv[++i]);
       if (targetStr == "cilk") {
-        TheTapirTarget = TapirTargetID::Cilk;
+        TheTapirTarget = TapirTargetID::OpenCilk;
       } else if (targetStr == "none") {
         TheTapirTarget = TapirTargetID::None;
       } else {
@@ -1897,6 +1912,18 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (TapirTargetID::OpenCilk == TheTapirTarget) {
+    // Set the path to the OpenCilk runtime-ABI bitcode file.
+    Optional<std::string> Path =
+        sys::Process::FindInEnvPath("LIBRARY_PATH", "libopencilk-abi.bc");
+    if (!Path.hasValue()) {
+      errs() << "Error: Cannot find OpenCilk runtime-ABI bitcode file "
+                "LIBRARY_PATH.\n";
+      return 1;
+    }
+    OpenCilkRuntimeBCPath = *Path;
+  }
+
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
   InitializeNativeTargetAsmParser();
@@ -1913,7 +1940,29 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "ready> ");
   getNextToken();
 
-  TheJIT = std::make_unique<KaleidoscopeJIT>();
+  TheJIT = ExitOnErr(KaleidoscopeJIT::Create());
+
+  if (TapirTargetID::OpenCilk == TheTapirTarget) {
+    Optional<std::string> Path =
+        sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk.so");
+    if (!Path.hasValue()) {
+      errs() << "Error: Cannot find OpenCilk runtime library in "
+                "LD_LIBRARY_PATH.\n";
+      return 1;
+    }
+    TheJIT->loadLibrary(Path->c_str());
+  }
+
+  if (RunCilksan) {
+    Optional<std::string> Path = sys::Process::FindInEnvPath(
+        "LD_LIBRARY_PATH", "libclang_rt.cilksan.so");
+    if (!Path.hasValue()) {
+      errs()
+          << "Error: Cannot find Cilksan runtime library in LD_LIBRARY_PATH.\n";
+      return 1;
+    }
+    TheJIT->loadLibrary(Path->c_str());
+  }
 
   InitializeModuleAndPassManager();
 
