@@ -26,6 +26,8 @@ class OpenCilkABI : public TapirTarget {
   SmallPtrSet<CallBase *, 8> CallsToInline;
   DenseMap<BasicBlock *, SmallVector<IntrinsicInst *, 4>> TapirRTCalls;
 
+  StringRef RuntimeBCPath = "";
+
   // Cilk RTS data types
   StructType *StackFrameTy = nullptr;
   StructType *WorkerTy = nullptr;
@@ -89,6 +91,9 @@ class OpenCilkABI : public TapirTarget {
 public:
   OpenCilkABI(Module &M);
   ~OpenCilkABI() { DetachCtxToStackFrame.clear(); }
+
+  void setOptions(const TapirTargetOptions &Options) override final;
+
   void prepareModule() override final;
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
