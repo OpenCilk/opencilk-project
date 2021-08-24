@@ -65,6 +65,11 @@ public:
       ES->reportError(std::move(Err));
   }
 
+  void loadLibrary(const char *FileName) {
+    MainJD.addGenerator(cantFail(
+        DynamicLibrarySearchGenerator::Load(FileName, DL.getGlobalPrefix())));
+  }
+
   static Expected<std::unique_ptr<KaleidoscopeJIT>> Create() {
     auto EPC = SelfExecutorProcessControl::Create();
     if (!EPC)
