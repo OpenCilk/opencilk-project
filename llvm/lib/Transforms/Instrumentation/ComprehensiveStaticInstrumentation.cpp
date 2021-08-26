@@ -2044,7 +2044,6 @@ void CSIImpl::finalizeCsi() {
 
   Function *Ctor = Function::Create(
       FunctionType::get(Type::getVoidTy(M.getContext()), false),
-      // Options.jitMode ? GlobalValue::ExternalLinkage :
       GlobalValue::InternalLinkage, CsiRtUnitCtorName, &M);
   BasicBlock *CtorBB = BasicBlock::Create(M.getContext(), "", Ctor);
   IRBuilder<> IRB(ReturnInst::Create(M.getContext(), CtorBB));
@@ -2052,28 +2051,23 @@ void CSIImpl::finalizeCsi() {
   // TODO: Add version-check to the cunstructor?  See
   // ModuleUtils::createSanitizerCtorAndInitFunctions for example.
 
-  // Add the constructor to the global list if we're doing AOT compilation.
-  // In JIT mode, we rely on the JIT compiler to call the constructor as
-  // a self-standing function.
-  if (!Options.jitMode) {
-    // Add the ctor to llvm.global_ctors via appendToGlobalCtors() if either
-    // llvm.global_ctors does not exist or it exists with an initializer.  One
-    // of these two conditions should always hold for modules compiled normally,
-    // but appendToGlobalCtors can crash if a tool, such as bugpoint, removes
-    // the initializer from llvm.global_ctors.  This change facilitates
-    // using bugpoint to debug crashes involving CSI.
-    if (GlobalVariable *GVCtor = M.getNamedGlobal("llvm.global_ctors")) {
-      if (GVCtor->hasInitializer())
-        appendToGlobalCtors(M, Ctor, CsiUnitCtorPriority);
-    } else {
+  // Add the ctor to llvm.global_ctors via appendToGlobalCtors() if either
+  // llvm.global_ctors does not exist or it exists with an initializer.  One of
+  // these two conditions should always hold for modules compiled normally, but
+  // appendToGlobalCtors can crash if a tool, such as bugpoint, removes the
+  // initializer from llvm.global_ctors.  This change facilitates using bugpoint
+  // to debug crashes involving CSI.
+  if (GlobalVariable *GVCtor = M.getNamedGlobal("llvm.global_ctors")) {
+    if (GVCtor->hasInitializer())
       appendToGlobalCtors(M, Ctor, CsiUnitCtorPriority);
-    }
-
-    CallGraphNode *CNCtor = CG->getOrInsertFunction(Ctor);
-    CallGraphNode *CNFunc =
-        CG->getOrInsertFunction(cast<Function>(RTUnitInit.getCallee()));
-    CNCtor->addCalledFunction(Call, CNFunc);
+  } else {
+    appendToGlobalCtors(M, Ctor, CsiUnitCtorPriority);
   }
+
+  CallGraphNode *CNCtor = CG->getOrInsertFunction(Ctor);
+  CallGraphNode *CNFunc =
+      CG->getOrInsertFunction(cast<Function>(RTUnitInit.getCallee()));
+  CNCtor->addCalledFunction(Call, CNFunc);
 }
 
 void llvm::CSIImpl::linkInToolFromBitcode(const std::string &bitcodePath) {
