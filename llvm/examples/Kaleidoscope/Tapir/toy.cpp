@@ -1,4 +1,4 @@
-#include "../include/KaleidoscopeJIT.h"
+#include "KaleidoscopeJIT.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1710,6 +1710,15 @@ static void AddTapirLoweringPasses() {
   // Add pass to lower Tapir to the target runtime.
   if (TheTapirTarget != TapirTargetID::None) {
     TheMPM->add(createLowerTapirToTargetPass());
+
+    if (Optimize) {
+      TheMPM->add(createSROAPass());
+      TheMPM->add(createEarlyCSEPass());
+      TheMPM->add(createCFGSimplificationPass());
+      TheMPM->add(createInstructionCombiningPass());
+      TheMPM->add(createAlwaysInlinerLegacyPass());
+    }
+
     // Perform some cleanup after the lowering pass.
     TheMPM->add(createCFGSimplificationPass());
     TheMPM->add(createAlwaysInlinerLegacyPass());
@@ -1719,7 +1728,10 @@ static void AddTapirLoweringPasses() {
 static void InitializeModuleAndPassManager() {
   // Open a new module.
   TheContext = std::make_unique<LLVMContext>();
-  TheModule = std::make_unique<Module>("my cool jit", *TheContext);
+  std::string ModuleName;
+  static size_t Counter = 0;
+  raw_string_ostream(ModuleName) << "my_module." << Counter++;
+  TheModule = std::make_unique<Module>(ModuleName, *TheContext);
 
   // Set the target triple to match the system.
   auto SysTargetTriple = sys::getDefaultTargetTriple();
@@ -1780,13 +1792,6 @@ static void HandleDefinition() {
       ExitOnErr(TheJIT->addModule(
           ThreadSafeModule(std::move(TheModule), std::move(TheContext))));
       InitializeModuleAndPassManager();
-
-      if (RunCilksan) {
-        // Run the CSI constructor
-        auto ExprSymbol = ExitOnErr(TheJIT->lookup("csirt.unit_ctor"));
-        void (*CSICtor)() = (void (*)())(intptr_t)ExprSymbol.getAddress();
-        CSICtor();
-      }
     }
   } else {
     // Skip token for error recovery.
@@ -1823,12 +1828,8 @@ static void HandleTopLevelExpression() {
       // Search the JIT for the __anon_expr symbol.
       auto ExprSymbol = ExitOnErr(TheJIT->lookup("__anon_expr"));
 
-      if (RunCilksan) {
-        // Run the CSI constructor
-        auto ExprSymbol = ExitOnErr(TheJIT->lookup("csirt.unit_ctor"));
-        void (*CSICtor)() = (void (*)())(intptr_t)ExprSymbol.getAddress();
-        CSICtor();
-      }
+      // Run initializers.
+      ExitOnErr(TheJIT->initialize());
 
       std::unique_ptr<Timer> T =
         std::make_unique<Timer>("__anon_expr", "Top-level expression");
@@ -1944,7 +1945,14 @@ int main(int argc, char *argv[]) {
 
   if (TapirTargetID::OpenCilk == TheTapirTarget) {
     Optional<std::string> Path =
-        sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk.so");
+        sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk-personality-c.so");
+    if (!Path.hasValue()) {
+      errs() << "Error: Cannot find OpenCilk runtime library in "
+                "LD_LIBRARY_PATH.\n";
+      return 1;
+    }
+    TheJIT->loadLibrary(Path->c_str());
+    Path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk.so");
     if (!Path.hasValue()) {
       errs() << "Error: Cannot find OpenCilk runtime library in "
                 "LD_LIBRARY_PATH.\n";
@@ -1954,6 +1962,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (RunCilksan) {
+    // Add the Cilksan runtime library.
     Optional<std::string> Path = sys::Process::FindInEnvPath(
         "LD_LIBRARY_PATH", "libclang_rt.cilksan.so");
     if (!Path.hasValue()) {
