@@ -1501,10 +1501,11 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
     }
   }
 
+  bool UseAsan = getSanitizerArgs().needsAsanRt();
   StringRef OpenCilkBCName =
       Args.hasArg(options::OPT_fopencilk_enable_pedigrees)
-          ? "opencilk-pedigrees-abi"
-          : "opencilk-abi";
+          ? (UseAsan ? "opencilk-pedigrees-asan-abi" : "opencilk-pedigrees-abi")
+          : (UseAsan ? "opencilk-asan-abi" : "opencilk-abi");
   if (auto OpenCilkABIBCFilename = getOpenCilkBC(Args, OpenCilkBCName)) {
     CmdArgs.push_back(
         Args.MakeArgString("--opencilk-abi-bitcode=" + *OpenCilkABIBCFilename));
@@ -1599,30 +1600,34 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                               Args.hasArg(options::OPT_static);
     bool OnlyStaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk) &&
                                   !Args.hasArg(options::OPT_static);
+    bool UseAsan = getSanitizerArgs().needsAsanRt();
     if (OnlyStaticOpenCilk)
       CmdArgs.push_back("-Bstatic");
 
     // If pedigrees are enabled, link the OpenCilk pedigree library.
     if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
       CmdArgs.push_back(Args.MakeArgString(getOpenCilkRT(
-          Args, "opencilk-pedigrees",
+          Args, UseAsan ? "opencilk-pedigrees-asan" : "opencilk-pedigrees",
           StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));
 
     // Link the correct Cilk personality fn
     if (getDriver().CCCIsCXX())
       CmdArgs.push_back(Args.MakeArgString(getOpenCilkRT(
-          Args, "opencilk-personality-cpp",
+          Args,
+          UseAsan ? "opencilk-asan-personality-cpp"
+                  : "opencilk-personality-cpp",
           StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));
     else
       CmdArgs.push_back(Args.MakeArgString(getOpenCilkRT(
-          Args, "opencilk-personality-c",
+          Args,
+          UseAsan ? "opencilk-asan-personality-c" : "opencilk-personality-c",
           StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));
 
     // Link the opencilk runtime.  We do this after linking the personality
     // function, to ensure that symbols are resolved correctly when using static
     // linking.
     CmdArgs.push_back(Args.MakeArgString(getOpenCilkRT(
-        Args, "opencilk",
+        Args, UseAsan ? "opencilk-asan" : "opencilk",
         StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));
 
     // Add to the executable's runpath the default directory containing OpenCilk
