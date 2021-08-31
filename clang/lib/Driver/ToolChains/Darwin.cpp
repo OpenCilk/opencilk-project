@@ -3344,10 +3344,13 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
           << A->getAsString(Args);
   }
 
-  SmallString<128> BitcodeFilename("libopencilk-abi");
+  bool UseAsan = getSanitizerArgs().needsAsanRt();
+  SmallString<128> BitcodeFilename(UseAsan ? "libopencilk-asan-abi"
+                                           : "libopencilk-abi");
   // If pedigrees are enabled, use the pedigree-enabled ABI bitcode instead.
   if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
-    BitcodeFilename.assign("libopencilk-pedigrees-abi");
+    BitcodeFilename.assign(UseAsan ? "libopencilk-pedigrees-asan-abi"
+                                   : "libopencilk-pedigrees-abi");
   BitcodeFilename += "_";
   BitcodeFilename += getOSLibraryNameSuffix();
   BitcodeFilename += ".bc";
@@ -3431,6 +3434,7 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
     break;
   case TapirTargetID::OpenCilk: {
     bool StaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk);
+    bool UseAsan = getSanitizerArgs().needsAsanRt();
 
     auto RLO = RLO_AlwaysLink;
     if (!StaticOpenCilk)
@@ -3438,21 +3442,29 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
 
     // If pedigrees are enabled, link the OpenCilk pedigree library.
     if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
-      AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk-pedigrees", RLO,
-                             !StaticOpenCilk);
+      AddLinkTapirRuntimeLib(Args, CmdArgs,
+                             UseAsan ? "opencilk-pedigrees-asan"
+                                     : "opencilk-pedigrees",
+                             RLO, !StaticOpenCilk);
 
     // Link the correct Cilk personality fn
     if (getDriver().CCCIsCXX())
-      AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk-personality-cpp", RLO,
-                             !StaticOpenCilk);
+      AddLinkTapirRuntimeLib(Args, CmdArgs,
+                             UseAsan ? "opencilk-asan-personality-cpp"
+                                     : "opencilk-personality-cpp",
+                             RLO, !StaticOpenCilk);
     else
-      AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk-personality-c", RLO,
-                             !StaticOpenCilk);
+      AddLinkTapirRuntimeLib(Args, CmdArgs,
+                             UseAsan ? "opencilk-asan-personality-c"
+                                     : "opencilk-personality-c",
+                             RLO, !StaticOpenCilk);
 
     // Link the opencilk runtime.  We do this after linking the personality
     // function, to ensure that symbols are resolved correctly when using static
     // linking.
-    AddLinkTapirRuntimeLib(Args, CmdArgs, "opencilk", RLO, !StaticOpenCilk);
+    AddLinkTapirRuntimeLib(Args, CmdArgs,
+                           UseAsan ? "opencilk-asan" : "opencilk", RLO,
+                           !StaticOpenCilk);
     break;
   }
   case TapirTargetID::Cilk:
