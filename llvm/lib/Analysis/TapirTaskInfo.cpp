@@ -477,8 +477,6 @@ static void recordContinuationSpindles(TaskInfo *TI) {
     Spindle *S = TI->getSpindleFor(DI->getParent());
 
     // Set the continuation spindle for the spawned task.
-    assert(S != TI->getSpindleFor(DI->getContinue()) &&
-           "Detach and continuation should appear in different spindles");
     T->setContinuationSpindle(TI->getSpindleFor(DI->getContinue()));
 
     // If the detach has an unwind destination, set the exceptional continuation
