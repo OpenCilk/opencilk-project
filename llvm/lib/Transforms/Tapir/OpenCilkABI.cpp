@@ -146,51 +146,51 @@ void OpenCilkABI::prepareModule() {
   WorkerTy = StructType::lookupOrCreate(C, "struct.__cilkrts_worker");
 
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
+  Type *VoidTy = Type::getVoidTy(C);
+
+  // Define the types of the CilkRTS functions.
+  FunctionType *CilkRTSFnTy =
+      FunctionType::get(VoidTy, {StackFramePtrTy}, false);
+  FunctionType *CilkPrepareSpawnFnTy =
+      FunctionType::get(Int32Ty, {StackFramePtrTy}, false);
+  FunctionType *CilkRTSEnterLandingpadFnTy =
+      FunctionType::get(VoidTy, {StackFramePtrTy, Int32Ty}, false);
+  FunctionType *CilkRTSPauseFrameFnTy = FunctionType::get(
+      VoidTy, {StackFramePtrTy, PointerType::getInt8PtrTy(C)}, false);
+  FunctionType *Grainsize8FnTy = FunctionType::get(Int8Ty, {Int8Ty}, false);
+  FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
+  FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
+  FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
+
+  // Create an array of CilkRTS functions, with their associated types and
+  // FunctionCallee member variables in the OpenCilkABI class.
+  SmallVector<CilkRTSFnDesc, 17> CilkRTSFunctions({
+      {"__cilkrts_enter_frame", CilkRTSFnTy, CilkRTSEnterFrame},
+      {"__cilkrts_enter_frame_helper", CilkRTSFnTy, CilkRTSEnterFrameHelper},
+      {"__cilkrts_detach", CilkRTSFnTy, CilkRTSDetach},
+      {"__cilkrts_leave_frame", CilkRTSFnTy, CilkRTSLeaveFrame},
+      {"__cilkrts_leave_frame_helper", CilkRTSFnTy, CilkRTSLeaveFrameHelper},
+      {"__cilk_prepare_spawn", CilkPrepareSpawnFnTy, CilkPrepareSpawn},
+      {"__cilk_sync", CilkRTSFnTy, CilkSync},
+      {"__cilk_sync_nothrow", CilkRTSFnTy, CilkSyncNoThrow},
+      {"__cilk_parent_epilogue", CilkRTSFnTy, CilkParentEpilogue},
+      {"__cilk_helper_epilogue", CilkRTSFnTy, CilkHelperEpilogue},
+      {"__cilkrts_enter_landingpad", CilkRTSEnterLandingpadFnTy,
+       CilkRTSEnterLandingpad},
+      {"__cilkrts_pause_frame", CilkRTSPauseFrameFnTy, CilkRTSPauseFrame},
+      {"__cilk_helper_epilogue_exn", CilkRTSPauseFrameFnTy,
+       CilkHelperEpilogueExn},
+      {"__cilkrts_cilk_for_grainsize_8", Grainsize8FnTy,
+       CilkRTSCilkForGrainsize8},
+      {"__cilkrts_cilk_for_grainsize_16", Grainsize16FnTy,
+       CilkRTSCilkForGrainsize16},
+      {"__cilkrts_cilk_for_grainsize_32", Grainsize32FnTy,
+       CilkRTSCilkForGrainsize32},
+      {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
+       CilkRTSCilkForGrainsize64},
+  });
+
   if (UseOpenCilkRuntimeBC) {
-    Type *VoidTy = Type::getVoidTy(C);
-    FunctionType *CilkRTSFnTy =
-        FunctionType::get(VoidTy, {StackFramePtrTy}, false);
-    FunctionType *CilkPrepareSpawnFnTy =
-        FunctionType::get(Int32Ty, {StackFramePtrTy}, false);
-    FunctionType *CilkRTSEnterLandingpadFnTy =
-        FunctionType::get(VoidTy, {StackFramePtrTy, Int32Ty}, false);
-    FunctionType *CilkRTSPauseFrameFnTy = FunctionType::get(
-        VoidTy, {StackFramePtrTy, PointerType::getInt8PtrTy(C)}, false);
-    FunctionType *Grainsize8FnTy =
-        FunctionType::get(Int8Ty, {Int8Ty}, false);
-    FunctionType *Grainsize16FnTy =
-        FunctionType::get(Int16Ty, {Int16Ty}, false);
-    FunctionType *Grainsize32FnTy =
-        FunctionType::get(Int32Ty, {Int32Ty}, false);
-    FunctionType *Grainsize64FnTy =
-        FunctionType::get(Int64Ty, {Int64Ty}, false);
-
-    SmallVector<CilkRTSFnDesc, 17> CilkRTSFunctions({
-        {"__cilkrts_enter_frame", CilkRTSFnTy, CilkRTSEnterFrame},
-        {"__cilkrts_enter_frame_helper", CilkRTSFnTy, CilkRTSEnterFrameHelper},
-        {"__cilkrts_detach", CilkRTSFnTy, CilkRTSDetach},
-        {"__cilkrts_leave_frame", CilkRTSFnTy, CilkRTSLeaveFrame},
-        {"__cilkrts_leave_frame_helper", CilkRTSFnTy, CilkRTSLeaveFrameHelper},
-        {"__cilk_prepare_spawn", CilkPrepareSpawnFnTy, CilkPrepareSpawn},
-        {"__cilk_sync", CilkRTSFnTy, CilkSync},
-        {"__cilk_sync_nothrow", CilkRTSFnTy, CilkSyncNoThrow},
-        {"__cilk_parent_epilogue", CilkRTSFnTy, CilkParentEpilogue},
-        {"__cilk_helper_epilogue", CilkRTSFnTy, CilkHelperEpilogue},
-        {"__cilkrts_enter_landingpad", CilkRTSEnterLandingpadFnTy,
-         CilkRTSEnterLandingpad},
-        {"__cilkrts_pause_frame", CilkRTSPauseFrameFnTy, CilkRTSPauseFrame},
-        {"__cilk_helper_epilogue_exn", CilkRTSPauseFrameFnTy,
-         CilkHelperEpilogueExn},
-        {"__cilkrts_cilk_for_grainsize_8", Grainsize8FnTy,
-         CilkRTSCilkForGrainsize8},
-        {"__cilkrts_cilk_for_grainsize_16", Grainsize16FnTy,
-         CilkRTSCilkForGrainsize16},
-        {"__cilkrts_cilk_for_grainsize_32", Grainsize32FnTy,
-         CilkRTSCilkForGrainsize32},
-        {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
-         CilkRTSCilkForGrainsize64},
-    });
-
     // Add attributes to internalized functions.
     for (CilkRTSFnDesc FnDesc : CilkRTSFunctions) {
       assert(!FnDesc.FnCallee && "Redefining Cilk function");
@@ -198,14 +198,23 @@ void OpenCilkABI::prepareModule() {
       assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
              "Cilk function is not a function");
       Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
+
       if (!Fn->isDeclaration())
+        // We set the function's linkage as available_externally, so that
+        // subsequent optimizations can remove these definitions from the
+        // module.  We don't want this module redefining any of these symbols,
+        // even if they aren't inlined, because the OpenCilk runtime library
+        // will provide those definitions later.
         Fn->setLinkage(Function::AvailableExternallyLinkage);
-      // Because __cilk_sync is a C function that can throw an exception,
-      // update its attributes specially.
+
+      // Because __cilk_sync is a C function that can throw an exception, update
+      // its attributes specially.  No other CilkRTS functions can throw an
+      // exception.
       if ("__cilk_sync" == FnDesc.FnName)
         fixCilkSyncFn(M, Fn);
       else
         Fn->setDoesNotThrow();
+
       // Unless we're debugging, mark the function as always_inline.  This
       // attribute is required for some functions, but is helpful for all
       // functions.
@@ -220,286 +229,27 @@ void OpenCilkABI::prepareModule() {
       // only.
       StackFrameTy->setBody(Int64Ty);
     }
+    // Create declarations of all CilkRTS functions, and add basic attributes to
+    // those declarations.
+    for (CilkRTSFnDesc FnDesc : CilkRTSFunctions) {
+      assert(!FnDesc.FnCallee && "Redefining Cilk function");
+      FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
+      assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
+             "Cilk function is not a function");
+      Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
+
+      // Mark all CilkRTS functions nounwind, except for __cilk_sync.
+      if ("__cilk_sync" == FnDesc.FnName)
+        Fn->removeFnAttr(Attribute::NoUnwind);
+      else
+        Fn->setDoesNotThrow();
+    }
   } else {
     // The OpenCilkABI target requires the use of a bitcode ABI file to generate
     // correct code.
     C.emitError(
         "OpenCilkABI: Bitcode ABI file required for correct code generation.");
   }
-}
-
-// Accessors for CilkRTS ABI functions.  When a bitcode file is loaded, these
-// functions should return the function defined in the bitcode file.  Otherwise,
-// these functions will return FunctionCallees for placeholder declarations of
-// these functions.  The latter case is intended for debugging ABI-call
-// insertion.
-
-FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_8() {
-  if (CilkRTSCilkForGrainsize8)
-    return CilkRTSCilkForGrainsize8;
-
-  LLVMContext &C = M.getContext();
-  Type *CountTy = Type::getInt8Ty(C);
-  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
-  CilkRTSCilkForGrainsize8 =
-      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_8", FTy);
-
-  return CilkRTSCilkForGrainsize8;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_16() {
-  if (CilkRTSCilkForGrainsize16)
-    return CilkRTSCilkForGrainsize16;
-
-  LLVMContext &C = M.getContext();
-  Type *CountTy = Type::getInt16Ty(C);
-  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
-  CilkRTSCilkForGrainsize16 =
-      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_16", FTy);
-
-  return CilkRTSCilkForGrainsize16;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_32() {
-  if (CilkRTSCilkForGrainsize32)
-    return CilkRTSCilkForGrainsize32;
-
-  LLVMContext &C = M.getContext();
-  Type *CountTy = Type::getInt32Ty(C);
-  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
-  CilkRTSCilkForGrainsize32 =
-      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_32", FTy);
-
-  return CilkRTSCilkForGrainsize32;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_cilk_for_grainsize_64() {
-  if (CilkRTSCilkForGrainsize64)
-    return CilkRTSCilkForGrainsize64;
-
-  LLVMContext &C = M.getContext();
-  Type *CountTy = Type::getInt64Ty(C);
-  FunctionType *FTy = FunctionType::get(CountTy, {CountTy}, false);
-  CilkRTSCilkForGrainsize64 =
-      M.getOrInsertFunction("__cilkrts_cilk_for_grainsize_64", FTy);
-
-  return CilkRTSCilkForGrainsize64;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_enter_frame() {
-  if (CilkRTSEnterFrame)
-    return CilkRTSEnterFrame;
-
-  const char *name = "__cilkrts_enter_frame";
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSEnterFrame = M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
-
-  return CilkRTSEnterFrame;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_enter_frame_helper() {
-  if (CilkRTSEnterFrameHelper)
-    return CilkRTSEnterFrameHelper;
-
-  const char *name = "__cilkrts_enter_frame_helper";
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSEnterFrameHelper =
-      M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
-
-  return CilkRTSEnterFrameHelper;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_detach() {
-  if (CilkRTSDetach)
-    return CilkRTSDetach;
-
-  const char *name = "__cilkrts_detach";
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSDetach = M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
-
-  return CilkRTSDetach;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_leave_frame() {
-  if (CilkRTSLeaveFrame)
-    return CilkRTSLeaveFrame;
-
-  const char *name = "__cilkrts_leave_frame";
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSLeaveFrame = M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
-
-  return CilkRTSLeaveFrame;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_leave_frame_helper() {
-  if (CilkRTSLeaveFrameHelper)
-    return CilkRTSLeaveFrameHelper;
-
-  const char *name = "__cilkrts_leave_frame_helper";
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkRTSLeaveFrameHelper =
-      M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy);
-
-  return CilkRTSLeaveFrameHelper;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_enter_landingpad() {
-  if (CilkRTSEnterLandingpad)
-    return CilkRTSEnterLandingpad;
-
-  const char *name = "__cilkrts_enter_landingpad";
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  Type *SelTy = Type::getInt32Ty(C);
-  CilkRTSEnterLandingpad =
-      M.getOrInsertFunction(name, AL, VoidTy, StackFramePtrTy, SelTy);
-
-  return CilkRTSEnterLandingpad;
-}
-
-FunctionCallee OpenCilkABI::Get__cilkrts_pause_frame() {
-  if (CilkRTSPauseFrame)
-    return CilkRTSPauseFrame;
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
-  CilkRTSPauseFrame = M.getOrInsertFunction("__cilkrts_pause_frame", AL, VoidTy,
-                                            StackFramePtrTy, ExnPtrTy);
-
-  return CilkRTSPauseFrame;
-}
-
-FunctionCallee OpenCilkABI::GetCilkPrepareSpawnFn() {
-  if (CilkPrepareSpawn)
-    return CilkPrepareSpawn;
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *Int32Ty = Type::getInt32Ty(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkPrepareSpawn = M.getOrInsertFunction("__cilk_prepare_spawn", AL, Int32Ty,
-                                           StackFramePtrTy);
-
-  return CilkPrepareSpawn;
-}
-
-FunctionCallee OpenCilkABI::GetCilkSyncFn() {
-  if (CilkSync)
-    return CilkSync;
-
-  LLVMContext &C = M.getContext();
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkSync =
-      M.getOrInsertFunction("__cilk_sync", VoidTy, StackFramePtrTy);
-
-  return CilkSync;
-}
-
-FunctionCallee OpenCilkABI::GetCilkSyncNoThrowFn() {
-  if (CilkSyncNoThrow)
-    return CilkSyncNoThrow;
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkSyncNoThrow =
-      M.getOrInsertFunction("__cilk_sync_nothrow", AL, VoidTy, StackFramePtrTy);
-
-  return CilkSyncNoThrow;
-}
-
-FunctionCallee OpenCilkABI::GetCilkParentEpilogueFn() {
-  if (CilkParentEpilogue)
-    return CilkParentEpilogue;
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkParentEpilogue = M.getOrInsertFunction("__cilk_parent_epilogue", AL,
-                                             VoidTy, StackFramePtrTy);
-
-  return CilkParentEpilogue;
-}
-
-FunctionCallee OpenCilkABI::GetCilkHelperEpilogueFn() {
-  if (CilkHelperEpilogue)
-    return CilkHelperEpilogue;
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  CilkHelperEpilogue = M.getOrInsertFunction("__cilk_helper_epilogue", AL,
-                                             VoidTy, StackFramePtrTy);
-
-  return CilkHelperEpilogue;
-}
-
-FunctionCallee OpenCilkABI::GetCilkHelperEpilogueExnFn() {
-  if (CilkHelperEpilogueExn)
-    return CilkHelperEpilogueExn;
-
-  LLVMContext &C = M.getContext();
-  AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex, Attribute::NoUnwind);
-  Type *VoidTy = Type::getVoidTy(C);
-  PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
-  PointerType *ExnPtrTy = Type::getInt8PtrTy(C);
-  CilkHelperEpilogueExn = M.getOrInsertFunction(
-      "__cilk_helper_epilogue_exn", AL, VoidTy, StackFramePtrTy, ExnPtrTy);
-
-  return CilkHelperEpilogueExn;
 }
 
 void OpenCilkABI::addHelperAttributes(Function &Helper) {
