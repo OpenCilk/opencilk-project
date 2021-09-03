@@ -51,26 +51,64 @@ class OpenCilkABI : public TapirTarget {
   FunctionCallee CilkRTSCilkForGrainsize32 = nullptr;
   FunctionCallee CilkRTSCilkForGrainsize64 = nullptr;
 
-  // Accessors for Cilk RTS functions
-  FunctionCallee Get__cilkrts_enter_frame();
-  FunctionCallee Get__cilkrts_enter_frame_helper();
-  FunctionCallee Get__cilkrts_detach();
-  FunctionCallee Get__cilkrts_leave_frame();
-  FunctionCallee Get__cilkrts_leave_frame_helper();
-  FunctionCallee Get__cilkrts_pause_frame();
-  FunctionCallee Get__cilkrts_enter_landingpad();
-  FunctionCallee Get__cilkrts_cilk_for_grainsize_8();
-  FunctionCallee Get__cilkrts_cilk_for_grainsize_16();
-  FunctionCallee Get__cilkrts_cilk_for_grainsize_32();
-  FunctionCallee Get__cilkrts_cilk_for_grainsize_64();
+  // Accessors for CilkRTS ABI functions. When a bitcode file is loaded, these
+  // functions should return the function defined in the bitcode file.
+  // Otherwise, these functions will return FunctionCallees for placeholder
+  // declarations of these functions.  The latter case is intended for debugging
+  // ABI-call insertion.
+  FunctionCallee Get__cilkrts_enter_frame() {
+    return CilkRTSEnterFrame;
+  }
+  FunctionCallee Get__cilkrts_enter_frame_helper() {
+    return CilkRTSEnterFrameHelper;
+  }
+  FunctionCallee Get__cilkrts_detach() {
+    return CilkRTSDetach;
+  }
+  FunctionCallee Get__cilkrts_leave_frame() {
+    return CilkRTSLeaveFrame;
+  }
+  FunctionCallee Get__cilkrts_leave_frame_helper() {
+    return CilkRTSLeaveFrameHelper;
+  }
+  FunctionCallee Get__cilkrts_pause_frame() {
+    return CilkRTSPauseFrame;
+  }
+  FunctionCallee Get__cilkrts_enter_landingpad() {
+    return CilkRTSEnterLandingpad;
+  }
+  FunctionCallee Get__cilkrts_cilk_for_grainsize_8() {
+    return CilkRTSCilkForGrainsize8;
+  }
+  FunctionCallee Get__cilkrts_cilk_for_grainsize_16() {
+    return CilkRTSCilkForGrainsize16;
+  }
+  FunctionCallee Get__cilkrts_cilk_for_grainsize_32() {
+    return CilkRTSCilkForGrainsize32;
+  }
+  FunctionCallee Get__cilkrts_cilk_for_grainsize_64() {
+    return CilkRTSCilkForGrainsize64;
+  }
 
   // Helper functions for implementing the Cilk ABI protocol
-  FunctionCallee GetCilkPrepareSpawnFn();
-  FunctionCallee GetCilkSyncFn();
-  FunctionCallee GetCilkSyncNoThrowFn();
-  FunctionCallee GetCilkParentEpilogueFn();
-  FunctionCallee GetCilkHelperEpilogueFn();
-  FunctionCallee GetCilkHelperEpilogueExnFn();
+  FunctionCallee GetCilkPrepareSpawnFn() {
+    return CilkPrepareSpawn;
+  }
+  FunctionCallee GetCilkSyncFn() {
+    return CilkSync;
+  }
+  FunctionCallee GetCilkSyncNoThrowFn() {
+    return CilkSyncNoThrow;
+  }
+  FunctionCallee GetCilkParentEpilogueFn() {
+    return CilkParentEpilogue;
+  }
+  FunctionCallee GetCilkHelperEpilogueFn() {
+    return CilkHelperEpilogue;
+  }
+  FunctionCallee GetCilkHelperEpilogueExnFn() {
+    return CilkHelperEpilogueExn;
+  }
 
   void GetTapirRTCalls(Spindle *TaskFrame, bool IsRootTask, TaskInfo &TI);
   void LowerTapirRTCalls(Function &F, BasicBlock *TFEntry);
