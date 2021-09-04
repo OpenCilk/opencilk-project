@@ -36,6 +36,28 @@ list(INSERT CMAKE_MODULE_PATH 0
   "${CMAKE_CURRENT_SOURCE_DIR}/../llvm/cmake/modules"
 )
 
+function(get_cheetah_path path)
+  foreach(entry ${runtimes})
+    get_filename_component(projName ${entry} NAME)
+    if("${projName}" MATCHES "cheetah")
+      set(${path} ${entry} PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+endfunction()
+
+# Some of the runtimes will conditionally use cheetah.  To make this
+# work smoothly we ensure that cheetah is added early in the list of
+# sub-projects. This allows other sub-projects to have checks like
+# `if(TARGET cheetah)`.
+get_cheetah_path(cheetah_path)
+if(cheetah_path)
+  list(REMOVE_ITEM runtimes ${cheetah_path})
+  if(NOT DEFINED LLVM_BUILD_CHEETAH OR LLVM_BUILD_CHEETAH)
+    list(INSERT runtimes 0 ${cheetah_path})
+  endif()
+endif()
+
 function(get_compiler_rt_path path)
   foreach(entry ${runtimes})
     get_filename_component(projName ${entry} NAME)
