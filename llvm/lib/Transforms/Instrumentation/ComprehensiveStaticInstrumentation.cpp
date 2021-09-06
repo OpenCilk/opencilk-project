@@ -1287,6 +1287,10 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
 
     Value *DefaultID = getDefaultID(IDBuilder);
     for (Spindle *SharedEH : SharedEHExits) {
+      // Skip shared-eh spindle exits that are placeholder unreachable blocks.
+      if (isa<UnreachableInst>(
+              SharedEH->getEntry()->getFirstNonPHIOrDbgOrLifetime()))
+        continue;
       CsiTaskExitProperty ExitProp;
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
       insertHookCallAtSharedEHSpindleExits(
