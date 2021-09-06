@@ -4145,6 +4145,10 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
 
     Value *DefaultID = getDefaultID(IDBuilder);
     for (Spindle *SharedEH : SharedEHExits) {
+      // Skip shared-eh spindle exits that are placeholder unreachable blocks.
+      if (isa<UnreachableInst>(
+              SharedEH->getEntry()->getFirstNonPHIOrDbgOrLifetime()))
+        continue;
       CsiTaskExitProperty ExitProp;
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
       insertHookCallAtSharedEHSpindleExits(
