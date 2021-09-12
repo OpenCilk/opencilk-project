@@ -126,15 +126,23 @@ void OpenCilkABI::prepareModule() {
     // TODO: Consider restructuring the import process to use
     // Linker::Flags::LinkOnlyNeeded to copy over only the necessary contents
     // from the external module.
-    bool Fail =
-        Linker::linkModules(M, std::move(ExternalModule), Linker::Flags::None,
-                            [](Module &M, const StringSet<> &GVS) {
-                              LLVM_DEBUG({
-                                for (StringRef GVName : GVS.keys())
-                                  dbgs() << "Linking global value " << GVName
-                                         << "\n";
-                              });
-                            });
+    bool Fail = Linker::linkModules(
+        M, std::move(ExternalModule), Linker::Flags::None,
+        [](Module &M, const StringSet<> &GVS) {
+          for (StringRef GVName : GVS.keys()) {
+            LLVM_DEBUG(dbgs() << "Linking global value " << GVName << "\n");
+            if (Function *Fn = M.getFunction(GVName)) {
+              if (!Fn->isDeclaration())
+                // We set the function's linkage as available_externally, so
+                // that subsequent optimizations can remove these definitions
+                // from the module.  We don't want this module redefining any of
+                // these symbols, even if they aren't inlined, because the
+                // OpenCilk runtime library will provide those definitions
+                // later.
+                Fn->setLinkage(Function::AvailableExternallyLinkage);
+            }
+          }
+        });
     if (Fail)
       C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
                   Twine(RuntimeBCPath));
@@ -198,14 +206,6 @@ void OpenCilkABI::prepareModule() {
       assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
              "Cilk function is not a function");
       Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
-
-      if (!Fn->isDeclaration())
-        // We set the function's linkage as available_externally, so that
-        // subsequent optimizations can remove these definitions from the
-        // module.  We don't want this module redefining any of these symbols,
-        // even if they aren't inlined, because the OpenCilk runtime library
-        // will provide those definitions later.
-        Fn->setLinkage(Function::AvailableExternallyLinkage);
 
       // Because __cilk_sync is a C function that can throw an exception, update
       // its attributes specially.  No other CilkRTS functions can throw an
