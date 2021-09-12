@@ -1545,6 +1545,7 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   // Rotate Loop - disable header duplication at -Oz
   LPM1.addPass(LoopRotatePass(Level != OptimizationLevel::Oz));
   LPM2.addPass(IndVarSimplifyPass());
+  LPM2.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap));
 
   FunctionPassManager FPM(DebugLogging);
   FPM.addPass(createFunctionToLoopPassAdaptor(
@@ -1623,27 +1624,15 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   if (EnableSyntheticCounts)
     MPM.addPass(SyntheticCountsPropagation());
 
+  MPM.addPass(AlwaysInlinerPass(
+      /*InsertLifetimeIntrinsics=*/PTO.Coroutines));
+
   // Require the GlobalsAA analysis for the module so we can query it within
   // the CGSCC pipeline.
   MPM.addPass(RequireAnalysisPass<GlobalsAA, Module>());
 
-  // Begin a postorder CGSCC pipeline to clean up and perform function inlining
-  // after Tapir lowering.
-  InlineParams IP = getInlineParamsFromOptLevel(OptimizationLevel::O0);
-  ModuleInlinerWrapperPass PostLowerMIWP(IP, DebugLogging,
-                                         PerformMandatoryInliningsFirst,
-                                         UseInlineAdvisor, MaxDevirtIterations);
-
-  // Require the GlobalsAA analysis for the module so we can query it within
-  // the CGSCC pipeline.
-  PostLowerMIWP.addRequiredModuleAnalysis<GlobalsAA>();
-
-  // Require the ProfileSummaryAnalysis for the module so we can query it within
-  // the inliner pass.
-  PostLowerMIWP.addRequiredModuleAnalysis<ProfileSummaryAnalysis>();
-
-  // Now begin the postoder CGSCC pipeline.
-  CGSCCPassManager &PostLowerCGPipeline = PostLowerMIWP.getPM();
+  // Begin the postoder CGSCC pipeline.
+  CGSCCPassManager PostLowerCGPipeline(DebugLogging);
 
   // Now deduce any function attributes based in the current code.
   PostLowerCGPipeline.addPass(PostOrderFunctionAttrsPass());
@@ -1669,6 +1658,11 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   // Drop bodies of available eternally objects to improve GlobalDCE.
   MPM.addPass(EliminateAvailableExternallyPass());
+
+  // Do RPO function attribute inference across the module to forward-propagate
+  // attributes where applicable.
+  // FIXME: Is this really an optimization rather than a canonicalization?
+  MPM.addPass(ReversePostOrderFunctionAttrsPass());
 
   // Now that we have optimized the program, discard unreachable functions.
   MPM.addPass(GlobalDCEPass());
