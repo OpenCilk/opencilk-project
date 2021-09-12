@@ -416,8 +416,11 @@ Value *TapirLoopInfo::getOrCreateTripCount(PredicatedScalarEvolution &PSE,
 
   Value *ConditionEnd = Condition->getOperand(0);
   {
-    if (!L->isLoopInvariant(ConditionEnd))
+    if (!L->isLoopInvariant(ConditionEnd)) {
+      if (!L->isLoopInvariant(Condition->getOperand(1)))
+        return nullptr;
       ConditionEnd = Condition->getOperand(1);
+    }
   }
   assert(L->isLoopInvariant(ConditionEnd) &&
          "Condition end is not loop invariant.");
