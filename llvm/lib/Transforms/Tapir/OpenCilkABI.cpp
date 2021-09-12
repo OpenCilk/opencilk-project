@@ -490,6 +490,7 @@ void OpenCilkABI::MarkSpawner(Function &F) {
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
+  F.removeFnAttr(Attribute::ArgMemOnly);
 }
 
 /// Lower a call to get the grainsize of a Tapir loop.
