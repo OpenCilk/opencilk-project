@@ -1452,7 +1452,8 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   // Rotate Loop - disable header duplication at -Oz
   LPM1.addPass(LoopRotatePass(Level != OptimizationLevel::Oz));
   LPM2.addPass(IndVarSimplifyPass());
-  LPM2.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap));
+  LPM2.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
+                        /*AllowSpeculation=*/true));
 
   FunctionPassManager FPM;
   FPM.addPass(createFunctionToLoopPassAdaptor(std::move(LPM1),

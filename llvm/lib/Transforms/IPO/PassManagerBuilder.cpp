@@ -511,6 +511,7 @@ void PassManagerBuilder::populateModulePassManager(
     // rotated form due to GVN or other transformations, and loop spawning
     // relies on the rotated form.  Disable header duplication at -Oz.
     MPM.add(createLoopRotatePass(SizeLevel == 2 ? 0 : -1));
+    MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap));
     // Outline Tapir loops as needed.
     MPM.add(createLoopSpawningTIPass());
 
