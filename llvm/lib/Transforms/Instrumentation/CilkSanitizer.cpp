@@ -300,6 +300,8 @@ struct CilkSanitizerImpl : public CSIImpl {
     SmallVector<Instruction *, 8> DelayedCalls;
   };
 
+  // TODO: With recent changes in LLVM's JIT technology, the JitMode option
+  // no longer seems to be necessary.
   CilkSanitizerImpl(Module &M, CallGraph *CG,
                     function_ref<DominatorTree &(Function &)> GetDomTree,
                     function_ref<TaskInfo &(Function &)> GetTaskInfo,
@@ -308,8 +310,8 @@ struct CilkSanitizerImpl : public CSIImpl {
                     function_ref<TargetLibraryInfo &(Function &)> GetTLI,
                     function_ref<ScalarEvolution &(Function &)> GetSE,
                     // function_ref<TargetTransformInfo &(Function &)> GetTTI,
-                    bool JitMode = false,
-                    bool CallsMayThrow = !AssumeNoExceptions)
+                    bool CallsMayThrow = !AssumeNoExceptions,
+                    bool JitMode = false)
       : CSIImpl(M, CG, GetDomTree, GetLoopInfo, GetTaskInfo, GetTLI, GetSE,
                 nullptr),
         GetRaceInfo(GetRaceInfo) {
@@ -525,8 +527,8 @@ private:
 /// CilkSanitizer: instrument the code in module to find races.
 struct CilkSanitizerLegacyPass : public ModulePass {
   static char ID;  // Pass identification, replacement for typeid.
-  CilkSanitizerLegacyPass(bool JitMode = false,
-                          bool CallsMayThrow = !AssumeNoExceptions)
+  CilkSanitizerLegacyPass(bool CallsMayThrow = !AssumeNoExceptions,
+                          bool JitMode = false)
       : ModulePass(ID), JitMode(JitMode), CallsMayThrow(CallsMayThrow) {
     initializeCilkSanitizerLegacyPassPass(*PassRegistry::getPassRegistry());
   }
@@ -572,13 +574,13 @@ void CilkSanitizerLegacyPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScalarEvolutionWrapperPass>();
 }
 
-ModulePass *llvm::createCilkSanitizerLegacyPass(bool JitMode) {
-  return new CilkSanitizerLegacyPass(JitMode);
+ModulePass *llvm::createCilkSanitizerLegacyPass(bool CallsMayThrow) {
+  return new CilkSanitizerLegacyPass(CallsMayThrow);
 }
 
-ModulePass *llvm::createCilkSanitizerLegacyPass(bool JitMode,
-                                                bool CallsMayThrow) {
-  return new CilkSanitizerLegacyPass(JitMode, CallsMayThrow);
+ModulePass *llvm::createCilkSanitizerLegacyPass(bool CallsMayThrow,
+                                                bool JitMode) {
+  return new CilkSanitizerLegacyPass(CallsMayThrow, JitMode);
 }
 
 uint64_t ObjectTable::add(Instruction &I, Value *Obj) {
@@ -4747,11 +4749,11 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
 
   bool Changed =
       CilkSanitizerImpl(M, CG, GetDomTree, nullptr, GetLoopInfo, nullptr,
-                        GetTLI, nullptr, JitMode, CallsMayThrow)
+                        GetTLI, nullptr, CallsMayThrow, JitMode)
           .setup();
   Changed |=
       CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo,
-                        GetRaceInfo, GetTLI, GetSE, JitMode, CallsMayThrow)
+                        GetRaceInfo, GetTLI, GetSE, CallsMayThrow, JitMode)
           .run();
   return Changed;
 }
