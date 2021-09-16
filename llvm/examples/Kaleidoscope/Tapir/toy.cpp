@@ -40,6 +40,8 @@
 #include <utility>
 #include <vector>
 
+#define PARFOR_RACE_BUG true
+
 using namespace llvm;
 using namespace llvm::orc;
 
@@ -869,7 +871,6 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
 static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
-// static std::map<std::string, AllocaInst *> NamedValues;
 static std::map<std::string, Value *> NamedValues;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 static std::unique_ptr<legacy::PassManager> TheMPM;
@@ -921,7 +922,6 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
 static AllocaInst *CreateTaskEntryBlockAlloca(StringRef VarName,
                                               Type *AllocaTy =
                                               Type::getDoubleTy(*TheContext)) {
-  // BasicBlock *TaskEntry = GetDetachedCtx(BB);
   BasicBlock *TaskEntry = TaskScopeEntry;
   if (!TaskEntry) {
     LogError("No local task scope.");
@@ -1238,10 +1238,7 @@ Value *ForExprAST::codegen() {
 }
 
 Value *VarExprAST::codegen() {
-  // std::vector<AllocaInst *> OldBindings;
   std::vector<Value *> OldBindings;
-
-  // Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
   // Register all variables and emit their initializer.
   for (unsigned i = 0, e = VarNames.size(); i != e; ++i) {
@@ -1305,7 +1302,6 @@ public:
 
 // Helper method for creating sync regions.
 static Value *CreateSyncRegion(Module &M) {
-  // BasicBlock *TaskEntry = GetDetachedCtx(BB);
   BasicBlock *TaskEntry = TaskScopeEntry;
   if (!TaskEntry)
     return LogErrorV("No local task scope.");
@@ -1421,22 +1417,21 @@ static std::vector<Metadata *> GetTapirLoopMetadata() {
 //   sync within sr, aftersync
 // aftersync:
 Value *ParForExprAST::codegen() {
-#define BUG true
-#if BUG
+#if PARFOR_RACE_BUG
   // Create an alloca for the variable in the entry block.
   AllocaInst *Alloca =
     CreateTaskEntryBlockAlloca(VarName, Type::getInt64Ty(*TheContext));
-#endif // BUG
+#endif // PARFOR_RACE_BUG
 
   // Emit the start code first, without 'variable' in scope.
   Value *StartVal = Start->codegen();
   if (!StartVal)
     return nullptr;
 
-#if BUG
+#if PARFOR_RACE_BUG
   // Store the value into the alloca.
   Builder->CreateStore(StartVal, Alloca);
-#endif // BUG
+#endif // PARFOR_RACE_BUG
 
   // Make the new basic block for the loop header, inserting after current
   // block.
@@ -1456,17 +1451,17 @@ Value *ParForExprAST::codegen() {
   // Start insertion in CondBB.
   Builder->SetInsertPoint(CondBB);
 
-#if !BUG
+#if !PARFOR_RACE_BUG
   // Start the PHI node with an entry for Start.
   PHINode *Variable =
       Builder->CreatePHI(Type::getInt64Ty(*TheContext), 2, VarName);
   Variable->addIncoming(StartVal, PreheaderBB);
-#endif // !BUG
+#endif // !PARFOR_RACE_BUG
 
   // Within the parallel loop, we use new different copies of the variable.
   // Save any existing variables that are shadowed.
   Value *OldVal = NamedValues[VarName];
-#if BUG
+#if PARFOR_RACE_BUG
   NamedValues[VarName] = Alloca;
 #else
   // For the end condition, use the PHI node as the variable VarName.
@@ -1508,7 +1503,7 @@ Value *ParForExprAST::codegen() {
     // Create a nested task scope corresponding to the loop body.
     TaskScopeRAII TaskScope(DetachBB);
 
-#if !BUG
+#if !PARFOR_RACE_BUG
     // To avoid races, within the parallel loop's body, the variable is stored
     // in a task-local allocation. Create an alloca in the task's entry block
     // for this version of the variable.
@@ -1517,7 +1512,7 @@ Value *ParForExprAST::codegen() {
     // Store the value into the alloca.
     Builder->CreateStore(Variable, VarAlloca);
     NamedValues[VarName] = VarAlloca;
-#endif // !BUG
+#endif // !PARFOR_RACE_BUG
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but
@@ -1546,13 +1541,13 @@ Value *ParForExprAST::codegen() {
     // If not specified, use 1.
     StepVal = ConstantInt::get(*TheContext, APSInt::get(1));
   }
-#if BUG
+#if PARFOR_RACE_BUG
   Value *CurVar = Builder->CreateLoad(Alloca, VarName.c_str());
   Value *NextVar = Builder->CreateAdd(CurVar, StepVal, "nextvar");
   Builder->CreateStore(NextVar, Alloca);
 #else
   Value *NextVar = Builder->CreateAdd(Variable, StepVal, "nextvar");
-#endif // BUG
+#endif // PARFOR_RACE_BUG
 
   // Insert a back edge to CondBB
   BranchInst *BackEdge = Builder->CreateBr(CondBB);
@@ -1567,10 +1562,10 @@ Value *ParForExprAST::codegen() {
     BackEdge->setMetadata(LLVMContext::MD_loop, LoopID);
   }
 
-#if !BUG
+#if !PARFOR_RACE_BUG
   // Add a new entry to the PHI node for the backedge.
   Variable->addIncoming(NextVar, ContinueBB);
-#endif // !BUG
+#endif // !PARFOR_RACE_BUG
 
   // Emit the "after loop" block.
   TheFunction->getBasicBlockList().push_back(AfterBB);
@@ -1776,8 +1771,7 @@ static void InitializeModuleAndPassManager() {
 
   // If requested, run the CilkSanitizer pass.
   if (RunCilksan)
-    TheMPM->add(createCilkSanitizerLegacyPass(/*JitMode*/true,
-                                              /*CallsMayThrow*/false));
+    TheMPM->add(createCilkSanitizerLegacyPass(/*CallsMayThrow*/false));
 
   // Add Tapir lowering passes.
   AddTapirLoweringPasses();
