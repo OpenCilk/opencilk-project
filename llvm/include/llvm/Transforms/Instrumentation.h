@@ -151,8 +151,8 @@ struct SanitizerCoverageOptions {
 };
 
 // Insert CilkSanitizer (Cilk determinacy race detection) instrumentation
-ModulePass *createCilkSanitizerLegacyPass(bool JitMode = false);
-ModulePass *createCilkSanitizerLegacyPass(bool JitMode, bool CallsMayThrow);
+ModulePass *createCilkSanitizerLegacyPass(bool CallsMayThrow = false);
+ModulePass *createCilkSanitizerLegacyPass(bool CallsMayThrow, bool JitMode);
 
 // Options for comprehensive static instrumentation
 struct CSIOptions {
@@ -168,6 +168,8 @@ struct CSIOptions {
   bool InstrumentAllocFns = true;
   bool Interpose = true;
 
+  // TODO: With recent changes LLVM's JIT technology, the jitMode flag no longer
+  // seems to be necessary.
   bool jitMode = false;
   bool CallsMayThrow = true;
   bool CallsTerminateBlocks = true;
