@@ -1004,7 +1004,13 @@ bool AccessPtrAnalysis::PointerCapturedBefore(const Value *Ptr,
     //
     // TODO: Possibly refine this check for private or internal globals.
     Result = true;
-  else
+  else if (!isa<Instruction>(StrippedPtr)) {
+    // If we could strip the pointer, we conservatively assume it may be
+    // captured.
+    LLVM_DEBUG(dbgs() << "PointerCapturedBefore: Could not fully strip pointer "
+                      << *Ptr << "\n");
+    Result = true;
+  } else
     Result = PointerMayBeCapturedBefore(StrippedPtr, false, false, I, &DT, true,
                                         MaxUsesToExplore);
   MayBeCapturedCache[CaptureQuery] = Result;
