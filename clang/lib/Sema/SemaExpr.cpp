@@ -15194,7 +15194,10 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
   checkTypeSupport(RHSExpr->getType(), OpLoc, /*ValueDecl*/ nullptr);
 
   // Check for illegal spawns
-  if (!BinaryOperator::isAssignmentOp(Opc))
+  // TODO: Add support for _Cilk_spawn on the RHS of a compound-assignment
+  // operator.
+  if (!BinaryOperator::isAssignmentOp(Opc) ||
+      BinaryOperator::isCompoundAssignmentOp(Opc))
     CheckForIllegalSpawn(*this, RHS.get());
   CheckForIllegalSpawn(*this, LHS.get());
 
