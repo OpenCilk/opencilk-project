@@ -92,7 +92,7 @@ int spawn_assign_eval_order_tests(int n) {
   int Arr[5];
   Arr[i++] = _Cilk_spawn bar(i++); // expected-warning {{multiple unsequenced modifications to 'i'}}
   Arr[i++] += bar(i); // expected-warning {{unsequenced modification and access to 'i'}}
-  Arr[i++] += _Cilk_spawn bar(i); // expected-warning {{unsequenced modification and access to 'i'}}
+  Arr[i++] += _Cilk_spawn bar(i); // expected-warning {{unsequenced modification and access to 'i'}} expected-error {{invalid _Cilk_spawn in expression}}
   return 0;
 }
 
@@ -100,4 +100,5 @@ void invalid_spawn_expr() {
   int x = 0;
   x + _Cilk_spawn 7; // expected-warning {{expression result unused}} expected-error {{invalid _Cilk_spawn in expression}}
   int y = x + _Cilk_spawn 7; // expected-error {{invalid _Cilk_spawn in expression}}
+  x += _Cilk_spawn 7; // expected-error {{invalid _Cilk_spawn in expression}}
 }
