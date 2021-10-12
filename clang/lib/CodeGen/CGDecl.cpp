@@ -569,6 +569,28 @@ namespace {
       CGF.EmitExtendGCLifetime(value);
     }
   };
+  
+  struct CallReducerCleanup final : EHScopeStack::Cleanup {
+    const VarDecl &Var;
+    ReducerAttr *Reducer;
+
+    CallReducerCleanup(const VarDecl *VarPtr)
+      : Var(*VarPtr), Reducer(VarPtr->getAttr<ReducerAttr>()) {
+      assert(Reducer);
+    }
+
+    void Emit(CodeGenFunction &CGF, Flags flags) override {
+      /* The other classes do it this way... */
+      DeclRefExpr DRE(CGF.getContext(), const_cast<VarDecl *>(&Var), false,
+                      Var.getType(), VK_LValue, SourceLocation());
+      llvm::Value *Addr = CGF.EmitDeclRefLValue(&DRE).getPointer(CGF);
+      llvm::Value *AddrVoid =
+	CGF.Builder.CreateBitCast(Addr, CGF.CGM.VoidPtrTy);
+      llvm::Function *Unregister =
+	CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
+      CGF.Builder.CreateCall(Unregister, {AddrVoid});
+    }
+  };
 
   struct CallCleanupFunction final : EHScopeStack::Cleanup {
     llvm::Constant *CleanupFn;
@@ -1802,6 +1824,45 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(*this, D.getLocation());
   QualType type = D.getType();
 
+  /* TODO(JFC):
+     1. Move this after the initializer?
+     2. Should the three function pointers be passed as arguments or as
+     a pointer to structure? */
+  if (ReducerAttr *R = D.getAttr<ReducerAttr>()) {
+    assert(!emission.IsEscapingByRef);
+    llvm::Value *Empty = CGM.EmitNullConstant(getContext().VoidPtrTy);
+    llvm::Value *Combine = Empty, *Init = Empty, *Destruct = Empty;
+    if (Expr *InitExpr = CGM.ValidateReducerCallback(R->getInit()))
+      Init = Builder.CreateBitCast(EmitLValue(InitExpr).getPointer(*this),
+                                   VoidPtrTy);
+    if (Expr *CombineExpr = CGM.ValidateReducerCallback(R->getCombine()))
+      Combine =
+          Builder.CreateBitCast(EmitLValue(CombineExpr).getPointer(*this),
+                                VoidPtrTy);
+    if (Expr *DestructExpr = CGM.ValidateReducerCallback(R->getDestruct()))
+      Destruct =
+          Builder.CreateBitCast(EmitLValue(DestructExpr).getPointer(*this),
+                                VoidPtrTy);
+    llvm::Value *Z =
+      Builder.CreateBitCast(emission.Addr.getPointer(), CGM.VoidPtrTy);
+    /* The interface is specified with 32 bit size. */
+    llvm::Value *Size = nullptr;
+    llvm::Type *I32 = llvm::Type::getInt32Ty(getLLVMContext());
+    if (uint64_t Bits = getContext().getTypeSize(type)) {
+      Size = llvm::Constant::getIntegerValue(I32, llvm::APInt(32, Bits / 8));
+    } else {
+      auto V = getVLASize(type);
+      llvm::Type *SizeType = ConvertType(getContext().getSizeType());
+      llvm::Value *Size1 = llvm::Constant::getIntegerValue(SizeType, llvm::APInt(64, getContext().getTypeSize(V.Type) / 8));
+      Size = Builder.CreateNUWMul(V.NumElts, Size1);
+      if (SizeType->getIntegerBitWidth() > 32)
+	Size = Builder.CreateTrunc(Size, I32);
+    }
+    // TODO: mark this call as registering a local
+    llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::reducer_register);
+    Builder.CreateCall(F, {Z, Size, Combine, Init, Destruct});
+  }
+
   // If this local has an initializer, emit it now.
   const Expr *Init = D.getInit();
 
@@ -2061,6 +2122,10 @@ void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
 
     const CGFunctionInfo &Info = CGM.getTypes().arrangeFunctionDeclaration(FD);
     EHStack.pushCleanup<CallCleanupFunction>(NormalAndEHCleanup, F, &Info, &D);
+  }
+
+  if (D.getAttr<ReducerAttr>()) {
+    EHStack.pushCleanup<CallReducerCleanup>(NormalAndEHCleanup, &D);
   }
 
   // If this is a block variable, call _Block_object_destroy

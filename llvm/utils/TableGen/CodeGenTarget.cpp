@@ -818,6 +818,14 @@ void CodeGenIntrinsic::setDefaultProperties(
 }
 
 void CodeGenIntrinsic::setProperty(Record *R) {
+
+  for (unsigned I = 0; I < BoolFieldListSize; ++I) {
+    if (R->getName() == BoolFieldList[I].InputName) {
+      this->*BoolFieldList[I].Field = true;
+      return;
+    }
+  }
+  
   if (R->getName() == "IntrNoMem")
     ModRef = NoMem;
   else if (R->getName() == "IntrReadMem") {
@@ -839,28 +847,6 @@ void CodeGenIntrinsic::setProperty(Record *R) {
   else if (R->getName() == "IntrInaccessibleMemOrArgMemOnly")
     ModRef = ModRefBehavior((ModRef & ~MR_Anywhere) | MR_ArgMem |
                             MR_InaccessibleMem);
-  else if (R->getName() == "Commutative")
-    isCommutative = true;
-  else if (R->getName() == "Throws")
-    canThrow = true;
-  else if (R->getName() == "IntrNoDuplicate")
-    isNoDuplicate = true;
-  else if (R->getName() == "IntrConvergent")
-    isConvergent = true;
-  else if (R->getName() == "IntrNoReturn")
-    isNoReturn = true;
-  else if (R->getName() == "IntrNoSync")
-    isNoSync = true;
-  else if (R->getName() == "IntrNoFree")
-    isNoFree = true;
-  else if (R->getName() == "IntrWillReturn")
-    isWillReturn = !isNoReturn;
-  else if (R->getName() == "IntrCold")
-    isCold = true;
-  else if (R->getName() == "IntrSpeculatable")
-    isSpeculatable = true;
-  else if (R->getName() == "IntrHasSideEffects")
-    hasSideEffects = true;
   else if (R->isSubClassOf("NoCapture")) {
     unsigned ArgNo = R->getValueAsInt("ArgNo");
     ArgumentAttributes.emplace_back(ArgNo, NoCapture, 0);

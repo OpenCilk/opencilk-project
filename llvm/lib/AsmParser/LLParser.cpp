@@ -1408,6 +1408,18 @@ bool LLParser::parseFnAttributeValuePairs(AttrBuilder &B,
     case lltok::kw_strand_pure:
       B.addAttribute(Attribute::StrandPure);
       break;
+    case lltok::kw_reducer_register:
+      B.addAttribute(Attribute::ReducerRegister);
+      break;
+    case lltok::kw_reducer_token:
+      B.addAttribute(Attribute::ReducerToken);
+      break;
+    case lltok::kw_reducer_view:
+      B.addAttribute(Attribute::ReducerView);
+      break;
+    case lltok::kw_reducer_unregister:
+      B.addAttribute(Attribute::ReducerUnregister);
+      break;
     case lltok::kw_strictfp: B.addAttribute(Attribute::StrictFP); break;
     case lltok::kw_uwtable: B.addAttribute(Attribute::UWTable); break;
     case lltok::kw_willreturn: B.addAttribute(Attribute::WillReturn); break;
@@ -1419,6 +1431,9 @@ bool LLParser::parseFnAttributeValuePairs(AttrBuilder &B,
       B.addPreallocatedAttr(Ty);
       break;
     }
+    case lltok::kw_injective:
+      B.addAttribute(Attribute::Injective);
+      break;
 
     // error handling.
     case lltok::kw_inreg:
@@ -1794,6 +1809,10 @@ bool LLParser::parseOptionalParamAttrs(AttrBuilder &B) {
     case lltok::kw_optforfuzzing:
     case lltok::kw_optnone:
     case lltok::kw_optsize:
+    case lltok::kw_reducer_register:
+    case lltok::kw_reducer_token:
+    case lltok::kw_reducer_unregister:
+    case lltok::kw_reducer_view:
     case lltok::kw_returns_twice:
     case lltok::kw_sanitize_address:
     case lltok::kw_sanitize_cilk:
@@ -1914,6 +1933,10 @@ bool LLParser::parseOptionalReturnAttrs(AttrBuilder &B) {
     case lltok::kw_optforfuzzing:
     case lltok::kw_optnone:
     case lltok::kw_optsize:
+    case lltok::kw_reducer_register:
+    case lltok::kw_reducer_token:
+    case lltok::kw_reducer_unregister:
+    case lltok::kw_reducer_view:
     case lltok::kw_returns_twice:
     case lltok::kw_sanitize_address:
     case lltok::kw_sanitize_cilk:

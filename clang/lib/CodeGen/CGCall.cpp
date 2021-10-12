@@ -1967,6 +1967,8 @@ void CodeGenModule::ConstructAttributeList(
       FuncAttrs.addAttribute(llvm::Attribute::Convergent);
     if (TargetDecl->hasAttr<StealableAttr>())
       FuncAttrs.addAttribute(llvm::Attribute::Stealable);
+    if (TargetDecl->getAttr<InjectiveAttr>())
+      FuncAttrs.addAttribute(llvm::Attribute::Injective);
 
     if (const FunctionDecl *Fn = dyn_cast<FunctionDecl>(TargetDecl)) {
       AddAttributesFromFunctionProtoType(
@@ -2008,10 +2010,23 @@ void CodeGenModule::ConstructAttributeList(
     } else if (TargetDecl->hasAttr<NoAliasAttr>()) {
       FuncAttrs.addAttribute(llvm::Attribute::ArgMemOnly);
       FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
-    } else if (TargetDecl->hasAttr<StrandPureAttr>()) {
+    }
+    if (TargetDecl->hasAttr<StrandPureAttr>()) {
       FuncAttrs.addAttribute(llvm::Attribute::StrandPure);
       FuncAttrs.addAttribute(llvm::Attribute::ReadOnly);
       FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
+    }
+    if (TargetDecl->hasAttr<ReducerRegisterAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::ReducerRegister);
+    }
+    if (TargetDecl->hasAttr<ReducerUnregisterAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::ReducerUnregister);
+    }
+    if (TargetDecl->hasAttr<ReducerViewAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::ReducerView);
+    }
+    else if (TargetDecl->hasAttr<ReducerTokenAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::ReducerToken);
     }
     if (TargetDecl->hasAttr<RestrictAttr>())
       RetAttrs.addAttribute(llvm::Attribute::NoAlias);
@@ -5115,7 +5130,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   AllocAlignAttrEmitter AllocAlignAttrEmitter(*this, TargetDecl, CallArgs);
   Attrs = AllocAlignAttrEmitter.TryEmitAsCallSiteAttribute(Attrs);
 
-  // sync before calling exit()
+  // If this call might lead to exit() make sure the runtime can
+  // be shutdown cleanly.
   if (CurSyncRegion && !ScopeIsSynced && !InvokeDest &&
       Attrs.hasFnAttribute(llvm::Attribute::NoReturn))
     EmitImplicitSyncCleanup(nullptr);

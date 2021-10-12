@@ -5108,6 +5108,14 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     Value *ArgPtr = Builder.CreateLoad(SrcAddr, "ap.val");
     return RValue::get(Builder.CreateStore(ArgPtr, DestAddr));
   }
+  case Builtin::BI__reducer_lookup: {
+    Function *F = CGM.getIntrinsic(Intrinsic::reducer_lookup);
+    return RValue::get(Builder.CreateCall(F, {EmitScalarExpr(E->getArg(0))}));
+  }
+  case Builtin::BI__reducer_of: {
+    Function *F = CGM.getIntrinsic(Intrinsic::reducer_of);
+    return RValue::get(Builder.CreateCall(F, {EmitScalarExpr(E->getArg(0))}));
+  }
   }
   IsSpawnedScope SpawnedScp(this);
 

@@ -4149,6 +4149,25 @@ void CodeGenModule::maybeSetTrivialComdat(const Decl &D,
   GO.setComdat(TheModule.getOrInsertComdat(GO.getName()));
 }
 
+
+// Reducer callbacks must be declarations or null.
+Expr *CodeGenModule::ValidateReducerCallback(Expr *E) {
+  E = E->IgnoreParenCasts();
+  switch (E->getStmtClass()) {
+  case Stmt::CXXNullPtrLiteralExprClass:
+    return nullptr;
+  case Stmt::IntegerLiteralClass:
+    if (cast<IntegerLiteral>(E)->getValue() != 0)
+      ErrorUnsupported(E, "reducer callback");
+    return nullptr;
+  case Stmt::DeclRefExprClass:
+    return E;
+  default:
+    ErrorUnsupported(E, "reducer callback");
+    return nullptr;
+  }
+}
+
 /// Pass IsTentative as true if you want to create a tentative definition.
 void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
                                             bool IsTentative) {
@@ -4171,6 +4190,45 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
 
   const VarDecl *InitDecl;
   const Expr *InitExpr = D->getAnyInitializer(InitDecl);
+
+#if 0
+  /* Must synthesize function as in CreateGlobalInitOrCleanUpFunction */
+  /* See CodeGenModule::EmitCXXGlobalVarDeclInitFunc */
+  if (ReducerAttr *R = D->getAttr<ReducerAttr>()) {
+    /* TODO: !GlobalVariable::hasWeakLinkage() */
+    llvm::Value *Empty = EmitNullConstant(getContext().VoidPtrTy);
+    llvm::Value *Combine = Empty, *Init = Empty, *Destruct = Empty;
+    if (Expr *InitExpr = ValidateReducerCallback(R->getInit()))
+      Init = Builder.CreateBitCast(EmitLValue(InitExpr).getPointer(*this),
+                                   VoidPtrTy);
+    if (Expr *CombineExpr = ValidateReducerCallback(R->getCombine()))
+      Combine =
+          Builder.CreateBitCast(EmitLValue(CombineExpr).getPointer(*this),
+                                VoidPtrTy);
+    if (Expr *DestructExpr = ValidateReducerCallback(R->getDestruct()))
+      Destruct =
+          Builder.CreateBitCast(EmitLValue(DestructExpr).getPointer(*this),
+                                VoidPtrTy);
+    llvm::Value *Z =
+      Builder.CreateBitCast(emission.Addr.getPointer(), VoidPtrTy);
+    /* The interface is specified with 32 bit size. */
+    llvm::Value *Size = nullptr;
+    llvm::Type *I32 = llvm::Type::getInt32Ty(getLLVMContext());
+    if (uint64_t Bits = getContext().getTypeSize(type)) {
+      Size = llvm::Constant::getIntegerValue(I32, llvm::APInt(32, Bits / 8));
+    } else {
+      auto V = getVLASize(type);
+      llvm::Type *SizeType = ConvertType(getContext().getSizeType());
+      llvm::Value *Size1 = llvm::Constant::getIntegerValue(SizeType, llvm::APInt(64, getContext().getTypeSize(V.Type) / 8));
+      Size = Builder.CreateNUWMul(V.NumElts, Size1);
+      if (SizeType->getIntegerBitWidth() > 32)
+	Size = Builder.CreateTrunc(Size, I32);
+    }
+    // TODO: mark this call as registering a global
+    llvm::Function *F = getIntrinsic(llvm::Intrinsic::reducer_register);
+    Builder.CreateCall(F, {Z, Size, Combine, Init, Destruct});
+  }
+#endif
 
   Optional<ConstantEmitter> emitter;
 

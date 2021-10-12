@@ -424,6 +424,19 @@ CallBase::BundleOpInfo &CallBase::getBundleOpInfoForOperand(unsigned OpIdx) {
   return *Current;
 }
 
+bool CallBase::isStrandPure() const {
+  return hasFnAttr(Attribute::StrandPure);
+}
+
+void CallBase::setStrandPure() {
+  addAttribute(AttributeList::FunctionIndex, Attribute::StrandPure);
+}
+
+void CallBase::setNotStrandPure() {
+  removeAttribute(AttributeList::FunctionIndex, Attribute::StrandPure);
+}
+
+
 //===----------------------------------------------------------------------===//
 //                        CallInst Implementation
 //===----------------------------------------------------------------------===//

@@ -1660,6 +1660,11 @@ static bool isFuncOnlyAttr(Attribute::AttrKind Kind) {
   case Attribute::NullPointerIsValid:
   case Attribute::MustProgress:
   case Attribute::NoProfile:
+  case Attribute::Injective:
+  case Attribute::ReducerRegister:
+  case Attribute::ReducerToken:
+  case Attribute::ReducerView:
+  case Attribute::ReducerUnregister:
     return true;
   default:
     break;

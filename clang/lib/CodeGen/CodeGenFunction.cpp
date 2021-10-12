@@ -889,6 +889,9 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
       Fn->addFnAttr(llvm::Attribute::Stealable);
   }
 
+  if (D && D->getAttr<InjectiveAttr>())
+    Fn->addFnAttr(llvm::Attribute::Injective);
+
   // Add no-jump-tables value.
   Fn->addFnAttr("no-jump-tables",
                 llvm::toStringRef(CGM.getCodeGenOpts().NoUseJumpTables));

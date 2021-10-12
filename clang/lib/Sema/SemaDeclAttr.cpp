@@ -5327,6 +5327,76 @@ void Sema::AddXConsumedAttr(Decl *D, const AttributeCommonInfo &CI,
   }
 }
 
+/* OpenCilk */
+static void handleReducerAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  // Currently based on language rather than code gen attributes.
+  if (S.getLangOpts().getCilk() != LangOptions::Cilk_opencilk) {
+    S.Diag(D->getBeginLoc(), diag::reducer_requires_cilk);
+    return;
+  }
+#if 0
+  /* The following is an example of how to turn change the type of
+     a variable declared as a reducer.  In its current form it breaks
+     initialization because
+       reducer<int> x = 1
+     turns into
+       struct { ... } x = 1;
+  */
+  IdentifierInfo &I = S.Context.Idents.getOwn("z");
+  Scope *Scope = nullptr; /* toplevel? */
+  SourceLocation Location = D->getLocation(); /* ??? */
+  NamedDecl *Z = S.LookupSingleName(Scope, &I, Location, Sema::LookupTagName);
+  if (Z) {
+    if (RecordDecl *R = dyn_cast<RecordDecl>(Z)) {
+      if (RecordDecl *O = R->getDefinition()) {
+        const FieldDecl *F = O->findFirstNamedDataMember();
+        bool Dependent = O->isDependentType();
+        unsigned A = O->getMaxAlignment(); /* in bits */
+        const Type *T = O->getTypeForDecl();
+        if (isa<ValueDecl>(D)) {
+          /* TODO: Changing the type breaks initialization.  Instead
+             use the declared variable as the leftmost view and the key
+             for runtime calls. */
+          cast<ValueDecl>(D)->setType(QualType(T, 0));
+        }
+      }
+    }
+  }
+#endif
+  Expr *Dest = AL.getNumArgs() > 2 ? AL.getArgAsExpr(2) : nullptr;
+  S.AddReducerAttr(AL.getRange(), AL, D, AL.getArgAsExpr(0), AL.getArgAsExpr(1),
+		   Dest);
+  /* See also handleCleanupAttr */
+}
+
+void Sema::AddReducerAttr(SourceRange AttrRange,
+                          const AttributeCommonInfo &CI,
+                          Decl *D, Expr *Red,
+                          Expr *Init, Expr *Dest) {
+  if (false) {
+    llvm::errs() << "Sema::AddReducerAttr\n";
+    llvm::errs() << "red\n"; Red->dump();
+    llvm::errs() << "init\n"; Init->dump();
+    if (Dest) llvm::errs() << "dest\n"; Dest->dump();
+  }
+  QualType T;
+  if (auto *TD = dyn_cast<TypedefNameDecl>(D))
+    T = TD->getUnderlyingType();
+  else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    T = VD->getType();
+    VD->setType(T);
+  }
+  else
+    llvm_unreachable("Unknown decl type for reducer");
+
+  if (false) {
+    llvm::errs() << "type of decl\n"; T->dump();
+  }
+
+  D->addAttr(::new (Context) ReducerAttr(Context, CI, Red, Init, Dest));
+  return;
+}
+
 static Sema::RetainOwnershipKind
 parsedAttrToRetainOwnershipKind(const ParsedAttr &AL) {
   switch (AL.getKind()) {
@@ -8328,6 +8398,9 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     break;
 
   // Cilk attributes
+  case ParsedAttr::AT_Reducer:
+    handleReducerAttr(S, D, AL);
+    break;
   case ParsedAttr::AT_StrandMalloc:
     handleSimpleAttribute<StrandMallocAttr>(S, D, AL);
     break;
@@ -8336,6 +8409,21 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     break;
   case ParsedAttr::AT_Stealable:
     handleSimpleAttribute<StealableAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_ReducerRegister:
+    handleSimpleAttribute<ReducerRegisterAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_ReducerView:
+    handleSimpleAttribute<ReducerViewAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_ReducerToken:
+    handleSimpleAttribute<ReducerTokenAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_ReducerUnregister:
+    handleSimpleAttribute<ReducerUnregisterAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_Injective:
+    handleSimpleAttribute<InjectiveAttr>(S, D, AL);
     break;
   }
 }

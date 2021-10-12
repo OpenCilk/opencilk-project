@@ -155,6 +155,7 @@ void OpenCilkABI::prepareModule() {
 
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Type *VoidTy = Type::getVoidTy(C);
+  Type *VoidPtrTy = Type::getInt8PtrTy(C);
 
   // Define the types of the CilkRTS functions.
   FunctionType *CilkRTSFnTy =
@@ -169,10 +170,15 @@ void OpenCilkABI::prepareModule() {
   FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
   FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
   FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
+  FunctionType *PtrPtrTy = FunctionType::get(VoidPtrTy, {VoidPtrTy}, false);
+  FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
+  FunctionType *RegTy =
+      FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
+              VoidPtrTy, VoidPtrTy}, false);
 
   // Create an array of CilkRTS functions, with their associated types and
   // FunctionCallee member variables in the OpenCilkABI class.
-  SmallVector<CilkRTSFnDesc, 17> CilkRTSFunctions({
+  CilkRTSFnDesc CilkRTSFunctions[] = {
       {"__cilkrts_enter_frame", CilkRTSFnTy, CilkRTSEnterFrame},
       {"__cilkrts_enter_frame_helper", CilkRTSFnTy, CilkRTSEnterFrameHelper},
       {"__cilkrts_detach", CilkRTSFnTy, CilkRTSDetach},
@@ -196,7 +202,10 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
-  });
+      {"__cilkrts_reducer_lookup", PtrPtrTy, CilkRTSReducerLookup},
+      {"__cilkrts_reducer_register", RegTy, CilkRTSReducerRegister},
+      {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
+  };
 
   if (UseOpenCilkRuntimeBC) {
     // Add attributes to internalized functions.
@@ -204,7 +213,7 @@ void OpenCilkABI::prepareModule() {
       assert(!FnDesc.FnCallee && "Redefining Cilk function");
       FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
       assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
-             "Cilk function is not a function");
+             "Cilk runtime function is not a function");
       Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
 
       // Because __cilk_sync is a C function that can throw an exception, update
@@ -927,4 +936,25 @@ LoopOutlineProcessor *OpenCilkABI::getLoopOutlineProcessor(
   if (UseRuntimeCilkFor)
     return new RuntimeCilkFor(M);
   return nullptr;
+}
+
+void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
+  FunctionCallee Fn = nullptr;
+  const Function *Called = CI->getCalledFunction();
+  assert(Called);
+  Intrinsic::ID ID = Called->getIntrinsicID();
+  switch (ID) {
+  default:
+    llvm_unreachable("unexpected reducer intrinsic");
+  case Intrinsic::reducer_lookup:
+    Fn = Get__cilkrts_reducer_lookup();
+    break;
+  case Intrinsic::reducer_register:
+    Fn = Get__cilkrts_reducer_register();
+    break;
+  case Intrinsic::reducer_unregister:
+    Fn = Get__cilkrts_reducer_unregister();
+    break;
+  }
+  CI->setCalledFunction(Fn);
 }

@@ -5111,17 +5111,17 @@ public:
   /// return a reason explaining why. Otherwise, return NOUR_None.
   NonOdrUseReason getNonOdrUseReasonInCurrentContext(ValueDecl *D);
 
-  DeclRefExpr *BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
+  Expr *BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
                                 SourceLocation Loc,
                                 const CXXScopeSpec *SS = nullptr);
-  DeclRefExpr *
+  Expr *
   BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
                    const DeclarationNameInfo &NameInfo,
                    const CXXScopeSpec *SS = nullptr,
                    NamedDecl *FoundD = nullptr,
                    SourceLocation TemplateKWLoc = SourceLocation(),
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
-  DeclRefExpr *
+  Expr *
   BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
                    const DeclarationNameInfo &NameInfo,
                    NestedNameSpecifierLoc NNS,
@@ -10096,6 +10096,10 @@ public:
   enum class RetainOwnershipKind {NS, CF, OS};
   void AddXConsumedAttr(Decl *D, const AttributeCommonInfo &CI,
                         RetainOwnershipKind K, bool IsTemplateInstantiation);
+
+  /// AddReducerAttr - Adds an reducer attribute to a particular declaration.
+  void AddReducerAttr(SourceRange AttrRange, const AttributeCommonInfo &CI,
+                      Decl *D, Expr *E1, Expr *Init, Expr *Dest);
 
   /// addAMDGPUFlatWorkGroupSizeAttr - Adds an amdgpu_flat_work_group_size
   /// attribute to a particular declaration.

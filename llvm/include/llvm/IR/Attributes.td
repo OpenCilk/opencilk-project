@@ -82,6 +82,9 @@ def InaccessibleMemOrArgMemOnly : EnumAttr<"inaccessiblemem_or_argmemonly">;
 /// Pass structure in an alloca.
 def InAlloca : EnumAttr<"inalloca">;
 
+/// Distinct arguments to this function yield distinct return values.
+def Injective : EnumAttr<"injective">;
+
 /// Source said inlining was desirable.
 def InlineHint : EnumAttr<"inlinehint">;
 
@@ -174,6 +177,12 @@ def ReadNone : EnumAttr<"readnone">;
 
 /// Function only reads from memory.
 def ReadOnly : EnumAttr<"readonly">;
+
+/// Reducer-related attributes.
+def ReducerRegister : EnumAttr<"reducer_register">;
+def ReducerView : EnumAttr<"reducer_view">;
+def ReducerToken : EnumAttr<"reducer_token">;
+def ReducerUnregister : EnumAttr<"reducer_unregister">;
 
 /// Return value is always equal to this argument.
 def Returned : EnumAttr<"returned">;

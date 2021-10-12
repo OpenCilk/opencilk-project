@@ -707,6 +707,11 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(immarg);
   KEYWORD(byref);
   KEYWORD(mustprogress);
+  KEYWORD(injective);
+  KEYWORD(reducer_register);
+  KEYWORD(reducer_view);
+  KEYWORD(reducer_token);
+  KEYWORD(reducer_unregister);
 
   KEYWORD(type);
   KEYWORD(opaque);

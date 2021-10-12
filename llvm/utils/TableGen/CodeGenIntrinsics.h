@@ -145,6 +145,16 @@ struct CodeGenIntrinsic {
   // True if the intrinsic is marked as speculatable.
   bool isSpeculatable;
 
+  // True if this is an injective function.
+  bool isInjective = false;
+
+  // Tapir reducer-related attributes
+  bool isStrandPure = false;
+  bool isReducerRegister = false;
+  bool isReducerView = false;
+  bool isReducerToken = false;
+  bool isReducerUnregister = false;
+
   enum ArgAttrKind {
     NoCapture,
     NoAlias,
@@ -194,6 +204,14 @@ struct CodeGenIntrinsic {
   bool isParamImmArg(unsigned ParamIdx) const;
 
   CodeGenIntrinsic(Record *R, std::vector<Record *> DefaultProperties);
+
+  struct BoolField {
+    bool CodeGenIntrinsic:: *Field;
+    const char *InputName; // .td file
+    const char *OutputName; // .inc file
+  };
+  static const BoolField BoolFieldList[];
+  static unsigned BoolFieldListSize;
 };
 
 class CodeGenIntrinsicTable {

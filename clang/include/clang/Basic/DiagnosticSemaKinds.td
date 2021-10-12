@@ -10100,6 +10100,10 @@ def note_exits_cilk_for : Note<
   "jump exits the scope of a '_Cilk_for'">;
 def err_jump_out_of_cilk_for : Error<
   "cannot jump out of '_Cilk_for' statement">;
+
+def reducer_requires_cilk : Warning<
+  "reducer attribute ignored when OpenCilk not in use">;
+
 } // end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {

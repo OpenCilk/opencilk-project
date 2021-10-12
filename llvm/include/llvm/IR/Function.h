@@ -617,12 +617,8 @@ public:
   }
 
   /// Determine if the call is pure within a strand.
-  bool isStrandPure() const {
-    return hasFnAttribute(Attribute::StrandPure);
-  }
-  void setStrandPure() {
-    addFnAttr(Attribute::StrandPure);
-  }
+  bool isStrandPure() const;
+  void setStrandPure();
 
   /// Determine if the call might deallocate memory.
   bool doesNotFreeMemory() const {

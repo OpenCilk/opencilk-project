@@ -225,6 +225,10 @@ enum Kind {
   kw_readonly,
   kw_returned,
   kw_returns_twice,
+  kw_reducer_register,
+  kw_reducer_view,
+  kw_reducer_token,
+  kw_reducer_unregister,
   kw_signext,
   kw_speculatable,
   kw_ssp,
@@ -250,6 +254,7 @@ enum Kind {
   kw_immarg,
   kw_byref,
   kw_mustprogress,
+  kw_injective,
 
   kw_type,
   kw_opaque,

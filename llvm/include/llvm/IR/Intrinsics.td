@@ -60,6 +60,16 @@ def Commutative : IntrinsicProperty;
 // Throws - This intrinsic can throw.
 def Throws : IntrinsicProperty;
 
+// Injective - This intrinsic returns different values given different
+// arguments.
+def IntrInjective : IntrinsicProperty;
+
+def IntrStrandPure : IntrinsicProperty;
+def IntrReducerRegister : IntrinsicProperty;
+def IntrReducerView : IntrinsicProperty;
+def IntrReducerToken : IntrinsicProperty;
+def IntrReducerUnregister : IntrinsicProperty;
+
 // Attribute index needs to match `AttrIndex` defined `Attributes.h`.
 class AttrIndex<int idx> {
   int Value = idx;
@@ -1321,6 +1331,31 @@ def int_tapir_loop_grainsize
 // intrinsics.
 def int_task_frameaddress
     : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty], [IntrWillReturn]>;
+
+// Or [llvm_anyptr_ty], [LLVMMatchType<0>]
+// isSpeculatable, ReadOnly, NoUnwind, IntrInaccessibleMemOnly
+def int_reducer_lookup
+    : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
+    [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+     IntrStrandPure, IntrReducerView, IntrInjective]>;
+
+// TODO: With constant argument the return value only changes
+// at calls to int_reducer_register with the same argument.
+// (But view access can not be reordered relative to unregister.)
+// Maybe the hyperobject table can be modeled as a distinct memory
+// space.
+def int_reducer_of
+    : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
+    [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly, IntrReducerToken]>;
+
+// TODO: Change tablegen to allow function pointer types in intrinsics.
+def int_reducer_register
+    : Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty, llvm_ptr_ty, llvm_ptr_ty, llvm_ptr_ty],
+     [IntrWillReturn, IntrInaccessibleMemOnly, IntrReducerRegister]>;
+
+def int_reducer_unregister
+    : Intrinsic<[], [llvm_ptr_ty], [IntrWillReturn, IntrInaccessibleMemOnly,
+     IntrReducerUnregister]>;
 
 ///===-------------------------- Other Intrinsics --------------------------===//
 //

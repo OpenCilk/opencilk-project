@@ -15117,12 +15117,13 @@ Expr *Sema::FixOverloadedFunctionReference(Expr *E, DeclAccessPair Found,
       TemplateArgs = &TemplateArgsBuffer;
     }
 
-    DeclRefExpr *DRE =
+    Expr *E =
         BuildDeclRefExpr(Fn, Fn->getType(), VK_LValue, ULE->getNameInfo(),
                          ULE->getQualifierLoc(), Found.getDecl(),
                          ULE->getTemplateKeywordLoc(), TemplateArgs);
-    DRE->setHadMultipleCandidates(ULE->getNumDecls() > 1);
-    return DRE;
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+      DRE->setHadMultipleCandidates(ULE->getNumDecls() > 1);
+    return E;
   }
 
   if (UnresolvedMemberExpr *MemExpr = dyn_cast<UnresolvedMemberExpr>(E)) {
@@ -15139,12 +15140,13 @@ Expr *Sema::FixOverloadedFunctionReference(Expr *E, DeclAccessPair Found,
     // implicit member access, rewrite to a simple decl ref.
     if (MemExpr->isImplicitAccess()) {
       if (cast<CXXMethodDecl>(Fn)->isStatic()) {
-        DeclRefExpr *DRE = BuildDeclRefExpr(
+	Expr *E = BuildDeclRefExpr(
             Fn, Fn->getType(), VK_LValue, MemExpr->getNameInfo(),
             MemExpr->getQualifierLoc(), Found.getDecl(),
             MemExpr->getTemplateKeywordLoc(), TemplateArgs);
-        DRE->setHadMultipleCandidates(MemExpr->getNumDecls() > 1);
-        return DRE;
+	if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+	  DRE->setHadMultipleCandidates(MemExpr->getNumDecls() > 1);
+        return E;
       } else {
         SourceLocation Loc = MemExpr->getMemberLoc();
         if (MemExpr->getQualifier())
