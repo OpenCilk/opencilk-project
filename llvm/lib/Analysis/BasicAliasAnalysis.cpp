@@ -1488,6 +1488,187 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
   return Alias;
 }
 
+// Given that O1 != O2, return NoAlias if they can not alias.
+static AliasResult
+UnderlyingNoAlias(const Value *O1, const Value *O2, AAQueryInfo &AAQI) {
+  // If V1/V2 point to two different objects, we know that we have no alias.
+  if (AAQI.AssumeSameSpindle) {
+    if (isIdentifiedObjectIfInSameSpindle(O1) &&
+        isIdentifiedObjectIfInSameSpindle(O2))
+      return NoAlias;
+  } else {
+    if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
+      return NoAlias;
+  }
+
+  // Constant pointers can't alias with non-const isIdentifiedObject objects.
+  if ((isa<Constant>(O1) && isIdentifiedObject(O2) && !isa<Constant>(O2)) ||
+      (isa<Constant>(O2) && isIdentifiedObject(O1) && !isa<Constant>(O1)))
+    return NoAlias;
+
+  // Function arguments can't alias with things that are known to be
+  // unambigously identified at the function level.
+  if ((isa<Argument>(O1) && isIdentifiedFunctionLocal(O2)) ||
+      (isa<Argument>(O2) && isIdentifiedFunctionLocal(O1)))
+    return NoAlias;
+
+  // If one pointer is the result of a call/invoke or load and the other is a
+  // non-escaping local object within the same function, then we know the
+  // object couldn't escape to a point where the call could return it.
+  //
+  // Note that if the pointers are in different functions, there are a
+  // variety of complications. A call with a nocapture argument may still
+  // temporary store the nocapture argument's value in a temporary memory
+  // location if that memory location doesn't escape. Or it may pass a
+  // nocapture value to other functions as long as they don't capture it.
+  if (isEscapeSource(O1) &&
+      isNonEscapingLocalObject(O2, &AAQI.IsCapturedCache))
+    return NoAlias;
+  if (isEscapeSource(O2) &&
+      isNonEscapingLocalObject(O1, &AAQI.IsCapturedCache))
+    return NoAlias;
+
+  return MayAlias;
+}
+
+#define C_INJECTIVE  1
+#define C_PURE       2
+#define C_VIEW       4
+#define C_TOKEN      8
+
+static const std::pair<Attribute::AttrKind, int> AttrTable[] = {
+  {Attribute::Injective, C_INJECTIVE},
+  {Attribute::ReducerRegister, C_TOKEN},
+  {Attribute::ReducerView, C_VIEW},
+  {Attribute::ReducerToken, C_TOKEN}
+};
+
+// Tapir/OpenCilk code has some simple optimization opportunities.
+// 1. Some runtime functions are injections, i.e. they return nonaliasing
+// pointers when given nonaliasing arguments.
+// 2. Some runtime functions are pure, or pure within a region of execution,
+// which means the return values MustAlias if the arguments are identical.
+// 3. View lookups return a value that does not alias anything that the
+// argument does not alias (for simplicity, this implies injective).
+// 4. Token lookups return a value that does not alias any alloca or global.
+static const Value *getRecognizedArgument(const Value *V, bool InSameSpindle,
+                                         const Value *&Fn, int &Behavior) {
+  const CallInst *C = dyn_cast<CallInst>(V);
+  if (!C)
+    return nullptr;
+  unsigned NumOperands = C->getNumOperands();
+  if (NumOperands != 2)
+    return nullptr;
+  for (auto E : AttrTable) {
+    if (C->hasFnAttr(E.first))
+      Behavior |= E.second;
+  }
+  if ((InSameSpindle && C->isStrandPure()) ||
+      (C->doesNotAccessMemory() && C->doesNotThrow() &&
+       C->hasFnAttr(Attribute::WillReturn)))
+    Behavior |= C_PURE;
+  if (Behavior == 0)
+    return nullptr;
+  Fn = C->getCalledOperand();
+  return C->getOperand(0);
+}
+
+AliasResult
+BasicAAResult::checkInjectiveArguments(const Value *V1, const Value *O1,
+                                       const Value *V2, const Value *O2,
+                                       AAQueryInfo &AAQI) {
+  // V1 and V2 are the original pointers stripped of casts
+  // O1 and O2 are the underlying objects stripped of GEP as well
+
+  const Value *Fn1 = nullptr, *Fn2 = nullptr;
+  int Behavior1 = 0, Behavior2 = 0;
+  bool InSameSpindle = AAQI.AssumeSameSpindle;
+  const Value *A1 = getRecognizedArgument(V1, InSameSpindle, Fn1, Behavior1);
+  const Value *A2 = getRecognizedArgument(V2, InSameSpindle, Fn2, Behavior2);
+
+  if ((Behavior1 & (C_INJECTIVE|C_PURE|C_VIEW|C_TOKEN)) == 0 &&
+      (Behavior2 & (C_INJECTIVE|C_PURE|C_VIEW|C_TOKEN)) == 0)
+    return MayAlias;
+
+  // At least one value is a call to an understood function
+  assert(A1 || A2);
+  assert(!!A1 == !!Fn1);
+  assert(!!A2 == !!Fn2);
+
+  // Calls to two different functions can not be analyzed.
+  if (Fn1 && Fn2 && Fn1 != Fn2)
+    return MayAlias;
+
+  // Pure functions return equal values given equal arguments.
+  AliasResult Equal = (Behavior1 & Behavior2 & C_PURE) ? MustAlias : MayAlias;
+
+  // This is for testing.  The intended use is with pointer arguments.
+  if (A1 && A2 && (Behavior1 & C_INJECTIVE)) {
+    if (const ConstantInt *I1 = dyn_cast<ConstantInt>(A1)) {
+      if (const ConstantInt *I2 = dyn_cast<ConstantInt>(A2))
+        return I1->getValue() == I2->getValue() ? Equal : NoAlias;
+      return MayAlias;
+    }
+  }
+
+  bool Known1 = false, Known2 = false;
+  const Value *U1 = nullptr, *U2 = nullptr;
+
+  if (A1) {
+    U1 = getUnderlyingObject(A1, MaxLookupSearchDepth);
+    Known1 = isIdentifiedObject(U1);
+  }
+  if (A2) {
+    U2 = getUnderlyingObject(A2, MaxLookupSearchDepth);
+    Known2 = isIdentifiedObject(U2);
+  }
+
+  // Token lookups do not alias any identified object.
+  // View lookups do not alias allocas that do not alias the argument
+  if (!A1) {
+    if (!Known2)
+      return MayAlias;
+    if (Behavior2 & C_TOKEN)
+      return NoAlias;
+    if (Behavior2 & C_VIEW)
+      return UnderlyingNoAlias(O1, U2, AAQI);
+    return MayAlias;
+  }
+  if (!A2) {
+    if (!Known1)
+      return MayAlias;
+    if (Behavior1 & C_TOKEN)
+      return NoAlias;
+    if (Behavior1 & C_VIEW)
+      return UnderlyingNoAlias(U1, O2, AAQI);
+    return MayAlias;
+  }
+
+  if (!(Behavior1 & C_INJECTIVE))
+    return MayAlias;
+
+  // Two calls to the same function with the same value.
+  if (isValueEqualInPotentialCycles(A1, A2))
+    return Equal;
+
+  // Two calls with different values based on the same object.
+  if (U1 == U2) {
+    BasicAAResult::DecomposedGEP DecompGEP1 =
+        DecomposeGEPExpression(A1, DL, &AC, DT);
+    BasicAAResult::DecomposedGEP DecompGEP2 =
+        DecomposeGEPExpression(A2, DL, &AC, DT);
+    if (DecompGEP1.HasCompileTimeConstantScale &&
+        DecompGEP2.HasCompileTimeConstantScale &&
+        DecompGEP1.VarIndices.empty() &&
+        DecompGEP2.VarIndices.empty() &&
+        isValueEqualInPotentialCycles(DecompGEP1.Base, DecompGEP2.Base))
+      return DecompGEP1.Offset == DecompGEP2.Offset ? Equal : NoAlias;
+    return MayAlias;
+  }
+
+  return UnderlyingNoAlias(U1, U2, AAQI);
+}
+
 /// Provides a bunch of ad-hoc rules to disambiguate in common cases, such as
 /// array references.
 AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
@@ -1521,6 +1702,14 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
   if (!V1->getType()->isPointerTy() || !V2->getType()->isPointerTy())
     return NoAlias; // Scalars cannot alias each other
 
+#if 0
+  V1->print(dbgs());
+  dbgs() << " + " << V1Size << '\n';
+  V2->print(dbgs());
+  dbgs() << " + " << V2Size << '\n';
+  dbgs() << (AAQI.AssumeSameSpindle ? "(same spindle)\n" : "\n");
+#endif
+
   // Figure out what objects these things are pointing to if we can.
   const Value *O1 = getUnderlyingObject(V1, MaxLookupSearchDepth);
   const Value *O2 = getUnderlyingObject(V2, MaxLookupSearchDepth);
@@ -1534,44 +1723,18 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
     if (!NullPointerIsDefined(&F, CPN->getType()->getAddressSpace()))
       return NoAlias;
 
-  if (O1 != O2) {
-    // If V1/V2 point to two different objects, we know that we have no alias.
-    if (AAQI.AssumeSameSpindle) {
-      if (isIdentifiedObjectIfInSameSpindle(O1) &&
-          isIdentifiedObjectIfInSameSpindle(O2))
-        return NoAlias;
-    } else {
-      if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
-        return NoAlias;
-    }
-
-    // Constant pointers can't alias with non-const isIdentifiedObject objects.
-    if ((isa<Constant>(O1) && isIdentifiedObject(O2) && !isa<Constant>(O2)) ||
-        (isa<Constant>(O2) && isIdentifiedObject(O1) && !isa<Constant>(O1)))
-      return NoAlias;
-
-    // Function arguments can't alias with things that are known to be
-    // unambigously identified at the function level.
-    if ((isa<Argument>(O1) && isIdentifiedFunctionLocal(O2)) ||
-        (isa<Argument>(O2) && isIdentifiedFunctionLocal(O1)))
-      return NoAlias;
-
-    // If one pointer is the result of a call/invoke or load and the other is a
-    // non-escaping local object within the same function, then we know the
-    // object couldn't escape to a point where the call could return it.
-    //
-    // Note that if the pointers are in different functions, there are a
-    // variety of complications. A call with a nocapture argument may still
-    // temporary store the nocapture argument's value in a temporary memory
-    // location if that memory location doesn't escape. Or it may pass a
-    // nocapture value to other functions as long as they don't capture it.
-    if (isEscapeSource(O1) &&
-        isNonEscapingLocalObject(O2, &AAQI.IsCapturedCache))
-      return NoAlias;
-    if (isEscapeSource(O2) &&
-        isNonEscapingLocalObject(O1, &AAQI.IsCapturedCache))
-      return NoAlias;
+  /* If the call is an injection (distinct argument implies
+     distinct return) some more optimization is possible. */
+  AliasResult InjectiveResult =
+      checkInjectiveArguments(V1, O1, V2, O2, AAQI);
+  if (InjectiveResult == NoAlias)
+    return NoAlias;
+  if (InjectiveResult == MustAlias) {
+    return V1AAInfo == V2AAInfo ? MustAlias : MayAlias;
   }
+
+  if (O1 != O2 && UnderlyingNoAlias(O1, O2, AAQI) == NoAlias)
+    return NoAlias;
 
   // If the size of one access is larger than the entire object on the other
   // side, then we know such behavior is undefined and can assume no alias.

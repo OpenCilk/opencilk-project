@@ -249,6 +249,10 @@ private:
                                   LocationSize V2Size, const AAMDNodes &V2AATag,
                                   AAQueryInfo &AAQI, const Value *O1,
                                   const Value *O2);
+
+  AliasResult checkInjectiveArguments(const Value *V1, const Value *O1,
+                                      const Value *V2, const Value *O2,
+                                      AAQueryInfo &AAQI);
 };
 
 /// Analysis pass providing a never-invalidated alias analysis result.
