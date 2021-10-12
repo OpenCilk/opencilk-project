@@ -1242,8 +1242,7 @@ public:
   llvm::Instruction *EmitSyncRegionStart();
 
   void PopSyncRegion() {
-    if (CurSyncRegion)
-      delete CurSyncRegion;
+    delete CurSyncRegion; // ~SyncRegion updates CurSyncRegion
   }
 
   void EnsureSyncRegion() {
