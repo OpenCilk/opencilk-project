@@ -2,17 +2,13 @@ name: libclang ABI Tests
 
 # TODO: Enable this test based on OpenCilk Clang changes.
 
-# on:
-#   push:
-#     branches:
-#       - 'release/**'
-#     paths:
-#       - 'clang/**'
-#       - '.github/workflows/libclang-abi-tests.yml'
-#   pull_request:
-#     paths:
-#       - 'clang/**'
-#       - '.github/workflows/libclang-abi-tests.yml'
+on:
+   push:
+     branches:
+       - 'xrelease/**'
+     paths:
+       - 'clang/**'
+       - '.github/workflows/libclang-abi-tests.yml'
 
 jobs:
   abi-dump-setup:
