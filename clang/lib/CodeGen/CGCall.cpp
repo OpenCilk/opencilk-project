@@ -5115,6 +5115,11 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   AllocAlignAttrEmitter AllocAlignAttrEmitter(*this, TargetDecl, CallArgs);
   Attrs = AllocAlignAttrEmitter.TryEmitAsCallSiteAttribute(Attrs);
 
+  // sync before calling exit()
+  if (CurSyncRegion && !ScopeIsSynced && !InvokeDest &&
+      Attrs.hasFnAttribute(llvm::Attribute::NoReturn))
+    EmitImplicitSyncCleanup(nullptr);
+
   // Emit the actual call/invoke instruction.
   llvm::CallBase *CI;
   if (!InvokeDest) {
