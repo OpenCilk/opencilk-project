@@ -49,6 +49,7 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSReducerRegister = nullptr;
   FunctionCallee CilkRTSReducerUnregister = nullptr;
   FunctionCallee CilkRTSReducerLookup = nullptr;
+  FunctionCallee CilkRTSReducerToken = nullptr;
 
   // Accessors for opaque Cilk RTS functions
   FunctionCallee CilkHelperEpilogueExn = nullptr;
@@ -103,6 +104,9 @@ class OpenCilkABI final : public TapirTarget {
   }
   FunctionCallee Get__cilkrts_reducer_lookup() {
     return CilkRTSReducerLookup;
+  }
+  FunctionCallee Get__cilkrts_reducer_token() {
+    return CilkRTSReducerToken;
   }
 
   // Helper functions for implementing the Cilk ABI protocol

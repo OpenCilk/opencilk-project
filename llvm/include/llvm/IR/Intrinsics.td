@@ -1334,16 +1334,12 @@ def int_task_frameaddress
 
 // Or [llvm_anyptr_ty], [LLVMMatchType<0>]
 // isSpeculatable, ReadOnly, NoUnwind, IntrInaccessibleMemOnly
+// TODO: Intrinsic<[llvm_anyptr_ty], [LLVMMatchType<0>],
 def int_reducer_lookup
     : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
     [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
      IntrStrandPure, IntrReducerView, IntrInjective]>;
 
-// TODO: With constant argument the return value only changes
-// at calls to int_reducer_register with the same argument.
-// (But view access can not be reordered relative to unregister.)
-// Maybe the hyperobject table can be modeled as a distinct memory
-// space.
 def int_reducer_of
     : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
     [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly, IntrReducerToken]>;

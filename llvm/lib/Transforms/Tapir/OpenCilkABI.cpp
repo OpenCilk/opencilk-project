@@ -202,6 +202,7 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
+      {"__cilkrts_reducer_token", PtrPtrTy, CilkRTSReducerToken},
       {"__cilkrts_reducer_lookup", PtrPtrTy, CilkRTSReducerLookup},
       {"__cilkrts_reducer_register", RegTy, CilkRTSReducerRegister},
       {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
@@ -948,6 +949,9 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
     llvm_unreachable("unexpected reducer intrinsic");
   case Intrinsic::reducer_lookup:
     Fn = Get__cilkrts_reducer_lookup();
+    break;
+  case Intrinsic::reducer_of:
+    Fn = Get__cilkrts_reducer_token();
     break;
   case Intrinsic::reducer_register:
     Fn = Get__cilkrts_reducer_register();
