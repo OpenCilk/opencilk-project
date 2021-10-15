@@ -609,15 +609,36 @@ void IntrinsicEmitter::EmitGenerator(const CodeGenIntrinsicTable &Ints,
 namespace {
 struct AttributeComparator {
   bool operator()(const CodeGenIntrinsic *L, const CodeGenIntrinsic *R) const {
-    // Sort throwing intrinsics after non-throwing intrinsics;
-    // otherwise the order is arbitrary.
+    // Sort throwing intrinsics after non-throwing intrinsics.
+    if (L->canThrow != R->canThrow)
+      return R->canThrow;
 
-    for (unsigned I = 0; I < CodeGenIntrinsic::BoolFieldListSize; ++I) {
-      bool LV = L->*CodeGenIntrinsic::BoolFieldList[I].Field;
-      bool RV = L->*CodeGenIntrinsic::BoolFieldList[I].Field;
-      if (LV != RV)
-        return RV;
-    }
+    if (L->isNoDuplicate != R->isNoDuplicate)
+      return R->isNoDuplicate;
+
+    if (L->isNoReturn != R->isNoReturn)
+      return R->isNoReturn;
+
+    if (L->isNoSync != R->isNoSync)
+      return R->isNoSync;
+
+    if (L->isNoFree != R->isNoFree)
+      return R->isNoFree;
+
+    if (L->isWillReturn != R->isWillReturn)
+      return R->isWillReturn;
+
+    if (L->isCold != R->isCold)
+      return R->isCold;
+
+    if (L->isConvergent != R->isConvergent)
+      return R->isConvergent;
+
+    if (L->isSpeculatable != R->isSpeculatable)
+      return R->isSpeculatable;
+
+    if (L->hasSideEffects != R->hasSideEffects)
+      return R->hasSideEffects;
 
     // Try to order by readonly/readnone attribute.
     CodeGenIntrinsic::ModRefBehavior LK = L->ModRef;
