@@ -3219,11 +3219,13 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
             if (Intrinsic::syncregion_start == II->getIntrinsicID()) {
               // Identify this sync region with a counter value, where all sync
               // regions within a function or task are numbered from 0.
-              BasicBlock *TEntry = TI.getTaskFor(&BB)->getEntry();
-              // Create a new counter if need be.
-              if (!SRCounters.count(TEntry))
-                SRCounters[TEntry] = 0;
-              SyncRegNums[&Inst] = SRCounters[TEntry]++;
+              if (TI.getTaskFor(&BB)) {
+                BasicBlock *TEntry = TI.getTaskFor(&BB)->getEntry();
+                // Create a new counter if need be.
+                if (!SRCounters.count(TEntry))
+                  SRCounters[TEntry] = 0;
+                SyncRegNums[&Inst] = SRCounters[TEntry]++;
+              }
             }
 
           // Record this function call as either an allocation function, a call to
