@@ -2495,8 +2495,10 @@ bool DependenceInfo::gcdMIVtest(const SCEV *Src, const SCEV *Dst,
       LLVM_DEBUG(dbgs() << "\tRemainder = " << Remainder << "\n");
       if (Remainder != 0) {
         unsigned Level = mapSrcLoop(CurLoop);
-        Result.DV[Level - 1].Direction &= unsigned(~Dependence::DVEntry::EQ);
-        Improved = true;
+        if (Level <= Result.Levels) {
+          Result.DV[Level - 1].Direction &= unsigned(~Dependence::DVEntry::EQ);
+          Improved = true;
+        }
       }
     }
   }
