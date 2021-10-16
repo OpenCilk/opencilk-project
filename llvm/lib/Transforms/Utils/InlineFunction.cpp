@@ -650,9 +650,11 @@ static void HandleInlinedTasksHelper(
     // Promote any calls in the block to invokes.
     if (BasicBlock *NewBB = HandleCallsInBlockInlinedThroughInvoke(
             BB, UnwindEdge)) {
-      // Update any PHI nodes in the exceptional block to indicate that there
-      // is now a new entry in them.
-      Invoke.addIncomingPHIValuesFor(NewBB);
+      // If this is the topmost invocation of HandleInlinedTasksHelper, update
+      // any PHI nodes in the exceptional block to indicate that there is now a
+      // new entry in them.
+      if (nullptr == ParentWorklist)
+        Invoke.addIncomingPHIValuesFor(NewBB);
       BlocksToProcess.insert(
           cast<InvokeInst>(NewBB->getTerminator())->getNormalDest());
     }
@@ -689,7 +691,7 @@ static void HandleInlinedTasksHelper(
       continue;
     }
 
-    // Process a detach instruction specially.  In particular, process th
+    // Process a detach instruction specially.  In particular, process the
     // spawned task recursively.
     if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
       if (!DI->hasUnwindDest()) {
@@ -706,8 +708,13 @@ static void HandleInlinedTasksHelper(
         // If the new unwind edge is not used, remove it.
         if (pred_empty(SubTaskUnwindEdge))
           SubTaskUnwindEdge->eraseFromParent();
-        else
+        else {
           DetachesToReplace.push_back(DI);
+          // Update PHI nodes in the exceptional block to indicate that
+          // SubTaskUnwindEdge is a new entry in them.  This should only have an
+          // effect for the topmost call to HandleInlinedTasksHelper.
+          Invoke.addIncomingPHIValuesFor(SubTaskUnwindEdge);
+        }
 
       } else if (Visited.insert(DI->getUnwindDest()).second) {
         // If the detach-unwind isn't dead, add it to the worklist.
@@ -737,6 +744,11 @@ static void HandleInlinedTasksHelper(
   // Replace detaches that now require unwind destinations.
   while (!DetachesToReplace.empty()) {
     DetachInst *DI = DetachesToReplace.pop_back_val();
+    // If this is the topmost invocation of HandleInlinedTasksHelper, update any
+    // PHI nodes in the exceptional block to indicate that there is now a new
+    // entry in them.
+    if (nullptr == ParentWorklist)
+      Invoke.addIncomingPHIValuesFor(DI->getParent());
     ReplaceInstWithInst(DI, DetachInst::Create(
                             DI->getDetached(), DI->getContinue(), UnwindEdge,
                             DI->getSyncRegion()));
