@@ -53,10 +53,7 @@ public:
 } // End anonymous namespace
 
 const CodeGenIntrinsic::BoolField CodeGenIntrinsic::BoolFieldList[] = {
-  // canThrow first; AttributeComparator::operator() wants it that way
   {&CodeGenIntrinsic::canThrow, "Throws", nullptr},
-  {&CodeGenIntrinsic::isOverloaded, nullptr, nullptr},
-  {&CodeGenIntrinsic::isCommutative, "Commutative", nullptr},
   {&CodeGenIntrinsic::isNoReturn, "IntrNoReturn", "Attribute::NoReturn"},
   {&CodeGenIntrinsic::isNoSync, "IntrNoSync", "Attribute::NoSync"},
   {&CodeGenIntrinsic::isNoFree, "IntrNoFree", "Attribute::NoFree"},
@@ -64,9 +61,11 @@ const CodeGenIntrinsic::BoolField CodeGenIntrinsic::BoolFieldList[] = {
   {&CodeGenIntrinsic::isCold, "IntrCold", "Attribute::Cold"},
   {&CodeGenIntrinsic::isNoDuplicate, "IntrNoDuplicate",
         "Attribute::NoDuplicate"},
+  {&CodeGenIntrinsic::isOverloaded, nullptr, nullptr},
   {&CodeGenIntrinsic::isConvergent, "IntrConvergent", "Attribute::Convergent"},
   {&CodeGenIntrinsic::isSpeculatable, "IntrSpeculatable",
         "Attribute::Speculatable"},
+  {&CodeGenIntrinsic::isCommutative, "Commutative", nullptr},
   {&CodeGenIntrinsic::hasSideEffects, "IntrHasSideEffects", nullptr},
   {&CodeGenIntrinsic::isInjective, "IntrInjective", "Attribute::Injective"},
   {&CodeGenIntrinsic::isStrandPure, "IntrStrandPure",
@@ -797,8 +796,15 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
       }
     }
 
-    std::string Prefix = "      const Attribute::AttrKind Atts[] = {";
+    const char *Prefix = "      const Attribute::AttrKind Atts[] = {";
     bool Emitted = false;
+
+    if (!intrinsic.canThrow) {
+      OS << Prefix;
+      Prefix = ",";
+      Emitted = true;
+      OS << "Attribute::NoUnwind";
+    }
 
     for (unsigned I = 0; I < CodeGenIntrinsic::BoolFieldListSize; ++I) {
       const CodeGenIntrinsic::BoolField &Field =
@@ -810,15 +816,10 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
         OS << Field.OutputName;
       }
     }
-    if (!intrinsic.canThrow) {
-      OS << Prefix;
-      Prefix = ",";
-      Emitted = true;
-      OS << "Attribute::NoUnwind";
-    }
 
     if (intrinsic.ModRef != CodeGenIntrinsic::ReadWriteMem &&
-        !intrinsic.hasSideEffects) {
+        (intrinsic.ModRef != CodeGenIntrinsic::NoMem ||
+         !intrinsic.hasSideEffects)) {
         OS << Prefix;
         Prefix = ",";
         Emitted = true;

@@ -819,6 +819,11 @@ void CodeGenIntrinsic::setDefaultProperties(
 
 void CodeGenIntrinsic::setProperty(Record *R) {
 
+  if (R->getName() == "IntrWillReturn") {
+    isWillReturn = !isNoReturn;
+    return;
+  }
+
   for (unsigned I = 0; I < BoolFieldListSize; ++I) {
     if (R->getName() == BoolFieldList[I].InputName) {
       this->*BoolFieldList[I].Field = true;
