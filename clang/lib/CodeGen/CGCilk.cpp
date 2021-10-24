@@ -820,7 +820,7 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     // detach.
     if (InvokeDest) {
       CGBuilderTy::InsertPoint SavedIP = Builder.saveIP();
-      Builder.SetInsertPoint(DetachBlock);
+      Builder.SetInsertPoint(Detach);
       // Create the new detach instruction.
       llvm::DetachInst *NewDetach = Builder.CreateDetach(
           ForBodyEntry, Continue.getBlock(), InvokeDest,
