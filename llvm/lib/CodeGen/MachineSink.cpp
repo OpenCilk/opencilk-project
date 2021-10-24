@@ -185,6 +185,8 @@ namespace {
 
     bool hasStoreBetween(MachineBasicBlock *From, MachineBasicBlock *To,
                          MachineInstr &MI);
+    bool possiblyHasSetjmpBetween(MachineBasicBlock *From,
+                                  MachineBasicBlock *To, MachineInstr &MI);
 
     /// Postpone the splitting of the given critical
     /// edge (\p From, \p To).
@@ -735,6 +737,22 @@ bool MachineSinking::isProfitableToSinkTo(Register Reg, MachineInstr &MI,
   return true;
 }
 
+// Helper function to check if MBB contains a terminator that might correspond
+// with EH_SjLj_Setup.
+static bool blockMayContainSetjmpSetup(const MachineBasicBlock *MBB,
+                                       const MachineBasicBlock *Succ) {
+  for (const MachineInstr &MI : MBB->terminators())
+    // It seems hard to check for EH_SjLj_Setup directly, since that instruction
+    // seems to be target-dependent.  Instead we simply check if the terminator
+    // has unmodeled side effects.
+    if (MI.hasUnmodeledSideEffects() &&
+        llvm::any_of(MI.operands(), [&](const MachineOperand &Op) {
+          return Op.isMBB() && Op.getMBB() == Succ;
+        }))
+      return true;
+  return false;
+}
+
 /// Get the sorted sequence of successors for this MachineBasicBlock, possibly
 /// computing it if it was not already cached.
 SmallVector<MachineBasicBlock *, 4> &
@@ -1098,6 +1116,26 @@ bool MachineSinking::hasStoreBetween(MachineBasicBlock *From,
   return HasAliasedStore;
 }
 
+// possiblyHasSetjmpBetween - Check for setjmps along the path from block From
+// to block To.
+bool MachineSinking::possiblyHasSetjmpBetween(MachineBasicBlock *From,
+                                              MachineBasicBlock *To,
+                                              MachineInstr &MI) {
+  // For now we examine just the predecessors of predecessors of To for possible
+  // setjmp-setup constructs.
+  for (MachineBasicBlock *BB : To->predecessors()) {
+    if (BB->hasAddressTaken() && PDT->dominates(To, BB)) {
+      for (MachineBasicBlock *Pred : BB->predecessors()) {
+        if (PDT->dominates(To, Pred)) {
+          if (blockMayContainSetjmpSetup(Pred, BB))
+            return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// SinkInstruction - Determine whether it is safe to sink the specified machine
 /// instruction out of its current block into a successor.
 bool MachineSinking::SinkInstruction(MachineInstr &MI, bool &SawStore,
@@ -1175,6 +1213,13 @@ bool MachineSinking::SinkInstruction(MachineInstr &MI, bool &SawStore,
     // Don't sink instructions into a loop.
     if (!TryBreak && LI->isLoopHeader(SuccToSinkTo)) {
       LLVM_DEBUG(dbgs() << " *** NOTE: Loop header found\n");
+      TryBreak = true;
+    }
+
+    // Don't sink instructions into successors of setjmps that may execute
+    // multiple times.
+    if (!TryBreak && possiblyHasSetjmpBetween(ParentBlock, SuccToSinkTo, MI)) {
+      LLVM_DEBUG(dbgs() << " *** NOTE: Possible setjmp setup found\n");
       TryBreak = true;
     }
 
