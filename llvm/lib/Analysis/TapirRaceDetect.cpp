@@ -457,6 +457,9 @@ static bool checkInstructionForRace(const Instruction *I,
     if (IgnoreTerminationCalls &&
         isa<UnreachableInst>(I->getParent()->getTerminator())) {
       const Function *CF = Call->getCalledFunction();
+      // If this function call is indirect, we want to instrument it.
+      if (!CF)
+        return true;
       // If this is an ordinary function call in a terminating block, ignore it.
       if (!CF->hasFnAttribute(Attribute::NoReturn))
         return false;
