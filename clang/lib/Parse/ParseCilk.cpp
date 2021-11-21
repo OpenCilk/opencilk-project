@@ -225,12 +225,10 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
     // Parse the second part of the for specifier.
     if (Tok.is(tok::semi)) {  // for (...;;
       // no second part.
-      Diag(Tok, diag::err_cilk_for_missing_condition)
-        << FirstPart.get()->getSourceRange();
+      Diag(Tok, diag::err_cilk_for_missing_condition);
     } else if (Tok.is(tok::r_paren)) {
       // missing both semicolons.
-      Diag(Tok, diag::err_cilk_for_missing_condition)
-        << FirstPart.get()->getSourceRange();
+      Diag(Tok, diag::err_cilk_for_missing_condition);
     } else {
       if (getLangOpts().CPlusPlus)
         SecondPart =
@@ -264,9 +262,9 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
       // FIXME: The C++11 standard doesn't actually say that this is a
       // discarded-value expression, but it clearly should be.
       ThirdPart = Actions.MakeFullDiscardedValueExpr(Third.get());
-    } else
-      Diag(Tok, diag::err_cilk_for_missing_increment)
-        << FirstPart.get()->getSourceRange();      
+    } else {
+      Diag(Tok, diag::err_cilk_for_missing_increment);
+    }
   }
   // Match the ')'.
   T.consumeClose();
