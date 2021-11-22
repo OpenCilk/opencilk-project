@@ -4152,6 +4152,8 @@ void CodeGenModule::maybeSetTrivialComdat(const Decl &D,
 
 // Reducer callbacks must be declarations or null.
 Expr *CodeGenModule::ValidateReducerCallback(Expr *E) {
+  if (!E)
+    return nullptr;
   E = E->IgnoreParenCasts();
   switch (E->getStmtClass()) {
   case Stmt::CXXNullPtrLiteralExprClass:

@@ -3743,11 +3743,21 @@ def ReducerUnregister : InheritableAttr {
   let Documentation = [StrandMallocDocs];
 }
 
-def Reducer : Attr {
+def Hyperobject : Attr {
+  let Spellings = [
+    GNU<"hyperobject">
+  ];
+  let Args = [ExprArgument<"lookup", 1>];
+  let Subjects = SubjectList<[Var, TypedefName]>;
+  let Documentation = [HyperobjectDocs];
+}
+
+def ReducerCallbacks : Attr {
   let Spellings = [
     GNU<"reducer">
   ];
-  let Args = [ExprArgument<"combine">, ExprArgument<"init">, ExprArgument<"destruct", 1>];
+  let Args = [ExprArgument<"reduce">, ExprArgument<"init">,
+      ExprArgument<"destruct", 1>];
   let Subjects = SubjectList<[Var, TypedefName]>;
-  let Documentation = [Undocumented];
+  let Documentation = [ReducerDocs];
 }

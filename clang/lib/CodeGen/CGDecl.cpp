@@ -572,10 +572,10 @@ namespace {
   
   struct CallReducerCleanup final : EHScopeStack::Cleanup {
     const VarDecl &Var;
-    ReducerAttr *Reducer;
+    ReducerCallbacksAttr *Reducer;
 
     CallReducerCleanup(const VarDecl *VarPtr)
-      : Var(*VarPtr), Reducer(VarPtr->getAttr<ReducerAttr>()) {
+      : Var(*VarPtr), Reducer(VarPtr->getAttr<ReducerCallbacksAttr>()) {
       assert(Reducer);
     }
 
@@ -1828,16 +1828,16 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
      1. Move this after the initializer?
      2. Should the three function pointers be passed as arguments or as
      a pointer to structure? */
-  if (ReducerAttr *R = D.getAttr<ReducerAttr>()) {
+  if (ReducerCallbacksAttr *R = D.getAttr<ReducerCallbacksAttr>()) {
     assert(!emission.IsEscapingByRef);
     llvm::Value *Empty = CGM.EmitNullConstant(getContext().VoidPtrTy);
-    llvm::Value *Combine = Empty, *Init = Empty, *Destruct = Empty;
+    llvm::Value *Reduce = Empty, *Init = Empty, *Destruct = Empty;
     if (Expr *InitExpr = CGM.ValidateReducerCallback(R->getInit()))
       Init = Builder.CreateBitCast(EmitLValue(InitExpr).getPointer(*this),
                                    VoidPtrTy);
-    if (Expr *CombineExpr = CGM.ValidateReducerCallback(R->getCombine()))
-      Combine =
-          Builder.CreateBitCast(EmitLValue(CombineExpr).getPointer(*this),
+    if (Expr *ReduceExpr = CGM.ValidateReducerCallback(R->getReduce()))
+      Reduce =
+          Builder.CreateBitCast(EmitLValue(ReduceExpr).getPointer(*this),
                                 VoidPtrTy);
     if (Expr *DestructExpr = CGM.ValidateReducerCallback(R->getDestruct()))
       Destruct =
@@ -1846,6 +1846,7 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     llvm::Value *Z =
       Builder.CreateBitCast(emission.Addr.getPointer(), CGM.VoidPtrTy);
     /* The interface is specified with 32 bit size. */
+    /* TODO: Give the builtin a variable width. */
     llvm::Value *Size = nullptr;
     llvm::Type *I32 = llvm::Type::getInt32Ty(getLLVMContext());
     if (uint64_t Bits = getContext().getTypeSize(type)) {
@@ -1859,8 +1860,9 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
 	Size = Builder.CreateTrunc(Size, I32);
     }
     // TODO: mark this call as registering a local
+    // TODO: add better handling of attribute arguments that evaluate to null
     llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::reducer_register);
-    Builder.CreateCall(F, {Z, Size, Combine, Init, Destruct});
+    Builder.CreateCall(F, {Z, Size, Reduce, Init, Destruct});
   }
 
   // If this local has an initializer, emit it now.
@@ -2124,7 +2126,7 @@ void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
     EHStack.pushCleanup<CallCleanupFunction>(NormalAndEHCleanup, F, &Info, &D);
   }
 
-  if (D.getAttr<ReducerAttr>()) {
+  if (D.hasAttr<ReducerCallbacksAttr>()) {
     EHStack.pushCleanup<CallReducerCleanup>(NormalAndEHCleanup, &D);
   }
 

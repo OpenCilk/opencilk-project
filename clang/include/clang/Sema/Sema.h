@@ -5129,7 +5129,7 @@ public:
                    SourceLocation TemplateKWLoc = SourceLocation(),
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
 
-  Expr *BuildReducerViewLookup(Expr *Var);
+  Expr *BuildHyperobjectLookup(Expr *Var);
 
   ExprResult
   BuildAnonymousStructUnionMemberReference(
@@ -10100,8 +10100,13 @@ public:
                         RetainOwnershipKind K, bool IsTemplateInstantiation);
 
   /// AddReducerAttr - Adds an reducer attribute to a particular declaration.
-  void AddReducerAttr(SourceRange AttrRange, const AttributeCommonInfo &CI,
-                      Decl *D, Expr *E1, Expr *Init, Expr *Dest);
+  void AddHyperobjectAttr(SourceRange AttrRange,
+                          const AttributeCommonInfo &CI,
+                          Decl *D, Expr *View);
+  void AddReducerCallbacksAttr(SourceRange AttrRange,
+                               const AttributeCommonInfo &CI,
+                               Decl *D, Expr *Reduce, Expr *Init,
+                               Expr *Destruct);
 
   /// addAMDGPUFlatWorkGroupSizeAttr - Adds an amdgpu_flat_work_group_size
   /// attribute to a particular declaration.

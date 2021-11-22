@@ -2009,15 +2009,20 @@ NonOdrUseReason Sema::getNonOdrUseReasonInCurrentContext(ValueDecl *D) {
   return NOUR_None;
 }
 
-Expr *Sema::BuildReducerViewLookup(Expr *E) {
+// If this is a reference to a variable with a reducer attribute,
+// change it to a call to the view lookup function.
+Expr *Sema::BuildHyperobjectLookup(Expr *E) {
   if (!isa<DeclRefExpr>(E))
     return E;
 
-  DeclRefExpr *Ref = cast<DeclRefExpr>(E);
+  ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
 
-  ValueDecl *D = Ref->getDecl();
+  if (!isa<VarDecl>(D))
+    return E;
 
-  if (!isa<VarDecl>(D) || !cast<VarDecl>(D)->hasAttr<ReducerAttr>())
+  HyperobjectAttr *H = cast<VarDecl>(D)->getAttr<HyperobjectAttr>();
+
+  if (!H)
     return E;
 
   QualType Ty = E->getType();
@@ -2029,27 +2034,23 @@ Expr *Sema::BuildReducerViewLookup(Expr *E) {
     D->dump();
     llvm::errs() << '\n';
   }
-  /* TODO: Get this from attributes.  */
-  IdentifierInfo *I = PP.getIdentifierInfo("__reducer_lookup");
-  ValueDecl *Lookup =
-    dyn_cast<ValueDecl>(LazilyCreateBuiltin(I, I->getBuiltinID(),
-					    /* Scope = */ nullptr,
-					    /* ForRedeclaration = */ false,
-                                                SourceLocation()));
-  assert(Lookup && "no __reducer_lookup");
-  // *(T *)__reducer_lookup((void *)&D), where T is type of D.
 
+  Expr *Lookup = H->getLookup();
+  if (!Lookup || !isa<DeclRefExpr>(Lookup))
+    return E;
+    
   QualType Ptr = Context.getPointerType(D->getType());
-  Expr *LookupExpr = BuildDeclRefExpr(Lookup, Lookup->getType(), VK_RValue,
-				      SourceLocation(), nullptr);
 
   Expr *A = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr,
 				  VK_RValue, OK_Ordinary,
 				  SourceLocation(), false,
 				  CurFPFeatureOverrides());
-  ExprResult Call = BuildCallExpr(nullptr, LookupExpr, SourceLocation(),
-				  { A }, SourceLocation(), nullptr);
-  assert(Call.isUsable() && "__reducer_lookup call failed");
+  ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(),
+				  { A }, E->getExprLoc(), nullptr);
+
+  if (!Call.isUsable())
+    return E; /* error should have been printed */
+
   auto *Casted =
     ImplicitCastExpr::Create(Context, Ptr,
 			     CK_BitCast /*???*/,
@@ -2120,7 +2121,7 @@ Sema::BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
       E->setObjectKind(BE->getObjectKind());
 
   if (getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
-    return BuildReducerViewLookup(E);
+    return BuildHyperobjectLookup(E);
 
   return E;
 }

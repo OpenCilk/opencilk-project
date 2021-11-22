@@ -5328,8 +5328,39 @@ void Sema::AddXConsumedAttr(Decl *D, const AttributeCommonInfo &CI,
 }
 
 /* OpenCilk */
-static void handleReducerAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
-  // Currently based on language rather than code gen attributes.
+static void handleHyperobjectAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  if (S.getLangOpts().getCilk() != LangOptions::Cilk_opencilk) {
+    S.Diag(D->getBeginLoc(), diag::reducer_requires_cilk);
+    return;
+  }
+
+  Expr *Lookup = nullptr;
+  if (AL.getNumArgs() == 0) {
+    /* If argument count is zero. */
+    IdentifierInfo *ID = S.PP.getIdentifierInfo("__reducer_lookup");
+    if (ValueDecl *Builtin =
+        dyn_cast_or_null<ValueDecl>
+        (S.LazilyCreateBuiltin(ID, ID->getBuiltinID(),
+                               /* Scope = */ nullptr,
+                               /* ForRedeclaration = */ false,
+                               SourceLocation())))
+      Lookup = S.BuildDeclRefExpr(Builtin, Builtin->getType(), VK_RValue,
+                                  SourceLocation(), nullptr);
+  } else {
+    Lookup = AL.getArgAsExpr(0);
+  }
+
+  if (!Lookup || !isa<DeclRefExpr>(Lookup)) {
+    /* TODO: Have a clang expert figure out how to properly report an
+       error here. */
+    S.Diag(AL.getLoc(), diag::warn_attribute_type_not_supported)
+        << AL << "view function";
+    return;
+  }
+  S.AddHyperobjectAttr(AL.getRange(), AL, D, Lookup);
+}
+
+static void handleReducerCallbacksAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (S.getLangOpts().getCilk() != LangOptions::Cilk_opencilk) {
     S.Diag(D->getBeginLoc(), diag::reducer_requires_cilk);
     return;
@@ -5363,26 +5394,56 @@ static void handleReducerAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
     }
   }
 #endif
-  Expr *Dest = AL.getNumArgs() > 2 ? AL.getArgAsExpr(2) : nullptr;
-  S.AddReducerAttr(AL.getRange(), AL, D, AL.getArgAsExpr(0), AL.getArgAsExpr(1),
-		   Dest);
+  Expr *Reduce = AL.getArgAsExpr(0);
+  Expr *Identity = AL.getArgAsExpr(1);
+  Expr *Destruct = AL.getNumArgs() > 2 ? AL.getArgAsExpr(2) : nullptr;
+  
+  S.AddReducerCallbacksAttr(AL.getRange(), AL, D, Reduce, Identity, Destruct);
   /* See also handleCleanupAttr */
 }
 
-void Sema::AddReducerAttr(SourceRange AttrRange,
-                          const AttributeCommonInfo &CI,
-                          Decl *D, Expr *Red,
-                          Expr *Init, Expr *Dest) {
+void Sema::AddHyperobjectAttr(SourceRange AttrRange,
+                              const AttributeCommonInfo &CI,
+                              Decl *Decl, Expr *View) {
   if (false) {
-    llvm::errs() << "Sema::AddReducerAttr\n";
-    llvm::errs() << "red\n"; Red->dump();
-    llvm::errs() << "init\n"; Init->dump();
-    if (Dest) llvm::errs() << "dest\n"; Dest->dump();
+    llvm::errs() << "Sema::AddHyperobjectAttr\n";
+    if (View) {
+      llvm::errs() << "view\n"; View->dump();
+    }
   }
   QualType T;
-  if (auto *TD = dyn_cast<TypedefNameDecl>(D))
+  if (auto *TD = dyn_cast<TypedefNameDecl>(Decl))
     T = TD->getUnderlyingType();
-  else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+  else if (auto *VD = dyn_cast<ValueDecl>(Decl)) {
+    T = VD->getType();
+    VD->setType(T);
+  }
+  else
+    llvm_unreachable("Unknown decl type for reducer");
+
+  Decl->addAttr(::new (Context) HyperobjectAttr(Context, CI, View));
+}
+
+void Sema::AddReducerCallbacksAttr(SourceRange AttrRange,
+                                   const AttributeCommonInfo &CI,
+                                   Decl *Decl, Expr *Reduce,
+                                   Expr *Init, Expr *Destruct) {
+  if (false) {
+    llvm::errs() << "Sema::AddReducerCallbacksAttr\n";
+    if (Reduce) {
+      llvm::errs() << "reduce\n"; Reduce->dump();
+    }
+    if (Init) {
+      llvm::errs() << "init\n"; Init->dump();
+    }
+    if (Destruct) {
+      llvm::errs() << "dest\n"; Destruct->dump();
+    }
+  }
+  QualType T;
+  if (auto *TD = dyn_cast<TypedefNameDecl>(Decl))
+    T = TD->getUnderlyingType();
+  else if (auto *VD = dyn_cast<ValueDecl>(Decl)) {
     T = VD->getType();
     VD->setType(T);
   }
@@ -5393,8 +5454,8 @@ void Sema::AddReducerAttr(SourceRange AttrRange,
     llvm::errs() << "type of decl\n"; T->dump();
   }
 
-  D->addAttr(::new (Context) ReducerAttr(Context, CI, Red, Init, Dest));
-  return;
+  Decl->addAttr(::new (Context) ReducerCallbacksAttr(Context, CI, Reduce, Init,
+                                                     Destruct));
 }
 
 static Sema::RetainOwnershipKind
@@ -8398,8 +8459,11 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     break;
 
   // Cilk attributes
-  case ParsedAttr::AT_Reducer:
-    handleReducerAttr(S, D, AL);
+  case ParsedAttr::AT_ReducerCallbacks:
+    handleReducerCallbacksAttr(S, D, AL);
+    break;
+  case ParsedAttr::AT_Hyperobject:
+    handleHyperobjectAttr(S, D, AL);
     break;
   case ParsedAttr::AT_StrandMalloc:
     handleSimpleAttribute<StrandMallocAttr>(S, D, AL);
