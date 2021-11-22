@@ -2009,6 +2009,59 @@ NonOdrUseReason Sema::getNonOdrUseReasonInCurrentContext(ValueDecl *D) {
   return NOUR_None;
 }
 
+Expr *Sema::BuildReducerViewLookup(Expr *E) {
+  if (!isa<DeclRefExpr>(E))
+    return E;
+
+  DeclRefExpr *Ref = cast<DeclRefExpr>(E);
+
+  ValueDecl *D = Ref->getDecl();
+
+  if (!isa<VarDecl>(D) || !cast<VarDecl>(D)->hasAttr<ReducerAttr>())
+    return E;
+
+  QualType Ty = E->getType();
+
+  if (false) {
+    llvm::errs() << "reducer reference ";
+    Ty.dump();
+    llvm::errs() << " | ";
+    D->dump();
+    llvm::errs() << '\n';
+  }
+  /* TODO: Get this from attributes.  */
+  IdentifierInfo *I = PP.getIdentifierInfo("__reducer_lookup");
+  ValueDecl *Lookup =
+    dyn_cast<ValueDecl>(LazilyCreateBuiltin(I, I->getBuiltinID(),
+					    /* Scope = */ nullptr,
+					    /* ForRedeclaration = */ false,
+                                                SourceLocation()));
+  assert(Lookup && "no __reducer_lookup");
+  // *(T *)__reducer_lookup((void *)&D), where T is type of D.
+
+  QualType Ptr = Context.getPointerType(D->getType());
+  Expr *LookupExpr = BuildDeclRefExpr(Lookup, Lookup->getType(), VK_RValue,
+				      SourceLocation(), nullptr);
+
+  Expr *A = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr,
+				  VK_RValue, OK_Ordinary,
+				  SourceLocation(), false,
+				  CurFPFeatureOverrides());
+  ExprResult Call = BuildCallExpr(nullptr, LookupExpr, SourceLocation(),
+				  { A }, SourceLocation(), nullptr);
+  assert(Call.isUsable() && "__reducer_lookup call failed");
+  auto *Casted =
+    ImplicitCastExpr::Create(Context, Ptr,
+			     CK_BitCast /*???*/,
+			     Call.get(), nullptr, VK_RValue,
+			     CurFPFeatureOverrides());
+  auto *UO =
+    UnaryOperator::Create(Context, Casted, UO_Deref, Ty,
+			  VK_LValue, OK_Ordinary, SourceLocation(),
+			  false, CurFPFeatureOverrides());
+  return UO;
+}
+
 /// BuildDeclRefExpr - Build an expression that references a
 /// declaration that does not require a closure capture.
 Expr *
@@ -2020,9 +2073,6 @@ Sema::BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
   bool RefersToCapturedVariable =
       isa<VarDecl>(D) &&
       NeedToCaptureVariable(cast<VarDecl>(D), NameInfo.getLoc());
-
-  bool RefersToReducer =
-    isa<VarDecl>(D) && cast<VarDecl>(D)->hasAttr<ReducerAttr>();
 
   DeclRefExpr *E = DeclRefExpr::Create(
       Context, NNS, TemplateKWLoc, D, RefersToCapturedVariable, NameInfo, Ty,
@@ -2069,50 +2119,8 @@ Sema::BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
     if (auto *BE = BD->getBinding())
       E->setObjectKind(BE->getObjectKind());
 
-  if (RefersToReducer) {
-    if (false) {
-      llvm::errs() << "reducer reference ";
-      Ty.dump();
-      if (FoundD) {
-        llvm::errs() << " | ";
-        FoundD->dump();
-      }
-      llvm::errs() << '\n';
-    }
-    IdentifierInfo *I = PP.getIdentifierInfo("__reducer_lookup");
-    ValueDecl *Lookup =
-        dyn_cast<ValueDecl>(LazilyCreateBuiltin(I, I->getBuiltinID(),
-                                                /* Scope = */ nullptr,
-                                                /* ForRedeclaration = */ false,
-                                                SourceLocation()));
-    assert(Lookup && "no __reducer_lookup");
-    // *(T *)__reducer_lookup((void *)&D), where T is type of D.
-
-    QualType Ptr = Context.getPointerType(D->getType());
-    Expr *LookupExpr = BuildDeclRefExpr(Lookup, Lookup->getType(), VK_RValue,
-                                        NameInfo /* wrong */,
-                                        NNS /* wrong */,
-                                        nullptr, SourceLocation(),
-                                        nullptr);
-
-    Expr *A = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr,
-                                    VK_RValue, OK_Ordinary,
-                                    SourceLocation(), false,
-                                    CurFPFeatureOverrides());
-    ExprResult Call = BuildCallExpr(nullptr, LookupExpr, SourceLocation(),
-                                    { A }, SourceLocation(), nullptr);
-    assert(Call.isUsable() && "__reducer_lookup call failed");
-    auto *Casted =
-        ImplicitCastExpr::Create(Context, Ptr,
-                                 CK_BitCast /*???*/,
-                                 Call.get(), nullptr, VK_RValue,
-                                 CurFPFeatureOverrides());
-    auto *UO =
-        UnaryOperator::Create(Context, Casted, UO_Deref, Ty,
-                              VK_LValue, OK_Ordinary, SourceLocation(),
-                              false, CurFPFeatureOverrides());
-    return UO;
-  }
+  if (getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
+    return BuildReducerViewLookup(E);
 
   return E;
 }

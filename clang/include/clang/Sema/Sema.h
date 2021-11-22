@@ -5129,6 +5129,8 @@ public:
                    SourceLocation TemplateKWLoc = SourceLocation(),
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
 
+  Expr *BuildReducerViewLookup(Expr *Var);
+
   ExprResult
   BuildAnonymousStructUnionMemberReference(
       const CXXScopeSpec &SS,
