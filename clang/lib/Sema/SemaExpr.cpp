@@ -2120,9 +2120,6 @@ Sema::BuildDeclRefExpr(ValueDecl *D, QualType Ty, ExprValueKind VK,
     if (auto *BE = BD->getBinding())
       E->setObjectKind(BE->getObjectKind());
 
-  if (getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
-    return BuildHyperobjectLookup(E);
-
   return E;
 }
 
@@ -2477,7 +2474,7 @@ recoverFromMSUnqualifiedLookup(Sema &S, ASTContext &Context,
 ExprResult
 Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
                         SourceLocation TemplateKWLoc, UnqualifiedId &Id,
-                        bool HasTrailingLParen, bool IsAddressOfOperand,
+                        bool HasTrailingLParen, int IsAddressOfOperand,
                         CorrectionCandidateCallback *CCC,
                         bool IsInlineAsmIdentifier, Token *KeywordReplacement) {
   assert(!(IsAddressOfOperand && HasTrailingLParen) &&
@@ -2719,7 +2716,16 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     return BuildTemplateIdExpr(SS, TemplateKWLoc, R, ADL, TemplateArgs);
   }
 
-  return BuildDeclarationNameExpr(SS, R, ADL);
+  ExprResult Res = BuildDeclarationNameExpr(SS, R, ADL);
+
+  /* OpenCilk extension: Unless IsAddressOfOperand == 2 (see unary &&
+     in Parser::ParseCastExpression), hyperobject references implicitly
+     call the runtime. */
+  if (!Res.isInvalid() && IsAddressOfOperand <= 1 &&
+      getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
+    return Sema::BuildHyperobjectLookup(Res.get());
+
+  return Res;
 }
 
 /// BuildQualifiedDeclarationNameExpr - Build a C++ qualified

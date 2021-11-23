@@ -5076,7 +5076,7 @@ public:
 
   ExprResult ActOnIdExpression(
       Scope *S, CXXScopeSpec &SS, SourceLocation TemplateKWLoc,
-      UnqualifiedId &Id, bool HasTrailingLParen, bool IsAddressOfOperand,
+      UnqualifiedId &Id, bool HasTrailingLParen, int IsAddressOfOperand,
       CorrectionCandidateCallback *CCC = nullptr,
       bool IsInlineAsmIdentifier = false, Token *KeywordReplacement = nullptr);
 

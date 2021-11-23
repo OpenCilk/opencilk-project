@@ -1247,9 +1247,15 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
       Validator.WantRemainingKeywords = Tok.isNot(tok::r_paren);
     }
     Name.setIdentifier(&II, ILoc);
+    /* OpenCilk extension: The only case where ParseKind == PrimaryExprOnly
+       and isAddressOperand is true is when unary && is used to get the
+       true address of a hyperobject. */
+    int ActionAddressOfOperand = isAddressOfOperand;
+    if (isAddressOfOperand && ParseKind == PrimaryExprOnly)
+      ActionAddressOfOperand = 2;
     Res = Actions.ActOnIdExpression(
         getCurScope(), ScopeSpec, TemplateKWLoc, Name, Tok.is(tok::l_paren),
-        isAddressOfOperand, &Validator,
+        ActionAddressOfOperand, &Validator,
         /*IsInlineAsmIdentifier=*/false,
         Tok.is(tok::r_paren) ? nullptr : &Replacement);
     if (!Res.isInvalid() && Res.isUnset()) {
@@ -1430,6 +1436,24 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
     SourceLocation AmpAmpLoc = ConsumeToken();
     if (Tok.isNot(tok::identifier))
       return ExprError(Diag(Tok, diag::err_expected) << tok::identifier);
+
+    /* OpenCilk extension: && applied to a variable with the hyperobject
+       attribute returns the true address of the variable. */
+    if (getLangOpts().getCilk() == LangOptions::Cilk_opencilk) {
+      NamedDecl *Decl =
+          Actions.LookupSingleName(getCurScope(), Tok.getIdentifierInfo(),
+                                   Tok.getLocation(), Sema::LookupOrdinaryName);
+      if (Decl && Decl->hasAttr<HyperobjectAttr>()) {
+        bool NotCastExpr;
+        Res = ParseCastExpression(PrimaryExprOnly, true, NotCastExpr,
+                                  NotTypeCast, false, nullptr);
+        if (!Res.isInvalid())
+          Res = Actions.ActOnUnaryOp(getCurScope(), AmpAmpLoc,
+                                     tok::amp, Res.get());
+        AllowSuffix = false;
+        break;
+      }
+    }
 
     if (getCurScope()->getFnParent() == nullptr)
       return ExprError(Diag(Tok, diag::err_address_of_label_outside_fn));

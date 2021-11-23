@@ -616,6 +616,11 @@ ExprResult Parser::tryParseCXXIdExpression(CXXScopeSpec &SS,
 
   if (!E.isInvalid() && !E.isUnset() && Tok.is(tok::less))
     checkPotentialAngleBracket(E);
+  
+  /* OpenCilk extension. */
+  if (!E.isInvalid() && getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
+    E = Actions.BuildHyperobjectLookup(E.get());
+
   return E;
 }
 
