@@ -3695,7 +3695,7 @@ def EnforceTCBLeaf : InheritableAttr {
 // TODO: Add docs to these attributes
 
 def Injective : InheritableAttr {
-  // TODO: Apply this to a single argument
+  // TODO: Associate this with a single argument, not the function.
   let Spellings = [Clang<"injective">];
   let Subjects = SubjectList<[Function]>;
   let Documentation = [Undocumented];
@@ -3719,20 +3719,20 @@ def StrandMalloc : InheritableAttr {
   let Documentation = [StrandMallocDocs];
 }
 
+def HyperView : InheritableAttr {
+  let Spellings = [Clang<"hyper_view">];
+  let Subjects = SubjectList<[FunctionLike]>;
+  let Documentation = [StrandMallocDocs];
+}
+
+def HyperToken : InheritableAttr {
+  let Spellings = [Clang<"hyper_token">];
+  let Subjects = SubjectList<[FunctionLike]>;
+  let Documentation = [StrandMallocDocs];
+}
+
 def ReducerRegister : InheritableAttr {
   let Spellings = [Clang<"reducer_register">];
-  let Subjects = SubjectList<[FunctionLike]>;
-  let Documentation = [StrandMallocDocs];
-}
-
-def ReducerView : InheritableAttr {
-  let Spellings = [Clang<"reducer_view">];
-  let Subjects = SubjectList<[FunctionLike]>;
-  let Documentation = [StrandMallocDocs];
-}
-
-def ReducerToken : InheritableAttr {
-  let Spellings = [Clang<"reducer_token">];
   let Subjects = SubjectList<[FunctionLike]>;
   let Documentation = [StrandMallocDocs];
 }

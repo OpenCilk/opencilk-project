@@ -1650,8 +1650,8 @@ BUILTIN(__builtin_ms_va_copy, "vc*&c*&", "n")
 
 // Tapir.  Rewriting of reducer references happens during sema
 // and needs a builtin to carry the information to codegen.
-BUILTIN(__reducer_lookup, "v*v*", "nU")
-BUILTIN(__reducer_of, "v*v*", "nu")
+BUILTIN(__hyper_lookup, "v*v*", "nU")
+BUILTIN(__hyper_of, "v*v*", "nu")
 
 #undef BUILTIN
 #undef LIBBUILTIN

@@ -708,9 +708,9 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(byref);
   KEYWORD(mustprogress);
   KEYWORD(injective);
+  KEYWORD(hyper_view);
+  KEYWORD(hyper_token);
   KEYWORD(reducer_register);
-  KEYWORD(reducer_view);
-  KEYWORD(reducer_token);
   KEYWORD(reducer_unregister);
 
   KEYWORD(type);

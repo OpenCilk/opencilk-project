@@ -1539,8 +1539,8 @@ UnderlyingNoAlias(const Value *O1, const Value *O2, AAQueryInfo &AAQI) {
 static const std::pair<Attribute::AttrKind, int> AttrTable[] = {
   {Attribute::Injective, C_INJECTIVE},
   {Attribute::ReducerRegister, C_TOKEN},
-  {Attribute::ReducerView, C_VIEW},
-  {Attribute::ReducerToken, C_TOKEN}
+  {Attribute::HyperView, C_VIEW},
+  {Attribute::HyperToken, C_TOKEN}
 };
 
 // Tapir/OpenCilk code has some simple optimization opportunities.

@@ -150,9 +150,9 @@ struct CodeGenIntrinsic {
 
   // Tapir reducer-related attributes
   bool isStrandPure = false;
+  bool isHyperView = false;
+  bool isHyperToken = false;
   bool isReducerRegister = false;
-  bool isReducerView = false;
-  bool isReducerToken = false;
   bool isReducerUnregister = false;
 
   enum ArgAttrKind {

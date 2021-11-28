@@ -5336,8 +5336,8 @@ static void handleHyperobjectAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
 
   Expr *Lookup = nullptr;
   if (AL.getNumArgs() == 0) {
-    /* If argument count is zero. */
-    IdentifierInfo *ID = S.PP.getIdentifierInfo("__reducer_lookup");
+    /* Use default function __hyper_lookup if attribute has no arguments. */
+    IdentifierInfo *ID = S.PP.getIdentifierInfo("__hyper_lookup");
     if (ValueDecl *Builtin =
         dyn_cast_or_null<ValueDecl>
         (S.LazilyCreateBuiltin(ID, ID->getBuiltinID(),
@@ -5405,12 +5405,6 @@ static void handleReducerCallbacksAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
 void Sema::AddHyperobjectAttr(SourceRange AttrRange,
                               const AttributeCommonInfo &CI,
                               Decl *Decl, Expr *View) {
-  if (false) {
-    llvm::errs() << "Sema::AddHyperobjectAttr\n";
-    if (View) {
-      llvm::errs() << "view\n"; View->dump();
-    }
-  }
   QualType T;
   if (auto *TD = dyn_cast<TypedefNameDecl>(Decl))
     T = TD->getUnderlyingType();
@@ -5428,18 +5422,6 @@ void Sema::AddReducerCallbacksAttr(SourceRange AttrRange,
                                    const AttributeCommonInfo &CI,
                                    Decl *Decl, Expr *Reduce,
                                    Expr *Init, Expr *Destruct) {
-  if (false) {
-    llvm::errs() << "Sema::AddReducerCallbacksAttr\n";
-    if (Reduce) {
-      llvm::errs() << "reduce\n"; Reduce->dump();
-    }
-    if (Init) {
-      llvm::errs() << "init\n"; Init->dump();
-    }
-    if (Destruct) {
-      llvm::errs() << "dest\n"; Destruct->dump();
-    }
-  }
   QualType T;
   if (auto *TD = dyn_cast<TypedefNameDecl>(Decl))
     T = TD->getUnderlyingType();
@@ -5449,10 +5431,6 @@ void Sema::AddReducerCallbacksAttr(SourceRange AttrRange,
   }
   else
     llvm_unreachable("Unknown decl type for reducer");
-
-  if (false) {
-    llvm::errs() << "type of decl\n"; T->dump();
-  }
 
   Decl->addAttr(::new (Context) ReducerCallbacksAttr(Context, CI, Reduce, Init,
                                                      Destruct));
@@ -8477,11 +8455,11 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
   case ParsedAttr::AT_ReducerRegister:
     handleSimpleAttribute<ReducerRegisterAttr>(S, D, AL);
     break;
-  case ParsedAttr::AT_ReducerView:
-    handleSimpleAttribute<ReducerViewAttr>(S, D, AL);
+  case ParsedAttr::AT_HyperView:
+    handleSimpleAttribute<HyperViewAttr>(S, D, AL);
     break;
-  case ParsedAttr::AT_ReducerToken:
-    handleSimpleAttribute<ReducerTokenAttr>(S, D, AL);
+  case ParsedAttr::AT_HyperToken:
+    handleSimpleAttribute<HyperTokenAttr>(S, D, AL);
     break;
   case ParsedAttr::AT_ReducerUnregister:
     handleSimpleAttribute<ReducerUnregisterAttr>(S, D, AL);

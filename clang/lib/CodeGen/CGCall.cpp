@@ -2022,11 +2022,11 @@ void CodeGenModule::ConstructAttributeList(
     if (TargetDecl->hasAttr<ReducerUnregisterAttr>()) {
       FuncAttrs.addAttribute(llvm::Attribute::ReducerUnregister);
     }
-    if (TargetDecl->hasAttr<ReducerViewAttr>()) {
-      FuncAttrs.addAttribute(llvm::Attribute::ReducerView);
+    if (TargetDecl->hasAttr<HyperViewAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::HyperView);
     }
-    else if (TargetDecl->hasAttr<ReducerTokenAttr>()) {
-      FuncAttrs.addAttribute(llvm::Attribute::ReducerToken);
+    else if (TargetDecl->hasAttr<HyperTokenAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::HyperToken);
     }
     if (TargetDecl->hasAttr<RestrictAttr>())
       RetAttrs.addAttribute(llvm::Attribute::NoAlias);

@@ -1408,14 +1408,14 @@ bool LLParser::parseFnAttributeValuePairs(AttrBuilder &B,
     case lltok::kw_strand_pure:
       B.addAttribute(Attribute::StrandPure);
       break;
+    case lltok::kw_hyper_token:
+      B.addAttribute(Attribute::HyperToken);
+      break;
+    case lltok::kw_hyper_view:
+      B.addAttribute(Attribute::HyperView);
+      break;
     case lltok::kw_reducer_register:
       B.addAttribute(Attribute::ReducerRegister);
-      break;
-    case lltok::kw_reducer_token:
-      B.addAttribute(Attribute::ReducerToken);
-      break;
-    case lltok::kw_reducer_view:
-      B.addAttribute(Attribute::ReducerView);
       break;
     case lltok::kw_reducer_unregister:
       B.addAttribute(Attribute::ReducerUnregister);
@@ -1790,6 +1790,8 @@ bool LLParser::parseOptionalParamAttrs(AttrBuilder &B) {
     case lltok::kw_alwaysinline:
     case lltok::kw_argmemonly:
     case lltok::kw_builtin:
+    case lltok::kw_hyper_token:
+    case lltok::kw_hyper_view:
     case lltok::kw_inlinehint:
     case lltok::kw_jumptable:
     case lltok::kw_minsize:
@@ -1810,9 +1812,7 @@ bool LLParser::parseOptionalParamAttrs(AttrBuilder &B) {
     case lltok::kw_optnone:
     case lltok::kw_optsize:
     case lltok::kw_reducer_register:
-    case lltok::kw_reducer_token:
     case lltok::kw_reducer_unregister:
-    case lltok::kw_reducer_view:
     case lltok::kw_returns_twice:
     case lltok::kw_sanitize_address:
     case lltok::kw_sanitize_cilk:
@@ -1914,6 +1914,8 @@ bool LLParser::parseOptionalReturnAttrs(AttrBuilder &B) {
     case lltok::kw_argmemonly:
     case lltok::kw_builtin:
     case lltok::kw_cold:
+    case lltok::kw_hyper_token:
+    case lltok::kw_hyper_view:
     case lltok::kw_inlinehint:
     case lltok::kw_jumptable:
     case lltok::kw_minsize:
@@ -1934,9 +1936,7 @@ bool LLParser::parseOptionalReturnAttrs(AttrBuilder &B) {
     case lltok::kw_optnone:
     case lltok::kw_optsize:
     case lltok::kw_reducer_register:
-    case lltok::kw_reducer_token:
     case lltok::kw_reducer_unregister:
-    case lltok::kw_reducer_view:
     case lltok::kw_returns_twice:
     case lltok::kw_sanitize_address:
     case lltok::kw_sanitize_cilk:

@@ -947,10 +947,10 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   switch (ID) {
   default:
     llvm_unreachable("unexpected reducer intrinsic");
-  case Intrinsic::reducer_lookup:
+  case Intrinsic::hyper_lookup:
     Fn = Get__cilkrts_reducer_lookup();
     break;
-  case Intrinsic::reducer_of:
+  case Intrinsic::hyper_of:
     Fn = Get__cilkrts_reducer_token();
     break;
   case Intrinsic::reducer_register:

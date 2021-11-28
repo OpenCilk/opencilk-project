@@ -10099,7 +10099,7 @@ public:
   void AddXConsumedAttr(Decl *D, const AttributeCommonInfo &CI,
                         RetainOwnershipKind K, bool IsTemplateInstantiation);
 
-  /// AddReducerAttr - Adds an reducer attribute to a particular declaration.
+  /// OpenCilk hyperobject support
   void AddHyperobjectAttr(SourceRange AttrRange,
                           const AttributeCommonInfo &CI,
                           Decl *D, Expr *View);

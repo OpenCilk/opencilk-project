@@ -179,9 +179,9 @@ def ReadNone : EnumAttr<"readnone">;
 def ReadOnly : EnumAttr<"readonly">;
 
 /// Reducer-related attributes.
+def HyperView : EnumAttr<"hyper_view">;
+def HyperToken : EnumAttr<"hyper_token">;
 def ReducerRegister : EnumAttr<"reducer_register">;
-def ReducerView : EnumAttr<"reducer_view">;
-def ReducerToken : EnumAttr<"reducer_token">;
 def ReducerUnregister : EnumAttr<"reducer_unregister">;
 
 /// Return value is always equal to this argument.
