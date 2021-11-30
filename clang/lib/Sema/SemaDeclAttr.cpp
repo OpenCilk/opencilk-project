@@ -5360,40 +5360,17 @@ static void handleHyperobjectAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   S.AddHyperobjectAttr(AL.getRange(), AL, D, Lookup);
 }
 
+void Sema::AddHyperobjectAttr(SourceRange AttrRange,
+                              const AttributeCommonInfo &CI,
+                              Decl *Decl, Expr *View) {
+  Decl->addAttr(::new (Context) HyperobjectAttr(Context, CI, View));
+}
+
 static void handleReducerCallbacksAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (S.getLangOpts().getCilk() != LangOptions::Cilk_opencilk) {
     S.Diag(D->getBeginLoc(), diag::reducer_requires_cilk);
     return;
   }
-#if 0
-  /* The following is an example of how to turn change the type of
-     a variable declared as a reducer.  In its current form it breaks
-     initialization because
-       reducer<int> x = 1
-     turns into
-       struct { ... } x = 1;
-  */
-  IdentifierInfo &I = S.Context.Idents.getOwn("z");
-  Scope *Scope = nullptr; /* toplevel? */
-  SourceLocation Location = D->getLocation(); /* ??? */
-  NamedDecl *Z = S.LookupSingleName(Scope, &I, Location, Sema::LookupTagName);
-  if (Z) {
-    if (RecordDecl *R = dyn_cast<RecordDecl>(Z)) {
-      if (RecordDecl *O = R->getDefinition()) {
-        const FieldDecl *F = O->findFirstNamedDataMember();
-        bool Dependent = O->isDependentType();
-        unsigned A = O->getMaxAlignment(); /* in bits */
-        const Type *T = O->getTypeForDecl();
-        if (isa<ValueDecl>(D)) {
-          /* TODO: Changing the type breaks initialization.  Instead
-             use the declared variable as the leftmost view and the key
-             for runtime calls. */
-          cast<ValueDecl>(D)->setType(QualType(T, 0));
-        }
-      }
-    }
-  }
-#endif
   Expr *Reduce = AL.getArgAsExpr(0);
   Expr *Identity = AL.getArgAsExpr(1);
   Expr *Destruct = AL.getNumArgs() > 2 ? AL.getArgAsExpr(2) : nullptr;
@@ -5402,36 +5379,10 @@ static void handleReducerCallbacksAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   /* See also handleCleanupAttr */
 }
 
-void Sema::AddHyperobjectAttr(SourceRange AttrRange,
-                              const AttributeCommonInfo &CI,
-                              Decl *Decl, Expr *View) {
-  QualType T;
-  if (auto *TD = dyn_cast<TypedefNameDecl>(Decl))
-    T = TD->getUnderlyingType();
-  else if (auto *VD = dyn_cast<ValueDecl>(Decl)) {
-    T = VD->getType();
-    VD->setType(T);
-  }
-  else
-    llvm_unreachable("Unknown decl type for reducer");
-
-  Decl->addAttr(::new (Context) HyperobjectAttr(Context, CI, View));
-}
-
 void Sema::AddReducerCallbacksAttr(SourceRange AttrRange,
                                    const AttributeCommonInfo &CI,
                                    Decl *Decl, Expr *Reduce,
                                    Expr *Init, Expr *Destruct) {
-  QualType T;
-  if (auto *TD = dyn_cast<TypedefNameDecl>(Decl))
-    T = TD->getUnderlyingType();
-  else if (auto *VD = dyn_cast<ValueDecl>(Decl)) {
-    T = VD->getType();
-    VD->setType(T);
-  }
-  else
-    llvm_unreachable("Unknown decl type for reducer");
-
   Decl->addAttr(::new (Context) ReducerCallbacksAttr(Context, CI, Reduce, Init,
                                                      Destruct));
 }
