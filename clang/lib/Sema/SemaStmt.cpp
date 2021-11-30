@@ -3141,9 +3141,16 @@ GetCilkForStride(Sema &S, llvm::SmallPtrSetImpl<VarDecl *> &Decls,
   return Invalid;
 }
 
-static void CheckCilkForInit(Sema &S, Stmt *First) {
-  if (!isa<DeclStmt>(First))
+static bool CheckCilkForInit(Sema &S, SourceLocation &CilkForLoc, Stmt *First) {
+  if (!First) {
+    S.Diag(CilkForLoc, diag::err_cilk_for_initializer_expected_decl);
+    return true;
+  }
+  if (!isa<DeclStmt>(First)) {
     S.Diag(First->getBeginLoc(), diag::err_cilk_for_initializer_expected_decl);
+    return true;
+  }
+  return false;
 }
 
 /// Rewrite the loop control of simple _Cilk_for loops into a form that LLVM
@@ -3556,7 +3563,8 @@ Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
                        DeclStmt *Begin, DeclStmt *End, ConditionResult Second,
                        FullExprArg Third, SourceLocation RParenLoc, Stmt *Body,
                        DeclStmt *LoopVar) {
-  CheckCilkForInit(*this, First);
+  if (CheckCilkForInit(*this, CilkForLoc, First))
+    return StmtResult();
 
   // if (!getLangOpts().CPlusPlus) {
     if (DeclStmt *DS = dyn_cast_or_null<DeclStmt>(First)) {
