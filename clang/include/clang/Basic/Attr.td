@@ -3748,7 +3748,7 @@ def Hyperobject : Attr {
     GNU<"hyperobject">
   ];
   let Args = [ExprArgument<"lookup", 1>];
-  let Subjects = SubjectList<[Var, TypedefName]>;
+  let Subjects = SubjectList<[NonParmVar, TypedefName]>;
   let Documentation = [HyperobjectDocs];
 }
 
@@ -3758,6 +3758,6 @@ def ReducerCallbacks : Attr {
   ];
   let Args = [ExprArgument<"reduce">, ExprArgument<"init">,
       ExprArgument<"destruct", 1>];
-  let Subjects = SubjectList<[Var, TypedefName]>;
+  let Subjects = SubjectList<[NonParmVar, TypedefName]>;
   let Documentation = [ReducerDocs];
 }
