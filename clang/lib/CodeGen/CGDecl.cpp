@@ -1814,6 +1814,17 @@ void CodeGenFunction::emitZeroOrPatternForAutoVarInit(QualType type,
   }
 }
 
+static ReducerCallbacksAttr *getReducer(const VarDecl *D) {
+  /* The reducer attribute may be on the declaration or a
+     typedef name providing its type, but not on any other
+     type declaration. */
+  if (ReducerCallbacksAttr *R = D->getAttr<ReducerCallbacksAttr>())
+    return R;
+  if (const TypedefType *T = D->getType()->getAs<TypedefType>())
+    return T->getDecl()->getAttr<ReducerCallbacksAttr>();
+  return nullptr;
+}
+
 void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   assert(emission.Variable && "emission was not valid!");
 
@@ -1828,7 +1839,7 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
      1. Move this after the initializer?
      2. Should the three function pointers be passed as arguments or as
      a pointer to structure? */
-  if (ReducerCallbacksAttr *R = D.getAttr<ReducerCallbacksAttr>()) {
+  if (ReducerCallbacksAttr *R = getReducer(&D)) {
     assert(!emission.IsEscapingByRef);
     llvm::Value *Empty = CGM.EmitNullConstant(getContext().VoidPtrTy);
     llvm::Value *Reduce = Empty, *Init = Empty, *Destruct = Empty;

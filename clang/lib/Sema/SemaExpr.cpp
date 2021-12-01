@@ -2020,10 +2020,19 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E) {
   if (!isa<VarDecl>(D))
     return E;
 
+  /* The hyperobject attribute may be on the declaration or a
+     typedef name providing its type, but not on any other
+     type declaration. */
   HyperobjectAttr *H = cast<VarDecl>(D)->getAttr<HyperobjectAttr>();
 
-  if (!H)
-    return E;
+  if (!H) {
+    const TypedefType *T = D->getType()->getAs<TypedefType>();
+    if (!T)
+      return E;
+    H = T->getDecl()->getAttr<HyperobjectAttr>();
+    if (!H)
+      return E;
+  }
 
   QualType Ty = E->getType();
 
