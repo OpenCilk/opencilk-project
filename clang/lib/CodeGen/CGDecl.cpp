@@ -1835,12 +1835,26 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(*this, D.getLocation());
   QualType type = D.getType();
 
+  // If this local has an initializer, emit it now.
+  const Expr *Init = D.getInit();
+
+  // If we are at an unreachable point, we don't need to emit the initializer
+  // unless it contains a label.
+  if (!HaveInsertPoint()) {
+    if (!Init || !ContainsLabel(Init)) return;
+    EnsureInsertPoint();
+  }
+
+  // Initialize the structure of a __block variable.
+  if (emission.IsEscapingByRef)
+    emitByrefStructureInit(emission);
+
   /* TODO(JFC):
      1. Move this after the initializer?
      2. Should the three function pointers be passed as arguments or as
      a pointer to structure? */
   if (ReducerCallbacksAttr *R = getReducer(&D)) {
-    assert(!emission.IsEscapingByRef);
+    assert(!emission.IsEscapingByRef); // block reducers not supported
     llvm::Value *Empty = CGM.EmitNullConstant(getContext().VoidPtrTy);
     llvm::Value *Reduce = Empty, *Init = Empty, *Destruct = Empty;
     if (Expr *InitExpr = CGM.ValidateReducerCallback(R->getInit()))
@@ -1854,7 +1868,7 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
       Destruct =
           Builder.CreateBitCast(EmitLValue(DestructExpr).getPointer(*this),
                                 VoidPtrTy);
-    llvm::Value *Z =
+    llvm::Value *Addr =
       Builder.CreateBitCast(emission.Addr.getPointer(), CGM.VoidPtrTy);
     /* The interface is specified with 32 bit size. */
     /* TODO: Give the builtin a variable width. */
@@ -1873,22 +1887,8 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     // TODO: mark this call as registering a local
     // TODO: add better handling of attribute arguments that evaluate to null
     llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::reducer_register);
-    Builder.CreateCall(F, {Z, Size, Reduce, Init, Destruct});
+    Builder.CreateCall(F, {Addr, Size, Reduce, Init, Destruct});
   }
-
-  // If this local has an initializer, emit it now.
-  const Expr *Init = D.getInit();
-
-  // If we are at an unreachable point, we don't need to emit the initializer
-  // unless it contains a label.
-  if (!HaveInsertPoint()) {
-    if (!Init || !ContainsLabel(Init)) return;
-    EnsureInsertPoint();
-  }
-
-  // Initialize the structure of a __block variable.
-  if (emission.IsEscapingByRef)
-    emitByrefStructureInit(emission);
 
   // Initialize the variable here if it doesn't have a initializer and it is a
   // C struct that is non-trivial to initialize or an array containing such a
