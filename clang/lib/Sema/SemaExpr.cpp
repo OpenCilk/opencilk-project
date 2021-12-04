@@ -2020,13 +2020,15 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E) {
   if (!isa<VarDecl>(D))
     return E;
 
+  QualType OuterType = D->getType();
+
   /* The hyperobject attribute may be on the declaration or a
      typedef name providing its type, but not on any other
-     type declaration. */
+     type declaration.
+     TODO: A loop is probably required. */
   HyperobjectAttr *H = cast<VarDecl>(D)->getAttr<HyperobjectAttr>();
-
   if (!H) {
-    const TypedefType *T = D->getType()->getAs<TypedefType>();
+    const TypedefType *T = OuterType->getAs<TypedefType>();
     if (!T)
       return E;
     H = T->getDecl()->getAttr<HyperobjectAttr>();
@@ -2034,28 +2036,20 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E) {
       return E;
   }
 
-  QualType Ty = E->getType();
-
-  if (false) {
-    llvm::errs() << "reducer reference ";
-    Ty.dump();
-    llvm::errs() << " | ";
-    D->dump();
-    llvm::errs() << '\n';
-  }
-
   Expr *Lookup = H->getLookup();
   if (!Lookup || !isa<DeclRefExpr>(Lookup))
     return E;
-    
-  QualType Ptr = Context.getPointerType(D->getType());
 
-  Expr *A = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr,
-				  VK_RValue, OK_Ordinary,
-				  SourceLocation(), false,
-				  CurFPFeatureOverrides());
+  QualType ResultType = OuterType.getNonReferenceType();
+  QualType Ptr = Context.getPointerType(ResultType);
+
+  Expr *VarAddr = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr,
+                                        VK_RValue, OK_Ordinary,
+                                        SourceLocation(), false,
+                                        CurFPFeatureOverrides());
+
   ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(),
-				  { A }, E->getExprLoc(), nullptr);
+				  { VarAddr }, E->getExprLoc(), nullptr);
 
   if (!Call.isUsable())
     return E; /* error should have been printed */
@@ -2065,11 +2059,9 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E) {
 			     CK_BitCast /*???*/,
 			     Call.get(), nullptr, VK_RValue,
 			     CurFPFeatureOverrides());
-  auto *UO =
-    UnaryOperator::Create(Context, Casted, UO_Deref, Ty,
-			  VK_LValue, OK_Ordinary, SourceLocation(),
-			  false, CurFPFeatureOverrides());
-  return UO;
+  return UnaryOperator::Create(Context, Casted, UO_Deref, ResultType,
+                               VK_LValue, OK_Ordinary, SourceLocation(),
+                               false, CurFPFeatureOverrides());
 }
 
 /// BuildDeclRefExpr - Build an expression that references a
