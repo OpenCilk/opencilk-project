@@ -1935,7 +1935,8 @@ Instruction *llvm::FindTaskFrameCreateInBlock(BasicBlock *BB) {
 // terminator, i.e., a taskframe.resume or detached.rethrow intrinsic.
 BasicBlock *llvm::CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
                                           BasicBlock *UnwindEdge,
-                                          BasicBlock *Unreachable) {
+                                          BasicBlock *Unreachable,
+                                          Instruction *ParentI) {
   Function *Caller = UnwindEdge->getParent();
   Module *M = Caller->getParent();
   LandingPadInst *OldLPad = UnwindEdge->getLandingPadInst();
@@ -1944,6 +1945,9 @@ BasicBlock *llvm::CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
   BasicBlock *NewUnwindEdge = BasicBlock::Create(
       Caller->getContext(), UnwindEdge->getName(), Caller);
   IRBuilder<> Builder(NewUnwindEdge);
+  // Get a debug location from ParentI.
+  if (const DebugLoc &Loc = ParentI->getDebugLoc())
+    Builder.SetCurrentDebugLocation(Loc);
 
   // Add a landingpad to the new unwind edge.
   LandingPadInst *LPad = Builder.CreateLandingPad(OldLPad->getType(), 0,
@@ -1956,6 +1960,17 @@ BasicBlock *llvm::CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
                        Unreachable, UnwindEdge, { Token, LPad });
 
   return NewUnwindEdge;
+}
+
+static void SetDebugLocInUnwindEdge(BasicBlock *UnwindEdge) {
+  for (const BasicBlock *Pred : predecessors(UnwindEdge)) {
+    if (const DebugLoc &Loc = Pred->getTerminator()->getDebugLoc()) {
+      for (Instruction &I : *UnwindEdge)
+        if (!I.getDebugLoc())
+          I.setDebugLoc(Loc);
+      break;
+    }
+  }
 }
 
 static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
@@ -2056,7 +2071,7 @@ static void PromoteCallsInTasksHelper(
         // Create an unwind edge for the taskframe.
         BasicBlock *TaskFrameUnwindEdge = CreateSubTaskUnwindEdge(
             Intrinsic::taskframe_resume, TFCreate, UnwindEdge,
-            Unreachable);
+            Unreachable, TFCreate);
 
         // Recursively check all blocks
         PromoteCallsInTasksHelper(NewBB, TaskFrameUnwindEdge, Unreachable,
@@ -2102,7 +2117,7 @@ static void PromoteCallsInTasksHelper(
         // detached-rethrow.
         BasicBlock *SubTaskUnwindEdge = CreateSubTaskUnwindEdge(
             Intrinsic::detached_rethrow, DI->getSyncRegion(), UnwindEdge,
-            Unreachable);
+            Unreachable, DI);
         // Recursively check all blocks in the detached task.
         PromoteCallsInTasksHelper(DI->getDetached(), SubTaskUnwindEdge,
                                   Unreachable, CurrentTaskFrame, &Worklist);
@@ -2167,7 +2182,7 @@ void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
   LandingPadInst *LPad =
       LandingPadInst::Create(ExnTy, 1, Name+".lpad", CleanupBB);
   LPad->setCleanup(true);
-  ResumeInst::Create(LPad, CleanupBB);
+  ResumeInst *RI = ResumeInst::Create(LPad, CleanupBB);
 
   // Create the normal return for the task resumes.
   BasicBlock *UnreachableBlk = BasicBlock::Create(C, Name+".unreachable", &F);
@@ -2183,6 +2198,14 @@ void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
       FunctionCallee PersFn = getDefaultPersonalityFn(F.getParent());
       F.setPersonalityFn(cast<Constant>(PersFn.getCallee()));
     }
+    // Inherit debug info for the landingpad and resume in CleanupBB, if
+    // possible.
+    for (const BasicBlock *Pred : predecessors(CleanupBB))
+      if (const DebugLoc &Loc = Pred->getTerminator()->getDebugLoc()) {
+        LPad->setDebugLoc(Loc);
+        RI->setDebugLoc(Loc);
+        break;
+      }
   } else {
     CleanupBB->eraseFromParent();
   }
