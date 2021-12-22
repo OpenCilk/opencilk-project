@@ -631,6 +631,10 @@ void DACSpawning::implementDACIterSpawnOnHelper(
       Preheader->getInstList().splice(InsertPoint, DACHead->getInstList(),
                                       II->getIterator(), I);
     }
+
+    if (!Preheader->getTerminator()->getDebugLoc())
+      Preheader->getTerminator()->setDebugLoc(
+          DACHead->getTerminator()->getDebugLoc());
   }
 
   Value *PrimaryIVInput = PrimaryIV->getIncomingValueForBlock(DACHead);
@@ -667,6 +671,9 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   {
     Instruction *PreheaderOrigFront = &(DACHead->front());
     IRBuilder<> Builder(PreheaderOrigFront);
+    if (!Builder.getCurrentDebugLocation())
+      Builder.SetCurrentDebugLocation(
+          Preheader->getTerminator()->getDebugLoc());
     // Create branch based on grainsize.
     PrimaryIVStart = Builder.CreatePHI(PrimaryIV->getType(), 2,
                                        PrimaryIV->getName()+".dac");
