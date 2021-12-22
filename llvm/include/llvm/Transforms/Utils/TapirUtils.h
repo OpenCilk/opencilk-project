@@ -216,7 +216,8 @@ Instruction *FindTaskFrameCreateInBlock(BasicBlock *BB);
 /// task.
 BasicBlock *CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
                                     BasicBlock *UnwindEdge,
-                                    BasicBlock *Unreachable);
+                                    BasicBlock *Unreachable,
+                                    Instruction *ParentI);
 
 /// promoteCallsInTasksToInvokes - Traverse the control-flow graph of F to
 /// convert calls to invokes, recursively traversing tasks and taskframes to
