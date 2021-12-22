@@ -113,13 +113,6 @@ void OpenCilkABI::prepareModule() {
       C.emitError("OpenCilkABI: Failed to parse bitcode ABI file: " +
                   Twine(RuntimeBCPath));
 
-    // Strip any debug info from the external module.  For convenience, this
-    // Tapir target synthesizes some helper functions, like
-    // __cilk_parent_epilogue, that contain calls to these functions, but don't
-    // necessarily have debug info.  As a result, debug info in the external
-    // module causes failures during subsequent inlining.
-    StripDebugInfo(*ExternalModule);
-
     // Link the external module into the current module, copying over global
     // values.
     //
@@ -399,6 +392,18 @@ CallInst *OpenCilkABI::InsertStackFramePush(Function &F,
   IRBuilder<> B(&(F.getEntryBlock()), InsertPt);
   if (TaskFrameCreate)
     B.SetInsertPoint(TaskFrameCreate);
+  if (!B.getCurrentDebugLocation()) {
+    // Try to find debug information later in this block for the ABI call.
+    BasicBlock::iterator BI = B.GetInsertPoint();
+    BasicBlock::const_iterator BE(B.GetInsertBlock()->end());
+    while (BI != BE) {
+      if (DebugLoc Loc = BI->getDebugLoc()) {
+        B.SetCurrentDebugLocation(Loc);
+        break;
+      }
+      ++BI;
+    }
+  }
 
   Value *Args[1] = {SF};
   if (Helper)
@@ -428,19 +433,30 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
   SmallPtrSet<ResumeInst *, 8> Resumes;
 
   // Add eh cleanup that returns control to the runtime
-  EscapeEnumerator EE(F, "cilkrabi_cleanup", PromoteCallsToInvokes);
+  EscapeEnumerator EE(F, "cilkrts_cleanup", PromoteCallsToInvokes);
   while (IRBuilder<> *Builder = EE.Next()) {
-    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint()))
+    if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
+      if (!RI->getDebugLoc())
+        // Attempt to set the debug location of this resume to match one of the
+        // preceeding terminators.
+        for (const BasicBlock *Pred : predecessors(RI->getParent()))
+          if (const DebugLoc &Loc = Pred->getTerminator()->getDebugLoc()) {
+            RI->setDebugLoc(Loc);
+            break;
+          }
       Resumes.insert(RI);
+    }
     else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint()))
       Returns.insert(RI);
   }
 
   for (ReturnInst *RI : Returns) {
     if (Helper) {
-      CallInst::Create(GetCilkHelperEpilogueFn(), {SF}, "", RI);
+      CallInst::Create(GetCilkHelperEpilogueFn(), {SF}, "", RI)
+          ->setDebugLoc(RI->getDebugLoc());
     } else {
-      CallInst::Create(GetCilkParentEpilogueFn(), {SF}, "", RI);
+      CallInst::Create(GetCilkParentEpilogueFn(), {SF}, "", RI)
+          ->setDebugLoc(RI->getDebugLoc());
     }
   }
   for (ResumeInst *RI : Resumes) {
@@ -448,7 +464,8 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
       Value *Exn = ExtractValueInst::Create(RI->getValue(), {0}, "", RI);
       // If throwing an exception, pass the exception object to the epilogue
       // function.
-      CallInst::Create(GetCilkHelperEpilogueExnFn(), {SF, Exn}, "", RI);
+      CallInst::Create(GetCilkHelperEpilogueExnFn(), {SF, Exn}, "", RI)
+          ->setDebugLoc(RI->getDebugLoc());
     }
   }
 }
