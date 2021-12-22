@@ -481,14 +481,32 @@ Function *llvm::CreateHelper(
                     SharedEHEntries, SP, CodeInfo, TypeMapper, Materializer);
 
   // Add a branch in the new function to the cloned Header.
-  BranchInst::Create(cast<BasicBlock>(VMap[Header]), NewEntry);
+  BasicBlock *ClonedHeader = cast<BasicBlock>(VMap[Header]);
+  BranchInst *EntryBr = BranchInst::Create(ClonedHeader, NewEntry);
+  // Set the debug location of the entry branch to match the first debug
+  // location in the cloned header.
+  for (const Instruction &I : *ClonedHeader)
+    if (const DebugLoc &Loc = I.getDebugLoc()) {
+      EntryBr->setDebugLoc(Loc);
+      break;
+    }
+
+  // Insert the new exit block, terminated by a return.
   NewExit->insertInto(NewFunc);
   // Add a return in the new function, with a default null value if necessary.
+  ReturnInst *NewRet;
   if (VoidRet)
-    ReturnInst::Create(Header->getContext(), NewExit);
+    NewRet = ReturnInst::Create(Header->getContext(), NewExit);
   else
-    ReturnInst::Create(Header->getContext(), Constant::getNullValue(RetTy),
-                       NewExit);
+    NewRet = ReturnInst::Create(Header->getContext(),
+                                Constant::getNullValue(RetTy), NewExit);
+  // Set the debug location of the ret to match the debug location of some
+  // corresponding reattach.
+  for (const BasicBlock *Pred : predecessors(NewExit))
+    if (const DebugLoc &Loc = Pred->getTerminator()->getDebugLoc()) {
+      NewRet->setDebugLoc(Loc);
+      break;
+    }
 
   // If needed, create a landingpad and resume for the unwind destination in the
   // new function.
@@ -498,7 +516,14 @@ Function *llvm::CreateHelper(
       LandingPadInst::Create(OldUnwind->getLandingPadInst()->getType(), 0,
                              "lpadval", NewUnwind);
     LPad->setCleanup(true);
-    ResumeInst::Create(LPad, NewUnwind);
+    ResumeInst *NewResume = ResumeInst::Create(LPad, NewUnwind);
+    // Set the debug location of the resume to match the debug location of some
+    // corresponding detached_rethrow.
+    for (const BasicBlock *Pred : predecessors(NewUnwind))
+      if (const DebugLoc &Loc = Pred->getTerminator()->getDebugLoc()) {
+        NewResume->setDebugLoc(Loc);
+        break;
+      }
   }
 
   // If needed, add the new unreachable destination.
