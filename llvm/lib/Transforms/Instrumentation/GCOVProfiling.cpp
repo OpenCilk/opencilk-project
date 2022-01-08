@@ -734,9 +734,12 @@ static BasicBlock *getInstrBB(CFGMST<Edge, BBInfo> &MST, Edge &E,
 
   // Some IndirectBr critical edges cannot be split by the previous
   // SplitIndirectBrCriticalEdges call. Bail out.
+  // Similarly bail out due to critical edges that cannot be split after detach
+  // instructions.
   const unsigned SuccNum = GetSuccessorNumber(SrcBB, DestBB);
-  BasicBlock *InstrBB =
-      isa<IndirectBrInst>(TI) ? nullptr : SplitCriticalEdge(TI, SuccNum);
+  BasicBlock *InstrBB = (isa<IndirectBrInst>(TI) || isa<DetachInst>(TI))
+                            ? nullptr
+                            : SplitCriticalEdge(TI, SuccNum);
   if (!InstrBB)
     return nullptr;
 
