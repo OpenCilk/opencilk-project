@@ -1,7 +1,12 @@
 ; Check GCov instrumentation in a function with Tapir instructions.
 ;
-; RUN: opt < %s -insert-gcov-profiling -S -o - | FileCheck %s
-; RUN: opt < %s -passes="insert-gcov-profiling" -S -o - | FileCheck %s
+; Inject metadata to set the .gcno file location
+; RUN: rm -rf %t && mkdir -p %t
+; RUN: echo '!5 = !{!"%/t/detach-gcov.ll", !0}' > %t/1
+; RUN: cat %s %t/1 > %t/2
+;
+; RUN: opt -insert-gcov-profiling -S < %t/2 | FileCheck %s
+; RUN: opt -passes=insert-gcov-profiling -S < %t/2 | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -97,7 +102,6 @@ attributes #4 = { argmemonly willreturn }
 !2 = !{}
 !3 = !{i32 2, !"Debug Info Version", i32 3}
 !4 = !{i32 1, !"wchar_size", i32 4}
-!5 = !{!"/data/compilers/tests/adhoc/wheatman-20220107/test.gcno", !"/data/compilers/tests/adhoc/wheatman-20220107/test.gcda", !0}
 !6 = !{!"clang version 12.0.0 (git@github.com:OpenCilk/opencilk-project.git 7ae859a161cba12018d3915ef01c11f16bbf1eca)"}
 !7 = distinct !DISubprogram(name: "main", scope: !1, file: !1, line: 3, type: !8, scopeLine: 3, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition | DISPFlagOptimized, unit: !0, retainedNodes: !2)
 !8 = !DISubroutineType(types: !2)
