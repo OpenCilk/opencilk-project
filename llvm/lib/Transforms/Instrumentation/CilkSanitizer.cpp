@@ -348,6 +348,33 @@ struct CilkSanitizerImpl : public CSIImpl {
       const Instruction *I, SmallVectorImpl<Value*> &AllocFnArgs,
       Type *SizeTy, Type *AddrTy, const TargetLibraryInfo &TLI);
 
+  static DebugLoc searchForDebugLoc(Instruction *I) {
+    if (DebugLoc Loc = I->getDebugLoc())
+      return Loc;
+
+    // Try to find debug information later in this block.
+    BasicBlock::iterator BI = I->getIterator();
+    BasicBlock::const_iterator BE(I->getParent()->end());
+    while (BI != BE) {
+      if (DebugLoc Loc = BI->getDebugLoc()) {
+        return Loc;
+      }
+      ++BI;
+    }
+
+    // Try to find debug information earlier in this block.
+    BI = I->getIterator();
+    BasicBlock::const_iterator BB(I->getParent()->begin());
+    while (BI != BB) {
+      if (DebugLoc Loc = BI->getDebugLoc()) {
+        return Loc;
+      }
+      --BI;
+    }
+
+    return I->getDebugLoc();
+  }
+
   void setupBlocks(Function &F, DominatorTree *DT = nullptr,
                    LoopInfo *LI = nullptr);
   bool setupFunction(Function &F, bool NeedToSetupCalls);
@@ -380,11 +407,15 @@ struct CilkSanitizerImpl : public CSIImpl {
   bool instrumentLoadOrStore(Instruction *I, IRBuilder<> &IRB);
   bool instrumentLoadOrStore(Instruction *I) {
     IRBuilder<> IRB(I);
+    if (!IRB.getCurrentDebugLocation())
+      IRB.SetCurrentDebugLocation(searchForDebugLoc(I));
     return instrumentLoadOrStore(I, IRB);
   }
   bool instrumentAtomic(Instruction *I, IRBuilder<> &IRB);
   bool instrumentAtomic(Instruction *I) {
     IRBuilder<> IRB(I);
+    if (!IRB.getCurrentDebugLocation())
+      IRB.SetCurrentDebugLocation(searchForDebugLoc(I));
     return instrumentAtomic(I, IRB);
   }
   bool instrumentIntrinsicCall(Instruction *I,
@@ -414,6 +445,8 @@ struct CilkSanitizerImpl : public CSIImpl {
                                  IRBuilder<> &IRB);
   bool instrumentAnyMemIntrinAcc(Instruction *I, unsigned OperandNum) {
     IRBuilder<> IRB(I);
+    if (!IRB.getCurrentDebugLocation())
+      IRB.SetCurrentDebugLocation(searchForDebugLoc(I));
     return instrumentAnyMemIntrinAcc(I, OperandNum, IRB);
   }
 
@@ -2496,6 +2529,7 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
     assert((RI.mightRaceViaAncestor(I) || RI.mightRaceLocally(I)) &&
            "Delayed instrumentation is not local race or race via ancestor");
     IRBuilder<> IRB(I);
+    DebugLoc Loc = searchForDebugLoc(I);
 
     if (MAAPChecks) {
       Value *MAAPChk = getMAAPCheck(I, IRB);
@@ -2503,6 +2537,8 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
           IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
           /*LI*/ nullptr);
       IRB.SetInsertPoint(CheckTerm);
+      if (Loc)
+        IRB.SetCurrentDebugLocation(Loc);
     }
     if (isa<LoadInst>(I) || isa<StoreInst>(I))
       Result |= CilkSanImpl.instrumentLoadOrStore(I, IRB);
@@ -2519,6 +2555,7 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
            "Delayed instrumentation is not local race or race via ancestor");
     unsigned OperandNum = MemIntrinOp.second;
     IRBuilder<> IRB(I);
+    DebugLoc Loc = searchForDebugLoc(I);
 
     if (MAAPChecks) {
       Value *MAAPChk = getMAAPCheck(I, IRB, OperandNum);
@@ -2526,6 +2563,8 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
           IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
           /*LI*/ nullptr);
       IRB.SetInsertPoint(CheckTerm);
+      if (Loc)
+        IRB.SetCurrentDebugLocation(Loc);
     }
     Result |= CilkSanImpl.instrumentAnyMemIntrinAcc(I, OperandNum, IRB);
   }
