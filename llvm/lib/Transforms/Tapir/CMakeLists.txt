@@ -33,6 +33,7 @@ add_llvm_component_library(LLVMTapirOpts
   Core
   IRReader
   Linker
+  MC
   Scalar
   Support
   TransformUtils
