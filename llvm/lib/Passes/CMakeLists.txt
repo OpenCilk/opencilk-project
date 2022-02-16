@@ -25,6 +25,7 @@ add_llvm_component_library(LLVMPasses
   ObjCARC
   Scalar
   Support
+  TapirOpts
   Target
   TransformUtils
   Vectorize
