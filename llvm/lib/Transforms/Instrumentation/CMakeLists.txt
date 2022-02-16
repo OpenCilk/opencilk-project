@@ -31,9 +31,10 @@ add_llvm_component_library(LLVMInstrumentation
   LINK_COMPONENTS
   Analysis
   Core
+  IRReader
+  Linker
   MC
   Support
   TransformUtils
   ProfileData
-  IRReader
   )
