@@ -795,12 +795,14 @@ private:
   static constexpr PropertyBits PropBits = {1, 1, (64 - 1 - 1)};
 };
 
+// This class assumes that fields in both the load and store properties appear
+// in the same bit positions.
 class CsiLoadStoreProperty : public CsiProperty {
 public:
   CsiLoadStoreProperty() { PropValue.Bits = 0; }
   /// Return the Type of a property.
   static Type *getType(LLVMContext &C) {
-    // Must match the definition of property type in csi.h
+    // Must match the definition of property type in csi.h.
     return CsiProperty::getCoercedType(
         C,
         StructType::get(IntegerType::get(C, PropBits.Alignment),
@@ -820,23 +822,6 @@ public:
   /// Return a constant value holding this property.
   Constant *getValueImpl(LLVMContext &C) const override {
     // Must match the definition of property type in csi.h
-    // return ConstantStruct::get(
-    //     StructTy,
-    //     ConstantInt::get(IntegerType::get(C, PropBits.Alignment),
-    //                      PropValue.Alignment),
-    //     ConstantInt::get(IntegerType::get(C, PropBits.IsVtableAccess),
-    //                      PropValue.IsVtableAccess),
-    //     ConstantInt::get(IntegerType::get(C, PropBits.IsConstant),
-    //                      PropValue.IsVtableAccess),
-    //     ConstantInt::get(IntegerType::get(C, PropBits.IsOnStack),
-    //                      PropValue.IsVtableAccess),
-    //     ConstantInt::get(IntegerType::get(C, PropBits.MayBeCaptured),
-    //                      PropValue.IsVtableAccess),
-    //     ConstantInt::get(IntegerType::get(C,
-    //     PropBits.LoadReadBeforeWriteInBB),
-    //                      PropValue.LoadReadBeforeWriteInBB),
-    //     ConstantInt::get(IntegerType::get(C, PropBits.Padding), 0),
-    //     nullptr);
     return ConstantInt::get(getType(C), PropValue.Bits);
   }
 
@@ -1117,7 +1102,7 @@ protected:
   /// Finalize the CSI pass.
   void finalizeCsi();
 
-  /// Initialize llvm::Functions for the CSI hooks.
+  /// Initialize FunctionCallees for the CSI hooks.
   /// @{
   void initializeLoadStoreHooks();
   void initializeFuncHooks();
@@ -1474,7 +1459,7 @@ protected:
     }
   }
 
-  void linkInToolFromBitcode(const std::string &bitcodePath);
+  void linkInToolFromBitcode(const std::string &BitcodePath);
   void loadConfiguration();
 
   Module &M;
@@ -1530,6 +1515,10 @@ protected:
 
   // Declarations of interposition functions.
   DenseMap<Function *, Function *> InterpositionFunctions;
+
+  bool LinkedBitcode = false;
+  SmallSet<std::string, 32> FunctionsInBitcode;
+  SmallPtrSet<Value *, 16> LinkedFromBitcode;
 
   // // Cached results of calls to GetUnderlyingObject.
   // using UnderlyingObjMapTy = DenseMap<Value *, Value *>;
