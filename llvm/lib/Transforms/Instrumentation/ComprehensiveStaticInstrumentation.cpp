@@ -313,6 +313,8 @@ bool CSIImpl::spawnsTapirLoopBody(DetachInst *DI, LoopInfo &LI, TaskInfo &TI) {
 }
 
 bool CSIImpl::run() {
+  // Link the tool bitcode once initially, to get type definitions.
+  linkInToolFromBitcode(ClToolBitcode);
   initializeCsi();
 
   for (Function &F : M)
@@ -326,6 +328,7 @@ bool CSIImpl::run() {
   if (IsFirstRun() && Options.jitMode) {
     llvm::sys::DynamicLibrary::LoadLibraryPermanently(ClToolLibrary.c_str());
   }
+  // Link the tool bitcode a second time, for definitions of used functions.
   linkInToolFromBitcode(ClToolBitcode);
   linkInToolFromBitcode(ClRuntimeBitcode);
 
@@ -2032,82 +2035,134 @@ void CSIImpl::finalizeCsi() {
   CNCtor->addCalledFunction(Call, CNFunc);
 }
 
-void llvm::CSIImpl::linkInToolFromBitcode(const std::string &bitcodePath) {
-  if (bitcodePath != "") {
-    std::unique_ptr<Module> toolModule;
+static GlobalVariable *copyGlobalArray(const char *Array, Module &M) {
+  // Get the current set of static global constructors.
+  if (GlobalVariable *GVA = M.getNamedGlobal(Array)) {
+    if (Constant *Init = GVA->getInitializer()) {
+      // Copy the existing global constructors into a new variable.
+      GlobalVariable *NGV = new GlobalVariable(
+          Init->getType(), GVA->isConstant(), GVA->getLinkage(), Init, "",
+          GVA->getThreadLocalMode());
+      GVA->getParent()->getGlobalList().insert(GVA->getIterator(), NGV);
+      return NGV;
+    }
+  }
+  return nullptr;
+}
 
-    SMDiagnostic error;
-    auto m = parseIRFile(bitcodePath, error, M.getContext());
-    if (m) {
-      toolModule = std::move(m);
+// Replace the modified global array list with the copy of the old version.
+static void replaceGlobalArray(const char *Array, Module &M,
+                               GlobalVariable *GVACopy) {
+  // Get the current version of the global array.
+  GlobalVariable *GVA = M.getNamedGlobal(Array);
+  GVACopy->takeName(GVA);
+
+  // Nuke the old list, replacing any uses with the new one.
+  if (!GVA->use_empty()) {
+    Constant *V = GVACopy;
+    if (V->getType() != GVA->getType())
+      V = ConstantExpr::getBitCast(V, GVA->getType());
+    GVA->replaceAllUsesWith(V);
+  }
+  GVA->eraseFromParent();
+}
+
+// Restore the global array to its copy of its previous value.
+static void restoreGlobalArray(const char *Array, Module &M,
+                               GlobalVariable *GVACopy, bool GVAModified) {
+  if (GVACopy) {
+    if (GVAModified) {
+      // Replace the new global array with the old copy.
+      replaceGlobalArray(Array, M, GVACopy);
     } else {
-      llvm::errs() << "Error loading bitcode (" << bitcodePath
-                   << "): " << error.getMessage() << "\n";
-      report_fatal_error(error.getMessage());
+      // The bitcode file doesn't add to the global array, so just delete the
+      // copy.
+      assert(GVACopy->use_empty());
+      GVACopy->eraseFromParent();
     }
+  } else { // No global array was copied.
+    if (GVAModified) {
+      // Create a zero-initialized version of the global array.
+      GlobalVariable *NewGV = M.getNamedGlobal(Array);
+      ConstantArray *NewCA = cast<ConstantArray>(NewGV->getInitializer());
+      Constant *CARepl = ConstantArray::get(
+          ArrayType::get(NewCA->getType()->getElementType(), 0), {});
+      GlobalVariable *GVRepl = new GlobalVariable(
+          CARepl->getType(), NewGV->isConstant(), NewGV->getLinkage(), CARepl,
+          "", NewGV->getThreadLocalMode());
+      NewGV->getParent()->getGlobalList().insert(NewGV->getIterator(), GVRepl);
 
-    std::vector<StringRef> functions;
-
-    for (Function &F : *toolModule) {
-      if (!F.isDeclaration() && F.hasName()) {
-        functions.push_back(F.getName());
-      }
-    }
-
-    std::vector<StringRef> globalVariables;
-
-    std::vector<GlobalValue *> toRemove;
-    for (GlobalValue &val : toolModule->getGlobalList()) {
-      if (!val.isDeclaration()) {
-        if (val.hasName() && (val.getName() == "llvm.global_ctors" ||
-                              val.getName() == "llvm.global_dtors")) {
-          toRemove.push_back(&val);
-          continue;
-        }
-
-        // We can't have globals with internal linkage due to how compile-time
-        // instrumentation works. Treat "static" variables as non-static.
-        if (val.getLinkage() == GlobalValue::InternalLinkage)
-          val.setLinkage(llvm::GlobalValue::CommonLinkage);
-
-        if (val.hasName())
-          globalVariables.push_back(val.getName());
-      }
-    }
-
-    // We remove global constructors and destructors because they'll be linked
-    // in at link time when the tool is linked. We can't have duplicates for
-    // each translation unit.
-    for (auto &val : toRemove) {
-      val->eraseFromParent();
-    }
-
-    llvm::Linker linker(M);
-    linker.linkInModule(std::move(toolModule),
-                        llvm::Linker::Flags::LinkOnlyNeeded);
-
-    // Set all tool's globals and functions to be "available externally" so
-    // the linker won't complain about multiple definitions.
-    for (auto &globalVariableName : globalVariables) {
-      auto var = M.getGlobalVariable(globalVariableName);
-
-      if (var && !var->isDeclaration() && !var->hasComdat()) {
-        var->setLinkage(
-            llvm::GlobalValue::LinkageTypes::AvailableExternallyLinkage);
-      }
-    }
-    for (auto &functionName : functions) {
-      auto function = M.getFunction(functionName);
-
-      if (function && !function->isDeclaration() && !function->hasComdat()) {
-        function->setLinkage(
-            GlobalValue::LinkageTypes::AvailableExternallyLinkage);
-      }
+      // Replace the global array with the zero-initialized version.
+      replaceGlobalArray(Array, M, GVRepl);
+    } else {
+      // Nothing to do.
     }
   }
 }
 
-void llvm::CSIImpl::loadConfiguration() {
+void CSIImpl::linkInToolFromBitcode(const std::string &BitcodePath) {
+  if (BitcodePath != "") {
+    LLVMContext &C = M.getContext();
+    LLVM_DEBUG(dbgs() << "Using external bitcode file for CSI: "
+                      << BitcodePath << "\n");
+    SMDiagnostic SMD;
+
+    std::unique_ptr<Module> ToolModule = parseIRFile(BitcodePath, SMD, C);
+    if (!ToolModule)
+      C.emitError("CSI: Failed to parse bitcode file: " + BitcodePath);
+
+    // Get list of functions in ToolModule.
+    for (Function &TF : *ToolModule)
+      FunctionsInBitcode.insert(std::string(TF.getName()));
+
+    GlobalVariable *GVCtorCopy = copyGlobalArray("llvm.global_ctors", M);
+    GlobalVariable *GVDtorCopy = copyGlobalArray("llvm.global_dtors", M);
+    bool BitcodeAddsCtors = false, BitcodeAddsDtors = false;
+
+    // Link the external module into the current module, copying over global
+    // values.
+    bool Fail = Linker::linkModules(
+        M, std::move(ToolModule), Linker::Flags::LinkOnlyNeeded,
+        [&](Module &M, const StringSet<> &GVS) {
+          for (StringRef GVName : GVS.keys()) {
+            LLVM_DEBUG(dbgs() << "Linking global value " << GVName << "\n");
+            if (GVName == "llvm.global_ctors") {
+              BitcodeAddsCtors = true;
+              continue;
+            } else if (GVName == "llvm.global_dtors") {
+              BitcodeAddsDtors = true;
+              continue;
+            }
+            // Record this GlobalValue as linked from the bitcode.
+            LinkedFromBitcode.insert(M.getNamedValue(GVName));
+            if (Function *Fn = M.getFunction(GVName)) {
+              if (!Fn->isDeclaration() && !Fn->hasComdat()) {
+                // We set the function's linkage as available_externally, so
+                // that subsequent optimizations can remove these definitions
+                // from the module.  We don't want this module redefining any of
+                // these symbols, even if they aren't inlined, because the
+                // OpenCilk runtime library will provide those definitions
+                // later.
+                Fn->setLinkage(Function::AvailableExternallyLinkage);
+              }
+            } else if (GlobalVariable *GV = M.getGlobalVariable(GVName)) {
+              if (!GV->isDeclaration() && !GV->hasComdat()) {
+                GV->setLinkage(Function::AvailableExternallyLinkage);
+              }
+            }
+          }
+        });
+    if (Fail)
+      C.emitError("CSI: Failed to link bitcode file: " + Twine(BitcodePath));
+
+    restoreGlobalArray("llvm.global_ctors", M, GVCtorCopy, BitcodeAddsCtors);
+    restoreGlobalArray("llvm.global_dtors", M, GVDtorCopy, BitcodeAddsDtors);
+
+    LinkedBitcode = true;
+  }
+}
+
+void CSIImpl::loadConfiguration() {
   if (ClConfigurationFilename != "")
     Config = InstrumentationConfig::ReadFromConfigurationFile(
         ClConfigurationFilename);
@@ -2281,7 +2336,8 @@ void CSIImpl::instrumentFunction(Function &F) {
   // This is required to prevent instrumenting the call to
   // __csi_module_init from within the module constructor.
 
-  if (F.empty() || shouldNotInstrumentFunction(F))
+  if (F.empty() || shouldNotInstrumentFunction(F) ||
+      LinkedFromBitcode.count(&F))
     return;
 
   if (Options.CallsMayThrow)

@@ -420,19 +420,42 @@ static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
   // of the original code, but operates on "shadow" values.  It can benefit from
   // re-running some general purpose optimization passes.
   if (Builder.OptLevel > 0) {
-    PM.add(createInstructionCombiningPass());
-    PM.add(createEarlyCSEPass());
+    PM.add(createSROAPass());
+    PM.add(createEarlyCSEPass(true));
     PM.add(createJumpThreadingPass());
     PM.add(createCorrelatedValuePropagationPass());
     PM.add(createCFGSimplificationPass());
     PM.add(createReassociatePass());
     PM.add(createLICMPass());
-    PM.add(createGVNPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createInstructionCombiningPass());
     PM.add(createSCCPPass());
     PM.add(createBitTrackingDCEPass());
     PM.add(createInstructionCombiningPass());
     PM.add(createDeadStoreEliminationPass());
     PM.add(createCFGSimplificationPass());
+    PM.add(createInstructionCombiningPass());
+    if (Builder.OptLevel > 1) {
+      PM.add(createFunctionInliningPass(
+                 Builder.OptLevel, Builder.SizeLevel, false));
+      PM.add(createGlobalOptimizerPass());
+      PM.add(createGlobalDCEPass());
+      PM.add(createSROAPass());
+      PM.add(createEarlyCSEPass(true));
+      PM.add(createJumpThreadingPass());
+      PM.add(createCorrelatedValuePropagationPass());
+      PM.add(createCFGSimplificationPass());
+      PM.add(createReassociatePass());
+      PM.add(createLICMPass());
+      PM.add(createCFGSimplificationPass());
+      PM.add(createInstructionCombiningPass());
+      PM.add(createSCCPPass());
+      PM.add(createBitTrackingDCEPass());
+      PM.add(createInstructionCombiningPass());
+      PM.add(createDeadStoreEliminationPass());
+      PM.add(createCFGSimplificationPass());
+      PM.add(createInstructionCombiningPass());
+    }
   }
 }
 
