@@ -221,6 +221,7 @@ function(llvm_ExternalProject_Add name source_dir)
                       -DCMAKE_OBJDUMP=${CMAKE_OBJDUMP}
                       -DCMAKE_STRIP=${CMAKE_STRIP})
     set(llvm_config_path ${LLVM_CONFIG_PATH})
+    set(llvm_link_path ${LLVM_LINK_PATH})
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
       string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
@@ -249,6 +250,7 @@ function(llvm_ExternalProject_Add name source_dir)
     endif()
   else()
     set(llvm_config_path "$<TARGET_FILE:llvm-config>")
+    set(llvm_link_path "$<TARGET_FILE:llvm-link>")
     set(cmake_args ${ARG_CMAKE_ARGS})
   endif()
 
@@ -266,6 +268,7 @@ function(llvm_ExternalProject_Add name source_dir)
                ${sysroot_arg}
                -DLLVM_BINARY_DIR=${PROJECT_BINARY_DIR}
                -DLLVM_CONFIG_PATH=${llvm_config_path}
+               -DLLVM_LINK_PATH=${llvm_link_path}
                -DLLVM_ENABLE_WERROR=${LLVM_ENABLE_WERROR}
                -DLLVM_HOST_TRIPLE=${LLVM_HOST_TRIPLE}
                -DLLVM_HAVE_LINK_VERSION_SCRIPT=${LLVM_HAVE_LINK_VERSION_SCRIPT}
