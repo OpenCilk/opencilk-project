@@ -863,6 +863,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   Type *NumBytesType = IRB.getInt32Ty();
   Type *LargeNumBytesType = IntptrTy;
   Type *IDType = IRB.getInt64Ty();
+  Type *SyncRegType = IRB.getInt32Ty();
 
   AttributeList GeneralFnAttrs;
   GeneralFnAttrs =
@@ -937,7 +938,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
     AttributeList FnAttrs = GeneralFnAttrs;
     CsanDetach = M.getOrInsertFunction("__csan_detach", FnAttrs, RetType,
                                        /* detach_id */ IDType,
-                                       /* sync_reg */ IRB.getInt8Ty());
+                                       /* sync_reg */ SyncRegType);
   }
   {
     AttributeList FnAttrs = GeneralFnAttrs;
@@ -958,7 +959,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
                                          /* task_exit_id */ IDType,
                                          /* task_id */ IDType,
                                          /* detach_id */ IDType,
-                                         /* sync_reg */ IRB.getInt8Ty(),
+                                         /* sync_reg */ SyncRegType,
                                          TaskExitPropertyTy);
   }
   {
@@ -967,13 +968,13 @@ void CilkSanitizerImpl::initializeCsanHooks() {
                                                FnAttrs, RetType,
                                                /* detach_continue_id */ IDType,
                                                /* detach_id */ IDType,
-                                               /* sync_reg */ IRB.getInt8Ty(),
+                                               /* sync_reg */ SyncRegType,
                                                DetContPropertyTy);
   }
   {
     AttributeList FnAttrs = GeneralFnAttrs;
     CsanSync = M.getOrInsertFunction("__csan_sync", FnAttrs, RetType, IDType,
-                                     /* sync_reg */ IRB.getInt8Ty());
+                                     /* sync_reg */ SyncRegType);
   }
 
   {
@@ -4081,14 +4082,15 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   BasicBlock *TaskEntryBlock = TI.getTaskFor(DI->getParent())->getEntry();
   IRBuilder<> IDBuilder(&*TaskEntryBlock->getFirstInsertionPt());
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
+  ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), SyncRegNum);
+  ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
   // Instrument the detach instruction itself
   Value *DetachID;
   {
     IRBuilder<> IRB(DI);
     uint64_t LocalID = DetachFED.add(*DI);
     DetachID = DetachFED.localToGlobalId(LocalID, IDBuilder);
-    Instruction *Call = IRB.CreateCall(CsanDetach, {DetachID,
-                                                    IRB.getInt8(SyncRegNum)});
+    Instruction *Call = IRB.CreateCall(CsanDetach, {DetachID, SyncRegVal});
     IRB.SetInstDebugLocation(Call);
   }
   NumInstrumentedDetaches++;
@@ -4100,9 +4102,6 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   SmallVector<BasicBlock *, 8> TaskExits, TaskResumes;
   SmallVector<Spindle *, 2> SharedEHExits;
   getTaskExits(DI, TaskExits, TaskResumes, SharedEHExits, TI);
-
-  ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt8Ty(Ctx), SyncRegNum);
-  ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt8Ty(Ctx), 0);
 
   // Instrument the entry and exit points of the detached task.
   {
@@ -4226,7 +4225,7 @@ bool CilkSanitizerImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
   uint64_t LocalID = SyncFED.add(*SI);
   Value *SyncID = SyncFED.localToGlobalId(LocalID, IRB);
   // Insert instrumentation before the sync.
-  insertHookCall(SI, CsanSync, {SyncID, IRB.getInt8(SyncRegNum)});
+  insertHookCall(SI, CsanSync, {SyncID, IRB.getInt32(SyncRegNum)});
 
   // NOTE: Because Cilksan executes serially, any exceptions thrown before this
   // sync will appear to be thrown from their respective spawns or calls, not
