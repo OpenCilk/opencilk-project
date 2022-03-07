@@ -44,8 +44,6 @@ static cl::opt<TapirTargetID> ClTapirTarget(
                           "cilk", "Cilk Plus"),
                clEnumValN(TapirTargetID::OpenMP,
                           "openmp", "OpenMP"),
-               clEnumValN(TapirTargetID::CilkR,
-                          "cilkr", "CilkR"),
                clEnumValN(TapirTargetID::Cheetah,
                           "cheetah", "Cheetah"),
                clEnumValN(TapirTargetID::OpenCilk,
@@ -1742,7 +1740,6 @@ void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
   case TapirTargetID::None:
   case TapirTargetID::Serial:
   case TapirTargetID::Cheetah:
-  case TapirTargetID::CilkR:
   case TapirTargetID::Cuda:
   case TapirTargetID::OpenMP:
   case TapirTargetID::Qthreads:

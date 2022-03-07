@@ -1,8 +1,8 @@
 ; Check that the flags in a __cilkrts_stack_frame are reloaded after a
 ; call to a spawning function.
 ;
-; RUN: opt < %s -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -simplifycfg -function-attrs -always-inline -gvn -S | FileCheck %s
-; RUN: opt < %s -passes='tapir2target,function(simplify-cfg),cgscc(function-attrs),always-inline,function(gvn)' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -simplifycfg -function-attrs -always-inline -gvn -S | FileCheck %s
+; RUN: opt < %s -passes='tapir2target,function(simplifycfg),cgscc(function-attrs),always-inline,function(gvn)' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

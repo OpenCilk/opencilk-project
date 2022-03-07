@@ -46,6 +46,13 @@
 ; GCN-O0-NEXT:      Expand Atomic instructions
 ; GCN-O0-NEXT:      Lower constant intrinsics
 ; GCN-O0-NEXT:      Remove unreachable blocks from the CFG
+; GCN-O0-NEXT:      Dominator Tree Construction
+; GCN-O0-NEXT:      Tapir Task Information
+; GCN-O0-NEXT:      Natural Loop Information
+; GCN-O0-NEXT:      Lazy Branch Probability Analysis
+; GCN-O0-NEXT:      Lazy Block Frequency Analysis
+; GCN-O0-NEXT:      Optimization Remark Emitter
+; GCN-O0-NEXT:      Tapir last-minute cleanup for CodeGen
 ; GCN-O0-NEXT:      Expand vector predication intrinsics
 ; GCN-O0-NEXT:      Scalarize Masked Memory Intrinsics
 ; GCN-O0-NEXT:      Expand reduction intrinsics
@@ -79,6 +86,7 @@
 ; GCN-O0-NEXT:        Legacy Divergence Analysis
 ; GCN-O0-NEXT:        Basic Alias Analysis (stateless AA impl)
 ; GCN-O0-NEXT:        Function Alias Analysis Results
+; GCN-O0-NEXT:        Tapir Task Information
 ; GCN-O0-NEXT:        Memory SSA
 ; GCN-O0-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O0-NEXT:        SI annotate control flow
@@ -181,6 +189,7 @@
 ; GCN-O1-NEXT:      Expand Atomic instructions
 ; GCN-O1-NEXT:      AMDGPU Promote Alloca
 ; GCN-O1-NEXT:      Dominator Tree Construction
+; GCN-O1-NEXT:      Tapir Task Information
 ; GCN-O1-NEXT:      SROA
 ; GCN-O1-NEXT:      Post-Dominator Tree Construction
 ; GCN-O1-NEXT:      Natural Loop Information
@@ -202,6 +211,13 @@
 ; GCN-O1-NEXT:      Expand memcmp() to load/stores
 ; GCN-O1-NEXT:      Lower constant intrinsics
 ; GCN-O1-NEXT:      Remove unreachable blocks from the CFG
+; GCN-O1-NEXT:      Tapir Task Information
+; GCN-O1-NEXT:      Natural Loop Information
+; GCN-O1-NEXT:      Lazy Branch Probability Analysis
+; GCN-O1-NEXT:      Lazy Block Frequency Analysis
+; GCN-O1-NEXT:      Optimization Remark Emitter
+; GCN-O1-NEXT:      Tapir last-minute cleanup for CodeGen
+; GCN-O1-NEXT:      Dominator Tree Construction
 ; GCN-O1-NEXT:      Natural Loop Information
 ; GCN-O1-NEXT:      Post-Dominator Tree Construction
 ; GCN-O1-NEXT:      Branch Probability Analysis
@@ -254,6 +270,7 @@
 ; GCN-O1-NEXT:        Legacy Divergence Analysis
 ; GCN-O1-NEXT:        Basic Alias Analysis (stateless AA impl)
 ; GCN-O1-NEXT:        Function Alias Analysis Results
+; GCN-O1-NEXT:        Tapir Task Information
 ; GCN-O1-NEXT:        Memory SSA
 ; GCN-O1-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O1-NEXT:        SI annotate control flow
@@ -431,6 +448,7 @@
 ; GCN-O1-OPTS-NEXT:      Expand Atomic instructions
 ; GCN-O1-OPTS-NEXT:      AMDGPU Promote Alloca
 ; GCN-O1-OPTS-NEXT:      Dominator Tree Construction
+; GCN-O1-OPTS-NEXT:      Tapir Task Information
 ; GCN-O1-OPTS-NEXT:      SROA
 ; GCN-O1-OPTS-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O1-OPTS-NEXT:      Function Alias Analysis Results
@@ -470,6 +488,13 @@
 ; GCN-O1-OPTS-NEXT:      Expand memcmp() to load/stores
 ; GCN-O1-OPTS-NEXT:      Lower constant intrinsics
 ; GCN-O1-OPTS-NEXT:      Remove unreachable blocks from the CFG
+; GCN-O1-OPTS-NEXT:      Tapir Task Information
+; GCN-O1-OPTS-NEXT:      Natural Loop Information
+; GCN-O1-OPTS-NEXT:      Lazy Branch Probability Analysis
+; GCN-O1-OPTS-NEXT:      Lazy Block Frequency Analysis
+; GCN-O1-OPTS-NEXT:      Optimization Remark Emitter
+; GCN-O1-OPTS-NEXT:      Tapir last-minute cleanup for CodeGen
+; GCN-O1-OPTS-NEXT:      Dominator Tree Construction
 ; GCN-O1-OPTS-NEXT:      Natural Loop Information
 ; GCN-O1-OPTS-NEXT:      Post-Dominator Tree Construction
 ; GCN-O1-OPTS-NEXT:      Branch Probability Analysis
@@ -529,6 +554,7 @@
 ; GCN-O1-OPTS-NEXT:        Legacy Divergence Analysis
 ; GCN-O1-OPTS-NEXT:        Basic Alias Analysis (stateless AA impl)
 ; GCN-O1-OPTS-NEXT:        Function Alias Analysis Results
+; GCN-O1-OPTS-NEXT:        Tapir Task Information
 ; GCN-O1-OPTS-NEXT:        Memory SSA
 ; GCN-O1-OPTS-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O1-OPTS-NEXT:        SI annotate control flow
@@ -714,6 +740,7 @@
 ; GCN-O2-NEXT:      Expand Atomic instructions
 ; GCN-O2-NEXT:      AMDGPU Promote Alloca
 ; GCN-O2-NEXT:      Dominator Tree Construction
+; GCN-O2-NEXT:      Tapir Task Information
 ; GCN-O2-NEXT:      SROA
 ; GCN-O2-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O2-NEXT:      Function Alias Analysis Results
@@ -753,6 +780,13 @@
 ; GCN-O2-NEXT:      Expand memcmp() to load/stores
 ; GCN-O2-NEXT:      Lower constant intrinsics
 ; GCN-O2-NEXT:      Remove unreachable blocks from the CFG
+; GCN-O2-NEXT:      Tapir Task Information
+; GCN-O2-NEXT:      Natural Loop Information
+; GCN-O2-NEXT:      Lazy Branch Probability Analysis
+; GCN-O2-NEXT:      Lazy Block Frequency Analysis
+; GCN-O2-NEXT:      Optimization Remark Emitter
+; GCN-O2-NEXT:      Tapir last-minute cleanup for CodeGen
+; GCN-O2-NEXT:      Dominator Tree Construction
 ; GCN-O2-NEXT:      Natural Loop Information
 ; GCN-O2-NEXT:      Post-Dominator Tree Construction
 ; GCN-O2-NEXT:      Branch Probability Analysis
@@ -812,6 +846,7 @@
 ; GCN-O2-NEXT:        Legacy Divergence Analysis
 ; GCN-O2-NEXT:        Basic Alias Analysis (stateless AA impl)
 ; GCN-O2-NEXT:        Function Alias Analysis Results
+; GCN-O2-NEXT:        Tapir Task Information
 ; GCN-O2-NEXT:        Memory SSA
 ; GCN-O2-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O2-NEXT:        SI annotate control flow
@@ -999,6 +1034,7 @@
 ; GCN-O3-NEXT:      Expand Atomic instructions
 ; GCN-O3-NEXT:      AMDGPU Promote Alloca
 ; GCN-O3-NEXT:      Dominator Tree Construction
+; GCN-O3-NEXT:      Tapir Task Information
 ; GCN-O3-NEXT:      SROA
 ; GCN-O3-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O3-NEXT:      Function Alias Analysis Results
@@ -1043,6 +1079,13 @@
 ; GCN-O3-NEXT:      Expand memcmp() to load/stores
 ; GCN-O3-NEXT:      Lower constant intrinsics
 ; GCN-O3-NEXT:      Remove unreachable blocks from the CFG
+; GCN-O3-NEXT:      Tapir Task Information
+; GCN-O3-NEXT:      Natural Loop Information
+; GCN-O3-NEXT:      Lazy Branch Probability Analysis
+; GCN-O3-NEXT:      Lazy Block Frequency Analysis
+; GCN-O3-NEXT:      Optimization Remark Emitter
+; GCN-O3-NEXT:      Tapir last-minute cleanup for CodeGen
+; GCN-O3-NEXT:      Dominator Tree Construction
 ; GCN-O3-NEXT:      Natural Loop Information
 ; GCN-O3-NEXT:      Post-Dominator Tree Construction
 ; GCN-O3-NEXT:      Branch Probability Analysis
@@ -1110,6 +1153,7 @@
 ; GCN-O3-NEXT:        Legacy Divergence Analysis
 ; GCN-O3-NEXT:        Basic Alias Analysis (stateless AA impl)
 ; GCN-O3-NEXT:        Function Alias Analysis Results
+; GCN-O3-NEXT:        Tapir Task Information
 ; GCN-O3-NEXT:        Memory SSA
 ; GCN-O3-NEXT:        AMDGPU Annotate Uniform Values
 ; GCN-O3-NEXT:        SI annotate control flow

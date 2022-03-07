@@ -83,7 +83,7 @@ void detectLocalizedCollisions(int32_t l, int32_t r, uint8_t h) {
 // CHECK-NEXT: icmp
 // CHECK-NEXT: sub
 // CHECK-NEXT: icmp
-// CHECK-NEXT: %[[CMP2:.+]] = or i1
+// CHECK-NEXT: %[[CMP2:.+]] = select i1
 // CHECK-NEXT: br i1 %[[CMP2]], label %[[IF_THEN:.+]], label %[[IF_END2:.+]]
 
 // CHECK: [[IF_THEN]]:

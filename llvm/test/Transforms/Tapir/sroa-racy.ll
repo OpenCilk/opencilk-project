@@ -1,4 +1,5 @@
-; RUN: opt < %s -tbaa -inline -sroa -loop-rotate -licm -loop-idiom -loop-unroll -gvn -S -o - | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -tbaa -inline -sroa -loop-rotate -licm -loop-idiom -loop-unroll -gvn -S | FileCheck %s
+; RUN: opt < %s -aa-pipeline=basic-aa,tbaa -passes='inline,function(sroa,loop(loop-rotate,licm,loop-idiom),loop-unroll,gvn)' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

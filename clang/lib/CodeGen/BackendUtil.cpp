@@ -1648,6 +1648,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
             // invalidate all analysis passes before running CilkSanitizer.
             MPM.addPass(InvalidateAllAnalysesPass());
             MPM.addPass(CilkSanitizerPass());
+            PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
           });
     // Register CSI instrumentation for Cilkscale
     if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
@@ -1663,6 +1664,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(false)));
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
@@ -1674,6 +1676,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(true)));
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
@@ -1685,6 +1688,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                               getCSIOptionsForCilkscaleBenchmark()));
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       }
@@ -1701,6 +1705,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_TapirLate:
@@ -1711,6 +1716,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_TapirLoopEnd:
@@ -1721,6 +1727,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_OptimizerLast:
@@ -1731,6 +1738,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_None:
@@ -1754,7 +1762,7 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
       MPM.addPass(createModuleToFunctionPassAdaptor(MemProfilerPass()));
       MPM.addPass(ModuleMemProfilerPass());
     }
-      }
+  }
 
   // FIXME: We still use the legacy pass manager to do code generation. We
   // create that pass manager here and use it as needed below.

@@ -1,4 +1,4 @@
-; RUN: opt < %s -analyze -memoryssa -enable-drf-memoryssa 2>&1 | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -analyze -memoryssa -enable-drf-memoryssa 2>&1 | FileCheck %s
 ; RUN: opt -disable-output < %s -passes='print<memoryssa>' -enable-drf-memoryssa 2>&1 | FileCheck %s
 
 @x = common local_unnamed_addr global i32 0, align 4

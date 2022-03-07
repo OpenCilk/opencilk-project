@@ -19,6 +19,7 @@ void nothrowfn(int a) noexcept;
 void catchfn_c(int i, char e) noexcept;
 void catchfn_i(int i, int e) noexcept;
 
+__attribute__((noinline))
 void bar(int a) {
   try {
     throw a;
@@ -33,6 +34,7 @@ void bar(int a) {
 // CHECK-NOT: sync
 // CHECK: ret void
 
+__attribute__((noinline))
 void foo(int a) {
   try {
     bar(a);
@@ -1352,7 +1354,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O0-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK-O0: [[TRYSYNCCONT]]:
-// CHECK-O0: call void @_ZN3BarD1Ev(%class.Bar* nonnull dereferenceable(1) %[[B2]])
+// CHECK-O0: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(1) %[[B2]])
 // CHECK-O0-NEXT: br label %[[TRYCONT]]
 
 // CHECK-O1: [[B3LIFETIMEENDLPAD]]:
