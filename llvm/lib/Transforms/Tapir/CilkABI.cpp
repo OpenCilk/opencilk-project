@@ -277,7 +277,9 @@ FunctionCallee CilkABI::Get__cilkrts_bind_thread_1() {
 static Value *GEP(IRBuilder<> &B, Value *Base, int Field) {
   // return B.CreateStructGEP(cast<PointerType>(Base->getType()),
   //                          Base, field);
-  return B.CreateConstInBoundsGEP2_32(nullptr, Base, 0, Field);
+  return B.CreateConstInBoundsGEP2_32(
+      Base->getType()->getScalarType()->getPointerElementType(), Base, 0,
+      Field);
 }
 
 static Align GetAlignment(const DataLayout &DL, StructType *STy, int Field) {
@@ -297,8 +299,10 @@ static Value *LoadSTyField(
     IRBuilder<> &B, const DataLayout &DL, StructType *STy, Value *Src,
     int Field, bool isVolatile = false,
     AtomicOrdering Ordering = AtomicOrdering::NotAtomic) {
-  LoadInst *L =  B.CreateAlignedLoad(GEP(B, Src, Field),
-                                     GetAlignment(DL, STy, Field), isVolatile);
+  Value *GetElPtr = GEP(B, Src, Field);
+  LoadInst *L =
+      B.CreateAlignedLoad(GetElPtr->getType()->getPointerElementType(),
+                          GetElPtr, GetAlignment(DL, STy, Field), isVolatile);
   L->setOrdering(Ordering);
   return L;
 }
@@ -534,7 +538,8 @@ Function *CilkABI::Get__cilkrts_detach() {
 
   // *tail++ = parent;
   B.CreateStore(Parent, Tail, /*isVolatile=*/true);
-  Tail = B.CreateConstGEP1_32(Tail, 1);
+  Tail = B.CreateConstGEP1_32(
+      Tail->getType()->getScalarType()->getPointerElementType(), Tail, 1);
 
   // w->tail = tail;
   StoreSTyField(B, DL, WorkerTy, Tail, W, WorkerFields::tail,
@@ -697,11 +702,11 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
                                  AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
+    Type *RankTy = Rank->getType()->getPointerElementType();
     Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
     B.CreateAlignedStore(
-        B.CreateAdd(
-            B.CreateAlignedLoad(Rank, RankAlignment),
-            ConstantInt::get(Rank->getType()->getPointerElementType(), 1)),
+        B.CreateAdd(B.CreateAlignedLoad(RankTy, Rank, RankAlignment),
+                    ConstantInt::get(RankTy, 1)),
         Rank, RankAlignment);
     // if (instrument)
     //   // cilk_sync_end
@@ -822,11 +827,11 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
                                  AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
+    Type *RankTy = Rank->getType()->getPointerElementType();
     Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
     B.CreateAlignedStore(
-        B.CreateAdd(
-            B.CreateAlignedLoad(Rank, RankAlignment),
-            ConstantInt::get(Rank->getType()->getPointerElementType(), 1)),
+        B.CreateAdd(B.CreateAlignedLoad(RankTy, Rank, RankAlignment),
+                    ConstantInt::get(RankTy, 1)),
         Rank, RankAlignment);
     // if (instrument)
     //   // cilk_sync_end
@@ -980,11 +985,11 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
                                  AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
+    Type *RankTy = Rank->getType()->getPointerElementType();
     Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
     B.CreateAlignedStore(
-        B.CreateAdd(
-            B.CreateAlignedLoad(Rank, RankAlignment),
-            ConstantInt::get(Rank->getType()->getPointerElementType(), 1)),
+        B.CreateAdd(B.CreateAlignedLoad(RankTy, Rank, RankAlignment),
+                    ConstantInt::get(RankTy, 1)),
         Rank, RankAlignment);
 
     B.CreateRet(ExnPN);

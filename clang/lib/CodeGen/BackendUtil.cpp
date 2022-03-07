@@ -1055,6 +1055,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
             // invalidate all analysis passes before running CilkSanitizer.
             MPM.addPass(InvalidateAllAnalysesPass());
             MPM.addPass(CilkSanitizerPass());
+            PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
           });
     // Register CSI instrumentation for Cilkscale
     if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
@@ -1070,6 +1071,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(false)));
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
@@ -1081,6 +1083,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(true)));
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
@@ -1092,6 +1095,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                               getCSIOptionsForCilkscaleBenchmark()));
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       }
@@ -1108,6 +1112,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_TapirLate:
@@ -1118,6 +1123,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_TapirLoopEnd:
@@ -1128,6 +1134,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_OptimizerLast:
@@ -1138,6 +1145,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               // analysis passes before running CSI.
               MPM.addPass(InvalidateAllAnalysesPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
+              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_None:

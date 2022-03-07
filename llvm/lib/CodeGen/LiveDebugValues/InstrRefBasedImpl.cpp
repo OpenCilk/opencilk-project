@@ -4028,6 +4028,18 @@ public:
     return Num;
   }
 
+  /// BlockReattaches - Always returns false, because machine basic blocks
+  /// should never contain Tapir instructions.
+  static bool BlockReattaches(LDVSSABlock *BB, LDVSSAUpdater *Updater) {
+    return false;
+  }
+
+  /// BlockDetaches - Always returns false, because machine basic blocks
+  /// should never contain Tapir instructions.
+  static bool BlockDetaches(LDVSSABlock *BB, LDVSSAUpdater *Updater) {
+    return false;
+  }
+
   /// CreateEmptyPHI - Create a (representation of a) PHI in the given block.
   /// SSAUpdater will populate it with information about incoming values. The
   /// value number of this PHI is whatever the  machine value number problem

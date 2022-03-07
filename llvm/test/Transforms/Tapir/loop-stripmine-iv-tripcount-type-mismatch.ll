@@ -1,7 +1,7 @@
 ; Check that loop stripmining properly handles Tapir loops where the
 ; primary IV and the tripcount have different types.
 ;
-; RUN: opt < %s -loop-stripmine -S -o - | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -loop-stripmine -S -o - | FileCheck %s
 ; RUN: opt < %s -passes='loop-stripmine' -S -o - | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -9,7 +9,7 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: argmemonly nounwind willreturn
 declare token @llvm.syncregion.start() #0
 
-define dso_local fastcc void @_ZL9conj_gradPiS_PdS0_S0_S0_S0_S0_S0_S0_() unnamed_addr #1 {
+define dso_local fastcc void @_ZL9conj_gradPiS_PdS0_S0_S0_S0_S0_S0_S0_(i32 %n) unnamed_addr #1 {
 entry:
   %syncreg143 = tail call token @llvm.syncregion.start()
   detach within %syncreg143, label %pfor.body.i, label %pfor.inc.i
@@ -78,7 +78,7 @@ pfor.body163:                                     ; preds = %pfor.cond157
 
 pfor.inc177:                                      ; preds = %pfor.body163, %pfor.cond157
   %lftr.wideiv = trunc i64 %indvars.iv.next165 to i32
-  %exitcond = icmp eq i32 undef, %lftr.wideiv
+  %exitcond = icmp eq i32 %n, %lftr.wideiv
   br i1 %exitcond, label %pfor.cond.cleanup180, label %pfor.cond157
 
 ; CHECK: pfor.cond157.strpm.outer:
@@ -96,7 +96,7 @@ pfor.inc177:                                      ; preds = %pfor.body163, %pfor
 ; CHECK: %[[EPIL_ITER:.+]] = phi i32
 
 ; CHECK: pfor.inc177.epil:
-; CHECK: %[[EPIL_ITER_SUB:.+]] = sub i32 %[[EPIL_ITER]], 1
+; CHECK: %[[EPIL_ITER_SUB:.+]] = sub nsw i32 %[[EPIL_ITER]], 1
 ; CHECK: icmp ne i32 %[[EPIL_ITER_SUB]], 0
 
 pfor.cond.cleanup180:                             ; preds = %pfor.inc177

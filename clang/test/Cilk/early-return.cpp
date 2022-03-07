@@ -38,7 +38,7 @@ void foo(int p) {
 // CHECK: br label %[[CLEANUP:.+]]
 
 // CHECK: [[END]]:
-// CHECK-NEXT: invoke void @_ZN3ObjC1Ev(%class.Obj* nonnull dereferenceable(1) %[[O2:.+]])
+// CHECK-NEXT: invoke void @_ZN3ObjC1Ev(%class.Obj* {{.*}}dereferenceable(1) %[[O2:.+]])
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label
 
 // CHECK: [[INVOKECONT]]:
@@ -53,10 +53,10 @@ void foo(int p) {
 // CHECK-NEXT: to label %[[SUCONT2:.+]] unwind label
 
 // CHECK: [[SUCONT2]]:
-// CHECK-NEXT: call void @_ZN3ObjD1Ev(%class.Obj* nonnull dereferenceable(1) %[[O2:.+]])
+// CHECK-NEXT: call void @_ZN3ObjD1Ev(%class.Obj* {{.*}}dereferenceable(1) %[[O2:.+]])
 // CHECK: br label %[[CLEANUP]]
 
 // CHECK: [[CLEANUP]]:
-// CHECK-NEXT: call void @_ZN3ObjD1Ev(%class.Obj* nonnull dereferenceable(1) %[[O1:.+]])
+// CHECK-NEXT: call void @_ZN3ObjD1Ev(%class.Obj* {{.*}}dereferenceable(1) %[[O1:.+]])
 
 // CHECK: ret void

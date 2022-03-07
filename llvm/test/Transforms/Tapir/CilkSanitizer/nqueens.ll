@@ -1,4 +1,4 @@
-; RUN: opt %s -csan -S | FileCheck %s
+; RUN: opt %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

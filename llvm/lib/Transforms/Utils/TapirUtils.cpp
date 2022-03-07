@@ -1586,7 +1586,8 @@ static bool needToSplitTaskFrameEnd(const Instruction *TFEnd) {
 /// Split blocks in function F containing taskframe.create calls to canonicalize
 /// the representation of Tapir taskframes in F.
 bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
-                                      TaskInfo *TI) {
+                                      TaskInfo *TI, LoopInfo *LI,
+                                      MemorySSAUpdater *MSSAU) {
   if (F.empty())
     return false;
 
@@ -1650,7 +1651,7 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
     if (needToSplitTaskFrameCreate(I)) {
       LLVM_DEBUG(dbgs() << "Splitting at " << *I << "\n");
       StringRef OldName = I->getParent()->getName();
-      SplitBlock(I->getParent(), I, DT);
+      SplitBlock(I->getParent(), I, DT, LI, MSSAU);
       I->getParent()->setName(OldName+".tf");
       Changed = true;
     }
@@ -1661,7 +1662,7 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
     if (needToSplitTaskFrameEnd(TFEnd)) {
       LLVM_DEBUG(dbgs() << "Splitting block after " << *TFEnd << "\n");
       BasicBlock::iterator Iter = ++TFEnd->getIterator();
-      SplitBlock(TFEnd->getParent(), &*Iter, DT);
+      SplitBlock(TFEnd->getParent(), &*Iter, DT, LI, MSSAU);
       Iter->getParent()->setName(TFEnd->getParent()->getName()+".tfend");
       Changed = true;
     }
@@ -1685,8 +1686,8 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
     InvokeInst *II = cast<InvokeInst>(TFResume);
     if (DT && isCriticalEdge(II, 1)) {
       BasicBlock *Unwind = II->getUnwindDest();
-      SplitBlockPredecessors(Unwind, {II->getParent()}, ".tfsplit", DT, nullptr,
-                             nullptr);
+      SplitBlockPredecessors(Unwind, {II->getParent()}, ".tfsplit", DT, LI,
+                             MSSAU);
       Changed = true;
     }
   }
@@ -1864,7 +1865,8 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
     else
       ParentEntry = TF->getParentTask()->getEntry();
     IRBuilder<> Builder(&*ParentEntry->getFirstInsertionPt());
-    AllocaInst *AI = Builder.CreateAlloca(TFInstr.first->getType());
+    Type *TFInstrTy = TFInstr.first->getType();
+    AllocaInst *AI = Builder.CreateAlloca(TFInstrTy);
     AI->setName(TFInstr.first->getName());
 
     // Store the result of the instruction into that alloca.
@@ -1880,7 +1882,7 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
     Builder.CreateCall(
         Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
                                   { AI->getType() }), { AI });
-    LoadInst *ContinVal = Builder.CreateLoad(AI);
+    LoadInst *ContinVal = Builder.CreateLoad(TFInstrTy, AI);
     LoadInst *EHContinVal = nullptr;
 
     // For each external use, replace the use with a load from the alloca.
@@ -1899,7 +1901,7 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
           Builder.CreateCall(
               Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
                                         { AI->getType() }), { AI });
-          EHContinVal = Builder.CreateLoad(AI);
+          EHContinVal = Builder.CreateLoad(TFInstrTy, AI);
         }
 
         // Rewrite to use the value loaded at the taskframe.resume continuation.
@@ -1960,17 +1962,6 @@ BasicBlock *llvm::CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
                        Unreachable, UnwindEdge, { Token, LPad });
 
   return NewUnwindEdge;
-}
-
-static void SetDebugLocInUnwindEdge(BasicBlock *UnwindEdge) {
-  for (const BasicBlock *Pred : predecessors(UnwindEdge)) {
-    if (const DebugLoc &Loc = Pred->getTerminator()->getDebugLoc()) {
-      for (Instruction &I : *UnwindEdge)
-        if (!I.getDebugLoc())
-          I.setDebugLoc(Loc);
-      break;
-    }
-  }
 }
 
 static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,

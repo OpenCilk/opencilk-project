@@ -25,7 +25,6 @@
 #include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/TargetParser/Triple.h"
-#include "llvm/Transforms/Tapir/TapirTypes.h"
 #include <optional>
 #include <string>
 #include <vector>
