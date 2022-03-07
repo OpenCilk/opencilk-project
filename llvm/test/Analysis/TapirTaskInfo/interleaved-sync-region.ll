@@ -2,7 +2,7 @@
 ; discriminating syncs interleave the set of parallel tasks.  Thanks
 ; to George Stelle for the inspiration for this test.
 
-; RUN: opt -analyze -tasks -print-may-happen-in-parallel < %s 2>&1 | FileCheck %s
+; RUN: opt -enable-new-pm=0 -analyze -tasks -print-may-happen-in-parallel < %s 2>&1 | FileCheck %s
 ; RUN: opt -passes="print<tasks>" -print-may-happen-in-parallel -disable-output < %s 2>&1 | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

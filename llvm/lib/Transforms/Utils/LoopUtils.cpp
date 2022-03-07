@@ -514,7 +514,7 @@ TransformationMode llvm::hasLICMVersioningTransformation(const Loop *L) {
   return TM_Unspecified;
 }
 
-TransformationMode llvm::hasLoopStripmineTransformation(Loop *L) {
+TransformationMode llvm::hasLoopStripmineTransformation(const Loop *L) {
   if (getBooleanLoopAttribute(L, "tapir.loop.stripmine.disable"))
     return TM_Disable;
 
@@ -524,7 +524,7 @@ TransformationMode llvm::hasLoopStripmineTransformation(Loop *L) {
   return TM_Unspecified;
 }
 
-TransformationMode llvm::hasLoopSpawningTransformation(Loop *L) {
+TransformationMode llvm::hasLoopSpawningTransformation(const Loop *L) {
   TapirLoopHints Hints(L);
 
   switch (Hints.getStrategy()) {

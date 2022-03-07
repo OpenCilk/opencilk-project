@@ -17,6 +17,10 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/GlobalsModRef.h"
+#include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Analysis/MemorySSAUpdater.h"
+#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Instructions.h"
@@ -569,12 +573,36 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
   if (F.empty())
     return PreservedAnalyses::all();
 
+  PreservedAnalyses PA;
   DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);
   TaskInfo &TI = AM.getResult<TaskAnalysis>(F);
-  bool SplitBlocks = splitTaskFrameCreateBlocks(F, &DT, &TI);
+  LoopInfo *LI = AM.getCachedResult<LoopAnalysis>(F);
+  auto *MSSAAnalysis = AM.getCachedResult<MemorySSAAnalysis>(F);
+  std::unique_ptr<MemorySSAUpdater> MSSAU;
+  if (MSSAAnalysis) {
+    auto *MSSA = &MSSAAnalysis->getMSSA();
+    MSSAU = std::make_unique<MemorySSAUpdater>(MSSA);
+  }
+
+  bool SplitBlocks = splitTaskFrameCreateBlocks(F, &DT, &TI, LI, MSSAU.get());
   TI.findTaskFrameTree();
-  if (TI.isSerial() && !TI.foundChildTaskFrames())
-    return PreservedAnalyses::all();
+  // Return early if there are no Tapir tasks or taskframes to simplify.
+  if (TI.isSerial() && !TI.foundChildTaskFrames()) {
+    // If we didn't event split taskframe.create blocks, all analyses are
+    // preserved.
+    if (!SplitBlocks)
+      return PreservedAnalyses::all();
+
+    // Identify passes preserved by splitTaskFrameCreateBlocks.
+    PA.preserve<DominatorTreeAnalysis>();
+    PA.preserve<TaskAnalysis>();
+    PA.preserve<ScalarEvolutionAnalysis>();
+    if (LI)
+      PA.preserve<LoopAnalysis>();
+    if (MSSAAnalysis)
+      PA.preserve<MemorySSAAnalysis>();
+    return PA;
+  }
 
   SimplifyCFGOptions Options;
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
@@ -592,8 +620,7 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
       if (TI.isSerial()) {
         if (PostCleanupCFG && SplitBlocks)
           simplifyFunctionCFG(F, TTI, &DT, Options);
-        PreservedAnalyses PA;
-        PA.preserve<GlobalsAA>();
+        PA.preserve<DominatorTreeAnalysis>();
         return PA;
       }
     }
@@ -616,9 +643,11 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
   if (PostCleanupCFG && (Changed | SplitBlocks))
     Changed |= simplifyFunctionCFG(F, TTI, nullptr, Options);
 
-  if (!Changed)
-    return PreservedAnalyses::all();
-  PreservedAnalyses PA;
-  PA.preserve<GlobalsAA>();
+  if (!Changed) {
+    PA.preserve<DominatorTreeAnalysis>();
+    PA.preserve<TaskAnalysis>();
+    return PA;
+  }
+  PA = PreservedAnalyses::none();
   return PA;
 }

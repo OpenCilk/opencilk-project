@@ -33,7 +33,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
-#include "llvm/IR/Attributes.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -1527,9 +1527,10 @@ Value *CilkSanitizerImpl::GetCalleeFuncID(const Function *Callee,
   std::string GVName =
     CsiFuncIdVariablePrefix + Callee->getName().str();
   GlobalVariable *FuncIdGV = M.getNamedGlobal(GVName);
+  Type *FuncIdGVTy = IRB.getInt64Ty();
   if (!FuncIdGV) {
-    FuncIdGV = dyn_cast<GlobalVariable>(M.getOrInsertGlobal(GVName,
-                                                            IRB.getInt64Ty()));
+    FuncIdGV =
+        dyn_cast<GlobalVariable>(M.getOrInsertGlobal(GVName, FuncIdGVTy));
     assert(FuncIdGV);
     FuncIdGV->setConstant(false);
     if (Options.jitMode && !Callee->empty())
@@ -1538,7 +1539,7 @@ Value *CilkSanitizerImpl::GetCalleeFuncID(const Function *Callee,
       FuncIdGV->setLinkage(GlobalValue::WeakAnyLinkage);
     FuncIdGV->setInitializer(IRB.getInt64(CsiCallsiteUnknownTargetId));
   }
-  return IRB.CreateLoad(FuncIdGV);
+  return IRB.CreateLoad(FuncIdGVTy, FuncIdGV);
 }
 
 //------------------------------------------------------------------------------
@@ -1752,7 +1753,8 @@ void CilkSanitizerImpl::Instrumentor::InsertArgMAAPs(Function &F,
       continue;
 
     // Create a new flag for this argument MAAP.
-    Value *NewFlag = IRB.CreateAlloca(getMAAPIRValue(IRB, 0)->getType(),
+    Type *MAAPIRValueTy = getMAAPIRValue(IRB, 0)->getType();
+    Value *NewFlag = IRB.CreateAlloca(MAAPIRValueTy,
                                       Arg.getType()->getPointerAddressSpace());
     Value *FinalMV;
     // If this function is main, then it has no ancestors that can create races.
@@ -1770,8 +1772,8 @@ void CilkSanitizerImpl::Instrumentor::InsertArgMAAPs(Function &F,
         LocalMV |= static_cast<unsigned>(MAAPValue::NoAlias);
 
       // Store this local MAAP value.
-      FinalMV =
-          IRB.CreateOr(getMAAPIRValue(IRB, LocalMV), IRB.CreateLoad(NewFlag));
+      FinalMV = IRB.CreateOr(getMAAPIRValue(IRB, LocalMV),
+                             IRB.CreateLoad(MAAPIRValueTy, NewFlag));
       IRB.CreateStore(FinalMV, NewFlag);
     }
     // Associate this flag with the argument for future lookups.
@@ -2043,8 +2045,8 @@ Value *CilkSanitizerImpl::Instrumentor::readMAAPVal(Value *V,
   //   I->setMetadata(LLVMContext::MD_invariant_group,
   //                  MDNode::get(IRB.getContext(), {}));
   Value *MV;
-  if (isa<AllocaInst>(V))
-    MV = IRB.CreateLoad(V);
+  if (AllocaInst *A = dyn_cast<AllocaInst>(V))
+    MV = IRB.CreateLoad(A->getAllocatedType(), A);
   else
     MV = V;
   return MV;
@@ -2171,7 +2173,8 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
       // If the operands must alias, then discard the default noalias MAAP
       // value.
       AliasResult ArgAlias = AA->alias(Loc, getMemoryLocation(I, OpIdx, TLI));
-      if (MustAlias == ArgAlias || PartialAlias == ArgAlias) {
+      if (AliasResult::MustAlias == ArgAlias ||
+          AliasResult::PartialAlias == ArgAlias) {
         NoAliasFlag = getMAAPIRValue(IRB, 0);
         break;
       }
@@ -2277,9 +2280,9 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
           // If there is must or partial aliasing between this object and racer
           // object, or we have no local MAAP information for RObj, then
           // act conservatively, because there's nothing to check.
-          if (MustAlias ==
+          if (AliasResult::MustAlias ==
                   AA->alias(Loc, MemoryLocation::getBeforeOrAfter(RObj)) ||
-              PartialAlias ==
+              AliasResult::PartialAlias ==
                   AA->alias(Loc, MemoryLocation::getBeforeOrAfter(RObj)) ||
               !LocalMAAPs.count(RObj)) {
             if (!LocalMAAPs.count(RObj))

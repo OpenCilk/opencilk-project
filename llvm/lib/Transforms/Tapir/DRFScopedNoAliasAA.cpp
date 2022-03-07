@@ -331,7 +331,5 @@ PreservedAnalyses DRFScopedNoAliasPass::run(Function &F,
   PA.preserve<LoopAnalysis>();
   PA.preserve<TaskAnalysis>();
   PA.preserve<DominatorTreeAnalysis>();
-  PA.preserve<BasicAA>();
-  PA.preserve<GlobalsAA>();
   return PA;
 }

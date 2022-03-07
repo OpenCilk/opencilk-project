@@ -24,6 +24,7 @@ namespace opt {
 namespace clang {
 
 TapirTargetID parseTapirTarget(const llvm::opt::ArgList &Args);
+llvm::Optional<llvm::StringRef> serializeTapirTarget(TapirTargetID Target);
 
 } // end namespace clang
 

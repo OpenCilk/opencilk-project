@@ -357,7 +357,8 @@ Value *ForensicTable::localToGlobalId(uint64_t LocalId,
                                       IRBuilder<> &IRB) const {
   assert(BaseId);
   LLVMContext &C = IRB.getContext();
-  LoadInst *Base = IRB.CreateLoad(BaseId);
+  Type *BaseIdTy = IRB.getInt64Ty();
+  LoadInst *Base = IRB.CreateLoad(BaseIdTy, BaseId);
   MDNode *MD = llvm::MDNode::get(C, None);
   Base->setMetadata(LLVMContext::MD_invariant_load, MD);
   Value *Offset = IRB.getInt64(LocalId);
@@ -1110,8 +1111,9 @@ void CSIImpl::instrumentCallsite(Instruction *I, DominatorTree *DT) {
   GlobalVariable *FuncIdGV = nullptr;
   if (Called) {
     std::string GVName = CsiFuncIdVariablePrefix + Called->getName().str();
+    Type *FuncIdGVTy = IRB.getInt64Ty();
     FuncIdGV = dyn_cast<GlobalVariable>(
-        M.getOrInsertGlobal(GVName, IRB.getInt64Ty()));
+        M.getOrInsertGlobal(GVName, FuncIdGVTy));
     assert(FuncIdGV);
     FuncIdGV->setConstant(false);
     if (Options.jitMode && !Called->empty())
@@ -1119,7 +1121,7 @@ void CSIImpl::instrumentCallsite(Instruction *I, DominatorTree *DT) {
     else
       FuncIdGV->setLinkage(GlobalValue::WeakAnyLinkage);
     FuncIdGV->setInitializer(IRB.getInt64(CsiCallsiteUnknownTargetId));
-    FuncId = IRB.CreateLoad(FuncIdGV);
+    FuncId = IRB.CreateLoad(FuncIdGVTy, FuncIdGV);
   } else {
     // Unknown targets (i.e. indirect calls) are always unknown.
     FuncId = IRB.getInt64(CsiCallsiteUnknownTargetId);
@@ -1851,7 +1853,8 @@ void CSIImpl::generateInitCallsiteToFunction() {
   IRBuilder<> IRB(ReturnInst::Create(C, EntryBB));
 
   GlobalVariable *Base = FunctionFED.baseId();
-  LoadInst *LI = IRB.CreateLoad(Base);
+  Type *BaseTy = IRB.getInt64Ty();
+  LoadInst *LI = IRB.CreateLoad(BaseTy, Base);
   // Traverse the map of function name -> function local id. Generate
   // a store of each function's global ID to the corresponding weak
   // global variable.
@@ -2616,9 +2619,12 @@ bool ComprehensiveStaticInstrumentationLegacyPass::runOnModule(Module &M) {
   return res;
 }
 
+ComprehensiveStaticInstrumentationPass::ComprehensiveStaticInstrumentationPass()
+    : Options(OverrideFromCL(CSIOptions())) {}
+
 ComprehensiveStaticInstrumentationPass::ComprehensiveStaticInstrumentationPass(
     const CSIOptions &Options)
-    : Options(OverrideFromCL(Options)) {}
+    : Options(Options) {}
 
 PreservedAnalyses
 ComprehensiveStaticInstrumentationPass::run(Module &M,

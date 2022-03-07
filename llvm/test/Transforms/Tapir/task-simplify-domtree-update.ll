@@ -1,7 +1,7 @@
 ; Verify that task-simplify properly handles with unreachable blocks,
 ; specifically, during its incremental updates to the dominator tree.
 ;
-; RUN: opt < %s -task-simplify -S -o - | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -task-simplify -S -o - | FileCheck %s
 ; RUN: opt < %s -passes='task-simplify' -S -o - | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -32,17 +32,8 @@ entry:
           to label %invoke.cont unwind label %lpad
 
 ; CHECK: entry
-; CHECK: invoke void @_ZN3ObjC2EPKc()
-; CHECK-NEXT: to label %[[CONT:.+]] unwind label %[[UNWIND:.+]]
-
-; CHECK: [[CONT]]:
-; CHECK: unreachable
-
-; CHECK: [[UNWIND]]:
-; CHECK: landingpad
-; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch
-; CHECK: unreachable
+; CHECK: call void @_ZN3ObjC2EPKc()
+; CHECK-NEXT: unreachable
 
 invoke.cont:                                      ; preds = %entry
   %0 = call token @llvm.taskframe.create()

@@ -1,4 +1,4 @@
-; RUN: opt < %s -loop-stripmine -require-parallel-epilog -S | FileCheck %s --check-prefixes=CHECK,CHECK-OLD
+; RUN: opt < %s -enable-new-pm=0 -loop-stripmine -require-parallel-epilog -S | FileCheck %s --check-prefixes=CHECK,CHECK-OLD
 ; RUN: opt < %s -passes='loop-stripmine' -require-parallel-epilog -S | FileCheck %s --check-prefixes=CHECK,CHECK-NEW
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"

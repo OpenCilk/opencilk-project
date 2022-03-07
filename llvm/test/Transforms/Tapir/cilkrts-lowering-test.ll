@@ -1,4 +1,5 @@
-; RUN: opt < %s -tapir2target -tapir-target=cilk -S
+; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -S
+; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -S
 
 ; ModuleID = '/data/compilers/tapir/cilkrts/runtime/cilk-abi-cilk-for.cpp'
 source_filename = "/data/compilers/tapir/cilkrts/runtime/cilk-abi-cilk-for.cpp"

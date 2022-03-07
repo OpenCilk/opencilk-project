@@ -1,5 +1,5 @@
-; RUN: opt < %s -tapir2target -tapir-target=cilk -debug-abi-calls -simplifycfg -instcombine -S | FileCheck %s
-; RUN: opt < %s -passes='tapir2target,function(simplify-cfg,instcombine)' -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -debug-abi-calls -simplifycfg -instcombine -S | FileCheck %s
+; RUN: opt < %s -passes='tapir2target,function(simplifycfg,instcombine)' -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 
 source_filename = "c2islModule"
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

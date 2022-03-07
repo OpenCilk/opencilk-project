@@ -1,7 +1,7 @@
 ; Check that indvars transforms Tapir loops to use backedges based on
 ; equality comparions, even if the transformation might be high cost.
 ;
-; RUN: opt < %s -indvars -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -indvars -S | FileCheck %s
 ; RUN: opt < %s -passes='indvars' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -114,8 +114,7 @@ if.end47:                                         ; preds = %if.then44, %cleanup
   br label %pfor.cond68
 
 ; CHECK: if.end47:
-; CHECK: %[[ICMPDIV:.+]] = icmp sgt i64 %div, 0
-; CHECK-NEXT: %[[SMAX:.+]] = select i1 %[[ICMPDIV]], i64 %div, i64 0
+; CHECK: %[[SMAX:.+]] = call i64 @llvm.smax.i64(i64 %div, i64 0)
 ; CHECK-NEXT: %[[LIMIT:.+]] = add nuw nsw i64 %[[SMAX]], 1
 ; CHECK-NEXT: br label %pfor.cond68
 

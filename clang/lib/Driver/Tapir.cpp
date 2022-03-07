@@ -40,7 +40,6 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       .Case("serial", TapirTargetID::Serial)
       .Case("cheetah", TapirTargetID::Cheetah)
       .Case("cilk", TapirTargetID::Cilk)
-      .Case("cilkr", TapirTargetID::CilkR)
       .Case("cuda", TapirTargetID::Cuda)
       .Case("opencilk", TapirTargetID::OpenCilk)
       .Case("openmp", TapirTargetID::OpenMP)
@@ -48,4 +47,38 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       .Default(TapirTargetID::Last_TapirTargetID);
 
   return TapirTarget;
+}
+
+llvm::Optional<llvm::StringRef>
+clang::serializeTapirTarget(TapirTargetID Target) {
+  llvm::Optional<llvm::StringRef> TapirTargetStr;
+  switch (Target) {
+  case TapirTargetID::None:
+    TapirTargetStr = "none";
+    break;
+  case TapirTargetID::Serial:
+    TapirTargetStr = "serial";
+    break;
+  case TapirTargetID::Cheetah:
+    TapirTargetStr = "cheetah";
+    break;
+  case TapirTargetID::Cilk:
+    TapirTargetStr = "cilkplus";
+    break;
+  case TapirTargetID::Cuda:
+    TapirTargetStr = "cuda";
+    break;
+  case TapirTargetID::OpenCilk:
+    TapirTargetStr = "opencilk";
+    break;
+  case TapirTargetID::OpenMP:
+    TapirTargetStr = "openmp";
+    break;
+  case TapirTargetID::Qthreads:
+    TapirTargetStr = "qthreads";
+    break;
+  case TapirTargetID::Last_TapirTargetID:
+    break;
+  }
+  return TapirTargetStr;
 }

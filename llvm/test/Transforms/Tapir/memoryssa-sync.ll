@@ -1,7 +1,8 @@
 ; Test to check that MemorySSA treats Tapir sync instructions like
 ; fences.
 ;
-; RUN: opt < %s -S -print-memoryssa 2>&1 | FileCheck %s
+; RUN: opt < %s -S -enable-new-pm=0 -print-memoryssa 2>&1 | FileCheck %s
+; RUN: opt < %s -S -passes='print<memoryssa>' -disable-output 2>&1 | FileCheck %s
 
 ; Function Attrs: nounwind readnone uwtable
 define i32 @fib(i32 %n) local_unnamed_addr #0 {

@@ -1,4 +1,5 @@
-; RUN: opt < %s -analyze -tasks -S 2>&1 | FileCheck %s
+; RUN: opt < %s -analyze -tasks -enable-new-pm=0 2>&1 | FileCheck %s
+; RUN: opt < %s -passes='print<tasks>' -disable-output 2>&1 | FileCheck %s
 
 %struct.vertex = type { %class._point2d, %struct.tri*, %struct.tri*, i32, i32 }
 %class._point2d = type { double, double }

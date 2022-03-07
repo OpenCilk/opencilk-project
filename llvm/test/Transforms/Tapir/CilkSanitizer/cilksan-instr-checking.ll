@@ -2,7 +2,7 @@
 ; - Accesses based on NULL pointers
 ; - Calls to llvm.experimental.noalias.scope.decl
 ;
-; RUN: opt < %s -csan -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt < %s -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"

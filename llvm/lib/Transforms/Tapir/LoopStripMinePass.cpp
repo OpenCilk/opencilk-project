@@ -271,10 +271,9 @@ static bool tryToStripMineLoop(
       RequireParallelEpilog ||
       (AllowParallelEpilog &&
        ((SMP.Count < SMP.DefaultCoarseningFactor) ||
-        (LoopCost >=
-         static_cast<unsigned>(
-             2 * TTI.getUserCost(DetachI,
-                                 TargetTransformInfo::TCK_SizeAndLatency)))));
+        (2 *
+         TTI.getUserCost(DetachI, TargetTransformInfo::TCK_SizeAndLatency)) <=
+            LoopCost));
 
   // Some parallel runtimes, such as Cilk, require nested parallel tasks to be
   // synchronized.
