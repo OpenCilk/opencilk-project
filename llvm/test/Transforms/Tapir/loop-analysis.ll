@@ -1,6 +1,6 @@
-; RUN: opt < %s -loop-stripmine -disable-output -pass-remarks-analysis=loop-stripmine 2>&1 | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -loop-stripmine -disable-output -pass-remarks-analysis=loop-stripmine 2>&1 | FileCheck %s
 ; RUN: opt < %s -passes='loop-stripmine' -disable-output -pass-remarks-analysis=loop-stripmine 2>&1 | FileCheck %s
-; RUN: opt < %s -loop-spawning-ti -disable-output -pass-remarks-analysis=loop-spawning 2>&1 | FileCheck %s --check-prefixes=CHECK,CHECK-LS
+; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -disable-output -pass-remarks-analysis=loop-spawning 2>&1 | FileCheck %s --check-prefixes=CHECK,CHECK-LS
 ; RUN: opt < %s -passes='loop-spawning' -disable-output -pass-remarks-analysis=loop-spawning 2>&1 | FileCheck %s --check-prefixes=CHECK,CHECK-LS
 
 ; ModuleID = 'loop-analysis.c'

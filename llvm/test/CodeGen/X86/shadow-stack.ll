@@ -133,7 +133,7 @@ define i32 @foo(i32 %i) local_unnamed_addr {
 ; X86_64-NEXT:    movq (%rax), %rax
 ; X86_64-NEXT:    movq %rbp, (%rax)
 ; X86_64-NEXT:    movq %rsp, 16(%rax)
-; X86_64-NEXT:    leaq LBB1_4(%rip), %rcx
+; X86_64-NEXT:    leaq LBB1_2(%rip), %rcx
 ; X86_64-NEXT:    movq %rcx, 8(%rax)
 ; X86_64-NEXT:    xorq %rcx, %rcx
 ; X86_64-NEXT:    rdsspq %rcx

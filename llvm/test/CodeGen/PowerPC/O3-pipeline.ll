@@ -30,6 +30,7 @@
 ; CHECK-NEXT:       Scalar Evolution Analysis
 ; CHECK-NEXT:       Split GEPs to a variadic base and a constant offset for better CSE
 ; CHECK-NEXT:       Early CSE
+; CHECK-NEXT:       Tapir Task Information
 ; CHECK-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:       Function Alias Analysis Results
 ; CHECK-NEXT:       Memory SSA
@@ -57,6 +58,13 @@
 ; CHECK-NEXT:       Shadow Stack GC Lowering
 ; CHECK-NEXT:       Lower constant intrinsics
 ; CHECK-NEXT:       Remove unreachable blocks from the CFG
+; CHECK-NEXT:       Tapir Task Information
+; CHECK-NEXT:       Natural Loop Information
+; CHECK-NEXT:       Lazy Branch Probability Analysis
+; CHECK-NEXT:       Lazy Block Frequency Analysis
+; CHECK-NEXT:       Optimization Remark Emitter
+; CHECK-NEXT:       Tapir last-minute cleanup for CodeGen
+; CHECK-NEXT:       Dominator Tree Construction
 ; CHECK-NEXT:       Natural Loop Information
 ; CHECK-NEXT:       Post-Dominator Tree Construction
 ; CHECK-NEXT:       Branch Probability Analysis

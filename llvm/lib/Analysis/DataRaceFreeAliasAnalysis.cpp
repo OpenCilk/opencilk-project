@@ -76,7 +76,7 @@ AliasResult DRFAAResult::alias(const MemoryLocation &LocA,
   if (const Instruction *AddrA = dyn_cast<Instruction>(LocA.Ptr))
     if (const Instruction *AddrB = dyn_cast<Instruction>(LocB.Ptr))
       if (TI.mayHappenInParallel(AddrA->getParent(), AddrB->getParent()))
-        return NoAlias;
+        return AliasResult::NoAlias;
   return AAResultBase::alias(LocA, LocB, AAQI);
 }
 

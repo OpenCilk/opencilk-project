@@ -3652,7 +3652,7 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   // original condition.  Hence we only need to cast InitRef.
   ExprResult CastInit = ImplicitCastExpr::Create(
       Context, LimitVar->getType(), CK_IntegralCast, InitRef.get(), nullptr,
-      VK_RValue, FPOptionsOverride());
+      VK_XValue, FPOptionsOverride());
 
   // Compute a check that this _Cilk_for loop executes at all.
   SourceLocation CondLoc = Cond->getExprLoc();

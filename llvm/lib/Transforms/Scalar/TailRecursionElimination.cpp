@@ -901,7 +901,7 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
     if (!Ret)
       return false;
 
-    CallInst *CI = findTRECandidate(&BB, CannotTailCallElimCallsMarkedTail);
+    CallInst *CI = findTRECandidate(&BB);
 
     if (!CI)
       return false;

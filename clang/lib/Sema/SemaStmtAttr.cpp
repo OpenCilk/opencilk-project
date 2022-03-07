@@ -92,7 +92,7 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   // This could be handled automatically by adding a Subjects definition in
   // Attr.td, but that would make the diagnostic behavior worse in this case
   // because the user spells this attribute as a pragma.
-  if (!isa<DoStmt, ForStmt, CXXForRangeStmt, WhileStmt, CilkFor>(St)) {
+  if (!isa<DoStmt, ForStmt, CXXForRangeStmt, WhileStmt, CilkForStmt>(St)) {
     std::string Pragma = "#pragma " + std::string(PragmaName);
     S.Diag(St->getBeginLoc(), diag::err_pragma_loop_precedes_nonloop) << Pragma;
     return nullptr;

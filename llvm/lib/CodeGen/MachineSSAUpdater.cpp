@@ -307,13 +307,16 @@ public:
     return NewDef->getOperand(0).getReg();
   }
 
+  /// BlockReattaches - Always returns false, because machine basic blocks
+  /// should never contain Tapir instructions.
   static bool BlockReattaches(MachineBasicBlock *BB,
                               MachineSSAUpdater *Updater) {
     return false;
   }
 
-  static bool BlockDetaches(MachineBasicBlock *BB,
-                            MachineSSAUpdater *Updater) {
+  /// BlockDetaches - Always returns false, because machine basic blocks
+  /// should never contain Tapir instructions.
+  static bool BlockDetaches(MachineBasicBlock *BB, MachineSSAUpdater *Updater) {
     return false;
   }
 

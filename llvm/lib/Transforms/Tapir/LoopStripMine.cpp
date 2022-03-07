@@ -211,9 +211,10 @@ bool llvm::computeStripMineCount(
   // given coarsening factor C gives the equation below.
   Instruction *DetachI = L->getHeader()->getTerminator();
   SMP.Count =
-      SMP.DefaultCoarseningFactor *
-      TTI.getUserCost(DetachI, TargetTransformInfo::TCK_SizeAndLatency) /
-      LoopCost;
+      *((SMP.DefaultCoarseningFactor *
+         TTI.getUserCost(DetachI, TargetTransformInfo::TCK_SizeAndLatency) /
+         LoopCost)
+            .getValue());
 
   return false;
 }

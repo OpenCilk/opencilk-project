@@ -25,6 +25,7 @@ class DominatorTree;
 class DomTreeUpdater;
 class Loop;
 class LoopInfo;
+class MemorySSAUpdater;
 class Spindle;
 class Task;
 class TaskInfo;
@@ -188,7 +189,8 @@ Value *getTaskFrameUsed(BasicBlock *Detached);
 /// taskframe.create intrinsics.  Returns true if anything changed, false
 /// otherwise.
 bool splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT = nullptr,
-                                TaskInfo *TI = nullptr);
+                                TaskInfo *TI = nullptr, LoopInfo *LI = nullptr,
+                                MemorySSAUpdater *MSSAU = nullptr);
 
 /// taskFrameContains - Returns true if the given basic block \p B is contained
 /// within the taskframe \p TF.

@@ -3395,10 +3395,7 @@ void DarwinClang::AddLinkTapirRuntimeLib(const ArgList &Args,
   // we explicitly force linking with this library).
   if ((Opts & RLO_AlwaysLink) || getVFS().exists(P)) {
     const char *LibArg = Args.MakeArgString(P);
-    if (Opts & RLO_FirstLink)
-      CmdArgs.insert(CmdArgs.begin(), LibArg);
-    else
-      CmdArgs.push_back(LibArg);
+    CmdArgs.push_back(LibArg);
   }
 
   // Adding the rpaths might negatively interact when other rpaths are involved,
@@ -3469,10 +3466,6 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
   }
   case TapirTargetID::Cilk:
     CmdArgs.push_back("-lcilkrts");
-    break;
-  case TapirTargetID::CilkR:
-    CmdArgs.push_back("-lcilkr");
-    CmdArgs.push_back("-lpthread");
     break;
   case TapirTargetID::OpenMP:
     CmdArgs.push_back("-lomp");

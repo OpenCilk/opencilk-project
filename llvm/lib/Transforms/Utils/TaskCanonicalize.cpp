@@ -62,12 +62,10 @@ PreservedAnalyses TaskCanonicalizePass::run(Function &F,
     return PreservedAnalyses::all();
 
   LLVM_DEBUG(dbgs() << "TaskCanonicalize running on function " << F.getName()
-             << "\n");
+                    << "\n");
 
   bool Changed = splitTaskFrameCreateBlocks(F);
   if (!Changed)
     return PreservedAnalyses::all();
-  PreservedAnalyses PA;
-  PA.preserve<GlobalsAA>();
-  return PA;
+  return PreservedAnalyses::none();
 }

@@ -1,6 +1,6 @@
-; RUN: opt < %s -tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s --check-prefix=TT
+; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s --check-prefix=TT
 ; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s --check-prefix=TT
-; RUN: opt < %s -loop-spawning-ti -S | FileCheck %s --check-prefix=LS
+; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -S | FileCheck %s --check-prefix=LS
 ; RUN: opt < %s -passes=loop-spawning -S | FileCheck %s --check-prefix=LS
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

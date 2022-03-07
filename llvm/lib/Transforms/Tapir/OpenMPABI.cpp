@@ -228,11 +228,13 @@ Value *getThreadID(Function *F, IRBuilder<> &IRBuilder) {
 
   if (I2 != OpenMPThreadIDAllocaMap.end()) {
     DataLayout DL(F->getParent());
-    auto Alloca = I2->second;
-    auto ThreadIDAddrs = IRBuilder.CreateLoad(Alloca);
+    auto Alloca = dyn_cast<AllocaInst>(I2->second);
+    auto ThreadIDAddrs =
+        IRBuilder.CreateLoad(Alloca->getAllocatedType(), Alloca);
     ThreadIDAddrs->setAlignment(
         Align(DL.getPrefTypeAlignment(ThreadIDAddrs->getType())));
-    ThreadID = IRBuilder.CreateLoad(ThreadIDAddrs);
+    ThreadID = IRBuilder.CreateLoad(
+        ThreadIDAddrs->getType()->getPointerElementType(), ThreadIDAddrs);
     ((LoadInst *)ThreadID)
         ->setAlignment(Align(DL.getPrefTypeAlignment(ThreadID->getType())));
     auto &Elem = OpenMPThreadIDLoadMap.FindAndConstruct(F);
@@ -485,16 +487,17 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
     unsigned int argc = 0;
     for (auto& arg : extracted->args()) {
       auto *DataAddrEP = IRBuilder.CreateInBoundsGEP(
+          Context->getType()->getScalarType()->getPointerElementType(),
           Context, {IRBuilder.getInt32(0), IRBuilder.getInt32(argc)});
       auto *DataAddr = IRBuilder.CreateAlignedLoad(
-          DataAddrEP,
+          DataAddrEP->getType()->getPointerElementType(), DataAddrEP,
           DL.getPrefTypeAlign(DataAddrEP->getType()->getPointerElementType()));
       valmap.insert(std::pair<Value*,Value*>(&arg,DataAddr));
       argc++;
     }
 
   	SmallVector< ReturnInst *,5> retinsts;
-    CloneFunctionInto(OutlinedFn, extracted, valmap, true, retinsts);
+    CloneFunctionInto(OutlinedFn, extracted, valmap, CloneFunctionChangeType::GlobalChanges, retinsts);
     IRBuilder.CreateBr(OutlinedFn->getBasicBlockList().getNextNode(*EntryBB));
 
   // We only need tied tasks for now and that's what the 1 value is for.
@@ -687,7 +690,7 @@ void OpenMPABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
 
     auto *EntryBB = BasicBlock::Create(Context, "entry", OMPRegionFn, nullptr);
     IRBuilder<> IRBuilder0(EntryBB);
-    tmp = IRBuilder0.CreateLoad(tmp);
+    tmp = IRBuilder0.CreateLoad(tmp->getType()->getPointerElementType(), tmp);
 
     ValueToValueMapTy VMap;
     for (auto &Arg : RegionFn->args()) {
@@ -701,7 +704,7 @@ void OpenMPABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
     }
 
   	SmallVector< ReturnInst *,5> retinsts;
-    CloneFunctionInto(OMPRegionFn, RegionFn, VMap, false, retinsts);
+    CloneFunctionInto(OMPRegionFn, RegionFn, VMap, CloneFunctionChangeType::LocalChangesOnly, retinsts);
     IRBuilder0.CreateBr(OMPRegionFn->getBasicBlockList().getNextNode(*EntryBB));
 
   auto FindCallToExtractedFn = [](Function *SpawningFn,

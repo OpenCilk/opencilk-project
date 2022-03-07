@@ -1,5 +1,5 @@
-; RUN: opt < %s -loop-spawning-ti -simplifycfg -function-attrs -csi -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
-; RUN: opt < %s -passes='loop-spawning,function(simplify-cfg),cgscc(function-attrs),csi' -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
+; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -simplifycfg -function-attrs -csi -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
+; RUN: opt < %s -passes='loop-spawning,function(simplifycfg),cgscc(function-attrs),csi' -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

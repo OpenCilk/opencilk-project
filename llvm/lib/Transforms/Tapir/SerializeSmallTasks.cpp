@@ -208,7 +208,6 @@ PreservedAnalyses SerializeSmallTasksPass::run(Function &F,
   PA.preserve<LoopAnalysis>();
   PA.preserve<ScalarEvolutionAnalysis>();
   PA.preserve<TaskAnalysis>();
-  PA.preserve<GlobalsAA>();
   // TODO: Add more preserved analyses here.
   return PA;
 }

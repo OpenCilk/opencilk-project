@@ -237,19 +237,32 @@
 ; CHECK-O-NEXT: Running pass: LowerConstantIntrinsicsPass on foo
 ; CHECK-MATRIX: Running pass: LowerMatrixIntrinsicsPass on f
 ; CHECK-MATRIX-NEXT: Running pass: EarlyCSEPass on f
-; CHECK-O23SZ-NEXT: Running pass: LoopStripMinePass
-; CHECK-O23SZ-NEXT: Running pass: TaskSimplifyPass on foo
-; CHECK-O23SZ-NEXT: Running pass: LoopSimplifyPass
-; CHECK-O23SZ-NEXT: Running pass: LCSSAPass
-; CHECK-O23SZ-NEXT: Running pass: LoopSimplifyCFGPass
-; CHECK-O23SZ-NEXT: Running pass: IndVarSimplifyPass
-; CHECK-O23SZ-NEXT: Running pass: LICMPass
-; CHECK-O23SZ-NEXT: Running pass: EarlyCSEPass
-; CHECK-O23SZ-NEXT: Running pass: JumpThreadingPass
-; CHECK-O23SZ-NEXT: Running analysis: LazyValueAnalysis
-; CHECK-O23SZ-NEXT: Running pass: CorrelatedValuePropagationPass
-; CHECK-O23SZ-NEXT: Invalidating analysis: LazyValueAnalysis
-; CHECK-O23SZ-NEXT: Running pass: InstCombinePass
+; CHECK-O2-NEXT: Running pass: LoopStripMinePass
+; CHECK-O2-NEXT: Running pass: TaskSimplifyPass on foo
+; CHECK-O2-NEXT: Running pass: LoopSimplifyPass
+; CHECK-O2-NEXT: Running pass: LCSSAPass
+; CHECK-O2-NEXT: Running pass: LoopSimplifyCFGPass
+; CHECK-O2-NEXT: Running pass: IndVarSimplifyPass
+; CHECK-O2-NEXT: Running pass: LICMPass
+; CHECK-O2-NEXT: Running pass: EarlyCSEPass
+; CHECK-O2-NEXT: Running pass: JumpThreadingPass
+; CHECK-O2-NEXT: Running analysis: LazyValueAnalysis
+; CHECK-O2-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-O2-NEXT: Invalidating analysis: LazyValueAnalysis
+; CHECK-O2-NEXT: Running pass: InstCombinePass
+; CHECK-O3-NEXT: Running pass: LoopStripMinePass
+; CHECK-O3-NEXT: Running pass: TaskSimplifyPass on foo
+; CHECK-O3-NEXT: Running pass: LoopSimplifyPass
+; CHECK-O3-NEXT: Running pass: LCSSAPass
+; CHECK-O3-NEXT: Running pass: LoopSimplifyCFGPass
+; CHECK-O3-NEXT: Running pass: IndVarSimplifyPass
+; CHECK-O3-NEXT: Running pass: LICMPass
+; CHECK-O3-NEXT: Running pass: EarlyCSEPass
+; CHECK-O3-NEXT: Running pass: JumpThreadingPass
+; CHECK-O3-NEXT: Running analysis: LazyValueAnalysis
+; CHECK-O3-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-O3-NEXT: Invalidating analysis: LazyValueAnalysis
+; CHECK-O3-NEXT: Running pass: InstCombinePass
 ; CHECK-EP-VECTORIZER-START-NEXT: Running pass: NoOpFunctionPass
 ; CHECK-EXT: Running pass: {{.*}}::Bye on foo
 ; CHECK-NOEXT:  {{^}}

@@ -256,10 +256,11 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
                                          .hoistCommonInsts(true)
                                          .sinkCommonInsts(true)));
 
+  // Rerun EarlyCSE for further cleanup after the sinking transformation.
+  PM.add(createEarlyCSEPass(true /* Enable mem-ssa. */));
+
   if (IsFullLTO) {
     PM.add(createSCCPPass());                 // Propagate exposed constants
-    // Rerun EarlyCSE for further cleanup after the sinking transformation.
-    PM.add(createEarlyCSEPass(true /* Enable mem-ssa. */));
     PM.add(createInstructionCombiningPass()); // Clean up again
     PM.add(createBitTrackingDCEPass());
   }

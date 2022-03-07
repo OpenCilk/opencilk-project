@@ -251,7 +251,7 @@ def StrandPure : EnumAttr<"strand_pure", [FnAttr]>;
 
 /// This function acts like a system memory allocation function from
 /// the perspective of memory accesses within the same strand.
-def StrandNoAlias : EnumAttr<"strand_noalias", [RetAttr]>;
+def StrandNoAlias : EnumAttr<"strand_noalias", [ParamAttr, RetAttr]>;
 
 /// Function was called in a scope requiring strict floating point semantics.
 def StrictFP : EnumAttr<"strictfp", [FnAttr]>;

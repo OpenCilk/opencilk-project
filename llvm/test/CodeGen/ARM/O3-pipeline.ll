@@ -32,7 +32,6 @@
 ; CHECK-NEXT:      Shadow Stack GC Lowering
 ; CHECK-NEXT:      Lower constant intrinsics
 ; CHECK-NEXT:      Remove unreachable blocks from the CFG
-; CHECK-NEXT:      Dominator Tree Construction
 ; CHECK-NEXT:      Tapir Task Information
 ; CHECK-NEXT:      Natural Loop Information
 ; CHECK-NEXT:      Lazy Branch Probability Analysis

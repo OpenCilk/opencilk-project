@@ -1,5 +1,5 @@
-; RUN: opt < %s -tapir2target -tapir-target=cilk -S | FileCheck %s
-; RUN: opt < %s -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -tapir-target=cilk -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 

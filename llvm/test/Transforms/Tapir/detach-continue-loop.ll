@@ -1,6 +1,6 @@
 ; Check that the continuation of a detach can be the same spindle as the detach itself.
 ;
-; RUN: opt < %s -analyze -tasks | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -analyze -tasks | FileCheck %s
 ; RUN: opt < %s -passes='print<tasks>' -disable-output 2>&1 | FileCheck %s
 source_filename = "heat_recursive_dp.c"
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"

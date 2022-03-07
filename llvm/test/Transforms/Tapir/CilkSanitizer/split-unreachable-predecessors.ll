@@ -3,8 +3,8 @@
 ; normal destinations of those terminators are terminated by
 ; unreachable.
 ;
-; RUN: opt < %s -csan -S | FileCheck %s
-; RUN: opt < %s -csi -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -csan -S | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -csi -S | FileCheck %s
 ; RUN: opt < %s -passes='cilksan' -S | FileCheck %s
 ; RUN: opt < %s -passes='csi' -S | FileCheck %s
 

@@ -302,9 +302,10 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
   assert(DefInst && "Defining instruction not actually an instruction");
 
   if (TI && EnableDRF)
-    if ((TI->getTaskFor(MD->getBlock()) != TI->getTaskFor(UseInst->getParent()))
-        && TI->mayHappenInParallel(MD->getBlock(), UseInst->getParent()))
-      return {false, NoAlias};
+    if ((TI->getTaskFor(MD->getBlock()) !=
+         TI->getTaskFor(UseInst->getParent())) &&
+        TI->mayHappenInParallel(MD->getBlock(), UseInst->getParent()))
+      return {false, AliasResult(AliasResult::NoAlias)};
 
   // Check for invokes of detached.rethrow, taskframe.resume, or sync.unwind.
   if (const InvokeInst *II = dyn_cast<InvokeInst>(DefInst))
@@ -312,7 +313,7 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
       if (Intrinsic::detached_rethrow == Called->getIntrinsicID() ||
           Intrinsic::taskframe_resume == Called->getIntrinsicID() ||
           Intrinsic::sync_unwind == Called->getIntrinsicID())
-        return {false, NoAlias};
+        return {false, AliasResult(AliasResult::NoAlias)};
 
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(DefInst)) {
     // These intrinsics will show up as affecting memory, but they are just

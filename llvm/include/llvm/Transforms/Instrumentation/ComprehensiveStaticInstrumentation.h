@@ -24,7 +24,8 @@ namespace llvm {
 class ComprehensiveStaticInstrumentationPass :
     public PassInfoMixin<ComprehensiveStaticInstrumentationPass> {
 public:
-  ComprehensiveStaticInstrumentationPass(const CSIOptions &Options = CSIOptions());
+  ComprehensiveStaticInstrumentationPass();
+  ComprehensiveStaticInstrumentationPass(const CSIOptions &Options);
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 
 private:

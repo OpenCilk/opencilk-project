@@ -11146,7 +11146,7 @@ int estimate_fill (int m,
     // CHECK: [[PFORINC]]:
     // CHECK: br i1
 
-    // CHECK-NOT: label %[[PFORPREATTACH]]
+    // CHECK-NOT: label %{{[[PFORPREATTACH]]\b}}
     // CHECK: return
 
     /*
