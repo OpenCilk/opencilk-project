@@ -1,5 +1,5 @@
-; RUN: opt < %s -simplifycfg -S -o - | FileCheck %s
-; RUN: opt < %s -passes="simplify-cfg" -S -o - | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -simplifycfg -S -o - | FileCheck %s
+; RUN: opt < %s -passes="simplifycfg" -S -o - | FileCheck %s
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 

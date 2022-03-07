@@ -1,10 +1,10 @@
 ; Thanks to Valentin Churavy for providing this test case.
 ;
-; RUN: opt %s -indvars -S | FileCheck %s -check-prefix=IV
+; RUN: opt %s -enable-new-pm=0 -indvars -S | FileCheck %s -check-prefix=IV
 ; RUN: opt %s -passes='indvars' -S | FileCheck %s -check-prefix=IV
-; RUN: opt %s -indvars -instcombine -S | FileCheck %s -check-prefix=IC
+; RUN: opt %s -enable-new-pm=0 -indvars -instcombine -S | FileCheck %s -check-prefix=IC
 ; RUN: opt %s -passes='loop(indvars),instcombine' -S | FileCheck %s -check-prefix=IC
-; RUN: opt %s -indvars -instcombine -loop-spawning-ti -S | FileCheck %s -check-prefix=LS
+; RUN: opt %s -enable-new-pm=0 -indvars -instcombine -loop-spawning-ti -S | FileCheck %s -check-prefix=LS
 ; RUN: opt %s -passes='function(loop(indvars),instcombine),loop-spawning' -S | FileCheck %s -check-prefix=LS
 
 ; ModuleID = 'simple.ll'
@@ -52,11 +52,11 @@ loop.cond:                                        ; preds = %loop, %L12
   br i1 %5, label %L27.loopexit, label %L12, !llvm.loop !84
 
 ; IV: {{^loop.cond}}
-; IV: %indvar.next = add nuw i64 %indvar, 1
+; IV: %indvar.next = add nuw nsw i64 %indvar, 1
 ; IV: br i1 %exitcond, label %L27.loopexit, label %L12
 
 ; IC: {{^loop.cond}}
-; IC: %indvar.next = add nuw i64 %indvar, 1
+; IC: %indvar.next = add nuw nsw i64 %indvar, 1
 ; IC: %exitcond = icmp eq i64 %indvar.next, %0
 ; IC: br i1 %exitcond, label %L27.loopexit, label %L12
 

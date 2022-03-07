@@ -1,6 +1,6 @@
-; RUN: opt < %s -simplifycfg -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
-; RUN: opt < %s -task-simplify -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
-; RUN: opt < %s -passes='simplify-cfg' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
+; RUN: opt < %s -enable-new-pm=0 -simplifycfg -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
+; RUN: opt < %s -enable-new-pm=0 -task-simplify -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
+; RUN: opt < %s -passes='simplifycfg' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
 ; RUN: opt < %s -passes='task-simplify' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

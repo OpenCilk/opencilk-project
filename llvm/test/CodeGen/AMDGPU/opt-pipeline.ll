@@ -141,6 +141,7 @@
 ; GCN-O1-NEXT:       Simplify Tapir tasks
 ; GCN-O1-NEXT:       Reassociate expressions
 ; GCN-O1-NEXT:       Dominator Tree Construction
+; GCN-O1-NEXT:       Tapir Task Information
 ; GCN-O1-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; GCN-O1-NEXT:       Function Alias Analysis Results
 ; GCN-O1-NEXT:       Memory SSA
@@ -149,10 +150,6 @@
 ; GCN-O1-NEXT:       LCSSA Verifier
 ; GCN-O1-NEXT:       Loop-Closed SSA Form Pass
 ; GCN-O1-NEXT:       Scalar Evolution Analysis
-; GCN-O1-NEXT:       Tapir Task Information
-; GCN-O1-NEXT:       Loop Pass Manager
-; GCN-O1-NEXT:         Rotate Loops
-; GCN-O1-NEXT:       Memory SSA
 ; GCN-O1-NEXT:       Lazy Branch Probability Analysis
 ; GCN-O1-NEXT:       Lazy Block Frequency Analysis
 ; GCN-O1-NEXT:       Loop Pass Manager
@@ -198,6 +195,7 @@
 ; GCN-O1-NEXT:       Aggressive Dead Code Elimination
 ; GCN-O1-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; GCN-O1-NEXT:       Function Alias Analysis Results
+; GCN-O1-NEXT:       Tapir Task Information
 ; GCN-O1-NEXT:       Memory SSA
 ; GCN-O1-NEXT:       MemCpy Optimization
 ; GCN-O1-NEXT:       Simplify the CFG
@@ -537,6 +535,7 @@
 ; GCN-O2-NEXT:       Simplify Tapir tasks
 ; GCN-O2-NEXT:       Reassociate expressions
 ; GCN-O2-NEXT:       Dominator Tree Construction
+; GCN-O2-NEXT:       Tapir Task Information
 ; GCN-O2-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; GCN-O2-NEXT:       Function Alias Analysis Results
 ; GCN-O2-NEXT:       Memory SSA
@@ -545,10 +544,6 @@
 ; GCN-O2-NEXT:       LCSSA Verifier
 ; GCN-O2-NEXT:       Loop-Closed SSA Form Pass
 ; GCN-O2-NEXT:       Scalar Evolution Analysis
-; GCN-O2-NEXT:       Tapir Task Information
-; GCN-O2-NEXT:       Loop Pass Manager
-; GCN-O2-NEXT:         Rotate Loops
-; GCN-O2-NEXT:       Memory SSA
 ; GCN-O2-NEXT:       Lazy Branch Probability Analysis
 ; GCN-O2-NEXT:       Lazy Block Frequency Analysis
 ; GCN-O2-NEXT:       Loop Pass Manager
@@ -971,6 +966,7 @@
 ; GCN-O3-NEXT:       Simplify Tapir tasks
 ; GCN-O3-NEXT:       Reassociate expressions
 ; GCN-O3-NEXT:       Dominator Tree Construction
+; GCN-O3-NEXT:       Tapir Task Information
 ; GCN-O3-NEXT:       Basic Alias Analysis (stateless AA impl)
 ; GCN-O3-NEXT:       Function Alias Analysis Results
 ; GCN-O3-NEXT:       Memory SSA
@@ -979,10 +975,6 @@
 ; GCN-O3-NEXT:       LCSSA Verifier
 ; GCN-O3-NEXT:       Loop-Closed SSA Form Pass
 ; GCN-O3-NEXT:       Scalar Evolution Analysis
-; GCN-O3-NEXT:       Tapir Task Information
-; GCN-O3-NEXT:       Loop Pass Manager
-; GCN-O3-NEXT:         Rotate Loops
-; GCN-O3-NEXT:       Memory SSA
 ; GCN-O3-NEXT:       Lazy Branch Probability Analysis
 ; GCN-O3-NEXT:       Lazy Block Frequency Analysis
 ; GCN-O3-NEXT:       Loop Pass Manager

@@ -44,10 +44,6 @@ using namespace llvm;
 
 #define DEBUG_TYPE "tapir-race-detect"
 
-// Statistics
-STATISTIC(AssumeSyncBeforeReturn, "Number of calls where the existence of a "
-          "race depends on the sync-before-return property.");
-
 static cl::opt<bool>
     AssumeSafeMalloc(
         "assume-safe-malloc", cl::init(true), cl::Hidden,
@@ -241,7 +237,7 @@ struct MaybeParallelTasksInLoopBody : public MaybeParallelTasks {
   // This method performs the data-flow update computation on a given spindle.
   bool evaluate(const Spindle *S, unsigned EvalNum) {
     LLVM_DEBUG(dbgs() << "MPTInLoop::evaluate @ " << S->getEntry()->getName()
-               << "\n");
+                      << "\n");
     if (!TaskList.count(S))
       TaskList.try_emplace(S);
 
@@ -274,11 +270,11 @@ struct MaybeParallelTasksInLoopBody : public MaybeParallelTasks {
       }
     }
     LLVM_DEBUG({
-        dbgs() << "  New MPT list for " << S->getEntry()->getName()
-               << (Complete ? " (complete)\n" : " (not complete)\n");
-        for (const Task *MP : TaskList[S])
-          dbgs() << "    " << MP->getEntry()->getName() << "\n";
-      });
+      dbgs() << "  New MPT list for " << S->getEntry()->getName()
+             << (Complete ? " (complete)\n" : " (not complete)\n");
+      for (const Task *MP : TaskList[S])
+        dbgs() << "    " << MP->getEntry()->getName() << "\n";
+    });
     return Complete;
   }
 };
@@ -640,7 +636,7 @@ void AccessPtrAnalysis::addAccess(Instruction *I) {
 
       SmallVector<const Value *, 1> Objects;
       LLVM_DEBUG(dbgs() << "Getting underlying objects for " << *Acc.getPtr()
-                 << "\n");
+                        << "\n");
       getUnderlyingObjects(const_cast<Value *>(Acc.getPtr()), Objects, &LI, 0);
       for (const Value *Obj : Objects) {
         LLVM_DEBUG(dbgs() << "  Considering object: " << *Obj << "\n");
@@ -674,7 +670,7 @@ void AccessPtrAnalysis::addAccess(Instruction *I) {
           continue;
 
         LLVM_DEBUG(dbgs() << "Adding object for access:\n  Obj: " << *Obj
-                   << "\n  Access: " << *Acc.getPtr() << "\n");
+                          << "\n  Access: " << *Acc.getPtr() << "\n");
         AccessToObjs[Access].insert(Obj);
 
         // UnderlyingObjToAccessMap::iterator Prev = ObjToLastAccess.find(Obj);
@@ -746,18 +742,16 @@ bool AccessPtrAnalysis::checkDependence(std::unique_ptr<Dependence> D,
   }
 
   LLVM_DEBUG({
-      D->dump(dbgs());
-      StringRef DepType =
-        D->isFlow() ? "flow" : D->isAnti() ? "anti" : "output";
-      dbgs() << "Found " << DepType
-             << " dependency between Src and Dst\n";
-      unsigned Levels = D->getLevels();
-      for (unsigned II = 1; II <= Levels; ++II) {
-        const SCEV *Distance = D->getDistance(II);
-        if (Distance)
-          dbgs() << "Level " << II << " distance " << *Distance << "\n";
-      }
-    });
+    D->dump(dbgs());
+    StringRef DepType = D->isFlow() ? "flow" : D->isAnti() ? "anti" : "output";
+    dbgs() << "Found " << DepType << " dependency between Src and Dst\n";
+    unsigned Levels = D->getLevels();
+    for (unsigned II = 1; II <= Levels; ++II) {
+      const SCEV *Distance = D->getDistance(II);
+      if (Distance)
+        dbgs() << "Level " << II << " distance " << *Distance << "\n";
+    }
+  });
 
   Instruction *I1 = GA1.I;
   Instruction *I2 = GA2.I;
@@ -1073,8 +1067,8 @@ bool AccessPtrAnalysis::checkOpaqueAccesses(GeneralAccess &GA1,
   // Otherwise we check the logical parallelism of the access.  Because one of
   // the pointers is null, we assume that the "minimum object depth" is 0.
   unsigned MinObjDepth = 0;
-  LLVM_DEBUG(dbgs() << "Min loop depth " << MinObjDepth <<
-             " used for opaque accesses.\n");
+  LLVM_DEBUG(dbgs() << "Min loop depth " << MinObjDepth
+                    << " used for opaque accesses.\n");
 
   // Find the deepest loop that contains both B1 and B2.
   const Loop *CommonLoop = getCommonLoop(B1, B2, LI);
@@ -1219,8 +1213,8 @@ AccessPtrAnalysis::underlyingObjectsAlias(const GeneralAccess &GAA,
       MemoryLocation::getBeforeOrAfter(LocA.Ptr, LocA.AATags);
   MemoryLocation LocBS =
       MemoryLocation::getBeforeOrAfter(LocB.Ptr, LocB.AATags);
-  if (AA->alias(LocAS, LocBS) == NoAlias)
-    return NoAlias;
+  if (AA->alias(LocAS, LocBS) == AliasResult::NoAlias)
+    return AliasResult::NoAlias;
 
   // Check the underlying objects are the same
   const Value *AObj = getUnderlyingObject(LocA.Ptr);
@@ -1228,20 +1222,20 @@ AccessPtrAnalysis::underlyingObjectsAlias(const GeneralAccess &GAA,
 
   // If the underlying objects are the same, they must alias
   if (AObj == BObj)
-    return MustAlias;
+    return AliasResult::MustAlias;
 
   // We may have hit the recursion limit for underlying objects, or have
   // underlying objects where we don't know they will alias.
   if (!isIdentifiedObject(AObj) || !isIdentifiedObject(BObj)) {
     if ((isIdentifiedObject(AObj) && !PointerCapturedBefore(AObj, GAB.I)) ||
         (isIdentifiedObject(BObj) && !PointerCapturedBefore(BObj, GAA.I)))
-      return NoAlias;
-    return MayAlias;
+      return AliasResult::NoAlias;
+    return AliasResult::MayAlias;
   }
 
   // Otherwise we know the objects are different and both identified objects so
   // must not alias.
-  return NoAlias;
+  return AliasResult::NoAlias;
 }
 
 void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
@@ -1282,10 +1276,11 @@ void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
             F, GA2.getPtr()->getType()->getPointerAddressSpace()))
       return;
 
-    if (NoAlias == underlyingObjectsAlias(GA1, GA2))
+    if (AliasResult::NoAlias == underlyingObjectsAlias(GA1, GA2))
       return;
 
-    LLVM_DEBUG(dbgs() << "Checking for race from dependence:\n"
+    LLVM_DEBUG(
+        dbgs() << "Checking for race from dependence:\n"
                << "  GA1 =\n"
                << "    Ptr:" << *GA1.getPtr() << "\n    I:" << *GA1.I << "\n"
                << "  GA2 =\n"
@@ -1296,7 +1291,7 @@ void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
 
   if (LocalRace) {
     LLVM_DEBUG(dbgs() << "Local race found:\n"
-               << "  I1 =" << *GA1.I << "\n  I2 =" << *GA2.I << "\n");
+                      << "  I1 =" << *GA1.I << "\n  I2 =" << *GA2.I << "\n");
     recordLocalRace(GA1, Result, ObjectMRForRace, GA2);
     recordLocalRace(GA2, Result, ObjectMRForRace, GA1);
   }
@@ -1352,8 +1347,8 @@ void AccessPtrAnalysis::checkForRacesHelper(
 
             // Otherwise record the possible race with an ancestor.
             LLVM_DEBUG(dbgs() << "Setting race via ancestor:\n"
-                       << "  GA.I: " << *GA.I << "\n"
-                       << "  Arg: " << *A << "\n");
+                              << "  GA.I: " << *GA.I << "\n"
+                              << "  Arg: " << *A << "\n");
             recordAncestorRace(GA, A, Result, ObjectMRForRace);
             continue;
           }
@@ -1365,8 +1360,8 @@ void AccessPtrAnalysis::checkForRacesHelper(
             if (!GV->hasPrivateLinkage() && !GV->hasInternalLinkage()) {
               // Races are only possible with ancestor functions in this module.
               LLVM_DEBUG(dbgs() << "Setting race via private/internal global:\n"
-                         << "  GA.I: " << *GA.I << "\n"
-                         << "  GV: " << *GV << "\n");
+                                << "  GA.I: " << *GA.I << "\n"
+                                << "  GV: " << *GV << "\n");
               // TODO: Add suppressions for private and internal global
               // variables, then record this as a potential ancestor race
               // instead of an opaque race
@@ -1376,8 +1371,8 @@ void AccessPtrAnalysis::checkForRacesHelper(
             } else {
               // Record the possible opaque race.
               LLVM_DEBUG(dbgs() << "Setting opaque race:\n"
-                         << "  GA.I: " << *GA.I << "\n"
-                         << "  GV: " << *GV << "\n");
+                                << "  GA.I: " << *GA.I << "\n"
+                                << "  GV: " << *GV << "\n");
               recordOpaqueRace(GA, GV, Result, ObjectMRForRace);
             }
             continue;
@@ -1386,8 +1381,8 @@ void AccessPtrAnalysis::checkForRacesHelper(
           if (isa<ConstantExpr>(Obj)) {
             // Record the possible opaque race.
             LLVM_DEBUG(dbgs() << "Setting opaque race:\n"
-                       << "  GA.I: " << *GA.I << "\n"
-                       << "  Obj: " << *Obj << "\n");
+                              << "  GA.I: " << *GA.I << "\n"
+                              << "  Obj: " << *Obj << "\n");
             recordOpaqueRace(GA, Obj, Result, ObjectMRForRace);
             continue;
           }
@@ -1398,8 +1393,8 @@ void AccessPtrAnalysis::checkForRacesHelper(
 
           // Record the possible opaque race.
           LLVM_DEBUG(dbgs() << "Setting opaque race:\n"
-                     << "  GA.I: " << *GA.I << "\n"
-                     << "  Obj: " << *Obj << "\n");
+                            << "  GA.I: " << *GA.I << "\n"
+                            << "  Obj: " << *Obj << "\n");
           recordOpaqueRace(GA, Obj, Result, ObjectMRForRace);
         }
       }
@@ -1484,8 +1479,8 @@ public:
   void addAccess(GeneralAccess GA, bool IsReadOnlyPtr = false) {
     if (GA.getPtr()) {
       LLVM_DEBUG(dbgs() << "Adding access for RT pointer checking:\n"
-                 << "  GA.I: " << *GA.I << "\n"
-                 << "  GA.Ptr: " << *GA.getPtr() << "\n");
+                        << "  GA.I: " << *GA.I << "\n"
+                        << "  GA.Ptr: " << *GA.getPtr() << "\n");
       AST.add(GA.I);
       Value *Ptr = const_cast<Value *>(GA.getPtr());
       Accesses.insert(MemAccessInfo(Ptr, GA.isMod()));
@@ -1932,9 +1927,9 @@ void AccessPtrAnalysis::processAccessPtrs(
           if (!Call->onlyAccessesArgMemory() &&
               !(AssumeSafeMalloc && (isAllocationFn(Call, TLI) ||
                                      isFreeCall(Call, TLI)))) {
-            LLVM_DEBUG(dbgs() << "Setting opaque race:\n" << "  GA.I: "
-                       << *GA.I << "\n"
-                       << "  no explicit racer\n");
+            LLVM_DEBUG(dbgs() << "Setting opaque race:\n"
+                              << "  GA.I: " << *GA.I << "\n"
+                              << "  no explicit racer\n");
             Result.recordOpaqueRace(GA, GeneralAccess());
           }
         }

@@ -591,14 +591,10 @@ define void @fadd_reassoc_FMF(float* nocapture %p, i32 %N) {
 ; AUTO_VEC-NEXT:    [[TMP15:%.*]] = fadd reassoc <8 x float> [[STEP_ADD]], [[WIDE_LOAD5]]
 ; AUTO_VEC-NEXT:    [[TMP16:%.*]] = fadd reassoc <8 x float> [[STEP_ADD2]], [[WIDE_LOAD6]]
 ; AUTO_VEC-NEXT:    [[TMP17:%.*]] = fadd reassoc <8 x float> [[STEP_ADD3]], [[WIDE_LOAD7]]
-; AUTO_VEC-NEXT:    [[TMP18:%.*]] = bitcast float* [[TMP6]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP14]], <8 x float>* [[TMP18]], align 4
-; AUTO_VEC-NEXT:    [[TMP19:%.*]] = bitcast float* [[TMP8]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP15]], <8 x float>* [[TMP19]], align 4
-; AUTO_VEC-NEXT:    [[TMP20:%.*]] = bitcast float* [[TMP10]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP16]], <8 x float>* [[TMP20]], align 4
-; AUTO_VEC-NEXT:    [[TMP21:%.*]] = bitcast float* [[TMP12]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP17]], <8 x float>* [[TMP21]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP14]], <8 x float>* [[TMP7]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP15]], <8 x float>* [[TMP9]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP16]], <8 x float>* [[TMP11]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP17]], <8 x float>* [[TMP13]], align 4
 ; AUTO_VEC-NEXT:    [[INDEX_NEXT:%.*]] = or i64 [[INDEX]], 32
 ; AUTO_VEC-NEXT:    [[VEC_IND_NEXT:%.*]] = fadd reassoc <8 x float> [[STEP_ADD3]], <float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02>
 ; AUTO_VEC-NEXT:    [[STEP_ADD_1:%.*]] = fadd reassoc <8 x float> [[VEC_IND_NEXT]], <float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02>
@@ -620,14 +616,10 @@ define void @fadd_reassoc_FMF(float* nocapture %p, i32 %N) {
 ; AUTO_VEC-NEXT:    [[TMP31:%.*]] = fadd reassoc <8 x float> [[STEP_ADD_1]], [[WIDE_LOAD5_1]]
 ; AUTO_VEC-NEXT:    [[TMP32:%.*]] = fadd reassoc <8 x float> [[STEP_ADD2_1]], [[WIDE_LOAD6_1]]
 ; AUTO_VEC-NEXT:    [[TMP33:%.*]] = fadd reassoc <8 x float> [[STEP_ADD3_1]], [[WIDE_LOAD7_1]]
-; AUTO_VEC-NEXT:    [[TMP34:%.*]] = bitcast float* [[TMP22]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP30]], <8 x float>* [[TMP34]], align 4
-; AUTO_VEC-NEXT:    [[TMP35:%.*]] = bitcast float* [[TMP24]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP31]], <8 x float>* [[TMP35]], align 4
-; AUTO_VEC-NEXT:    [[TMP36:%.*]] = bitcast float* [[TMP26]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP32]], <8 x float>* [[TMP36]], align 4
-; AUTO_VEC-NEXT:    [[TMP37:%.*]] = bitcast float* [[TMP28]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP33]], <8 x float>* [[TMP37]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP30]], <8 x float>* [[TMP23]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP31]], <8 x float>* [[TMP25]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP32]], <8 x float>* [[TMP27]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP33]], <8 x float>* [[TMP29]], align 4
 ; AUTO_VEC-NEXT:    [[INDEX_NEXT_1]] = add nuw i64 [[INDEX]], 64
 ; AUTO_VEC-NEXT:    [[VEC_IND_NEXT_1]] = fadd reassoc <8 x float> [[STEP_ADD3_1]], <float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02, float 3.360000e+02>
 ; AUTO_VEC-NEXT:    [[NITER_NEXT_1]] = add i64 [[NITER]], 2
@@ -658,14 +650,10 @@ define void @fadd_reassoc_FMF(float* nocapture %p, i32 %N) {
 ; AUTO_VEC-NEXT:    [[TMP47:%.*]] = fadd reassoc <8 x float> [[STEP_ADD_EPIL]], [[WIDE_LOAD5_EPIL]]
 ; AUTO_VEC-NEXT:    [[TMP48:%.*]] = fadd reassoc <8 x float> [[STEP_ADD2_EPIL]], [[WIDE_LOAD6_EPIL]]
 ; AUTO_VEC-NEXT:    [[TMP49:%.*]] = fadd reassoc <8 x float> [[STEP_ADD3_EPIL]], [[WIDE_LOAD7_EPIL]]
-; AUTO_VEC-NEXT:    [[TMP50:%.*]] = bitcast float* [[TMP38]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP46]], <8 x float>* [[TMP50]], align 4
-; AUTO_VEC-NEXT:    [[TMP51:%.*]] = bitcast float* [[TMP40]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP47]], <8 x float>* [[TMP51]], align 4
-; AUTO_VEC-NEXT:    [[TMP52:%.*]] = bitcast float* [[TMP42]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP48]], <8 x float>* [[TMP52]], align 4
-; AUTO_VEC-NEXT:    [[TMP53:%.*]] = bitcast float* [[TMP44]] to <8 x float>*
-; AUTO_VEC-NEXT:    store <8 x float> [[TMP49]], <8 x float>* [[TMP53]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP46]], <8 x float>* [[TMP39]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP47]], <8 x float>* [[TMP41]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP48]], <8 x float>* [[TMP43]], align 4
+; AUTO_VEC-NEXT:    store <8 x float> [[TMP49]], <8 x float>* [[TMP45]], align 4
 ; AUTO_VEC-NEXT:    br label [[MIDDLE_BLOCK]]
 ; AUTO_VEC:       middle.block:
 ; AUTO_VEC-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N_VEC]], [[TMP0]]

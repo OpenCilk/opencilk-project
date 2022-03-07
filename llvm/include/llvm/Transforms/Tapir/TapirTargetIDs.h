@@ -23,7 +23,6 @@ enum class TapirTargetID {
   Serial,   // Lower to serial projection
   Cheetah,  // Lower to the Cheetah ABI
   Cilk,     // Lower to the Cilk Plus ABI
-  CilkR,    // Lower to the CilkR ABI
   Cuda,     // Lower to Cuda ABI
   OpenCilk, // Lower to OpenCilk ABI
   OpenMP,   // Lower to OpenMP

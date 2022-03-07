@@ -414,8 +414,8 @@ class FunctionDifferenceEngine {
       return false;
 
     } else if (isa<DetachInst>(L)) {
-      DetachInst *LI = cast<DetachInst>(L);
-      DetachInst *RI = cast<DetachInst>(R);
+      const DetachInst *LI = cast<DetachInst>(L);
+      const DetachInst *RI = cast<DetachInst>(R);
       if (!equivalentAsOperands(LI->getSyncRegion(), RI->getSyncRegion())) {
         if (Complain) Engine.log("detach sync regions differ");
         return true;
@@ -433,8 +433,8 @@ class FunctionDifferenceEngine {
       return false;
 
     } else if (isa<ReattachInst>(L)) {
-      ReattachInst *LI = cast<ReattachInst>(L);
-      ReattachInst *RI = cast<ReattachInst>(R);
+      const ReattachInst *LI = cast<ReattachInst>(L);
+      const ReattachInst *RI = cast<ReattachInst>(R);
       if (!equivalentAsOperands(LI->getSyncRegion(), RI->getSyncRegion())) {
         if (Complain) Engine.log("reattach sync regions differ");
         return true;
@@ -445,8 +445,8 @@ class FunctionDifferenceEngine {
       return false;
 
     } else if (isa<SyncInst>(L)) {
-      SyncInst *LI = cast<SyncInst>(L);
-      SyncInst *RI = cast<SyncInst>(R);
+      const SyncInst *LI = cast<SyncInst>(L);
+      const SyncInst *RI = cast<SyncInst>(R);
       if (!equivalentAsOperands(LI->getSyncRegion(), RI->getSyncRegion())) {
         if (Complain) Engine.log("sync-instruction sync regions differ");
         return true;

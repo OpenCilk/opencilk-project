@@ -119,6 +119,7 @@
 ; CHECK-O23SZ-NEXT: WarnMissedTransformationsPass on foo
 ; CHECK-O23SZ-NEXT: Running pass: InstCombinePass on foo
 ; CHECK-O23SZ-NEXT: Running pass: SimplifyCFGPass on foo
+; CHECK-O23SZ-NEXT: Running pass: EarlyCSEPass on foo
 ; CHECK-O23SZ-NEXT: Running pass: SCCPPass on foo
 ; CHECK-O23SZ-NEXT: Running pass: InstCombinePass on foo
 ; CHECK-O23SZ-NEXT: Running pass: BDCEPass on foo
