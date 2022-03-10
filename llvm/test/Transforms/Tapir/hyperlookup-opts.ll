@@ -1,4 +1,9 @@
+; Check that optimization passes can optimize codes with
+; __cilkrts_hyper_lookup calls, i.e., by moving __cilkrts_hyper_lookup
+; calls out of serial loops and subsequently vectorizing those loops.
+;
 ; RUN: opt < %s -enable-new-pm=0 -tti -tbaa -loop-stripmine -indvars -licm -loop-vectorize -instcombine -simplifycfg -S -o - | FileCheck %s
+; RUN: opt < %s -aa-pipeline=tbaa,basic-aa -passes='loop-stripmine,loop-mssa(indvars,licm),loop-vectorize,instcombine,simplifycfg' -S -o - | FileCheck %s
 ; REQUIRES: x86-registered-target
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
