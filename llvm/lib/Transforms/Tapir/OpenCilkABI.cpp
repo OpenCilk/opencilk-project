@@ -133,6 +133,9 @@ void OpenCilkABI::prepareModule() {
                 // OpenCilk runtime library will provide those definitions
                 // later.
                 Fn->setLinkage(Function::AvailableExternallyLinkage);
+            } else if (GlobalVariable *G = M.getGlobalVariable(GVName)) {
+              if (!G->isDeclaration())
+                G->setLinkage(GlobalValue::AvailableExternallyLinkage);
             }
           }
         });
@@ -215,6 +218,11 @@ void OpenCilkABI::prepareModule() {
         Fn->addFnAttr(Attribute::AlwaysInline);
       else
         Fn->removeFnAttr(Attribute::AlwaysInline);
+    }
+    if (GlobalVariable *AlignVar =
+        M.getGlobalVariable("__cilkrts_stack_frame_align", true)) {
+      if (auto Align = AlignVar->getAlign())
+        StackFrameAlign = Align.getValue();
     }
   } else if (DebugABICalls) {
     if (StackFrameTy->isOpaque()) {
@@ -346,7 +354,7 @@ Value *OpenCilkABI::CreateStackFrame(Function &F) {
   AllocaInst *SF = B.CreateAlloca(SFTy, DL.getAllocaAddrSpace(),
                                   /*ArraySize*/ nullptr,
                                   /*Name*/ StackFrameName);
-  SF->setAlignment(Align(8));
+  SF->setAlignment(StackFrameAlign);
 
   return SF;
 }
