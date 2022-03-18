@@ -578,7 +578,7 @@ public:
 
   /// Get basic blocks that are outside of the loop, based on CFG analysis, but
   /// inside tasks created within the loop.  Many analyses and optimizations
-  /// should treat these blocks are part of the loop.
+  /// should treat these blocks as part of the loop.
   void getTaskExits(SmallPtrSetImpl<BasicBlock *> &TaskExits) const;
 
   /// Return all of the successor blocks of this loop. These are the blocks

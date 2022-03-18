@@ -251,6 +251,107 @@ void llvm::simplifyLoopAfterUnroll(Loop *L, bool SimplifyIVs, LoopInfo *LI,
   }
 }
 
+// Wrapper class for GraphTraits to examine task exits of a loop.
+template <class GraphType> struct TaskExitGraph {
+  const GraphType &Graph;
+
+  inline TaskExitGraph(const GraphType &G) : Graph(G) {}
+};
+
+// GraphTraits to examine task exits of a loop, to support using the post_order
+// iterator to examine the task exits.
+template <> struct GraphTraits<TaskExitGraph<BasicBlock *>> {
+  using NodeRef = BasicBlock *;
+
+  struct TaskExitFilter {
+    NodeRef TaskExitPred = nullptr;
+    TaskExitFilter(NodeRef TaskExit) : TaskExitPred(TaskExit) {}
+    bool operator()(NodeRef N) const {
+      return !isDetachedRethrow(TaskExitPred->getTerminator()) &&
+             !isTaskFrameResume(TaskExitPred->getTerminator());
+    }
+  };
+
+  using ChildIteratorType = filter_iterator<succ_iterator, TaskExitFilter>;
+
+  static NodeRef getEntryNode(TaskExitGraph<BasicBlock *> G) { return G.Graph; }
+  static ChildIteratorType child_begin(NodeRef N) {
+    return make_filter_range(successors(N), TaskExitFilter(N)).begin();
+  }
+  static ChildIteratorType child_end(NodeRef N) {
+    return make_filter_range(successors(N), TaskExitFilter(N)).end();
+  }
+};
+
+// Clone task-exit blocks that are effectively part of the loop but don't appear
+// to be based on standard loop analysis.
+static void handleTaskExits(SmallPtrSetImpl<BasicBlock *> &TaskExits,
+                            SmallPtrSetImpl<BasicBlock *> &TaskExitSrcs,
+                            unsigned It, Loop *L, BasicBlock *Header,
+                            LoopInfo *LI, NewLoopsMap &NewLoops,
+                            SmallSetVector<Loop *, 4> &LoopsToSimplify,
+                            ValueToValueMapTy &LastValueMap,
+                            SmallVectorImpl<BasicBlock *> &NewBlocks,
+                            std::vector<BasicBlock *> &UnrolledLoopBlocks,
+                            DominatorTree *DT) {
+  // Get the TaskExits in reverse post order.  Using post_order here seems
+  // necessary to ensure the custom filter for processing task exits is used.
+  SmallVector<BasicBlock *, 8> TaskExitsRPO;
+  for (BasicBlock *TEStart : TaskExitSrcs)
+    for (BasicBlock *BB : post_order<TaskExitGraph<BasicBlock *>>((TEStart)))
+      TaskExitsRPO.push_back(BB);
+  std::reverse(TaskExitsRPO.begin(), TaskExitsRPO.end());
+
+  // Process the task exits similarly to loop blocks.
+  for (BasicBlock *BB : TaskExitsRPO) {
+    ValueToValueMapTy VMap;
+    BasicBlock *New = CloneBasicBlock(BB, VMap, "." + Twine(It));
+    Header->getParent()->getBasicBlockList().push_back(New);
+
+    assert(BB != Header && "Header should not be a task exit");
+    // Tell LI about New.
+    if (LI->getLoopFor(BB)) {
+      const Loop *OldLoop = addClonedBlockToLoopInfo(BB, New, LI, NewLoops);
+      if (OldLoop)
+        LoopsToSimplify.insert(NewLoops[OldLoop]);
+    }
+
+    // Update our running map of newest clones
+    LastValueMap[BB] = New;
+    for (ValueToValueMapTy::iterator VI = VMap.begin(), VE = VMap.end();
+         VI != VE; ++VI)
+      LastValueMap[VI->first] = VI->second;
+
+    // Add phi entries for newly created values to all exit blocks.
+    for (BasicBlock *Succ : successors(BB)) {
+      if (L->contains(Succ) || TaskExits.count(Succ))
+        continue;
+      for (PHINode &PHI : Succ->phis()) {
+        Value *Incoming = PHI.getIncomingValueForBlock(BB);
+        ValueToValueMapTy::iterator It = LastValueMap.find(Incoming);
+        if (It != LastValueMap.end())
+          Incoming = It->second;
+        PHI.addIncoming(Incoming, New);
+      }
+    }
+
+    NewBlocks.push_back(New);
+    UnrolledLoopBlocks.push_back(New);
+
+    // Update DomTree: since we just copy the loop body, and each copy has a
+    // dedicated entry block (copy of the header block), this header's copy
+    // dominates all copied blocks. That means, dominance relations in the
+    // copied body are the same as in the original body.
+    if (DT) {
+      auto BBDomNode = DT->getNode(BB);
+      auto BBIDom = BBDomNode->getIDom();
+      BasicBlock *OriginalBBIDom = BBIDom->getBlock();
+      DT->addNewBlock(
+          New, cast<BasicBlock>(LastValueMap[cast<Value>(OriginalBBIDom)]));
+    }
+  }
+}
+
 /// Unroll the given loop by Count. The loop must be in LCSSA form.  Unrolling
 /// can only fail when the loop's latch block is not terminated by a conditional
 /// branch instruction. However, if the trip count (and multiple) are not known,
@@ -503,7 +604,12 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   LoopBlocksDFS::RPOIterator BlockBegin = DFS.beginRPO();
   LoopBlocksDFS::RPOIterator BlockEnd = DFS.endRPO();
 
+  SmallPtrSet<BasicBlock *, 8> TaskExits;
+  L->getTaskExits(TaskExits);
+
   std::vector<BasicBlock*> UnrolledLoopBlocks = L->getBlocks();
+  UnrolledLoopBlocks.insert(UnrolledLoopBlocks.end(), TaskExits.begin(),
+                            TaskExits.end());
 
   // Loop Unrolling might create new loops. While we do preserve LoopInfo, we
   // might break loop-simplified form for these loops (as they, e.g., would
@@ -533,13 +639,14 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   // Identify what noalias metadata is inside the loop: if it is inside the
   // loop, the associated metadata must be cloned for each iteration.
   SmallVector<MDNode *, 6> LoopLocalNoAliasDeclScopes;
-  identifyNoAliasScopesToClone(L->getBlocks(), LoopLocalNoAliasDeclScopes);
+  identifyNoAliasScopesToClone(UnrolledLoopBlocks, LoopLocalNoAliasDeclScopes);
 
   // We place the unrolled iterations immediately after the original loop
   // latch.  This is a reasonable default placement if we don't have block
   // frequencies, and if we do, well the layout will be adjusted later.
   auto BlockInsertPt = std::next(LatchBlock->getIterator());
   for (unsigned It = 1; It != ULO.Count; ++It) {
+    SmallPtrSet<BasicBlock *, 8> TaskExitSrcs;
     SmallVector<BasicBlock *, 8> NewBlocks;
     SmallDenseMap<const Loop *, Loop *, 4> NewLoops;
     NewLoops[L] = L;
@@ -579,6 +686,14 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
       for (BasicBlock *Succ : successors(*BB)) {
         if (L->contains(Succ))
           continue;
+        if (TaskExits.count(Succ)) {
+          if (llvm::none_of(predecessors(Succ),
+                            [&TaskExits](const BasicBlock *B) {
+                              return TaskExits.count(B);
+                            }))
+            TaskExitSrcs.insert(Succ);
+          continue;
+        }
         for (PHINode &PHI : Succ->phis()) {
           Value *Incoming = PHI.getIncomingValueForBlock(*BB);
           ValueToValueMapTy::iterator It = LastValueMap.find(Incoming);
@@ -618,6 +733,12 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
             New, cast<BasicBlock>(LastValueMap[cast<Value>(OriginalBBIDom)]));
       }
     }
+
+    // Handle task-exit blocks from this loop similarly to ordinary loop-body
+    // blocks.
+    handleTaskExits(TaskExits, TaskExitSrcs, It, L, Header, LI, NewLoops,
+                    LoopsToSimplify, LastValueMap, NewBlocks,
+                    UnrolledLoopBlocks, DT);
 
     // Remap all instructions in the most recent iteration
     remapInstructionsInBlocks(NewBlocks, LastValueMap);
