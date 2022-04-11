@@ -3694,13 +3694,6 @@ def EnforceTCBLeaf : InheritableAttr {
 
 // TODO: Add docs to these attributes
 
-def Injective : InheritableAttr {
-  // TODO: Associate this with a single argument, not the function.
-  let Spellings = [Clang<"injective">];
-  let Subjects = SubjectList<[Function]>;
-  let Documentation = [Undocumented];
-}
-
 def Stealable : InheritableAttr {
   let Spellings = [Clang<"stealable">];
   let Subjects = SubjectList<[FunctionLike]>;
@@ -3717,38 +3710,4 @@ def StrandMalloc : InheritableAttr {
   let Spellings = [Clang<"strand_malloc">];
   let Subjects = SubjectList<[Function]>;
   let Documentation = [StrandMallocDocs];
-}
-
-def HyperView : InheritableAttr {
-  let Spellings = [Clang<"hyper_view">];
-  let Subjects = SubjectList<[FunctionLike]>;
-  let Documentation = [StrandMallocDocs];
-}
-
-def HyperToken : InheritableAttr {
-  let Spellings = [Clang<"hyper_token">];
-  let Subjects = SubjectList<[FunctionLike]>;
-  let Documentation = [StrandMallocDocs];
-}
-
-def ReducerRegister : InheritableAttr {
-  let Spellings = [Clang<"reducer_register">];
-  let Subjects = SubjectList<[FunctionLike]>;
-  let Documentation = [StrandMallocDocs];
-}
-
-def ReducerUnregister : InheritableAttr {
-  let Spellings = [Clang<"reducer_unregister">];
-  let Subjects = SubjectList<[FunctionLike]>;
-  let Documentation = [StrandMallocDocs];
-}
-
-def ReducerCallbacks : Attr {
-  let Spellings = [
-    GNU<"reducer">
-  ];
-  let Args = [ExprArgument<"reduce">, ExprArgument<"init">,
-      ExprArgument<"destruct", 1>];
-  let Subjects = SubjectList<[NonParmVar, TypedefName]>;
-  let Documentation = [ReducerDocs];
 }

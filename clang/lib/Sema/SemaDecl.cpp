@@ -4793,9 +4793,6 @@ Sema::ParsedFreeStandingDeclSpec(Scope *S, AccessSpecifier AS, DeclSpec &DS,
     if (DS.getTypeQualifiers() & DeclSpec::TQ_unaligned)
       Diag(DS.getUnalignedSpecLoc(), DiagID) << "__unaligned";
   }
-  // Hard to make this work with templates.
-  if (DS.isHyper())
-    Diag(DS.getHyperLoc(), DiagID) << "_Hyperobject";
 
   // Warn about ignored type attributes, for example:
   // __attribute__((aligned)) struct A;
@@ -7995,7 +7992,7 @@ void Sema::CheckVariableDeclarationType(VarDecl *NewVD) {
 
   bool isVM = T->isVariablyModifiedType();
   if (isVM || NewVD->hasAttr<CleanupAttr>() ||
-      NewVD->hasAttr<BlocksAttr>() || NewVD->hasAttr<ReducerCallbacksAttr>())
+      NewVD->hasAttr<BlocksAttr>())
     setFunctionHasBranchProtectedScope();
 
   if ((isVM && NewVD->hasLinkage()) ||
@@ -12503,8 +12500,6 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
 
   if (VarDecl *Var = dyn_cast<VarDecl>(RealDecl)) {
     QualType Type = Var->getType();
-    if (const HyperobjectType *H = Type->getAs<HyperobjectType>())
-      Type = H->getElementType();
 
     // C++1z [dcl.dcl]p1 grammar implies that an initializer is mandatory.
     if (isa<DecompositionDecl>(RealDecl)) {

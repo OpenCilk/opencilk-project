@@ -2042,8 +2042,6 @@ void CodeGenFunction::EmitCXXAggrConstructorCall(const CXXConstructorDecl *ctor,
 void CodeGenFunction::destroyCXXObject(CodeGenFunction &CGF,
                                        Address addr,
                                        QualType type) {
-  if (const HyperobjectType *H = type->getAs<HyperobjectType>())
-    type = H->getElementType();
   const RecordType *rtype = type->castAs<RecordType>();
   const CXXRecordDecl *record = cast<CXXRecordDecl>(rtype->getDecl());
   const CXXDestructorDecl *dtor = record->getDestructor();

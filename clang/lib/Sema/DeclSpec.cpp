@@ -706,12 +706,6 @@ bool DeclSpec::SetTypeSpecWidth(TypeSpecifierWidth W, SourceLocation Loc,
   return false;
 }
 
-bool DeclSpec::SetTypeHyperobject(SourceLocation Loc) {
-  TQ_hyperLoc = Loc;
-  TypeHyper = 1;
-  return false;
-}
-
 bool DeclSpec::SetTypeSpecComplex(TSC C, SourceLocation Loc,
                                   const char *&PrevSpec,
                                   unsigned &DiagID) {
@@ -1128,7 +1122,7 @@ void DeclSpec::Finish(Sema &S, const PrintingPolicy &Policy) {
   // If decltype(auto) is used, no other type specifiers are permitted.
   if (TypeSpecType == TST_decltype_auto &&
       (getTypeSpecWidth() != TypeSpecifierWidth::Unspecified ||
-       TypeSpecComplex != TSC_unspecified || TypeHyper ||
+       TypeSpecComplex != TSC_unspecified ||
        getTypeSpecSign() != TypeSpecifierSign::Unspecified ||
        TypeAltiVecVector || TypeAltiVecPixel || TypeAltiVecBool ||
        TypeQualifiers)) {

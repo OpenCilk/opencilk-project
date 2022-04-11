@@ -10100,22 +10100,6 @@ def note_exits_cilk_for : Note<
   "jump exits the scope of a '_Cilk_for'">;
 def err_jump_out_of_cilk_for : Error<
   "cannot jump out of '_Cilk_for' statement">;
-
-def attribute_requires_cilk : Warning<
-  "%0 ignored when OpenCilk not in use">;
-
-def attribute_requires_hyperobject : Warning<
-  "%0 ignored when not on hyperobject">;
-
-def hyperobject_exclusive : Warning<
-  "%0 not allowed on hyperobjects">;
-
-def variable_length_hyperobject : Warning<
-   "variable length type %0 may not be a hyperobject">;
-
-def note_protected_by_reducer : Note<
-  "jump bypasses initialization of variable with __attribute__((reducer))">;
-
 } // end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {

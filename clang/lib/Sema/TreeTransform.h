@@ -4857,12 +4857,6 @@ QualType TreeTransform<Derived>::TransformComplexType(TypeLocBuilder &TLB,
   return TransformTypeSpecType(TLB, T);
 }
 
-template<typename Derived>
-QualType TreeTransform<Derived>::TransformHyperobjectType
-  (TypeLocBuilder &TLB, HyperobjectTypeLoc T) {
-  return TransformTypeSpecType(TLB, T);
-}
-
 template <typename Derived>
 QualType TreeTransform<Derived>::TransformAdjustedType(TypeLocBuilder &TLB,
                                                        AdjustedTypeLoc TL) {

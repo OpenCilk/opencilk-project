@@ -109,4 +109,3 @@ def PipeType : TypeNode<Type>;
 def AtomicType : TypeNode<Type>;
 def ExtIntType : TypeNode<Type>;
 def DependentExtIntType : TypeNode<Type>, AlwaysDependent;
-def HyperobjectType : TypeNode<Type>;

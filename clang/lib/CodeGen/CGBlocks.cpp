@@ -2074,8 +2074,6 @@ computeDestroyInfoForBlockCapture(const BlockDecl::Capture &CI, QualType T,
   }
 
   switch (T.isDestructedType()) {
-  case QualType::DK_hyperobject:
-    llvm_unreachable("hyperobject cleanup not implemented");
   case QualType::DK_cxx_destructor:
     return std::make_pair(BlockCaptureEntityKind::CXXRecord, BlockFieldFlags());
   case QualType::DK_objc_strong_lifetime:

@@ -1768,19 +1768,6 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
   if (!DS.isTypeSpecPipe())
     processTypeAttrs(state, Result, TAL_DeclSpec, DS.getAttributes());
 
-  // XXX Where does this go?  Are complex hyper and hyper complex the same?
-  if (DS.isHyper()) {
-    unsigned Tmp = DS.getTypeQualifiers();
-    diagnoseAndRemoveTypeQualifiers(S, DS, Tmp, Result,
-                                    DeclSpec::TQ_volatile,
-                                    diag::hyperobject_exclusive);
-    // This is too hard to get right.
-    if (Result->isVariablyModifiedType())
-      S.Diag(DS.getHyperLoc(), diag::variable_length_hyperobject) << Result;
-    else
-      Result = Context.getHyperobjectType(Result);
-  }
-
   // Apply const/volatile/restrict qualifiers to T.
   if (unsigned TypeQuals = DS.getTypeQualifiers()) {
     // Warn about CV qualifiers on function types.

@@ -2646,20 +2646,7 @@ VarDecl::needsDestruction(const ASTContext &Ctx) const {
   if (isNoDestroy(Ctx))
     return QualType::DK_none;
 
-  QualType::DestructionKind Kind = getType().isDestructedType();
-  if (Kind != QualType::DK_none)
-    return Kind;
-
-  if (const HyperobjectType *H = getType()->getAs<HyperobjectType>()) {
-    Kind = H->getElementType().isDestructedType();
-    if (Kind != QualType::DK_none)
-      return Kind;
-    if (getAttr<ReducerCallbacksAttr>())
-      return QualType::DK_hyperobject;
-    // Attributes on typedefs were checked by isDestructedType().
-  }
-
-  return QualType::DK_none;
+  return getType().isDestructedType();
 }
 
 MemberSpecializationInfo *VarDecl::getMemberSpecializationInfo() const {

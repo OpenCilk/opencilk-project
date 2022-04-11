@@ -17,14 +17,6 @@ let Class = ComplexType in {
   def : Creator<[{ return ctx.getComplexType(elementType); }]>;
 }
 
-let Class = HyperobjectType in {
-  def : Property<"elementType", QualType> {
-    let Read = [{ node->getElementType() }];    
-  }
-
-  def : Creator<[{ return ctx.getHyperobjectType(elementType); }]>;
-}
-
 let Class = PointerType in {
   def : Property<"pointeeType", QualType> {
     let Read = [{ node->getPointeeType() }];

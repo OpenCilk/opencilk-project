@@ -3740,14 +3740,6 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
       isInvalid = DS.SetTypeSpecSign(TypeSpecifierSign::Unsigned, Loc, PrevSpec,
                                      DiagID);
       break;
-    case tok::kw__Hyperobject:
-      if (getLangOpts().getCilk() != LangOptions::Cilk_opencilk) {
-        Diag(Tok, diag::warn_opencilk_disabled) << Tok.getName();
-        isInvalid = false; // meaning, warning already emitted
-        break;
-      }
-      isInvalid = DS.SetTypeHyperobject(Loc);
-      break;
     case tok::kw__Complex:
       if (!getLangOpts().C99)
         Diag(Tok, diag::ext_c99_feature) << Tok.getName();
@@ -4886,7 +4878,6 @@ bool Parser::isKnownToBeTypeSpecifier(const Token &Tok) const {
   case tok::kw___int128:
   case tok::kw_signed:
   case tok::kw_unsigned:
-  case tok::kw__Hyperobject:
   case tok::kw__Complex:
   case tok::kw__Imaginary:
   case tok::kw_void:
@@ -4968,7 +4959,6 @@ bool Parser::isTypeSpecifierQualifier() {
   case tok::kw___int128:
   case tok::kw_signed:
   case tok::kw_unsigned:
-  case tok::kw__Hyperobject:
   case tok::kw__Complex:
   case tok::kw__Imaginary:
   case tok::kw_void:
@@ -5137,7 +5127,6 @@ bool Parser::isDeclarationSpecifier(bool DisambiguatingWithExpression) {
   case tok::kw___int128:
   case tok::kw_signed:
   case tok::kw_unsigned:
-  case tok::kw__Hyperobject:
   case tok::kw__Complex:
   case tok::kw__Imaginary:
   case tok::kw_void:

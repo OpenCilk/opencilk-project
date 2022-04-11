@@ -338,7 +338,6 @@ private:
   unsigned TypeAltiVecBool : 1;
   unsigned TypeSpecOwned : 1;
   unsigned TypeSpecPipe : 1;
-  unsigned TypeHyper : 1;
   unsigned TypeSpecSat : 1;
   unsigned ConstrainedAuto : 1;
 
@@ -393,7 +392,6 @@ private:
   SourceLocation FS_forceinlineLoc;
   SourceLocation FriendLoc, ModulePrivateLoc, ConstexprLoc;
   SourceLocation TQ_pipeLoc;
-  SourceLocation TQ_hyperLoc;
 
   WrittenBuiltinSpecs writtenBS;
   void SaveWrittenBuiltinSpecs();
@@ -429,11 +427,10 @@ public:
         TypeSpecSign(static_cast<unsigned>(TypeSpecifierSign::Unspecified)),
         TypeSpecType(TST_unspecified), TypeAltiVecVector(false),
         TypeAltiVecPixel(false), TypeAltiVecBool(false), TypeSpecOwned(false),
-        TypeSpecPipe(false), TypeHyper(false), TypeSpecSat(false),
-        ConstrainedAuto(false), TypeQualifiers(TQ_unspecified),
-        FS_inline_specified(false), FS_forceinline_specified(false),
-        FS_virtual_specified(false), FS_noreturn_specified(false),
-        Friend_specified(false),
+        TypeSpecPipe(false), TypeSpecSat(false), ConstrainedAuto(false),
+        TypeQualifiers(TQ_unspecified), FS_inline_specified(false),
+        FS_forceinline_specified(false), FS_virtual_specified(false),
+        FS_noreturn_specified(false), Friend_specified(false),
         ConstexprSpecifier(
             static_cast<unsigned>(ConstexprSpecKind::Unspecified)),
         FS_explicit_specifier(), Attrs(attrFactory), writtenBS(),
@@ -485,7 +482,6 @@ public:
   bool isTypeSpecPipe() const { return TypeSpecPipe; }
   bool isTypeSpecSat() const { return TypeSpecSat; }
   bool isConstrainedAuto() const { return ConstrainedAuto; }
-  bool isHyper() const { return TypeHyper; }
 
   ParsedType getRepAsType() const {
     assert(isTypeRep((TST) TypeSpecType) && "DeclSpec does not store a type");
@@ -555,7 +551,6 @@ public:
   SourceLocation getAtomicSpecLoc() const { return TQ_atomicLoc; }
   SourceLocation getUnalignedSpecLoc() const { return TQ_unalignedLoc; }
   SourceLocation getPipeLoc() const { return TQ_pipeLoc; }
-  SourceLocation getHyperLoc() const { return TQ_hyperLoc; }
 
   /// Clear out all of the type qualifiers.
   void ClearTypeQualifiers() {
@@ -566,7 +561,6 @@ public:
     TQ_atomicLoc = SourceLocation();
     TQ_unalignedLoc = SourceLocation();
     TQ_pipeLoc = SourceLocation();
-    TQ_hyperLoc = SourceLocation();
   }
 
   // function-specifier
@@ -664,7 +658,6 @@ public:
                         const PrintingPolicy &Policy);
   bool SetTypeSpecComplex(TSC C, SourceLocation Loc, const char *&PrevSpec,
                           unsigned &DiagID);
-  bool SetTypeHyperobject(SourceLocation Loc);
   bool SetTypeSpecSign(TypeSpecifierSign S, SourceLocation Loc,
                        const char *&PrevSpec, unsigned &DiagID);
   bool SetTypeSpecType(TST T, SourceLocation Loc, const char *&PrevSpec,

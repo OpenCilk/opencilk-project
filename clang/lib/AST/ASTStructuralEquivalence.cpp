@@ -702,13 +702,6 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
       return false;
     break;
 
-  case Type::Hyperobject:
-    if (!IsStructurallyEquivalent(Context,
-                                  cast<HyperobjectType>(T1)->getElementType(),
-                                  cast<HyperobjectType>(T2)->getElementType()))
-      return false;
-    break;
-
   case Type::Adjusted:
   case Type::Decayed:
     if (!IsStructurallyEquivalent(Context,

@@ -1272,8 +1272,6 @@ def warn_cilk_for_following_grainsize: Warning<
 def warn_pragma_cilk_grainsize_equals: Warning<
   "'#pragma cilk grainsize' no longer requires '='">,
   InGroup<SourceUsesCilkPlus>;
-def warn_opencilk_disabled: Warning<
-  "%0 ignored when OpenCilk not enabled">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

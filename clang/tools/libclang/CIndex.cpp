@@ -1794,7 +1794,6 @@ bool CursorVisitor::VisitPipeTypeLoc(PipeTypeLoc TL) {
   }
 
 DEFAULT_TYPELOC_IMPL(Complex, Type)
-DEFAULT_TYPELOC_IMPL(Hyperobject, Type)
 DEFAULT_TYPELOC_IMPL(ConstantArray, ArrayType)
 DEFAULT_TYPELOC_IMPL(IncompleteArray, ArrayType)
 DEFAULT_TYPELOC_IMPL(VariableArray, ArrayType)

@@ -5686,10 +5686,7 @@ void InitializationSequence::InitializeFrom(Sema &S,
   //   defined when the initializer is a braced-init-list or when it is a
   //   parenthesized list of expressions.
   QualType DestType = Entity.getType();
-#if 0
-  if (const HyperobjectType *H = DestType->getAs<HyperobjectType>())
-    DestType = H->getElementType();
-#endif
+
   if (DestType->isDependentType() ||
       Expr::hasAnyTypeDependentArguments(Args)) {
     SequenceKind = DependentSequence;

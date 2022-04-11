@@ -428,11 +428,7 @@ public:
   const InitializedEntity *getParent() const { return Parent; }
 
   /// Retrieve type being initialized.
-  QualType getType() const {
-    if (const HyperobjectType *H = Type->getAs<HyperobjectType>())
-      return H->getElementType();
-    return Type;
-  }
+  QualType getType() const { return Type; }
 
   /// Retrieve complete type-source information for the object being
   /// constructed, if known.

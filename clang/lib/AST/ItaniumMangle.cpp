@@ -2073,7 +2073,6 @@ bool CXXNameMangler::mangleUnresolvedTypeOrSimpleId(QualType Ty,
   // Only certain other types are valid as prefixes;  enumerate them.
   switch (Ty->getTypeClass()) {
   case Type::Builtin:
-  case Type::Hyperobject:
   case Type::Complex:
   case Type::Adjusted:
   case Type::Decayed:
@@ -3214,11 +3213,6 @@ void CXXNameMangler::mangleType(const RValueReferenceType *T) {
 void CXXNameMangler::mangleType(const ComplexType *T) {
   Out << 'C';
   mangleType(T->getElementType());
-}
-
-void CXXNameMangler::mangleType(const HyperobjectType *H) {
-  Out << 'H';
-  mangleType(H->getElementType());
 }
 
 // ARM's ABI for Neon vector types specifies that they should be mangled as

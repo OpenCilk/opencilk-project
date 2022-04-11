@@ -1102,7 +1102,6 @@ IdentifierInfo *Parser::ParseObjCSelectorPiece(SourceLocation &SelectorLoc) {
   case tok::kw_while:
   case tok::kw__Bool:
   case tok::kw__Complex:
-  case tok::kw__Hyperobject:
   case tok::kw___alignof:
   case tok::kw___auto_type:
     IdentifierInfo *II = Tok.getIdentifierInfo();

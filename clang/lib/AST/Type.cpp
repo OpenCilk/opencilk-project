@@ -3855,8 +3855,6 @@ static CachedProperties computeCachedProperties(const Type *T) {
     //     compounded exclusively from types that have linkage; or
   case Type::Complex:
     return Cache::get(cast<ComplexType>(T)->getElementType());
-  case Type::Hyperobject:
-    return Cache::get(cast<HyperobjectType>(T)->getElementType());
   case Type::Pointer:
     return Cache::get(cast<PointerType>(T)->getPointeeType());
   case Type::BlockPointer:
@@ -3944,8 +3942,6 @@ LinkageInfo LinkageComputer::computeTypeLinkageInfo(const Type *T) {
 
   case Type::Complex:
     return computeTypeLinkageInfo(cast<ComplexType>(T)->getElementType());
-  case Type::Hyperobject:
-    return computeTypeLinkageInfo(cast<HyperobjectType>(T)->getElementType());
   case Type::Pointer:
     return computeTypeLinkageInfo(cast<PointerType>(T)->getPointeeType());
   case Type::BlockPointer:
@@ -4126,7 +4122,6 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
 
   // Non-pointer types.
   case Type::Complex:
-  case Type::Hyperobject:
   case Type::LValueReference:
   case Type::RValueReference:
   case Type::ConstantArray:
@@ -4349,28 +4344,6 @@ QualType::DestructionKind QualType::isDestructedTypeImpl(QualType type) {
     return DK_objc_strong_lifetime;
   case Qualifiers::OCL_Weak:
     return DK_objc_weak_lifetime;
-  }
-
-  bool IsReducer = false;
-  // Check for attribute on typedef that getAs<HyperobjectType> looks through.
-  if (const TypedefType *T = type->getAs<TypedefType>())
-    IsReducer = T->getDecl()->getAttr<ReducerCallbacksAttr>();
-
-  if (const HyperobjectType *HT = type->getAs<HyperobjectType>()) {
-    QualType Inner = HT->getElementType();
-    QualType::DestructionKind DK_Inner = isDestructedTypeImpl(Inner);
-    if (DK_Inner != DK_none)
-      return DK_Inner;
-    if (IsReducer)
-      return DK_hyperobject;
-    const TypedefType *T = Inner->getAs<TypedefType>();
-    while (T) {
-      TypedefNameDecl *Decl = T->getDecl();
-      if (Decl->getAttr<ReducerCallbacksAttr>())
-        return DK_hyperobject;
-      T = dyn_cast<TypedefType>(Decl->getUnderlyingType());
-    }
-    return DK_none;
   }
 
   if (const auto *RT =

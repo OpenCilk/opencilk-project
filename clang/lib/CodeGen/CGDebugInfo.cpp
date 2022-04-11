@@ -865,10 +865,6 @@ llvm::DIType *CGDebugInfo::CreateType(const ExtIntType *Ty) {
                                   Encoding);
 }
 
-llvm::DIType *CGDebugInfo::CreateType(const HyperobjectType *Ty) {
-  return CreateTypeNode(Ty->getElementType(), nullptr); /* this won't work */
-}
-
 llvm::DIType *CGDebugInfo::CreateType(const ComplexType *Ty) {
   // Bit size and offset of the type.
   llvm::dwarf::TypeKind Encoding = llvm::dwarf::DW_ATE_complex_float;
@@ -3250,8 +3246,6 @@ llvm::DIType *CGDebugInfo::CreateTypeNode(QualType Ty, llvm::DIFile *Unit) {
     return CreateType(cast<BuiltinType>(Ty));
   case Type::Complex:
     return CreateType(cast<ComplexType>(Ty));
-  case Type::Hyperobject:
-    return CreateType(cast<HyperobjectType>(Ty));
   case Type::Pointer:
     return CreateType(cast<PointerType>(Ty), Unit);
   case Type::BlockPointer:
