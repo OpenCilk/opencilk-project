@@ -1833,9 +1833,13 @@ public:
   }
 
   /// Determine if the call or invoke is strand-pure.
-  bool isStrandPure() const;
-  void setStrandPure();
-  void setNotStrandPure();
+  bool isStrandPure() const { return hasFnAttr(Attribute::StrandPure); }
+  void setStrandPure() {
+    addAttribute(AttributeList::FunctionIndex, Attribute::StrandPure);
+  }
+  void setNotStrandPure() {
+    removeAttribute(AttributeList::FunctionIndex, Attribute::StrandPure);
+  }
 
   /// Determine if the call returns a structure through first
   /// pointer argument.
