@@ -52,6 +52,37 @@ public:
 };
 } // End anonymous namespace
 
+const CodeGenIntrinsic::BoolField CodeGenIntrinsic::BoolFieldList[] = {
+  {&CodeGenIntrinsic::canThrow, "Throws", nullptr},
+  {&CodeGenIntrinsic::isNoReturn, "IntrNoReturn", "Attribute::NoReturn"},
+  {&CodeGenIntrinsic::isNoSync, "IntrNoSync", "Attribute::NoSync"},
+  {&CodeGenIntrinsic::isNoFree, "IntrNoFree", "Attribute::NoFree"},
+  {&CodeGenIntrinsic::isWillReturn, "IntrWillReturn", "Attribute::WillReturn"},
+  {&CodeGenIntrinsic::isCold, "IntrCold", "Attribute::Cold"},
+  {&CodeGenIntrinsic::isNoDuplicate, "IntrNoDuplicate",
+        "Attribute::NoDuplicate"},
+  {&CodeGenIntrinsic::isOverloaded, nullptr, nullptr},
+  {&CodeGenIntrinsic::isConvergent, "IntrConvergent", "Attribute::Convergent"},
+  {&CodeGenIntrinsic::isSpeculatable, "IntrSpeculatable",
+        "Attribute::Speculatable"},
+  {&CodeGenIntrinsic::isCommutative, "Commutative", nullptr},
+  {&CodeGenIntrinsic::hasSideEffects, "IntrHasSideEffects", nullptr},
+  {&CodeGenIntrinsic::isInjective, "IntrInjective", "Attribute::Injective"},
+  {&CodeGenIntrinsic::isStrandPure, "IntrStrandPure",
+   "Attribute::StrandPure"},
+  {&CodeGenIntrinsic::isReducerRegister, "IntrReducerRegister",
+   "Attribute::ReducerRegister"},
+  {&CodeGenIntrinsic::isHyperView, "IntrHyperView",
+   "Attribute::HyperView"},
+  {&CodeGenIntrinsic::isHyperToken, "IntrHyperToken",
+   "Attribute::HyperToken"},
+  {&CodeGenIntrinsic::isReducerUnregister, "IntrReducerUnregister",
+   "Attribute::ReducerUnregister"},
+};
+
+unsigned CodeGenIntrinsic::BoolFieldListSize =
+    sizeof CodeGenIntrinsic::BoolFieldList / sizeof CodeGenIntrinsic::BoolFieldList[0];
+
 //===----------------------------------------------------------------------===//
 // IntrinsicEmitter Implementation
 //===----------------------------------------------------------------------===//
@@ -765,139 +796,82 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
       }
     }
 
-    if (!intrinsic.canThrow ||
-        (intrinsic.ModRef != CodeGenIntrinsic::ReadWriteMem &&
-         !intrinsic.hasSideEffects) ||
-        intrinsic.isNoReturn || intrinsic.isNoSync || intrinsic.isNoFree ||
-        intrinsic.isWillReturn || intrinsic.isCold || intrinsic.isNoDuplicate ||
-        intrinsic.isConvergent || intrinsic.isSpeculatable) {
-      OS << "      const Attribute::AttrKind Atts[] = {";
-      bool addComma = false;
-      if (!intrinsic.canThrow) {
-        OS << "Attribute::NoUnwind";
-        addComma = true;
-      }
-      if (intrinsic.isNoReturn) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::NoReturn";
-        addComma = true;
-      }
-      if (intrinsic.isNoSync) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::NoSync";
-        addComma = true;
-      }
-      if (intrinsic.isNoFree) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::NoFree";
-        addComma = true;
-      }
-      if (intrinsic.isWillReturn) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::WillReturn";
-        addComma = true;
-      }
-      if (intrinsic.isCold) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::Cold";
-        addComma = true;
-      }
-      if (intrinsic.isNoDuplicate) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::NoDuplicate";
-        addComma = true;
-      }
-      if (intrinsic.isConvergent) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::Convergent";
-        addComma = true;
-      }
-      if (intrinsic.isSpeculatable) {
-        if (addComma)
-          OS << ",";
-        OS << "Attribute::Speculatable";
-        addComma = true;
-      }
+    const char *Prefix = "      const Attribute::AttrKind Atts[] = {";
+    bool Emitted = false;
 
+    if (!intrinsic.canThrow) {
+      OS << Prefix;
+      Prefix = ",";
+      Emitted = true;
+      OS << "Attribute::NoUnwind";
+    }
+
+    for (unsigned I = 0; I < CodeGenIntrinsic::BoolFieldListSize; ++I) {
+      const CodeGenIntrinsic::BoolField &Field =
+          CodeGenIntrinsic::BoolFieldList[I];
+      if (intrinsic.*Field.Field && Field.OutputName) {
+        OS << Prefix;
+        Prefix = ",";
+        Emitted = true;
+        OS << Field.OutputName;
+      }
+    }
+
+    if (intrinsic.ModRef != CodeGenIntrinsic::ReadWriteMem &&
+        (intrinsic.ModRef != CodeGenIntrinsic::NoMem ||
+         !intrinsic.hasSideEffects)) {
+        OS << Prefix;
+        Prefix = ",";
+        Emitted = true;
       switch (intrinsic.ModRef) {
       case CodeGenIntrinsic::NoMem:
-        if (intrinsic.hasSideEffects)
-          break;
-        if (addComma)
-          OS << ",";
         OS << "Attribute::ReadNone";
         break;
       case CodeGenIntrinsic::ReadArgMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::ReadOnly,";
         OS << "Attribute::ArgMemOnly";
         break;
       case CodeGenIntrinsic::ReadMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::ReadOnly";
         break;
       case CodeGenIntrinsic::ReadInaccessibleMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::ReadOnly,";
         OS << "Attribute::InaccessibleMemOnly";
         break;
       case CodeGenIntrinsic::ReadInaccessibleMemOrArgMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::ReadOnly,";
         OS << "Attribute::InaccessibleMemOrArgMemOnly";
         break;
       case CodeGenIntrinsic::WriteArgMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::WriteOnly,";
         OS << "Attribute::ArgMemOnly";
         break;
       case CodeGenIntrinsic::WriteMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::WriteOnly";
         break;
       case CodeGenIntrinsic::WriteInaccessibleMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::WriteOnly,";
         OS << "Attribute::InaccessibleMemOnly";
         break;
       case CodeGenIntrinsic::WriteInaccessibleMemOrArgMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::WriteOnly,";
         OS << "Attribute::InaccessibleMemOrArgMemOnly";
         break;
       case CodeGenIntrinsic::ReadWriteArgMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::ArgMemOnly";
         break;
       case CodeGenIntrinsic::ReadWriteInaccessibleMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::InaccessibleMemOnly";
         break;
       case CodeGenIntrinsic::ReadWriteInaccessibleMemOrArgMem:
-        if (addComma)
-          OS << ",";
         OS << "Attribute::InaccessibleMemOrArgMemOnly";
         break;
       case CodeGenIntrinsic::ReadWriteMem:
         break;
       }
+    }
+
+    if (Emitted) {
       OS << "};\n";
       OS << "      AS[" << numAttrs++ << "] = AttributeList::get(C, "
          << "AttributeList::FunctionIndex, Atts);\n";

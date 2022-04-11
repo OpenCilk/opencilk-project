@@ -21,7 +21,7 @@ namespace llvm {
 class Value;
 class TapirLoopInfo;
 
-class OpenCilkABI : public TapirTarget {
+class OpenCilkABI final : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
   SmallPtrSet<CallBase *, 8> CallsToInline;
   DenseMap<BasicBlock *, SmallVector<IntrinsicInst *, 4>> TapirRTCalls;
@@ -45,6 +45,14 @@ class OpenCilkABI : public TapirTarget {
   FunctionCallee CilkHelperEpilogue = nullptr;
   FunctionCallee CilkRTSEnterLandingpad = nullptr;
   FunctionCallee CilkRTSPauseFrame = nullptr;
+
+  FunctionCallee CilkRTSReducerRegister32 = nullptr;
+  FunctionCallee CilkRTSReducerRegister64 = nullptr;
+  FunctionCallee CilkRTSReducerUnregister = nullptr;
+  FunctionCallee CilkRTSReducerLookup = nullptr;
+  FunctionCallee CilkRTSReducerToken = nullptr;
+
+  // Accessors for opaque Cilk RTS functions
   FunctionCallee CilkHelperEpilogueExn = nullptr;
   FunctionCallee CilkRTSCilkForGrainsize8 = nullptr;
   FunctionCallee CilkRTSCilkForGrainsize16 = nullptr;
@@ -90,6 +98,22 @@ class OpenCilkABI : public TapirTarget {
   }
   FunctionCallee Get__cilkrts_cilk_for_grainsize_64() {
     return CilkRTSCilkForGrainsize64;
+  }
+  FunctionCallee Get__cilkrts_reducer_register(unsigned Bits) {
+    if (Bits == 32)
+      return CilkRTSReducerRegister32;
+    if (Bits == 64)
+      return CilkRTSReducerRegister64;
+    return 0;
+  }
+  FunctionCallee Get__cilkrts_reducer_unregister() {
+    return CilkRTSReducerUnregister;
+  }
+  FunctionCallee Get__cilkrts_reducer_lookup() {
+    return CilkRTSReducerLookup;
+  }
+  FunctionCallee Get__cilkrts_reducer_token() {
+    return CilkRTSReducerToken;
   }
 
   // Helper functions for implementing the Cilk ABI protocol
@@ -137,6 +161,7 @@ public:
   void prepareModule() override final;
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
+  void lowerReducerOperation(CallBase *CI) override;
 
   ArgStructMode getArgStructMode() const override final {
     return ArgStructMode::None;

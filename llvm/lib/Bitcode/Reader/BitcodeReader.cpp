@@ -1549,6 +1549,16 @@ static Attribute::AttrKind getAttrFromCode(uint64_t Code) {
     return Attribute::MustProgress;
   case bitc::ATTR_KIND_HOT:
     return Attribute::Hot;
+  case bitc::ATTR_KIND_INJECTIVE:
+    return Attribute::Injective;
+  case bitc::ATTR_KIND_HYPER_VIEW:
+    return Attribute::HyperView;
+  case bitc::ATTR_KIND_HYPER_TOKEN:
+    return Attribute::HyperToken;
+  case bitc::ATTR_KIND_REDUCER_REGISTER:
+    return Attribute::ReducerRegister;
+  case bitc::ATTR_KIND_REDUCER_UNREGISTER:
+    return Attribute::ReducerUnregister;
   }
 }
 

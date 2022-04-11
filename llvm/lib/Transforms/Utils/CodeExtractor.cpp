@@ -903,10 +903,13 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::Convergent:
       case Attribute::Dereferenceable:
       case Attribute::DereferenceableOrNull:
+      case Attribute::HyperToken:
+      case Attribute::HyperView:
       case Attribute::InAlloca:
       case Attribute::InReg:
       case Attribute::InaccessibleMemOnly:
       case Attribute::InaccessibleMemOrArgMemOnly:
+      case Attribute::Injective:
       case Attribute::JumpTable:
       case Attribute::Naked:
       case Attribute::Nest:
@@ -922,6 +925,8 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::Preallocated:
       case Attribute::ReadNone:
       case Attribute::ReadOnly:
+      case Attribute::ReducerRegister:
+      case Attribute::ReducerUnregister:
       case Attribute::Returned:
       case Attribute::ReturnsTwice:
       case Attribute::SExt:

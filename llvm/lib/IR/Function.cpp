@@ -1783,3 +1783,12 @@ bool llvm::NullPointerIsDefined(const Function *F, unsigned AS) {
 
   return false;
 }
+
+bool Function::isStrandPure() const {
+  return hasFnAttribute(Attribute::StrandPure);
+}
+
+void Function::setStrandPure() {
+  addFnAttr(Attribute::StrandPure);
+}
+
