@@ -2206,6 +2206,8 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     Align = EltInfo.Align;
     break;
   }
+  case Type::Hyperobject:
+    return getTypeInfo(cast<HyperobjectType>(T)->getElementType());
   case Type::ObjCObject:
     return getTypeInfo(cast<ObjCObjectType>(T)->getBaseType().getTypePtr());
   case Type::Adjusted:
@@ -3148,6 +3150,34 @@ QualType ASTContext::getComplexType(QualType T) const {
   return QualType(New, 0);
 }
 
+/// This is a cut and paste job from getComplexType
+QualType ASTContext::getHyperobjectType(QualType T) const {
+  // Unique pointers, to guarantee there is only one pointer of a particular
+  // structure.
+  llvm::FoldingSetNodeID ID;
+  HyperobjectType::Profile(ID, T);
+
+  void *InsertPos = nullptr;
+  if (HyperobjectType *HT = HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
+    return QualType(HT, 0);
+
+  // If the pointee type isn't canonical, this won't be a canonical type either,
+  // so fill in the canonical type field.
+  QualType Canonical;
+  if (!T.isCanonical()) {
+    Canonical = getHyperobjectType(getCanonicalType(T));
+
+    // Get the new insert position for the node we care about.
+    HyperobjectType *NewIP =
+      HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos);
+    assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
+  }
+  auto *New = new (*this, TypeAlignment) HyperobjectType(T, Canonical);
+  Types.push_back(New);
+  HyperobjectTypes.InsertNode(New, InsertPos);
+  return QualType(New, 0);
+}
+
 /// getPointerType - Return the uniqued reference to the type for a pointer to
 /// the specified type.
 QualType ASTContext::getPointerType(QualType T) const {
@@ -3515,6 +3545,9 @@ QualType ASTContext::getVariableArrayDecayedType(QualType type) const {
     result = getAtomicType(getVariableArrayDecayedType(at->getValueType()));
     break;
   }
+
+  case Type::Hyperobject:
+    return getVariableArrayDecayedType(cast<HyperobjectType>(ty)->getElementType());
 
   case Type::ConstantArray: {
     const auto *cat = cast<ConstantArrayType>(ty);
@@ -7330,6 +7363,10 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
                                /*Field=*/nullptr);
     return;
 
+  case Type::Hyperobject:
+    llvm_unreachable("hyperobject not implemented");
+    return;
+
   case Type::Atomic:
     S += 'A';
     getObjCEncodingForTypeImpl(T->castAs<AtomicType>()->getValueType(), S,
@@ -9793,6 +9830,9 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS,
     return {};
   case Type::Complex:
     // Distinct complex types are incompatible.
+    return {};
+  case Type::Hyperobject:
+    llvm_unreachable("hyperobject not implemented");
     return {};
   case Type::Vector:
     // FIXME: The merged type should be an ExtVector!

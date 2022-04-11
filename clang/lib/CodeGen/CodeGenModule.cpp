@@ -4149,6 +4149,42 @@ void CodeGenModule::maybeSetTrivialComdat(const Decl &D,
   GO.setComdat(TheModule.getOrInsertComdat(GO.getName()));
 }
 
+static bool CheckReducerParams(const FunctionProtoType *F, unsigned NumArgs) {
+  if (F->getNumParams() != NumArgs)
+    return false;
+  for (unsigned I = 0; I < NumArgs; ++I) {
+    if (!F->getParamType(I)->isPointerType())
+      return false;
+  }
+  return true;
+}
+
+// Reducer callbacks must be declarations or null.
+Expr *CodeGenModule::ValidateReducerCallback(Expr *E, unsigned NumArgs) {
+  if (!E)
+    return nullptr;
+  E = E->IgnoreParenCasts();
+  switch (E->getStmtClass()) {
+  case Stmt::CXXNullPtrLiteralExprClass:
+    return nullptr;
+  case Stmt::IntegerLiteralClass:
+    if (cast<IntegerLiteral>(E)->getValue() == 0)
+      return nullptr;
+    break;
+  case Stmt::DeclRefExprClass:
+    if (const FunctionProtoType *F =
+	dyn_cast<FunctionProtoType>(E->getType())) {
+      if (CheckReducerParams(F, NumArgs))
+	return E;
+    }
+    break;
+  default:
+    break;
+  }
+  Diags.Report(E->getExprLoc(), diag::err_invalid_reducer_callback) << NumArgs;
+  return nullptr;
+}
+
 /// Pass IsTentative as true if you want to create a tentative definition.
 void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
                                             bool IsTentative) {
@@ -4166,8 +4202,18 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
 
   llvm::Constant *Init = nullptr;
   bool NeedsGlobalCtor = false;
-  bool NeedsGlobalDtor =
-      D->needsDestruction(getContext()) == QualType::DK_cxx_destructor;
+  bool NeedsGlobalDtor = false;
+  switch (D->needsDestruction(getContext())) {
+    case QualType::DK_cxx_destructor:
+      NeedsGlobalDtor = true;
+      break;
+    case QualType::DK_hyperobject:
+      NeedsGlobalCtor = true;
+      NeedsGlobalDtor = true;
+      break;
+  default:
+    break;
+  }
 
   const VarDecl *InitDecl;
   const Expr *InitExpr = D->getAnyInitializer(InitDecl);

@@ -1242,8 +1242,7 @@ public:
   llvm::Instruction *EmitSyncRegionStart();
 
   void PopSyncRegion() {
-    if (CurSyncRegion)
-      delete CurSyncRegion;
+    delete CurSyncRegion; // ~SyncRegion updates CurSyncRegion
   }
 
   void EnsureSyncRegion() {
@@ -2548,6 +2547,7 @@ public:
     case QualType::DK_cxx_destructor:
     case QualType::DK_objc_weak_lifetime:
     case QualType::DK_nontrivial_c_struct:
+    case QualType::DK_hyperobject:
       return getLangOpts().Exceptions;
     case QualType::DK_objc_strong_lifetime:
       return getLangOpts().Exceptions &&
@@ -3380,6 +3380,7 @@ public:
                                   bool ZeroInitialization = false);
 
   static Destroyer destroyCXXObject;
+  static Destroyer destroyHyperobject;
 
   void EmitCXXDestructorCall(const CXXDestructorDecl *D, CXXDtorType Type,
                              bool ForVirtualBase, bool Delegating, Address This,
@@ -3589,6 +3590,9 @@ public:
   void EmitAutoVarCleanups(const AutoVarEmission &emission);
   void emitAutoVarTypeCleanup(const AutoVarEmission &emission,
                               QualType::DestructionKind dtorKind);
+
+  void EmitReducerInit(const VarDecl *D, ReducerCallbacksAttr *R,
+                       llvm::Value *Addr);
 
   /// Emits the alloca and debug information for the size expressions for each
   /// dimension of an array. It registers the association of its (1-dimensional)

@@ -618,6 +618,8 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
     ResultType = llvm::StructType::get(EltTy, EltTy);
     break;
   }
+  case Type::Hyperobject:
+    return ConvertType(cast<HyperobjectType>(Ty)->getElementType());
   case Type::LValueReference:
   case Type::RValueReference: {
     const ReferenceType *RTy = cast<ReferenceType>(Ty);

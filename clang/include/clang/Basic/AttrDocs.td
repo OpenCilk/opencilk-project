@@ -5786,3 +5786,11 @@ like a system memory allocation function from the perspective of
 memory operations within the same strand.
 }];
 }
+
+def ReducerDocs : Documentation {
+  let Category = DocCatFunction;
+  let Content = [{
+The ``reducer`` attribute causes this variable to be registered with
+the runtime as a reducer hyperobject.
+}];
+}

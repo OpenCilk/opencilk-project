@@ -1450,6 +1450,10 @@ TryImplicitConversion(Sema &S, Expr *From, QualType ToType,
   //   constructor (i.e., a user-defined conversion function) is
   //   called for those cases.
   QualType FromType = From->getType();
+
+  if (const HyperobjectType *H = FromType->getAs<HyperobjectType>())
+    FromType = H->getElementType();
+
   if (ToType->getAs<RecordType>() && FromType->getAs<RecordType>() &&
       (S.Context.hasSameUnqualifiedType(FromType, ToType) ||
        S.IsDerivedFrom(From->getBeginLoc(), FromType, ToType))) {
@@ -1702,6 +1706,9 @@ static bool IsStandardConversion(Sema &S, Expr* From, QualType ToType,
   if (S.getLangOpts().CPlusPlus &&
       (FromType->isRecordType() || ToType->isRecordType()))
     return false;
+
+  if (const HyperobjectType *H = FromType->getAs<HyperobjectType>())
+    FromType = H->getElementType();
 
   // The first conversion can be an lvalue-to-rvalue conversion,
   // array-to-pointer conversion, or function-to-pointer conversion

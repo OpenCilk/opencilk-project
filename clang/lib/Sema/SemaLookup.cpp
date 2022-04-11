@@ -2799,6 +2799,9 @@ addAssociatedClassesAndNamespaces(AssociatedLookup &Result, QualType Ty) {
     case Type::Pointer:
       T = cast<PointerType>(T)->getPointeeType().getTypePtr();
       continue;
+    case Type::Hyperobject:
+      llvm_unreachable("hyperobjects not implemented here");
+      break;
     case Type::ConstantArray:
     case Type::IncompleteArray:
     case Type::VariableArray:

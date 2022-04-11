@@ -5129,6 +5129,8 @@ public:
                    SourceLocation TemplateKWLoc = SourceLocation(),
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
 
+  Expr *BuildHyperobjectLookup(Expr *);
+
   ExprResult
   BuildAnonymousStructUnionMemberReference(
       const CXXScopeSpec &SS,
@@ -10096,6 +10098,12 @@ public:
   enum class RetainOwnershipKind {NS, CF, OS};
   void AddXConsumedAttr(Decl *D, const AttributeCommonInfo &CI,
                         RetainOwnershipKind K, bool IsTemplateInstantiation);
+
+  /// OpenCilk hyperobject support
+  void AddReducerCallbacksAttr(SourceRange AttrRange,
+                               const AttributeCommonInfo &CI,
+                               Decl *D, Expr *Reduce, Expr *Init,
+                               Expr *Destruct);
 
   /// addAMDGPUFlatWorkGroupSizeAttr - Adds an amdgpu_flat_work_group_size
   /// attribute to a particular declaration.
