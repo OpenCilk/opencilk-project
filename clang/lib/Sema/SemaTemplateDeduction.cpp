@@ -1623,6 +1623,9 @@ DeduceTemplateArgumentsByTypeMatch(Sema &S,
     case Type::SubstTemplateTypeParmPack:
       llvm_unreachable("Type nodes handled above");
 
+    case Type::Hyperobject:
+      llvm_unreachable("Implement me");
+
     // These types cannot be dependent, so simply check whether the types are
     // the same.
     case Type::Builtin:
@@ -5980,6 +5983,13 @@ MarkUsedTemplateParameters(ASTContext &Ctx, QualType T,
     if (!OnlyDeduced)
       MarkUsedTemplateParameters(Ctx,
                                  cast<ComplexType>(T)->getElementType(),
+                                 OnlyDeduced, Depth, Used);
+    break;
+
+  case Type::Hyperobject:
+    if (!OnlyDeduced)
+      MarkUsedTemplateParameters(Ctx,
+                                 cast<HyperobjectType>(T)->getElementType(),
                                  OnlyDeduced, Depth, Used);
     break;
 

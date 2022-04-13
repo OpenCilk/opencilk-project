@@ -1,0 +1,100 @@
+// Test autoincrement operations on hyperobjects.
+// RUN: %clang_cc1 %s -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
+// expected-no-diagnostics
+extern void identity(void* reducer, double * value);
+extern void reduce(void* reducer, double* left, double* right);
+
+typedef _Hyperobject long *long_hp;
+typedef _Hyperobject long long_h;
+extern  _Hyperobject int x;
+// CHECK_LABEL: extern1
+void extern1()
+{
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load i32,
+  // Only one call for a read-modify-write operation.
+  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: store i32
+  // CHECK: ret void
+  ++x;
+}
+
+// CHECK_LABEL: extern2
+int extern2()
+{
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load i32,
+  // Only one call for a read-modify-write operation.
+  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: store i32
+  // CHECK: ret i32
+  return 1 + --x;
+}
+
+// CHECK_LABEL: ptr_with_direct_typedef
+long ptr_with_direct_typedef(long_hp ptr)
+{
+  // CHECK-NOT: ret i64
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: ret i64
+  return ++*ptr;
+}
+
+// CHECK_LABEL: ptr_with_indirect_typedef_1
+long ptr_with_indirect_typedef_1(long_h *ptr)
+{
+  // CHECK-NOT: ret i64
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: store i64
+  // CHECK: ret i64
+  return *ptr++; // this increments the pointer, a dead store
+}
+
+// CHECK_LABEL: ptr_with_indirect_typedef_2
+long ptr_with_indirect_typedef_2(long_h *ptr)
+{
+  // CHECK-NOT: ret i64
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: store i64
+  // CHECK: ret i64
+  return *++ptr; // again, the increment is dead
+}
+
+// CHECK_LABEL: ptr_with_indirect_typedef_3
+long ptr_with_indirect_typedef_3(long_h *ptr)
+{
+  // CHECK-NOT: ret i64
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: ret i64
+  return ptr[0]++;
+}
+
+// CHECK_LABEL: direct_typedef_1
+long direct_typedef_1()
+{
+  extern long_h y;
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load i64,
+  // CHECK: store i64
+  // CHECK: ret i64
+  return ++y;
+}
+
+// CHECK_LABEL: local_reducer_1
+double local_reducer_1()
+{
+  // Initialization precedes registration
+  // CHECK: store double 0.0
+  // CHECK: call void @llvm.reducer.register
+  _Hyperobject double x __attribute__((reducer(reduce, identity))) = 0.0;
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load double
+  // CHECK: fadd double
+  // CHECK: store double
+  x += 1.0f;
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load double
+  // CHECK: call void @llvm.reducer.unregister
+  // CHECK: ret double
+  return x;
+}

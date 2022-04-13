@@ -1,0 +1,18 @@
+// RUN: %clang_cc1 %s -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
+// expected-no-diagnostics
+// XFAIL: *
+
+// One hyperobject array with 10 integer elementso
+typedef int I10[10];
+extern _Hyperobject I10 y;
+// CHECK_LABEL: read_hyper_array
+int read_hyper_array(unsigned i)
+{
+  return y[i];
+  // CHECK: call i8* @llvm.hyper.lookup
+  // The read is incorrectly compiled to a copy of the entire array to
+  // the stack followed by a local read.
+  // CHECK-NOT: call void @llvm.memcpy
+  // CHECK: getelementptr
+  // CHECK: ret i32
+}

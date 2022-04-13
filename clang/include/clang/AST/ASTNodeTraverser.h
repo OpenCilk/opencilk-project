@@ -314,6 +314,9 @@ public:
     }
   }
 
+  void VisitHyperobjectType(const HyperobjectType *T) {
+    Visit(T->getElementType());
+  }
   void VisitComplexType(const ComplexType *T) { Visit(T->getElementType()); }
   void VisitLocInfoType(const LocInfoType *T) {
     Visit(T->getTypeSourceInfo()->getType());

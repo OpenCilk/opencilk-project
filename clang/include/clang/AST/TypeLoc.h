@@ -1892,6 +1892,12 @@ class ComplexTypeLoc : public InheritingConcreteTypeLoc<TypeSpecTypeLoc,
                                                         ComplexType> {
 };
 
+class HyperobjectTypeLoc :
+    public InheritingConcreteTypeLoc<TypeSpecTypeLoc,
+                                     HyperobjectTypeLoc,
+                                     HyperobjectType> {
+};
+
 struct TypeofLocInfo {
   SourceLocation TypeofLoc;
   SourceLocation LParenLoc;

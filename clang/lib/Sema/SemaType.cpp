@@ -1276,6 +1276,79 @@ static QualType ConvertConstrainedAutoDeclSpecToType(Sema &S, DeclSpec &DS,
                                TemplateArgs);
 }
 
+// It is forbidden to add new bits to the Type class so do a deep
+// search on every hyperobject type creation.
+
+enum HyperobjectCategory {
+  HYPER_NORMAL = 0,
+  HYPER_HYPER = 1,
+  HYPER_VLA = 2,
+  HYPER_CONFUSING = 3
+};
+
+static HyperobjectCategory ContainsHyperobject(QualType Outer) {
+  if (Outer->isVariablyModifiedType())
+    return HYPER_VLA;
+  const Type *T = Outer.getCanonicalType().getTypePtr();
+  QualType Inner;
+  switch (T->getTypeClass()) {
+  case Type::Hyperobject:
+    return HYPER_HYPER;
+  case Type::Typedef:
+    Inner = cast<TypedefType>(T)->desugar();
+    break;
+  case Type::ConstantArray:
+  case Type::IncompleteArray:
+  case Type::VariableArray:
+  case Type::DependentSizedArray:
+    Inner = cast<ArrayType>(T)->getElementType();
+    break;
+  case Type::Complex:
+    Inner = cast<ComplexType>(T)->getElementType();
+    break;
+  case Type::Record:
+    if (const RecordDecl *Def =
+        cast<RecordType>(T)->getDecl()->getDefinition()) {
+      for (const FieldDecl *FD : Def->fields()) {
+        HyperobjectCategory FH = ContainsHyperobject(FD->getType());
+        if (FH != HYPER_NORMAL)
+          return FH;
+      }
+    }
+    return HYPER_NORMAL;
+  case Type::TypeOf:
+    Inner = cast<TypeOfType>(T)->getUnderlyingType();
+    break;
+  case Type::TypeOfExpr:
+    Inner = cast<TypeOfExprType>(T)->getUnderlyingExpr()->getType();
+    break;
+  case Type::Decltype:
+    Inner = cast<DecltypeType>(T)->getUnderlyingType();
+    break;
+  case Type::Elaborated:
+    Inner = cast<ElaboratedType>(T)->desugar();
+    break;
+  case Type::Adjusted:
+  case Type::Decayed:
+    Inner = cast<AdjustedType>(T)->desugar();
+    break;
+  case Type::Auto:
+  case Type::DeducedTemplateSpecialization:
+    Inner = cast<DeducedType>(T)->desugar();
+    break;
+  case Type::TemplateSpecialization:
+  case Type::DependentName:
+  case Type::DependentTemplateSpecialization:
+  case Type::PackExpansion:
+  case Type::TemplateTypeParm:
+  case Type::UnaryTransform:
+    return HYPER_CONFUSING;
+  default:
+    return HYPER_NORMAL;
+  }
+  return ContainsHyperobject(Inner);
+}
+
 /// Convert the specified declspec to the appropriate type
 /// object.
 /// \param state Specifies the declarator containing the declaration specifier
@@ -1767,6 +1840,28 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
   // pipe attributes will be handled later ( at GetFullTypeForDeclarator )
   if (!DS.isTypeSpecPipe())
     processTypeAttrs(state, Result, TAL_DeclSpec, DS.getAttributes());
+
+  // XXX Where does this go?  Are complex hyper and hyper complex the same?
+  if (DS.isHyper()) {
+    unsigned Tmp = DS.getTypeQualifiers();
+    diagnoseAndRemoveTypeQualifiers(S, DS, Tmp, Result,
+                                    DeclSpec::TQ_volatile,
+                                    diag::hyperobject_exclusive);
+    switch (ContainsHyperobject(Result)) {
+    case HYPER_NORMAL:
+      Result = Context.getHyperobjectType(Result);
+      break;
+    case HYPER_HYPER:
+      S.Diag(DS.getHyperLoc(), diag::nested_hyperobject) << Result;
+      break;
+    case HYPER_VLA: // This is too hard to get right.
+      S.Diag(DS.getHyperLoc(), diag::variable_length_hyperobject) << Result;
+      break;
+    case HYPER_CONFUSING:
+      S.Diag(DS.getHyperLoc(), diag::confusing_hyperobject) << Result;
+      break;
+    }
+  }
 
   // Apply const/volatile/restrict qualifiers to T.
   if (unsigned TypeQuals = DS.getTypeQualifiers()) {

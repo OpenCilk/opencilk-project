@@ -1192,7 +1192,8 @@ public:
     DK_cxx_destructor,
     DK_objc_strong_lifetime,
     DK_objc_weak_lifetime,
-    DK_nontrivial_c_struct
+    DK_nontrivial_c_struct,
+    DK_hyperobject
   };
 
   /// Returns a nonzero value if objects of this type require
@@ -6345,6 +6346,34 @@ public:
 
   static bool classof(const Type *T) {
     return T->getTypeClass() == DependentExtInt;
+  }
+};
+
+class HyperobjectType final : public Type, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  QualType ElementType;
+
+  HyperobjectType(QualType Element, QualType CanonicalPtr)
+    : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
+      ElementType(Element) {}
+
+public:
+  QualType getElementType() const { return ElementType; }
+
+  bool isSugared() const { return false; }
+  QualType desugar() const { return QualType(this, 0); }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getElementType());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee) {
+    ID.AddPointer(Pointee.getAsOpaquePtr());
+  }
+
+  static bool classof(const Type *T) {
+    return T->getTypeClass() == Hyperobject;
   }
 };
 
