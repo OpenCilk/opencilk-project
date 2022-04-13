@@ -9832,7 +9832,6 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS,
     // Distinct complex types are incompatible.
     return {};
   case Type::Hyperobject:
-    llvm_unreachable("hyperobject not implemented");
     return {};
   case Type::Vector:
     // FIXME: The merged type should be an ExtVector!

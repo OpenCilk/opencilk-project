@@ -6,7 +6,7 @@ extern void reduce(void* reducer, double* left, double* right);
 
 typedef _Hyperobject long *long_hp;
 typedef _Hyperobject long long_h;
-extern  _Hyperobject int x;
+extern  _Hyperobject int x, y;
 // CHECK_LABEL: extern1
 void extern1()
 {
@@ -65,6 +65,9 @@ long ptr_with_indirect_typedef_3(long_h *ptr)
 {
   // CHECK-NOT: ret i64
   // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load i64
+  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: store i64
   // CHECK: ret i64
   return ptr[0]++;
 }
@@ -72,12 +75,12 @@ long ptr_with_indirect_typedef_3(long_h *ptr)
 // CHECK_LABEL: direct_typedef_1
 long direct_typedef_1()
 {
-  extern long_h y;
+  extern long_h z;
   // CHECK: call i8* @llvm.hyper.lookup
   // CHECK: load i64,
   // CHECK: store i64
   // CHECK: ret i64
-  return ++y;
+  return ++z;
 }
 
 // CHECK_LABEL: local_reducer_1
@@ -97,4 +100,18 @@ double local_reducer_1()
   // CHECK: call void @llvm.reducer.unregister
   // CHECK: ret double
   return x;
+}
+
+// CHECK_LABEL: two_increments
+long two_increments()
+{
+  // It would also be correct for evaluation of operands of + to be interleaved.
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load i32
+  // CHECK: store i32
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: load i32
+  // CHECK: store i32
+  // CHECK: ret i64
+  return ++x + y++;
 }
