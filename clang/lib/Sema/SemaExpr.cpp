@@ -508,6 +508,11 @@ ExprResult Sema::DefaultFunctionArrayConversion(Expr *E, bool Diagnose) {
     E = result.get();
   }
 
+  if (E->isLValue()) {
+    if (Expr *E2 = BuildHyperobjectLookup(E))
+      E = E2;
+  }
+
   QualType Ty = E->getType();
   assert(!Ty.isNull() && "DefaultFunctionArrayConversion - missing type");
 
