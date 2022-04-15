@@ -10124,6 +10124,8 @@ def note_protected_by_reducer : Note<
 
 def err_hyperobject_param : Error<"parameter is hyperobject">;
 
+def err_hyperobject_cast : Error<"cast to hyperobject">;
+
 } // end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {
