@@ -3,7 +3,7 @@
 _Hyperobject struct A; // expected-warning{{'_Hyperobject' ignored on this declaration}}
 _Hyperobject struct B { int b; }; // expected-warning{{'_Hyperobject' ignored on this declaration}}
 struct C { _Hyperobject int c; };
-_Hyperobject struct C c; // expected-warning{{type 'struct C', which contains a hyperobject, may not be a hyperobject}}
+_Hyperobject struct C c; // expected-error{{type 'struct C', which contains a hyperobject, may not be a hyperobject}}
 _Hyperobject long d; // expected-note{{previous definition}}
 void f() {
   extern _Hyperobject int d; // expected-error{{redeclaration of 'd' with a different type: '_Hyperobject int' vs '_Hyperobject long'}}
