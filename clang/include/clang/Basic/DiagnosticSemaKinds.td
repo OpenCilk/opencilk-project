@@ -10102,21 +10102,24 @@ def err_jump_out_of_cilk_for : Error<
   "cannot jump out of '_Cilk_for' statement">;
 
 def attribute_requires_cilk : Warning<
-  "%0 ignored when OpenCilk not in use">;
+  "%0 ignored when OpenCilk not in use">,
+  InGroup<DiagGroup<"required-cilk">>;
 
 def attribute_requires_hyperobject : Warning<
-  "%0 ignored when not on hyperobject">;
+  "%0 ignored when not on hyperobject">,
+   InGroup<CilkIgnored>;
 
 def hyperobject_exclusive : Warning<
-  "%0 not allowed on hyperobjects">;
+  "%0 not allowed on hyperobjects">,
+   InGroup<CilkIgnored>;
 
-def variable_length_hyperobject : Warning<
+def variable_length_hyperobject : Error<
    "variable length type %0 may not be a hyperobject">;
 
-def confusing_hyperobject : Warning<
+def confusing_hyperobject : Error<
    "type %0 may not be a hyperobject">;
 
-def nested_hyperobject : Warning<
+def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
 
 def note_protected_by_reducer : Note<
