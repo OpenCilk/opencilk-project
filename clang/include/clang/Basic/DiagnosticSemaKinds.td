@@ -10122,6 +10122,8 @@ def nested_hyperobject : Warning<
 def note_protected_by_reducer : Note<
   "jump bypasses initialization of variable with __attribute__((reducer))">;
 
+def err_hyperobject_param : Error<"parameter is hyperobject">;
+
 } // end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {

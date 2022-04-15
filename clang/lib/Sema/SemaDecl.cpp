@@ -13786,6 +13786,12 @@ ParmVarDecl *Sema::CheckParameter(DeclContext *DC, SourceLocation StartLoc,
     New->setInvalidDecl();
   }
 
+  if (T->getTypeClass() == Type::Hyperobject) {
+    Diag(New->getLocation(), diag::err_hyperobject_param);
+    // Disabling the parameter is easier than making argument passing work.
+    New->setInvalidDecl();
+  }
+
   return New;
 }
 
