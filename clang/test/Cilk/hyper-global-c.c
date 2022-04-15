@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 %s -triple amd64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
 
 void identity_long(void *r, long *v);

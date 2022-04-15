@@ -2,7 +2,8 @@
    1. __builtin_addressof returns leftmost view
    2. & returns current view
 */
-// RUN: %clang_cc1 %s -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
 void identity(void* reducer, long * value);
 void reduce(void* reducer, long* left, long* right);
@@ -14,10 +15,10 @@ void assorted_addresses()
   // CHECK: call void @llvm.reducer.register
   _Hyperobject long __attribute__((reducer(reduce, identity))) sum = 0;
   // CHECK-NOT: llvm.hyper.lookup
-  // CHECK: call void @consume_hyper
+  // CHECK: call void @[[FN1:.*consume_hyper]]
   consume_hyper(__builtin_addressof(sum));
   // CHECK: call i8* @llvm.hyper.lookup
-  // CHECK: call void @consume_view
+  // CHECK: call void @[[FN2:.*consume_view]]
   consume_view(&sum);
   // CHECK: call void @llvm.reducer.unregister
   // CHECK: ret void

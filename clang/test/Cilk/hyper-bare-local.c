@@ -1,4 +1,5 @@
-// RUN: %clang_cc1 %s -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c++ -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 extern void add(void *key, void *l, void *r);
 extern void zero(void *key, void *v);
@@ -6,7 +7,10 @@ extern void zero(void *key, void *v);
 // Test reducer attribute on non-hyperobject.
 
 typedef double double_reducer __attribute__((reducer(add, zero)));
-extern void g(double *);
+#ifdef __cplusplus
+extern "C"
+#endif
+void g(double *);
 
 // CHECK_LABEL: f1
 double f1(double x)

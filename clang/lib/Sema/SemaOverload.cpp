@@ -13414,6 +13414,11 @@ void Sema::LookupOverloadedBinOp(OverloadCandidateSet &CandidateSet,
                                  OverloadedOperatorKind Op,
                                  const UnresolvedSetImpl &Fns,
                                  ArrayRef<Expr *> Args, bool PerformADL) {
+  assert(Args[0]->getType()->getTypeClass() != Type::Hyperobject &&
+         "hyperobjects not allowed in overloading");
+  assert(Args[1]->getType()->getTypeClass() != Type::Hyperobject &&
+         "hyperobjects not allowed in overloading");
+
   SourceLocation OpLoc = CandidateSet.getLocation();
 
   OverloadedOperatorKind ExtraOp =

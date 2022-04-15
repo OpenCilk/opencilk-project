@@ -1,5 +1,6 @@
 // Test autoincrement operations on hyperobjects.
-// RUN: %clang_cc1 %s -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
 extern void identity(void* reducer, double * value);
 extern void reduce(void* reducer, double* left, double* right);
@@ -115,3 +116,4 @@ long two_increments()
   // CHECK: ret i64
   return ++x + y++;
 }
+

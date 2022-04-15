@@ -1,4 +1,5 @@
-// RUN: %clang_cc1 %s -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 -x c %s -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 -x c++ %s -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 
 // VLA of hyperobject
