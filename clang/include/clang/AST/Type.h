@@ -2009,6 +2009,7 @@ public:
   bool isAnyPointerType() const;   // Any C pointer or ObjC object pointer
   bool isBlockPointerType() const;
   bool isVoidPointerType() const;
+  bool isHyperobjectType() const;
   bool isReferenceType() const;
   bool isLValueReferenceType() const;
   bool isRValueReferenceType() const;
@@ -4620,6 +4621,7 @@ public:
   /// Recursively check all fields in the record for const-ness. If any field
   /// is declared const, return true. Otherwise, return false.
   bool hasConstFields() const;
+  bool hasHyperobjectFields() const;
 
   bool isSugared() const { return false; }
   QualType desugar() const { return QualType(this, 0); }
@@ -6696,6 +6698,10 @@ inline bool Type::isAnyPointerType() const {
 
 inline bool Type::isBlockPointerType() const {
   return isa<BlockPointerType>(CanonicalType);
+}
+
+inline bool Type::isHyperobjectType() const {
+  return isa<HyperobjectType>(CanonicalType);
 }
 
 inline bool Type::isReferenceType() const {

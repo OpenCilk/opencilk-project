@@ -14134,6 +14134,14 @@ void Sema::DefineImplicitCopyAssignment(SourceLocation CurrentLocation,
       continue;
     }
 
+    if (Field->getType()->isHyperobjectType()) {
+      Diag(ClassDecl->getLocation(), diag::err_uninitialized_member_for_assign)
+        << Context.getTagDeclType(ClassDecl) << 2 << Field->getDeclName();
+      Diag(Field->getLocation(), diag::note_declared_at);
+      Invalid = true;
+      continue;
+    }
+
     // Suppress assigning zero-width bitfields.
     if (Field->isZeroLengthBitField(Context))
       continue;
@@ -14499,6 +14507,14 @@ void Sema::DefineImplicitMoveAssignment(SourceLocation CurrentLocation,
     if (!BaseType->getAs<RecordType>() && BaseType.isConstQualified()) {
       Diag(ClassDecl->getLocation(), diag::err_uninitialized_member_for_assign)
         << Context.getTagDeclType(ClassDecl) << 1 << Field->getDeclName();
+      Diag(Field->getLocation(), diag::note_declared_at);
+      Invalid = true;
+      continue;
+    }
+
+    if (Field->getType()->isHyperobjectType()) {
+      Diag(ClassDecl->getLocation(), diag::err_uninitialized_member_for_assign)
+        << Context.getTagDeclType(ClassDecl) << 2 << Field->getDeclName();
       Diag(Field->getLocation(), diag::note_declared_at);
       Invalid = true;
       continue;

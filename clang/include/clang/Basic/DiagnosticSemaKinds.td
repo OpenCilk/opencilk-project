@@ -4150,7 +4150,7 @@ def err_param_default_argument_on_parameter_pack : Error<
   "parameter pack cannot have a default argument">;
 def err_uninitialized_member_for_assign : Error<
   "cannot define the implicit copy assignment operator for %0, because "
-  "non-static %select{reference|const}1 member %2 cannot use copy "
+  "non-static %select{reference|const|hyperobject}1 member %2 cannot use copy "
   "assignment operator">;
 def err_uninitialized_member_in_ctor : Error<
   "%select{constructor for %1|"
@@ -10128,6 +10128,9 @@ def note_protected_by_reducer : Note<
 def err_hyperobject_param : Error<"parameter is hyperobject">;
 
 def err_hyperobject_cast : Error<"cast to hyperobject">;
+
+def err_hyperobject_struct_assign : Error<
+    "unimplemented assignment to structure with hyperobject member">;
 
 } // end of Cilk category
 

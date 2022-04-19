@@ -12931,6 +12931,9 @@ static bool CheckForModifiableLvalue(Expr *E, SourceLocation Loc, Sema &S) {
   case Expr::MLV_SubObjCPropertySetting:
     DiagID = diag::err_no_subobject_property_setting;
     break;
+  case Expr::MLV_HyperobjectField:
+    DiagID = diag::err_hyperobject_struct_assign;
+    break;
   }
 
   SourceRange Assign;

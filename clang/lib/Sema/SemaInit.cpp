@@ -1334,6 +1334,9 @@ void InitListChecker::CheckSubElementType(const InitializedEntity &Entity,
     return CheckReferenceType(Entity, IList, ElemType, Index,
                               StructuredList, StructuredIndex);
 
+  if (const HyperobjectType *H = ElemType->getAs<HyperobjectType>())
+    ElemType = H->getElementType();
+
   if (InitListExpr *SubInitList = dyn_cast<InitListExpr>(expr)) {
     if (SubInitList->getNumInits() == 1 &&
         IsStringInit(SubInitList->getInit(0), ElemType, SemaRef.Context) ==
