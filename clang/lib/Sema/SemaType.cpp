@@ -1288,10 +1288,6 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
     return Optional<unsigned>();
   QualType Inner;
   switch (T->getTypeClass()) {
-  case Type::Builtin:
-    if (T->isIncompleteType(nullptr))
-      return diag::incomplete_hyperobject;
-    return Optional<unsigned>();
   case Type::Hyperobject:
     return diag::nested_hyperobject;
   case Type::Typedef:
@@ -1308,12 +1304,13 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
     break;
   case Type::Record: {
     const RecordDecl *Decl = cast<RecordType>(T)->getDecl();
+    // TODO: There must be a better way to do this.
+    // A hyperobject might sneak in without being explicitly
+    // declared in the template.
     if (auto Spec = dyn_cast<ClassTemplateSpecializationDecl>(Decl)) {
       if (ClassTemplateDecl *Inner = Spec->getSpecializedTemplate())
         return DeclContainsHyperobject(Inner->getTemplatedDecl());
     }
-    if (T->isIncompleteType(nullptr))
-      return diag::incomplete_hyperobject;
     if (const RecordDecl *Def = Decl->getDefinition())
       return DeclContainsHyperobject(Def);
     return diag::confusing_hyperobject;
@@ -1344,6 +1341,7 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
   case Type::PackExpansion:
   case Type::UnaryTransform:
     return diag::confusing_hyperobject;
+  case Type::Builtin:
   case Type::TemplateTypeParm:
   default:
     return Optional<unsigned>();
@@ -2269,8 +2267,11 @@ QualType Sema::BuildReferenceType(QualType T, bool SpelledAsLValue,
 
 QualType Sema::BuildHyperobjectType(QualType Element, SourceLocation Loc) {
   QualType Result = Element;
-  if (Optional<unsigned> Code = ContainsHyperobject(Result))
-    Diag(Loc, *Code) << Result;
+  if (!RequireCompleteType(Loc, Element, CompleteTypeKind::Normal,
+                           diag::incomplete_hyperobject)) {
+    if (Optional<unsigned> Code = ContainsHyperobject(Result))
+      Diag(Loc, *Code) << Result;
+  }
   // The result of this function must be HyperobjectType if it is called
   // from C++ template instantiation when rebuilding an existing hyperobject
   // type.
