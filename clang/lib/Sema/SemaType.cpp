@@ -1276,16 +1276,22 @@ static QualType ConvertConstrainedAutoDeclSpecToType(Sema &S, DeclSpec &DS,
                                TemplateArgs);
 }
 
+static Optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl);
+
 // It is forbidden to add new bits to the Type class so do a deep
 // search on every hyperobject type creation.
 static Optional<unsigned> ContainsHyperobject(QualType Outer) {
-  if (Outer->isVariablyModifiedType())
-    return diag::variable_length_hyperobject;
-  if (Outer->isDependentType())
-    return Optional<unsigned>();
   const Type *T = Outer.getCanonicalType().getTypePtr();
+  if (T->isVariablyModifiedType())
+    return diag::variable_length_hyperobject;
+  if (T->isDependentType())
+    return Optional<unsigned>();
   QualType Inner;
   switch (T->getTypeClass()) {
+  case Type::Builtin:
+    if (T->isIncompleteType(nullptr))
+      return diag::incomplete_hyperobject;
+    return Optional<unsigned>();
   case Type::Hyperobject:
     return diag::nested_hyperobject;
   case Type::Typedef:
@@ -1300,15 +1306,18 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
   case Type::Complex:
     Inner = cast<ComplexType>(T)->getElementType();
     break;
-  case Type::Record:
-    if (const RecordDecl *Def =
-        cast<RecordType>(T)->getDecl()->getDefinition()) {
-      for (const FieldDecl *FD : Def->fields()) {
-        if (Optional<unsigned> O = ContainsHyperobject(FD->getType()))
-          return O;
-      }
+  case Type::Record: {
+    const RecordDecl *Decl = cast<RecordType>(T)->getDecl();
+    if (auto Spec = dyn_cast<ClassTemplateSpecializationDecl>(Decl)) {
+      if (ClassTemplateDecl *Inner = Spec->getSpecializedTemplate())
+        return DeclContainsHyperobject(Inner->getTemplatedDecl());
     }
-    return Optional<unsigned>();
+    if (T->isIncompleteType(nullptr))
+      return diag::incomplete_hyperobject;
+    if (const RecordDecl *Def = Decl->getDefinition())
+      return DeclContainsHyperobject(Def);
+    return diag::confusing_hyperobject;
+  }
   case Type::TypeOf:
     Inner = cast<TypeOfType>(T)->getUnderlyingType();
     break;
@@ -1340,6 +1349,13 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
     return Optional<unsigned>();
   }
   return ContainsHyperobject(Inner);
+}
+
+static Optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl) {
+  for (const FieldDecl *FD : Decl->fields())
+    if (Optional<unsigned> O = ContainsHyperobject(FD->getType()))
+      return O;
+  return Optional<unsigned>();
 }
 
 /// Convert the specified declspec to the appropriate type
@@ -2255,6 +2271,9 @@ QualType Sema::BuildHyperobjectType(QualType Element, SourceLocation Loc) {
   QualType Result = Element;
   if (Optional<unsigned> Code = ContainsHyperobject(Result))
     Diag(Loc, *Code) << Result;
+  // The result of this function must be HyperobjectType if it is called
+  // from C++ template instantiation when rebuilding an existing hyperobject
+  // type.
   return Context.getHyperobjectType(Result);
 }
 

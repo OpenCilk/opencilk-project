@@ -10119,6 +10119,9 @@ def variable_length_hyperobject : Error<
 def confusing_hyperobject : Error<
    "type %0 may not be a hyperobject">;
 
+def incomplete_hyperobject : Error<
+   "incomplete type %0 may not be a hyperobject">;
+
 def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
 
