@@ -1899,6 +1899,7 @@ public:
                               SourceLocation AttrLoc);
   QualType BuildMatrixType(QualType T, Expr *NumRows, Expr *NumColumns,
                            SourceLocation AttrLoc);
+  QualType BuildHyperobjectType(QualType Element, SourceLocation Loc);
 
   QualType BuildAddressSpaceAttr(QualType &T, LangAS ASIdx, Expr *AddrSpace,
                                  SourceLocation AttrLoc);

@@ -1278,22 +1278,16 @@ static QualType ConvertConstrainedAutoDeclSpecToType(Sema &S, DeclSpec &DS,
 
 // It is forbidden to add new bits to the Type class so do a deep
 // search on every hyperobject type creation.
-
-enum HyperobjectCategory {
-  HYPER_NORMAL = 0,
-  HYPER_HYPER = 1,
-  HYPER_VLA = 2,
-  HYPER_CONFUSING = 3
-};
-
-static HyperobjectCategory ContainsHyperobject(QualType Outer) {
+static Optional<unsigned> ContainsHyperobject(QualType Outer) {
   if (Outer->isVariablyModifiedType())
-    return HYPER_VLA;
+    return diag::variable_length_hyperobject;
+  if (Outer->isDependentType())
+    return Optional<unsigned>();
   const Type *T = Outer.getCanonicalType().getTypePtr();
   QualType Inner;
   switch (T->getTypeClass()) {
   case Type::Hyperobject:
-    return HYPER_HYPER;
+    return diag::nested_hyperobject;
   case Type::Typedef:
     Inner = cast<TypedefType>(T)->desugar();
     break;
@@ -1310,12 +1304,11 @@ static HyperobjectCategory ContainsHyperobject(QualType Outer) {
     if (const RecordDecl *Def =
         cast<RecordType>(T)->getDecl()->getDefinition()) {
       for (const FieldDecl *FD : Def->fields()) {
-        HyperobjectCategory FH = ContainsHyperobject(FD->getType());
-        if (FH != HYPER_NORMAL)
-          return FH;
+        if (Optional<unsigned> O = ContainsHyperobject(FD->getType()))
+          return O;
       }
     }
-    return HYPER_NORMAL;
+    return Optional<unsigned>();
   case Type::TypeOf:
     Inner = cast<TypeOfType>(T)->getUnderlyingType();
     break;
@@ -1340,11 +1333,11 @@ static HyperobjectCategory ContainsHyperobject(QualType Outer) {
   case Type::DependentName:
   case Type::DependentTemplateSpecialization:
   case Type::PackExpansion:
-  case Type::TemplateTypeParm:
   case Type::UnaryTransform:
-    return HYPER_CONFUSING;
+    return diag::confusing_hyperobject;
+  case Type::TemplateTypeParm:
   default:
-    return HYPER_NORMAL;
+    return Optional<unsigned>();
   }
   return ContainsHyperobject(Inner);
 }
@@ -1847,20 +1840,7 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
     diagnoseAndRemoveTypeQualifiers(S, DS, Tmp, Result,
                                     DeclSpec::TQ_volatile,
                                     diag::hyperobject_exclusive);
-    switch (ContainsHyperobject(Result)) {
-    case HYPER_NORMAL:
-      Result = Context.getHyperobjectType(Result);
-      break;
-    case HYPER_HYPER:
-      S.Diag(DS.getHyperLoc(), diag::nested_hyperobject) << Result;
-      break;
-    case HYPER_VLA: // This is too hard to get right.
-      S.Diag(DS.getHyperLoc(), diag::variable_length_hyperobject) << Result;
-      break;
-    case HYPER_CONFUSING:
-      S.Diag(DS.getHyperLoc(), diag::confusing_hyperobject) << Result;
-      break;
-    }
+    Result = S.BuildHyperobjectType(Result, DS.getHyperLoc());
   }
 
   // Apply const/volatile/restrict qualifiers to T.
@@ -2269,6 +2249,13 @@ QualType Sema::BuildReferenceType(QualType T, bool SpelledAsLValue,
   if (LValueRef)
     return Context.getLValueReferenceType(T, SpelledAsLValue);
   return Context.getRValueReferenceType(T);
+}
+
+QualType Sema::BuildHyperobjectType(QualType Element, SourceLocation Loc) {
+  QualType Result = Element;
+  if (Optional<unsigned> Code = ContainsHyperobject(Result))
+    Diag(Loc, *Code) << Result;
+  return Context.getHyperobjectType(Result);
 }
 
 /// Build a Read-only Pipe type.
