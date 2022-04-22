@@ -1309,7 +1309,25 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
     // declared in the template.
     if (auto Spec = dyn_cast<ClassTemplateSpecializationDecl>(Decl)) {
       if (ClassTemplateDecl *Inner = Spec->getSpecializedTemplate())
-        return DeclContainsHyperobject(Inner->getTemplatedDecl());
+        if (auto O = DeclContainsHyperobject(Inner->getTemplatedDecl()))
+          return O;
+      const TemplateArgumentList &Args = Spec->getTemplateArgs();
+      for (unsigned I = 0; I < Args.size(); ++I) {
+        const TemplateArgument &Arg = Args.get(I);
+        switch (Arg.getKind()) {
+        case TemplateArgument::Declaration:
+          if (auto O = ContainsHyperobject(Arg.getAsDecl()->getType()))
+            return O;
+          break;
+        case TemplateArgument::Type:
+          if (auto O = ContainsHyperobject(Arg.getAsType()))
+            return O;
+          break;
+        default:
+          return diag::confusing_hyperobject;
+        }
+      }
+      return Optional<unsigned>();
     }
     if (const RecordDecl *Def = Decl->getDefinition())
       return DeclContainsHyperobject(Def);
