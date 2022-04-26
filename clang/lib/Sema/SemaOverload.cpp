@@ -1449,10 +1449,7 @@ TryImplicitConversion(Sema &S, Expr *From, QualType ToType,
   //   given Conversion rank, in spite of the fact that a copy/move
   //   constructor (i.e., a user-defined conversion function) is
   //   called for those cases.
-  QualType FromType = From->getType();
-
-  if (const HyperobjectType *H = FromType->getAs<HyperobjectType>())
-    FromType = H->getElementType();
+  QualType FromType = From->getType().stripHyperobject();
 
   if (ToType->getAs<RecordType>() && FromType->getAs<RecordType>() &&
       (S.Context.hasSameUnqualifiedType(FromType, ToType) ||

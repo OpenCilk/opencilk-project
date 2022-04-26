@@ -12502,7 +12502,7 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
     return;
 
   if (VarDecl *Var = dyn_cast<VarDecl>(RealDecl)) {
-    QualType Type = Var->getType();
+    QualType Type = Var->getType().stripHyperobject();
     if (const HyperobjectType *H = Type->getAs<HyperobjectType>())
       Type = H->getElementType();
 

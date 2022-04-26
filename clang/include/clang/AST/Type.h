@@ -1280,6 +1280,8 @@ public:
   /// Remove all qualifiers including _Atomic.
   QualType getAtomicUnqualifiedType() const;
 
+  QualType stripHyperobject() const;
+
 private:
   // These methods are implemented in a separate translation unit;
   // "static"-ize them to avoid creating temporary QualTypes in the

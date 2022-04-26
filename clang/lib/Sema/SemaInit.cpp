@@ -1334,8 +1334,7 @@ void InitListChecker::CheckSubElementType(const InitializedEntity &Entity,
     return CheckReferenceType(Entity, IList, ElemType, Index,
                               StructuredList, StructuredIndex);
 
-  if (const HyperobjectType *H = ElemType->getAs<HyperobjectType>())
-    ElemType = H->getElementType();
+  ElemType = ElemType.stripHyperobject();
 
   if (InitListExpr *SubInitList = dyn_cast<InitListExpr>(expr)) {
     if (SubInitList->getNumInits() == 1 &&
@@ -5690,8 +5689,7 @@ void InitializationSequence::InitializeFrom(Sema &S,
   //   parenthesized list of expressions.
   QualType DestType = Entity.getType();
 #if 0
-  if (const HyperobjectType *H = DestType->getAs<HyperobjectType>())
-    DestType = H->getElementType();
+  DestType = DestType.stripHyperobject();
 #endif
   if (DestType->isDependentType() ||
       Expr::hasAnyTypeDependentArguments(Args)) {

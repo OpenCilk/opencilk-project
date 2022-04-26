@@ -3116,6 +3116,12 @@ QualType QualType::getNonLValueExprType(const ASTContext &Context) const {
   return *this;
 }
 
+QualType QualType::stripHyperobject() const {
+  if (const auto *Hyperobject = getTypePtr()->getAs<HyperobjectType>())
+    return Hyperobject->getElementType();
+  return *this;
+}
+
 StringRef FunctionType::getNameForCallConv(CallingConv CC) {
   switch (CC) {
   case CC_C: return "cdecl";

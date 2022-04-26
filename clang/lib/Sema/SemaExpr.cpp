@@ -9505,9 +9505,7 @@ Sema::CheckSingleAssignmentConstraints(QualType LHSType, ExprResult &CallerRHS,
   // they ask us to issue diagnostics.
   assert((ConvertRHS || !Diagnose) && "can't indicate whether we diagnosed");
 
-  if (const HyperobjectType *H = LHSType->getAs<HyperobjectType>()) {
-    LHSType = H->getElementType();
-  }
+  LHSType = LHSType.stripHyperobject();
 
   // If ConvertRHS is false, we want to leave the caller's RHS untouched. Sadly,
   // we can't avoid *all* modifications at the moment, so we need some somewhere
