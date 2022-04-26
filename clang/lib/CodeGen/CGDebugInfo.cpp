@@ -866,7 +866,7 @@ llvm::DIType *CGDebugInfo::CreateType(const ExtIntType *Ty) {
 }
 
 llvm::DIType *CGDebugInfo::CreateType(const HyperobjectType *Ty) {
-  return CreateTypeNode(Ty->getElementType(), nullptr); /* this won't work */
+  llvm_unreachable("handled in CreateTypeNode");
 }
 
 llvm::DIType *CGDebugInfo::CreateType(const ComplexType *Ty) {
@@ -3251,7 +3251,8 @@ llvm::DIType *CGDebugInfo::CreateTypeNode(QualType Ty, llvm::DIFile *Unit) {
   case Type::Complex:
     return CreateType(cast<ComplexType>(Ty));
   case Type::Hyperobject:
-    return CreateType(cast<HyperobjectType>(Ty));
+    return CreateTypeNode
+      (cast<HyperobjectType>(Ty)->getElementType().getCanonicalType(), Unit);
   case Type::Pointer:
     return CreateType(cast<PointerType>(Ty), Unit);
   case Type::BlockPointer:
