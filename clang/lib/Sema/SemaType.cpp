@@ -6438,7 +6438,9 @@ TypeResult Sema::ActOnTypeName(Scope *S, Declarator &D) {
   // we are actually going to build a declaration from this eventually.
   if (D.getContext() != DeclaratorContext::ObjCParameter &&
       D.getContext() != DeclaratorContext::AliasDecl &&
-      D.getContext() != DeclaratorContext::AliasTemplate)
+      // Hyperobjects don't get attributes for some mysterious reason.
+      !(D.getContext() == DeclaratorContext::AliasTemplate &&
+        !T->isHyperobjectType()))
     checkUnusedDeclAttributes(D);
 
   if (getLangOpts().CPlusPlus) {
