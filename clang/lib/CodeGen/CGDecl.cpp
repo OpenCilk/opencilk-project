@@ -1815,13 +1815,17 @@ void CodeGenFunction::emitZeroOrPatternForAutoVarInit(QualType type,
 }
 
 static ReducerCallbacksAttr *getReducer(const VarDecl *D) {
-  /* The reducer attribute may be on the declaration or a
-     typedef name providing its type, but not on any other
-     type declaration. */
   if (ReducerCallbacksAttr *R = D->getAttr<ReducerCallbacksAttr>())
     return R;
-  if (const TypedefType *T = D->getType()->getAs<TypedefType>())
-    return T->getDecl()->getAttr<ReducerCallbacksAttr>();
+  QualType Type = D->getType();
+  if (const TypedefType *T = Type->getAs<TypedefType>())
+    if (ReducerCallbacksAttr *R = T->getDecl()->getAttr<ReducerCallbacksAttr>())
+      return R;
+  Type = Type.getCanonicalType();
+  const HyperobjectType *H = Type->getAs<HyperobjectType>();
+  assert(H && "getReducer requires hyperobject");
+  if (TagDecl *T = H->getElementType()->getAsTagDecl())
+    return T->getAttr<ReducerCallbacksAttr>();
   return nullptr;
 }
 
