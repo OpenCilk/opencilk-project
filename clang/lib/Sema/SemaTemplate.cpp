@@ -3721,6 +3721,12 @@ QualType Sema::CheckTemplateIdType(TemplateName Name,
 
       return QualType();
     }
+
+    if (AliasTemplate->getTemplatedDecl()->hasAttrs()) {
+      const Attr *First = *AliasTemplate->getTemplatedDecl()->attr_begin();
+      Diag(First->getLocation(), diag::warn_attribute_no_decl) << First;
+    }
+
   } else if (Name.isDependent() ||
              TemplateSpecializationType::anyDependentTemplateArguments(
                  TemplateArgs, Converted)) {
