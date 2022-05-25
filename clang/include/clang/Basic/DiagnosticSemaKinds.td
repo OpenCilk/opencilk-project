@@ -10134,6 +10134,9 @@ def err_hyperobject_cast : Error<"cast to hyperobject">;
 def err_hyperobject_struct_assign : Error<
     "unimplemented assignment to structure with hyperobject member">;
 
+def no_reducer_array : Warning<
+    "array of reducer not implemented">;
+
 } // end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {

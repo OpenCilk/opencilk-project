@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 %s -x c -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
-// expected-no-diagnostics
 extern void identity_long(void *, long *);
 extern void reduce_long(void *, long *, long *);
 
@@ -14,7 +13,7 @@ long local_array_of_hyper(unsigned int x)
   // The outermost variable is not a hyperobject, and registration of
   // hyperobject array elements is not implemented.
   // CHECK-NOT: call void @llvm.reducer.register
-  rlong array[10];
+  rlong array[10]; // expected-warning{{array of reducer not implemented}}
   // CHECK: getelementptr inbounds [[JUNK:.+]] %[[ARRAY]]
   // CHECK: call i8* @llvm.hyper.lookup
   // CHECK: %[[VIEW:.+]] = bitcast

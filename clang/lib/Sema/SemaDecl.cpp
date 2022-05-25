@@ -13309,6 +13309,14 @@ void Sema::FinalizeDeclaration(Decl *ThisDecl) {
   if (VD->isFileVarDecl() && !isa<VarTemplatePartialSpecializationDecl>(VD))
     MarkUnusedFileScopedDecl(VD);
 
+  // This is only a shallow search.  See also SemaType.cpp ContainsHyperobject.
+  if (VD->getType()->isArrayType()) {
+    const ArrayType *A = cast<ArrayType>(VD->getType().getTypePtr());
+    const HyperobjectType *H = A->getElementType()->getAs<HyperobjectType>();
+    if (H && H->hasCallbacks())
+      Diag(VD->getLocation(), diag::no_reducer_array);
+  }
+
   // Now we have parsed the initializer and can update the table of magic
   // tag values.
   if (!VD->hasAttr<TypeTagForDatatypeAttr>() ||
