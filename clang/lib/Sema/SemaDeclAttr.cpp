@@ -5327,28 +5327,6 @@ void Sema::AddXConsumedAttr(Decl *D, const AttributeCommonInfo &CI,
   }
 }
 
-/* OpenCilk */
-static void handleReducerCallbacksAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
-  if (S.getLangOpts().getCilk() != LangOptions::Cilk_opencilk) {
-    S.Diag(D->getBeginLoc(), diag::attribute_requires_cilk) << AL;
-    return;
-  }
-  Expr *Reduce = AL.getArgAsExpr(0);
-  Expr *Identity = AL.getArgAsExpr(1);
-  Expr *Destruct = AL.getNumArgs() > 2 ? AL.getArgAsExpr(2) : nullptr;
-  
-  S.AddReducerCallbacksAttr(AL.getRange(), AL, D, Reduce, Identity, Destruct);
-  /* See also handleCleanupAttr */
-}
-
-void Sema::AddReducerCallbacksAttr(SourceRange AttrRange,
-                                   const AttributeCommonInfo &CI,
-                                   Decl *Decl, Expr *Reduce,
-                                   Expr *Init, Expr *Destruct) {
-  Decl->addAttr(::new (Context) ReducerCallbacksAttr(Context, CI, Reduce, Init,
-                                                     Destruct));
-}
-
 static Sema::RetainOwnershipKind
 parsedAttrToRetainOwnershipKind(const ParsedAttr &AL) {
   switch (AL.getKind()) {
@@ -8350,9 +8328,6 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     break;
 
   // Cilk attributes
-  case ParsedAttr::AT_ReducerCallbacks:
-    handleReducerCallbacksAttr(S, D, AL);
-    break;
   case ParsedAttr::AT_StrandMalloc:
     handleSimpleAttribute<StrandMallocAttr>(S, D, AL);
     break;

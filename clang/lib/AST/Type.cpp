@@ -3122,6 +3122,47 @@ QualType QualType::stripHyperobject() const {
   return *this;
 }
 
+/// Check if the expression is exactly nullptr or 0.
+/// The more general isNullPointerConstant requires a non-const ASTContext.
+bool HyperobjectType::isNullish(Expr *E) {
+  E = E->IgnoreParenCasts();
+  switch (E->getStmtClass()) {
+  case Expr::CXXNullPtrLiteralExprClass:
+    return true;
+  case Expr::IntegerLiteralClass:
+    return cast<IntegerLiteral>(E)->getValue().isNullValue();
+  default:
+    return false;
+  }
+}
+
+HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
+                                 Expr *r, const IdentifierInfo *ri,
+                                 Expr *i, const IdentifierInfo *ii,
+                                 Expr *d, const IdentifierInfo *di)
+  : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
+    ElementType(Element), Reduce(r), Identity(i), Destroy(d),
+    ReduceID(ri), IdentityID(ii), DestroyID(di),
+    Bare(isNullish(r) && isNullish(i) && isNullish(d)) {
+}
+
+void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID) const {
+  Profile(ID, getElementType(), ReduceID, IdentityID, DestroyID);
+}
+
+void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
+                              const IdentifierInfo *R, const IdentifierInfo *I,
+                              const IdentifierInfo *D) {
+  ID.AddPointer(Pointee.getAsOpaquePtr());
+  // In normal use all of R, I, D will be non-null or none of them will be.
+  if (R)
+    ID.AddString(R->getName());
+  if (I)
+    ID.AddString(I->getName());
+  if (D)
+    ID.AddString(D->getName());
+}
+
 StringRef FunctionType::getNameForCallConv(CallingConv CC) {
   switch (CC) {
   case CC_C: return "cdecl";
@@ -4380,25 +4421,13 @@ QualType::DestructionKind QualType::isDestructedTypeImpl(QualType type) {
     return DK_objc_weak_lifetime;
   }
 
-  bool IsReducer = false;
-  // Check for attribute on typedef that getAs<HyperobjectType> looks through.
-  if (const TypedefType *T = type->getAs<TypedefType>())
-    IsReducer = T->getDecl()->getAttr<ReducerCallbacksAttr>();
-
   if (const HyperobjectType *HT = type->getAs<HyperobjectType>()) {
     QualType Inner = HT->getElementType();
     QualType::DestructionKind DK_Inner = isDestructedTypeImpl(Inner);
     if (DK_Inner != DK_none)
       return DK_Inner;
-    if (IsReducer)
+    if (HT->hasCallbacks())
       return DK_hyperobject;
-    const TypedefType *T = Inner->getAs<TypedefType>();
-    while (T) {
-      TypedefNameDecl *Decl = T->getDecl();
-      if (Decl->getAttr<ReducerCallbacksAttr>())
-        return DK_hyperobject;
-      T = dyn_cast<TypedefType>(Decl->getUnderlyingType());
-    }
     return DK_none;
   }
 

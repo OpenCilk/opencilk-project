@@ -1,5 +1,5 @@
 // RUN: %clang_cc1 %s -xc -fopencilk -verify -fsyntax-only
-int f(_Hyperobject int x) // expected-error{{parameter is hyperobject}}
+int f(int _Hyperobject x) // expected-error{{parameter is hyperobject}}
 {
   return x;
 }

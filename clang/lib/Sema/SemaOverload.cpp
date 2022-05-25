@@ -1690,7 +1690,7 @@ static bool IsStandardConversion(Sema &S, Expr* From, QualType ToType,
                                  StandardConversionSequence &SCS,
                                  bool CStyle,
                                  bool AllowObjCWritebackConversion) {
-  QualType FromType = From->getType();
+  QualType FromType = From->getType().stripHyperobject();
 
   // Standard conversions (C++ [conv])
   SCS.setAsIdentityConversion();
@@ -1703,9 +1703,6 @@ static bool IsStandardConversion(Sema &S, Expr* From, QualType ToType,
   if (S.getLangOpts().CPlusPlus &&
       (FromType->isRecordType() || ToType->isRecordType()))
     return false;
-
-  if (const HyperobjectType *H = FromType->getAs<HyperobjectType>())
-    FromType = H->getElementType();
 
   // The first conversion can be an lvalue-to-rvalue conversion,
   // array-to-pointer conversion, or function-to-pointer conversion

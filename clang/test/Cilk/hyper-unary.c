@@ -3,14 +3,14 @@
 // without side effects are not emitted.  Unclear if this is a bug or a feature.
 // expected-no-diagnostics
 
-extern _Hyperobject int x;
-extern _Hyperobject int *xp;
+extern int _Hyperobject x;
+extern int _Hyperobject *xp;
 
 // CHECK-LABEL: function1
 void function1()
 {
   // CHECK: store i32 1, i32* %[[Y:.+]],
-  _Hyperobject int y = 1;
+  int _Hyperobject y = 1;
   // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i32* @x to i8*))
   // CHECK: load i32
   // CHECK: %[[Y1:.+]] = bitcast i32* %[[Y]] to i8*
@@ -23,7 +23,7 @@ void function1()
 void function2()
 {
   // CHECK: store i32 1, i32* %[[Y:.+]],
-  _Hyperobject int y = 1;
+  int _Hyperobject y = 1;
   // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i32* @x to i8*))
   // CHECK: load i32
   // CHECK: %[[Y2:.+]] = bitcast i32* %[[Y]] to i8*
@@ -36,7 +36,7 @@ void function2()
 void function3()
 {
   // CHECK: store i32 1, i32* %[[Y:.+]],
-  _Hyperobject int y = 1;
+  int _Hyperobject y = 1;
   // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i32* @x to i8*))
   // CHECK: load i32
   // CHECK: %[[Y3:.+]] = bitcast i32* %[[Y]] to i8*

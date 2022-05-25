@@ -381,8 +381,23 @@ void TypePrinter::printComplexAfter(const ComplexType *T, raw_ostream &OS) {
 
 void TypePrinter::printHyperobjectBefore(const HyperobjectType *T,
                                          raw_ostream &OS) {
-  OS << "_Hyperobject ";
+  SaveAndRestore<bool> NonEmptyPH(HasEmptyPlaceHolder, false);
   printBefore(T->getElementType(), OS);
+  OS << "_Hyperobject";
+  if (T->hasCallbacks()) {
+    Expr *R = T->getReduce();
+    Expr *I = T->getIdentity();
+    Expr *D = T->getDestroy();
+    OS << '(';
+    R->printPretty(OS, nullptr, Policy);
+    OS << ", ";
+    I->printPretty(OS, nullptr, Policy);
+    if (!HyperobjectType::isNullish(D)) {
+      OS << ", ";
+      D->printPretty(OS, nullptr, Policy);
+    }
+    OS << ")";
+  }
 }
 
 void TypePrinter::printHyperobjectAfter(const HyperobjectType *T,

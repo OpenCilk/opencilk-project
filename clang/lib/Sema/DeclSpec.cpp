@@ -335,6 +335,7 @@ bool Declarator::isDeclarationOfFunction() const {
     case DeclaratorChunk::BlockPointer:
     case DeclaratorChunk::MemberPointer:
     case DeclaratorChunk::Pipe:
+    case DeclaratorChunk::Hyperobject:
       return false;
     }
     llvm_unreachable("Invalid type chunk");
@@ -703,12 +704,6 @@ bool DeclSpec::SetTypeSpecWidth(TypeSpecifierWidth W, SourceLocation Loc,
   TypeSpecWidth = static_cast<unsigned>(W);
   // Remember location of the last 'long'
   TSWRange.setEnd(Loc);
-  return false;
-}
-
-bool DeclSpec::SetTypeHyperobject(SourceLocation Loc) {
-  TQ_hyperLoc = Loc;
-  TypeHyper = 1;
   return false;
 }
 
@@ -1128,7 +1123,7 @@ void DeclSpec::Finish(Sema &S, const PrintingPolicy &Policy) {
   // If decltype(auto) is used, no other type specifiers are permitted.
   if (TypeSpecType == TST_decltype_auto &&
       (getTypeSpecWidth() != TypeSpecifierWidth::Unspecified ||
-       TypeSpecComplex != TSC_unspecified || TypeHyper ||
+       TypeSpecComplex != TSC_unspecified ||
        getTypeSpecSign() != TypeSpecifierSign::Unspecified ||
        TypeAltiVecVector || TypeAltiVecPixel || TypeAltiVecBool ||
        TypeQualifiers)) {

@@ -1899,7 +1899,8 @@ public:
                               SourceLocation AttrLoc);
   QualType BuildMatrixType(QualType T, Expr *NumRows, Expr *NumColumns,
                            SourceLocation AttrLoc);
-  QualType BuildHyperobjectType(QualType Element, SourceLocation Loc);
+  QualType BuildHyperobjectType(QualType Element, Expr *Reduce, Expr *Identity,
+                                Expr *Destroy, SourceLocation Loc);
 
   QualType BuildAddressSpaceAttr(QualType &T, LangAS ASIdx, Expr *AddrSpace,
                                  SourceLocation AttrLoc);
@@ -10100,12 +10101,6 @@ public:
   void AddXConsumedAttr(Decl *D, const AttributeCommonInfo &CI,
                         RetainOwnershipKind K, bool IsTemplateInstantiation);
 
-  /// OpenCilk hyperobject support
-  void AddReducerCallbacksAttr(SourceRange AttrRange,
-                               const AttributeCommonInfo &CI,
-                               Decl *D, Expr *Reduce, Expr *Init,
-                               Expr *Destruct);
-
   /// addAMDGPUFlatWorkGroupSizeAttr - Adds an amdgpu_flat_work_group_size
   /// attribute to a particular declaration.
   void addAMDGPUFlatWorkGroupSizeAttr(Decl *D, const AttributeCommonInfo &CI,
@@ -12762,6 +12757,8 @@ private:
   /// Adds an expression to the set of gathered misaligned members.
   void AddPotentialMisalignedMembers(Expr *E, RecordDecl *RD, ValueDecl *MD,
                                      CharUnits Alignment);
+
+  Expr *ValidateReducerCallback(Expr *E, unsigned NumArgs);
 
 public:
   /// Diagnoses the current set of gathered accesses. This typically

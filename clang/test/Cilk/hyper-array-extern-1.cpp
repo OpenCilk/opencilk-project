@@ -2,7 +2,7 @@
 // RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
 
-extern _Hyperobject int x[10];
+extern int _Hyperobject x[10];
 
 // One array with 10 hyperobject elements
 // CHECK_LABEL: read_array_hyper

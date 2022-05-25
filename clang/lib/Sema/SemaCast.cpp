@@ -3051,7 +3051,6 @@ ExprResult Sema::BuildCStyleCastExpr(SourceLocation LPLoc,
                                      TypeSourceInfo *CastTypeInfo,
                                      SourceLocation RPLoc,
                                      Expr *CastExpr) {
-
   if (CastTypeInfo->getType()->getTypeClass() == Type::Hyperobject) {
     Diag(LPLoc, diag::err_hyperobject_cast);
     return ExprError();

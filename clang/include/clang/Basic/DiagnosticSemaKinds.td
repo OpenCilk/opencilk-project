@@ -10105,14 +10105,6 @@ def attribute_requires_cilk : Warning<
   "%0 ignored when OpenCilk not in use">,
   InGroup<DiagGroup<"required-cilk">>;
 
-def attribute_requires_hyperobject : Warning<
-  "%0 ignored when not on hyperobject">,
-   InGroup<CilkIgnored>;
-
-def hyperobject_exclusive : Warning<
-  "%0 not allowed on hyperobjects">,
-   InGroup<CilkIgnored>;
-
 def variable_length_hyperobject : Error<
    "variable length type %0 may not be a hyperobject">;
 
@@ -10124,6 +10116,13 @@ def incomplete_hyperobject : Error<
 
 def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
+
+def reducer_callbacks_not_allowed: Warning<
+   "reducer callbacks not implemented for structure members">;
+
+def err_invalid_reducer_callback : Error<
+  "reducer callback must be function with %0 pointer parameter%s0"
+>;
 
 def note_protected_by_reducer : Note<
   "jump bypasses initialization of variable with __attribute__((reducer))">;

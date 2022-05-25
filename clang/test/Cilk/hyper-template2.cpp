@@ -5,14 +5,15 @@ struct reducer
   static void reduce(void *, VIEW *, VIEW *);
   static void identity(void *, VIEW *);
   char pad;
-  _Hyperobject VIEW value __attribute__((reducer(reduce, identity))); // expected-warning{{'reducer' attribute only applies to}}
+  // Registration of structure members is not implemented.
+  VIEW _Hyperobject(reduce, identity) value; // expected-warning{{reducer callbacks not implemented}}
   reducer();
   ~reducer();
 };
 
 // CHECK: call void @_ZN7reducerIsEC1Ev
 // CHECK: @_ZN7reducerIsED1Ev
-reducer<short> r;
+reducer<short> r; // expected-note{{in instantiation}}
 
 // CHECK-LABEL: _Z1fv
 // CHECK: call i8* @llvm.hyper.lookup

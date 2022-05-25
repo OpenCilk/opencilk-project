@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 %s -fopencilk -verify -fsyntax-only
 
-struct S { _Hyperobject long field; };
+struct S { long _Hyperobject field; };
 extern struct S x, y;
 
 struct S simple_assign(long val)

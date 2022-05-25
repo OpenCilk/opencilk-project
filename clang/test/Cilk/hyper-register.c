@@ -8,7 +8,7 @@ extern
 #endif
 void add(void *key, void *l, void *r), zero(void *key, void *v);
 
-typedef _Hyperobject double double_reducer __attribute__((reducer(add, zero)));
+typedef double _Hyperobject(add, zero) double_reducer;
 
 #ifdef __cplusplus
 extern "C" void g(double *);
@@ -37,7 +37,7 @@ double f2(double x)
 {
   // CHECK: store double
   // CHECK: call void @llvm.reducer.register
-  _Hyperobject double y __attribute__((reducer(add, zero))) = x;
+  double _Hyperobject(add, zero) y = x;
   // CHECK: call void @g
   g(&y);
   // CHECK: call void @llvm.reducer.unregister

@@ -1,10 +1,10 @@
 // RUN: %clang_cc1 %s -xc++ -fopencilk -verify -fsyntax-only
 struct S
 {
-  void fn(_Hyperobject int); // expected-error{{parameter is hyperobject}}
+  void fn(int _Hyperobject); // expected-error{{parameter is hyperobject}}
 };
 
-extern int f(_Hyperobject int x); // expected-error{{parameter is hyperobject}} expected-note{{candidate function not viable}}
+extern int f(int _Hyperobject x); // expected-error{{parameter is hyperobject}} expected-note{{candidate function not viable}}
 
 void g()
 {

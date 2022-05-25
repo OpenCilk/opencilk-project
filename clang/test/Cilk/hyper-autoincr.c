@@ -5,9 +5,9 @@
 extern void identity(void* reducer, double * value);
 extern void reduce(void* reducer, double* left, double* right);
 
-typedef _Hyperobject long *long_hp;
-typedef _Hyperobject long long_h;
-extern  _Hyperobject int x, y;
+typedef long _Hyperobject *long_hp;
+typedef long _Hyperobject long_h;
+extern int _Hyperobject x, _Hyperobject y;
 // CHECK_LABEL: extern1
 void extern1()
 {
@@ -90,7 +90,7 @@ double local_reducer_1()
   // Initialization precedes registration
   // CHECK: store double 0.0
   // CHECK: call void @llvm.reducer.register
-  _Hyperobject double x __attribute__((reducer(reduce, identity))) = 0.0;
+  double _Hyperobject(reduce, identity) x = 0.0;
   // CHECK: call i8* @llvm.hyper.lookup
   // CHECK: load double
   // CHECK: fadd double

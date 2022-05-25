@@ -9,7 +9,7 @@ void reduce_long(void *z, S *l, S *r);
 // CHECK-LABEL: cxx_global_var_init
 // CHECK: call void @_ZN1SC1Ei(%struct.S* nonnull dereferenceable(4) @global, i32 1)
 // CHECK: call void @llvm.reducer.register.i64
-_Hyperobject S __attribute__((reducer(reduce_long, identity_long, 0))) global(1);
+S _Hyperobject(reduce_long, identity_long, 0) global(1);
 
 // CHECK: call void @llvm.reducer.unregister
 // CHECK: call void @_ZN1SD1Ev

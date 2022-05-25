@@ -2,7 +2,7 @@
 // RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
 
-extern _Hyperobject long x, y;
+extern long _Hyperobject x, _Hyperobject y;
 
 long chain_assign()
 {

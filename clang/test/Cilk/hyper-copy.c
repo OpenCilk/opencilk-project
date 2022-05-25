@@ -3,7 +3,7 @@
 // expected-no-diagnostics
 struct S { int first, second; };
 
-extern _Hyperobject struct S a __attribute__((aligned(8)));
+extern struct S _Hyperobject a __attribute__((aligned(8)));
 extern struct S b __attribute__((aligned(8)));
 
 // CHECK-LABEL: scopy

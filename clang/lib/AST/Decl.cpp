@@ -2654,9 +2654,8 @@ VarDecl::needsDestruction(const ASTContext &Ctx) const {
     Kind = H->getElementType().isDestructedType();
     if (Kind != QualType::DK_none)
       return Kind;
-    if (getAttr<ReducerCallbacksAttr>())
+    if (H->hasCallbacks())
       return QualType::DK_hyperobject;
-    // Attributes on typedefs were checked by isDestructedType().
   }
 
   return QualType::DK_none;
@@ -2704,6 +2703,13 @@ VarDecl::setInstantiationOfStaticDataMember(VarDecl *VD,
   assert(getASTContext().getTemplateOrSpecializationInfo(this).isNull() &&
          "Previous template or instantiation?");
   getASTContext().setInstantiatedFromStaticDataMember(this, VD, TSK);
+}
+
+bool
+VarDecl::isReducer() const {
+  if (const HyperobjectType *H = getType()->getAs<HyperobjectType>())
+    return H->hasCallbacks();
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

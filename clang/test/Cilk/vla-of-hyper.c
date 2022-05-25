@@ -6,7 +6,7 @@
 // CHECK-LABEL: test_vla_hyper
 int test_vla_hyper(unsigned long size)
 {
-  _Hyperobject int array[size];
+  int _Hyperobject array[size];
 
   // CHECK: getelementptr
   // CHECK: %[[RAW:.+]] = call i8* @llvm.hyper.lookup

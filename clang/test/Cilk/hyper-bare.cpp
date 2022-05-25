@@ -3,7 +3,7 @@
 
 struct S { S(); ~S(); int x; };
 // Should be constructed and destructed like a regular variable.
-_Hyperobject struct S shyper;
+struct S _Hyperobject shyper;
 
 // CHECK-NOT: call void @llvm.reducer.register
 // CHECK: call void @_ZN1SC1Ev

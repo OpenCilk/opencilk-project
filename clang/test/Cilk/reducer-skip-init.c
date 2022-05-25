@@ -6,7 +6,7 @@ int into(int x)
 {
   if (x)
     goto skip; // expected-error{{cannot jump}}
-  _Hyperobject short y __attribute__((reducer(reduce_short, identity_short))); // expected-note{{jump bypasses initialization}}
+  short _Hyperobject(reduce_short, identity_short) y; // expected-note{{jump bypasses initialization}}
 skip:
   return y;
 }

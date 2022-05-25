@@ -131,6 +131,12 @@ unsigned JumpScopeChecker::GetDeepestCommonScope(unsigned A, unsigned B) {
 
 typedef std::pair<unsigned,unsigned> ScopePair;
 
+static bool isReducer(const VarDecl *VD) {
+  if (const HyperobjectType *H = VD->getType()->getAs<HyperobjectType>())
+    return H->hasCallbacks();
+  return false;
+}
+
 /// GetDiagForGotoScopeDecl - If this decl induces a new goto scope, return a
 /// diagnostic that should be emitted if control goes over it. If not, return 0.
 static ScopePair GetDiagForGotoScopeDecl(Sema &S, const Decl *D) {
@@ -149,7 +155,7 @@ static ScopePair GetDiagForGotoScopeDecl(Sema &S, const Decl *D) {
       return ScopePair(diag::note_protected_by_cleanup,
                        diag::note_exits_cleanup);
 
-    if (VD->hasAttr<ReducerCallbacksAttr>())
+    if (isReducer(VD))
       return ScopePair(diag::note_protected_by_reducer,
                        diag::note_exits_cleanup);
 

@@ -6500,7 +6500,7 @@ void TypeLocReader::VisitComplexTypeLoc(ComplexTypeLoc TL) {
 }
 
 void TypeLocReader::VisitHyperobjectTypeLoc(HyperobjectTypeLoc TL) {
-  TL.setNameLoc(readSourceLocation());
+  TL.setHyperLoc(readSourceLocation());
 }
 
 void TypeLocReader::VisitPointerTypeLoc(PointerTypeLoc TL) {

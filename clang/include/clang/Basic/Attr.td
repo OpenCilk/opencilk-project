@@ -3742,13 +3742,3 @@ def ReducerUnregister : InheritableAttr {
   let Subjects = SubjectList<[FunctionLike]>;
   let Documentation = [StrandMallocDocs];
 }
-
-def ReducerCallbacks : Attr {
-  let Spellings = [
-    GNU<"reducer">
-  ];
-  let Args = [ExprArgument<"reduce">, ExprArgument<"init">,
-      ExprArgument<"destruct", 1>];
-  let Subjects = SubjectList<[NonParmVar, TypedefName]>;
-  let Documentation = [ReducerDocs];
-}

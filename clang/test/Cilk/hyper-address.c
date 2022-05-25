@@ -3,17 +3,19 @@
    2. & returns current view
 */
 // RUN: %clang_cc1 %s -x c -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
-// RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
+// This does not compile in C++ because function overloading requires
+// an exact match for hyperobject types.  C allows assigning to a
+// generic hyperobject.
 void identity(void* reducer, long * value);
 void reduce(void* reducer, long* left, long* right);
 extern void consume_view(long *);
-extern void consume_hyper(_Hyperobject long *);
+extern void consume_hyper(long _Hyperobject *);
 // CHECK_LABEL: assorted_addresses
 void assorted_addresses()
 {
   // CHECK: call void @llvm.reducer.register
-  _Hyperobject long __attribute__((reducer(reduce, identity))) sum = 0;
+  long _Hyperobject(reduce, identity) sum = 0;
   // CHECK-NOT: llvm.hyper.lookup
   // CHECK: call void @[[FN1:.*consume_hyper]]
   consume_hyper(__builtin_addressof(sum));

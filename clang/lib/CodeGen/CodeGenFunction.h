@@ -3591,7 +3591,14 @@ public:
   void emitAutoVarTypeCleanup(const AutoVarEmission &emission,
                               QualType::DestructionKind dtorKind);
 
-  void EmitReducerInit(const VarDecl *D, ReducerCallbacksAttr *R,
+  struct ReducerCallbacks {
+    Expr *Reduce;
+    Expr *Identity;
+    Expr *Destroy;
+  };
+
+  bool getReducer(const VarDecl *D, ReducerCallbacks &CB);
+  void EmitReducerInit(const VarDecl *D, const ReducerCallbacks &CB,
                        llvm::Value *Addr);
 
   /// Emits the alloca and debug information for the size expressions for each

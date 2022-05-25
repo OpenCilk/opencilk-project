@@ -2,7 +2,7 @@
 // expected-no-diagnostics
 
 template<typename T> struct S { T member; };
-_Hyperobject S<long> S_long;
+S<long> _Hyperobject S_long;
 
 // CHECK-LABEL: @_Z1fv
 // CHECK: %0 = call i8* @llvm.hyper.lookup(i8* bitcast (%struct.S* @S_long to i8*))
@@ -15,4 +15,4 @@ long f() { return S_long.member; }
 // CHECK: call i8* @llvm.hyper.lookup
 // CHECK: getelementptr
 // CHECK: load i16
-long g(_Hyperobject S<short> *p) { return p->member; }
+long g(S<short> _Hyperobject *p) { return p->member; }

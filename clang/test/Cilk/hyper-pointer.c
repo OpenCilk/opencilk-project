@@ -5,7 +5,7 @@ extern double array[];
 extern const int size;
 
 // CHECK-LABEL: g
-void g(_Hyperobject double *sum) { // hyperobject-aware function
+void g(double _Hyperobject *sum) { // hyperobject-aware function
     // CHECK-LABEL: pfor.body
     _Cilk_for (int i = 0; i < size; ++i)
         // CHECK: call i8* @llvm.hyper.lookup

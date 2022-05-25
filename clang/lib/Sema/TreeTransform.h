@@ -1205,7 +1205,8 @@ public:
   QualType RebuildDependentExtIntType(bool IsUnsigned, Expr *NumBitsExpr,
                                       SourceLocation Loc);
 
-  QualType RebuildHyperobjectType(QualType ElementType, SourceLocation Loc);
+  QualType RebuildHyperobjectType(QualType ElementType, Expr *R,
+                                  Expr *I, Expr *D, SourceLocation Loc);
 
   /// Build a new template name given a nested name specifier, a flag
   /// indicating whether the "template" keyword was provided, and the template
@@ -4862,14 +4863,30 @@ QualType TreeTransform<Derived>::TransformComplexType(TypeLocBuilder &TLB,
 template<typename Derived>
 QualType TreeTransform<Derived>::TransformHyperobjectType
   (TypeLocBuilder &TLB, HyperobjectTypeLoc TL) {
-  const HyperobjectType *H = TL.getTypePtr();
-  QualType ElementType = getDerived().TransformType(H->getElementType());
+  ExprResult NewR, NewI, NewD;
+
+  {
+    const HyperobjectType *H = TL.getTypePtr();
+    EnterExpressionEvaluationContext Context(
+        SemaRef, Sema::ExpressionEvaluationContext::PotentiallyEvaluated);
+    NewR = getDerived().TransformExpr(H->getReduce());
+    NewI = getDerived().TransformExpr(H->getIdentity());
+    NewD = getDerived().TransformExpr(H->getDestroy());
+  }
+  if (NewR.isInvalid() || NewI.isInvalid() || NewD.isInvalid())
+    return QualType();
+
+  QualType ElementType = getDerived().TransformType(TLB, TL.getPointeeLoc());
   if (ElementType.isNull())
     return QualType();
-  QualType Result = getDerived().RebuildHyperobjectType(ElementType,
-                                                        TL.getNameLoc());
+
+  QualType Result =
+    getDerived().RebuildHyperobjectType(ElementType, NewR.get(),
+                                        NewI.get(), NewD.get(),
+                                        TL.getHyperLoc());
+
   HyperobjectTypeLoc NewT = TLB.push<HyperobjectTypeLoc>(Result);
-  NewT.setNameLoc(TL.getNameLoc());
+  NewT.setHyperLoc(TL.getHyperLoc());
   return Result;
 }
 
@@ -14247,8 +14264,10 @@ QualType TreeTransform<Derived>::RebuildDependentExtIntType(
 
 template<typename Derived>
 QualType TreeTransform<Derived>::RebuildHyperobjectType(QualType ElementType,
+                                                        Expr *R, Expr *I,
+                                                        Expr *D,
                                                         SourceLocation Loc) {
-  return SemaRef.BuildHyperobjectType(ElementType, Loc);
+  return SemaRef.BuildHyperobjectType(ElementType, R, I, D, Loc);
 }
 
 template<typename Derived>

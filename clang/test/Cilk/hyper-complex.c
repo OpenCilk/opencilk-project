@@ -2,7 +2,7 @@
 // RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
 
-extern _Hyperobject __complex__ float c;
+extern __complex__ float _Hyperobject c;
 
 // CHECK-LABEL: get_real 
 float get_real()

@@ -3,7 +3,7 @@
 
 struct S { S() noexcept; int val; ~S() noexcept; };
 typedef S S10[10];
-_Hyperobject S10 s;
+S10 _Hyperobject s;
 
 // CHECK-NOT: call void @llvm.reducer.register
 // CHECK-NOT: call void @llvm.reducer.unregister

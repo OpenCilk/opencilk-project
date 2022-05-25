@@ -4,7 +4,7 @@
 extern void identity_long(void *, long *);
 extern void reduce_long(void *, long *, long *);
 
-typedef _Hyperobject long __attribute__((reducer(reduce_long, identity_long), aligned(16))) rlong;
+typedef long _Hyperobject(reduce_long, identity_long) rlong __attribute__((aligned(16)));
 
 // CHECK_LABEL: local_array_of_hyper
 long local_array_of_hyper(unsigned int x)
@@ -32,7 +32,7 @@ long local_hyper_of_array(unsigned int x)
   // A hyperobject without reducer attribute should not be registered.
   // CHECK-NOT: call void @llvm.reducer.register
   typedef long Array[10];
-  _Hyperobject Array array;
+  Array _Hyperobject array;
   // CHECK: call i8* @llvm.hyper.lookup
   // CHECK: %[[VIEW:.+]] = bitcast
   // CHECK: %[[ELEMENT:.+]] = getelementptr inbounds [[JUNK:.+]] %[[VIEW]]

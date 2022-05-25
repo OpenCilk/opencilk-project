@@ -6357,24 +6357,35 @@ class HyperobjectType final : public Type, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   QualType ElementType;
+  Expr *Reduce, *Identity, *Destroy;
+  const IdentifierInfo *ReduceID, *IdentityID, *DestroyID;
+  bool Bare;
 
-  HyperobjectType(QualType Element, QualType CanonicalPtr)
-    : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
-      ElementType(Element) {}
+  HyperobjectType(QualType Element, QualType CanonicalPtr,
+                  Expr *r, const IdentifierInfo *ri,
+                  Expr *i, const IdentifierInfo *ii,
+                  Expr *d, const IdentifierInfo *di);
 
 public:
   QualType getElementType() const { return ElementType; }
 
+  static bool isNullish(Expr *);
+
+  Expr *getReduce() const { return Reduce; }
+  Expr *getIdentity() const { return Identity; }
+  Expr *getDestroy() const { return Destroy; }
+
+  bool hasCallbacks() const { return !Bare; }
+
   bool isSugared() const { return false; }
   QualType desugar() const { return QualType(this, 0); }
 
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getElementType());
-  }
+  void Profile(llvm::FoldingSetNodeID &ID) const;
 
-  static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee) {
-    ID.AddPointer(Pointee.getAsOpaquePtr());
-  }
+  static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
+                      const IdentifierInfo *R,
+                      const IdentifierInfo *I,
+                      const IdentifierInfo *D);
 
   static bool classof(const Type *T) {
     return T->getTypeClass() == Hyperobject;

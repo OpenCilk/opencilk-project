@@ -8,7 +8,7 @@ void reduce_long(void *z, S *l, S *r);
 
 // CHECK-LABEL: __cxx_global_var_init
 // CHECK: call void @llvm.reducer.register.i64
-_Hyperobject S global __attribute__((reducer(reduce_long, identity_long, 0)));
+S _Hyperobject(reduce_long, identity_long, 0) global;
 
 // CHECK: call void @llvm.reducer.unregister
 // CHECK: call void @_ZN1SD1Ev

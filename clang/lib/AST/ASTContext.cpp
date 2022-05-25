@@ -3150,29 +3150,55 @@ QualType ASTContext::getComplexType(QualType T) const {
   return QualType(New, 0);
 }
 
-/// This is a cut and paste job from getComplexType
-QualType ASTContext::getHyperobjectType(QualType T) const {
+static const IdentifierInfo *getFunction(Expr *E) {
+  if (!E)
+    return nullptr;
+  const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(E);
+  if (!DR)
+    return nullptr;
+  const FunctionDecl *F = dyn_cast<FunctionDecl>(DR->getDecl());
+  if (!F)
+    return nullptr;
+  return F->getIdentifier();
+}
+
+QualType ASTContext::getHyperobjectType(QualType T, Expr *R, Expr *I, Expr *D) const {
+  assert(R && I && D);
+  bool RN = HyperobjectType::isNullish(R);
+  bool IN = HyperobjectType::isNullish(I);
+  bool DN = HyperobjectType::isNullish(D);
+
+  const IdentifierInfo *RI = getFunction(R);
+  const IdentifierInfo *II = getFunction(I);
+  const IdentifierInfo *DI = getFunction(D);
+  bool Varies = (!RN && !RI) || (!IN && !II) || (!DN && !DI);
+
+  QualType Canonical;
+  if (!T.isCanonical())
+    Canonical = getHyperobjectType(getCanonicalType(T), R, I, D);
+
+  // Do not unique hyperobject types with variable expressions.
+  if (Varies) {
+    auto *New =
+      new (*this, TypeAlignment)
+      HyperobjectType(T, Canonical, R, RI, I, II, D, DI);
+    Types.push_back(New);
+    return QualType(New, 0);
+  }
+
   // Unique pointers, to guarantee there is only one pointer of a particular
   // structure.
+  // TODO: 0 and nullptr are not properly treated as equivalent here.
   llvm::FoldingSetNodeID ID;
-  HyperobjectType::Profile(ID, T);
+  HyperobjectType::Profile(ID, T, RI, II, DI);
 
   void *InsertPos = nullptr;
   if (HyperobjectType *HT = HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
     return QualType(HT, 0);
 
-  // If the pointee type isn't canonical, this won't be a canonical type either,
-  // so fill in the canonical type field.
-  QualType Canonical;
-  if (!T.isCanonical()) {
-    Canonical = getHyperobjectType(getCanonicalType(T));
-
-    // Get the new insert position for the node we care about.
-    HyperobjectType *NewIP =
-      HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos);
-    assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
-  }
-  auto *New = new (*this, TypeAlignment) HyperobjectType(T, Canonical);
+  auto *New =
+    new (*this, TypeAlignment)
+    HyperobjectType(T, Canonical, R, RI, I, II, D, DI);
   Types.push_back(New);
   HyperobjectTypes.InsertNode(New, InsertPos);
   return QualType(New, 0);
@@ -8537,6 +8563,21 @@ Qualifiers::GC ASTContext::getObjCGCAttrKind(QualType Ty) const {
 //                        Type Compatibility Testing
 //===----------------------------------------------------------------------===//
 
+static QualType mergeHyperobjectTypes(QualType LQ, QualType RQ) {
+  const HyperobjectType *LH = LQ->castAs<HyperobjectType>();
+  const HyperobjectType *RH = RQ->castAs<HyperobjectType>();
+  if (LH->getElementType() != RH->getElementType())
+    return {};
+  bool LeftCallbacks = LH->hasCallbacks(), RightCallbacks = RH->hasCallbacks();
+  if (LeftCallbacks && RightCallbacks)
+    return {};
+  if (LeftCallbacks && !RightCallbacks)
+    return LQ;
+  if (RightCallbacks)
+    return RQ;
+  llvm_unreachable("hyperobjects not uniqued");
+}
+
 /// areCompatVectorTypes - Return true if the two specified vector types are
 /// compatible.
 static bool areCompatVectorTypes(const VectorType *LHS,
@@ -9832,7 +9873,7 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS,
     // Distinct complex types are incompatible.
     return {};
   case Type::Hyperobject:
-    return {};
+    return mergeHyperobjectTypes(LHSCan, RHSCan);
   case Type::Vector:
     // FIXME: The merged type should be an ExtVector!
     if (areCompatVectorTypes(LHSCan->castAs<VectorType>(),
