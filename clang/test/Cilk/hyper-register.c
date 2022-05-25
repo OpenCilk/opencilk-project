@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 %s -x c -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
-// RUN: %clang_cc1 %s -x c++ -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c -fopencilk -verify -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -x c++ -fopencilk -verify -ftapir=none -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 #ifdef __cplusplus
 extern "C"

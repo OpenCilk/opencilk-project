@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %s -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 %s -fopencilk -verify -ftapir=none -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 
 template<typename T> struct S { T member; };
