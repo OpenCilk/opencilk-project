@@ -10118,7 +10118,8 @@ def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
 
 def reducer_callbacks_not_allowed: Warning<
-   "reducer callbacks not implemented for structure members">;
+   "reducer callbacks not implemented for structure members">,
+    InGroup<CilkIgnored>;
 
 def err_invalid_reducer_callback : Error<
   "reducer callback must be function with %0 pointer parameter%s0"
@@ -10135,7 +10136,8 @@ def err_hyperobject_struct_assign : Error<
     "unimplemented assignment to structure with hyperobject member">;
 
 def no_reducer_array : Warning<
-    "array of reducer not implemented">;
+    "array of reducer not implemented">,
+    InGroup<CilkIgnored>;
 
 } // end of Cilk category
 
