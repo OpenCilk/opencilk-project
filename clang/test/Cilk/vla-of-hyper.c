@@ -1,12 +1,14 @@
-// RUN: %clang_cc1 -x c %s -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
-// RUN: %clang_cc1 -x c++ %s -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
-// expected-no-diagnostics
+// RUN: %clang_cc1 -x c %s -fopencilk -verify -ftapir=none -S -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 -x c++ %s -fopencilk -verify -ftapir=none -S -emit-llvm -o - | FileCheck %s
+
+extern void reduce(void *, void *, void *), identity(void *, void *);
 
 // VLA of hyperobject
 // CHECK-LABEL: test_vla_hyper
 int test_vla_hyper(unsigned long size)
 {
-  int _Hyperobject array[size];
+  int _Hyperobject(reduce, identity) array[size];
+  // expected-warning@-1{{array of reducer not implemented}}
 
   // CHECK: getelementptr
   // CHECK: %[[RAW:.+]] = call i8* @llvm.hyper.lookup
