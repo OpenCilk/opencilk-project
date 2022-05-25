@@ -13311,7 +13311,7 @@ void Sema::FinalizeDeclaration(Decl *ThisDecl) {
 
   // This is only a shallow search.  See also SemaType.cpp ContainsHyperobject.
   if (VD->getType()->isArrayType()) {
-    const ArrayType *A = cast<ArrayType>(VD->getType().getTypePtr());
+    const ArrayType *A = VD->getType()->getAsArrayTypeUnsafe();
     const HyperobjectType *H = A->getElementType()->getAs<HyperobjectType>();
     if (H && H->hasCallbacks())
       Diag(VD->getLocation(), diag::no_reducer_array);
