@@ -2653,7 +2653,7 @@ bool llvm::removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU,
 // Recursively check the task starting at TaskEntry to find detached-rethrows
 // for tasks that cannot throw.
 static bool recursivelyCheckDetachedRethrows(
-    BasicBlock *TaskEntry, SmallPtrSetImpl<BasicBlock *> &DeadDU) {
+    BasicBlock *TaskEntry, SmallPtrSetImpl<Instruction *> &DeadDU) {
   SmallVector<BasicBlock*, 128> Worklist;
   SmallPtrSet<BasicBlock*, 32> Visited;
   BasicBlock *BB = TaskEntry;
@@ -2675,7 +2675,7 @@ static bool recursivelyCheckDetachedRethrows(
       if (DI->hasUnwindDest()) {
         // Recursively check all blocks in the detached task.
         if (!recursivelyCheckDetachedRethrows(DI->getDetached(), DeadDU))
-          DeadDU.insert(DI->getUnwindDest());
+          DeadDU.insert(DI);
         else if (Visited.insert(DI->getUnwindDest()).second)
           // If the detach-unwind isn't dead, add it to the worklist.
           Worklist.push_back(DI->getUnwindDest());
@@ -2698,18 +2698,17 @@ static bool recursivelyCheckDetachedRethrows(
 
 bool llvm::removeDeadDetachUnwinds(Function &F, DomTreeUpdater *DTU,
                                    MemorySSAUpdater *MSSAU) {
-  SmallPtrSet<BasicBlock *, 16> DeadDU;
+  SmallPtrSet<Instruction *, 16> DeadDU;
   // Recusirvely check all tasks for dead detach-unwinds.
   recursivelyCheckDetachedRethrows(&F.front(), DeadDU);
   bool Changed = false;
   // Scan the detach instructions and remove any dead detach-unwind edges.
   for (BasicBlock &BB : F)
     if (DetachInst *DI = dyn_cast<DetachInst>(BB.getTerminator()))
-      if (DI->hasUnwindDest())
-        if (DeadDU.count(DI->getUnwindDest())) {
-          removeUnwindEdge(&BB, DTU);
-          Changed = true;
-        }
+      if (DeadDU.count(DI)) {
+        removeUnwindEdge(&BB, DTU);
+        Changed = true;
+      }
   // If any dead detach-unwinds were removed, remove unreachable blocks.
   if (Changed)
     removeUnreachableBlocks(F, DTU, MSSAU);
