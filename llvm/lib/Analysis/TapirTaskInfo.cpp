@@ -698,10 +698,11 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
   SmallVector<BasicBlock *, 32> IDFBlocks;
   IDFs.calculate(IDFBlocks);
 
-  llvm::sort(IDFBlocks.begin(), IDFBlocks.end(),
-             [&BBNumbers](const BasicBlock *A, const BasicBlock *B) {
-               return BBNumbers.find(A)->second < BBNumbers.find(B)->second;
-             });
+  if (IDFBlocks.size() > 1)
+    llvm::sort(IDFBlocks,
+               [&BBNumbers](const BasicBlock *A, const BasicBlock *B) {
+                 return BBNumbers.find(A)->second < BBNumbers.find(B)->second;
+               });
 
   LLVM_DEBUG({
       dbgs() << "IDFBlocks:\n";

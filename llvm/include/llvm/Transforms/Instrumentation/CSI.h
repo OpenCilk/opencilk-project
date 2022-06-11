@@ -1065,7 +1065,8 @@ public:
   bool run();
 
   /// Get the number of bytes accessed via the given address.
-  static int getNumBytesAccessed(Value *Addr, const DataLayout &DL);
+  static int getNumBytesAccessed(Value *Addr, Type *OrigTy,
+                                 const DataLayout &DL);
 
   /// Members to extract properties of loads/stores.
   static bool isVtableAccess(Instruction *I);

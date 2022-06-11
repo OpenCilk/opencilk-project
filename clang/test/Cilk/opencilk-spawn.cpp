@@ -6,10 +6,10 @@ int return_spawn_test(int i){
   return _Cilk_spawn return_stuff(i); // expected-warning{{no parallelism from a '_Cilk_spawn' in a return statement}}
 }
 
-// CHECK-LABEL: define {{(dso_local )?}}i32 @_Z17return_spawn_testi(i32 %i)
+// CHECK-LABEL: define {{(dso_local )?}}{{.*}}i32 @_Z17return_spawn_testi(i32 noundef %i)
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]
-// CHECK: %[[CALL:.+]] = call i32 @_Z12return_stuffi(i32
+// CHECK: %[[CALL:.+]] = call noundef i32 @_Z12return_stuffi(i32
 // CHECK-NEXT: store i32 %[[CALL]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 // CHECK: [[CONTINUE]]
@@ -53,19 +53,19 @@ void spawn_infinite_loop() {
 // CHECK: br label %[[LABEL1:.+]]
 // CHECK: [[LABEL1]]
 // CHECK: call void @_ZN3BarC1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[REFTMP]])
-// CHECK: %[[CALL:.+]] = invoke i32 @_ZNK3Bar11getValSpawnEi(%class.Bar* {{.*}}dereferenceable(16) %[[REFTMP]], i32 0)
+// CHECK: %[[CALL:.+]] = invoke {{.*}}i32 @_ZNK3Bar11getValSpawnEi(%class.Bar* {{.*}}dereferenceable(16) %[[REFTMP]], i32 noundef 0)
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[REFTMP]])
 // CHECK: call void @_ZN3BarC1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[REFTMP2]])
-// CHECK: %[[CALL:.+]] = invoke i32 @_Z3fooRK3Bar(%class.Bar* {{.+}}%[[REFTMP2]])
+// CHECK: %[[CALL:.+]] = invoke {{.*}}i32 @_Z3fooRK3Bar(%class.Bar* {{.+}}%[[REFTMP2]])
 // CHECK: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[REFTMP2]])
 // CHECK-NEXT: br label %[[LABEL1]]
 // CHECK: [[CONTINUE]]
 // CHECK: ret void
 
-// CHECK-LABEL: define linkonce_odr {{(dso_local )?}}i32 @_ZNK3Bar11getValSpawnEi(%class.Bar
+// CHECK-LABEL: define linkonce_odr {{(dso_local )?}}{{.*}}i32 @_ZNK3Bar11getValSpawnEi(%class.Bar
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 // CHECK: [[DETACHED]]
-// CHECK: %[[CALL:.+]] = call i32 @_Z12return_stuffi(i32
+// CHECK: %[[CALL:.+]] = call noundef i32 @_Z12return_stuffi(i32
 // CHECK-NEXT: store i32 %[[CALL]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 // CHECK: [[CONTINUE]]

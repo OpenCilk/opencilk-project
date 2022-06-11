@@ -199,7 +199,7 @@ if.end:                                           ; preds = %if.end.preheader, %
   %arrayidx6 = getelementptr inbounds [16 x [16 x double]], [16 x [16 x double]]* %M.tr130, i64 %idxprom5
   %arrayidx22 = getelementptr inbounds [16 x [16 x double]], [16 x [16 x double]]* %V.tr132, i64 %idxprom5
   %arrayidx38 = getelementptr inbounds [16 x [16 x double]], [16 x [16 x double]]* %W.tr134, i64 %idxprom5
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %6, i16* nonnull %7) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %6, i16* nonnull elementtype(i16) %7) #3
   %45 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %45, i8** %9, align 8
   %46 = call i8* @llvm.stacksave()
@@ -213,7 +213,7 @@ if.end.split:                                     ; preds = %if.end
   br label %det.cont
 
 det.cont:                                         ; preds = %if.end, %if.end.split
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %6, i16* nonnull %7) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %6, i16* nonnull elementtype(i16) %7) #3
   store volatile i8* %45, i8** %9, align 8
   %49 = call i8* @llvm.stacksave()
   store volatile i8* %49, i8** %10, align 8
@@ -226,7 +226,7 @@ det.cont.split:                                   ; preds = %det.cont
   br label %det.cont48
 
 det.cont48:                                       ; preds = %det.cont, %det.cont.split
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %6, i16* nonnull %7) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %6, i16* nonnull elementtype(i16) %7) #3
   store volatile i8* %45, i8** %9, align 8
   %52 = call i8* @llvm.stacksave()
   store volatile i8* %52, i8** %10, align 8
@@ -246,7 +246,7 @@ det.cont50:                                       ; preds = %det.cont48, %det.co
   br i1 %57, label %sync.continue, label %cilk.sync.savestate.i
 
 cilk.sync.savestate.i:                            ; preds = %det.cont50
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %6, i16* nonnull %7) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %6, i16* nonnull elementtype(i16) %7) #3
   store volatile i8* %45, i8** %9, align 8
   %58 = call i8* @llvm.stacksave()
   store volatile i8* %58, i8** %10, align 8
@@ -259,7 +259,7 @@ cilk.sync.runtimecall.i:                          ; preds = %cilk.sync.savestate
   br label %sync.continue
 
 sync.continue:                                    ; preds = %cilk.sync.runtimecall.i, %cilk.sync.savestate.i, %det.cont50
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %6, i16* nonnull %7) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %6, i16* nonnull elementtype(i16) %7) #3
   store volatile i8* %45, i8** %9, align 8
   %61 = call i8* @llvm.stacksave()
   store volatile i8* %61, i8** %10, align 8
@@ -272,7 +272,7 @@ sync.continue.split:                              ; preds = %sync.continue
   br label %det.cont52
 
 det.cont52:                                       ; preds = %sync.continue, %sync.continue.split
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %6, i16* nonnull %7) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %6, i16* nonnull elementtype(i16) %7) #3
   store volatile i8* %45, i8** %9, align 8
   %64 = call i8* @llvm.stacksave()
   store volatile i8* %64, i8** %10, align 8
@@ -285,7 +285,7 @@ det.cont52.split:                                 ; preds = %det.cont52
   br label %det.cont54
 
 det.cont54:                                       ; preds = %det.cont52, %det.cont52.split
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %6, i16* nonnull %7) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %6, i16* nonnull elementtype(i16) %7) #3
   store volatile i8* %45, i8** %9, align 8
   %67 = call i8* @llvm.stacksave()
   store volatile i8* %67, i8** %10, align 8
@@ -311,7 +311,7 @@ cleanup:                                          ; preds = %for.inc12.i
 cilk.sync.savestate.i1:                           ; preds = %cleanup
   %75 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 4
   %76 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %75, i16* nonnull %76) #3
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %75, i16* nonnull elementtype(i16) %76) #3
   %77 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 3
   %78 = call i8* @llvm.frameaddress(i32 0)
   %79 = getelementptr inbounds [5 x i8*], [5 x i8*]* %77, i64 0, i64 0

@@ -14,6 +14,7 @@
 #define LLVM_CLANG_DRIVER_TAPIR_H
 
 #include "clang/Basic/Tapir.h"
+#include "llvm/ADT/Optional.h"
 
 namespace llvm {
 namespace opt {
