@@ -865,10 +865,9 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   Type *IDType = IRB.getInt64Ty();
 
   AttributeList GeneralFnAttrs;
-  GeneralFnAttrs = GeneralFnAttrs.addAttribute(
-      C, AttributeList::FunctionIndex, Attribute::InaccessibleMemOrArgMemOnly);
-  GeneralFnAttrs = GeneralFnAttrs.addAttribute(C, AttributeList::FunctionIndex,
-                                               Attribute::NoUnwind);
+  GeneralFnAttrs =
+      GeneralFnAttrs.addFnAttribute(C, Attribute::InaccessibleMemOrArgMemOnly);
+  GeneralFnAttrs = GeneralFnAttrs.addFnAttribute(C, Attribute::NoUnwind);
   {
     AttributeList FnAttrs = GeneralFnAttrs;
     FnAttrs = FnAttrs.addParamAttribute(C, 1, Attribute::NoCapture);
@@ -3452,6 +3451,8 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
   Value *Addr = IsWrite
       ? cast<StoreInst>(I)->getPointerOperand()
       : cast<LoadInst>(I)->getPointerOperand();
+  Type *Ty =
+      IsWrite ? cast<StoreInst>(I)->getValueOperand()->getType() : I->getType();
 
   // swifterror memory addresses are mem2reg promoted by instruction selection.
   // As such they cannot have regular uses like an instrumentation function and
@@ -3459,7 +3460,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
   if (Addr->isSwiftError())
     return false;
 
-  int NumBytesAccessed = getNumBytesAccessed(Addr, DL);
+  int NumBytesAccessed = getNumBytesAccessed(Addr, Ty, DL);
   if (-1 == NumBytesAccessed) {
     // Ignore accesses with bad sizes.
     NumAccessesWithBadSize++;
@@ -3511,15 +3512,18 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
 bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
   CsiLoadStoreProperty Prop;
   Value *Addr;
+  Type *Ty;
   if (AtomicRMWInst *RMWI = dyn_cast<AtomicRMWInst>(I)) {
     Addr = RMWI->getPointerOperand();
+    Ty = RMWI->getValOperand()->getType();
   } else if (AtomicCmpXchgInst *CASI = dyn_cast<AtomicCmpXchgInst>(I)) {
     Addr = CASI->getPointerOperand();
+    Ty = CASI->getNewValOperand()->getType();
   } else {
     return false;
   }
 
-  int NumBytesAccessed = getNumBytesAccessed(Addr, DL);
+  int NumBytesAccessed = getNumBytesAccessed(Addr, Ty, DL);
   if (-1 == NumBytesAccessed) {
     // Ignore accesses with bad sizes.
     NumAccessesWithBadSize++;
@@ -3600,10 +3604,8 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
 
   Type *IDType = IRB.getInt64Ty();
   AttributeList FnAttrs;
-  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::InaccessibleMemOrArgMemOnly);
-  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::NoUnwind);
+  FnAttrs = FnAttrs.addFnAttribute(Ctx, Attribute::InaccessibleMemOrArgMemOnly);
+  FnAttrs = FnAttrs.addFnAttribute(Ctx, Attribute::NoUnwind);
 
   // If the intrinsic does not return, insert the hook before the intrinsic.
   if (CB->doesNotReturn()) {
@@ -3769,10 +3771,8 @@ bool CilkSanitizerImpl::instrumentLibCall(Instruction *I,
 
   Type *IDType = IRB.getInt64Ty();
   AttributeList FnAttrs;
-  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::InaccessibleMemOrArgMemOnly);
-  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::NoUnwind);
+  FnAttrs = FnAttrs.addFnAttribute(Ctx, Attribute::InaccessibleMemOrArgMemOnly);
+  FnAttrs = FnAttrs.addFnAttribute(Ctx, Attribute::NoUnwind);
 
   // If the intrinsic does not return, insert the hook before the intrinsic.
   if (CB->doesNotReturn()) {
@@ -4571,10 +4571,8 @@ bool CilkSanitizerImpl::instrumentAllocFnLibCall(Instruction *I,
 
   Type *IDType = IRB.getInt64Ty();
   AttributeList FnAttrs;
-  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::InaccessibleMemOrArgMemOnly);
-  FnAttrs = FnAttrs.addAttribute(Ctx, AttributeList::FunctionIndex,
-                                 Attribute::NoUnwind);
+  FnAttrs = FnAttrs.addFnAttribute(Ctx, Attribute::InaccessibleMemOrArgMemOnly);
+  FnAttrs = FnAttrs.addFnAttribute(Ctx, Attribute::NoUnwind);
 
   // Synthesize the after hook for this function.
   SmallVector<Type *, 8> AfterHookParamTys({IDType, /*callee func_id*/ IDType,

@@ -772,7 +772,7 @@ private:
   Constant *AsanShadowGlobal;
 
   // Analyses
-  TaskInfo &TI;
+  TaskInfo *TI;
 
   // These arrays is indexed by AccessIsWrite, Experiment and log2(AccessSize).
   FunctionCallee AsanErrorCallback[2][2][kNumberOfAccessSizes];
@@ -1186,8 +1186,9 @@ PreservedAnalyses AddressSanitizerPass::run(Module &M,
   const StackSafetyGlobalInfo *const SSGI =
       ClUseStackSafety ? &MAM.getResult<StackSafetyGlobalAnalysis>(M) : nullptr;
   for (Function &F : M) {
+    TaskInfo *TI = !F.empty() ? &FAM.getResult<TaskAnalysis>(F) : nullptr;
     AddressSanitizer FunctionSanitizer(
-        M, SSGI, Options.InstrumentationWithCallsThreshold,
+        M, SSGI, TI, Options.InstrumentationWithCallsThreshold,
         Options.MaxInlinePoisoningSize, Options.CompileKernel, Options.Recover,
         Options.UseAfterScope, Options.UseAfterReturn);
     const TargetLibraryInfo &TLI = FAM.getResult<TargetLibraryAnalysis>(F);
@@ -1286,7 +1287,7 @@ bool AddressSanitizer::isInterestingAlloca(const AllocaInst &AI) {
        // Promotable allocas are common under -O0.
        (!ClSkipPromotableAllocas || !isAllocaPromotable(&AI)) &&
        (!ClSkipPromotableAllocas ||
-        (TI.isSerial() || !TI.isAllocaParallelPromotable(&AI))) &&
+        (TI->isSerial() || !TI->isAllocaParallelPromotable(&AI))) &&
        // inalloca allocas are not treated as static, and we don't want
        // dynamic alloca instrumentation for them as well.
        !AI.isUsedWithInAlloca() &&

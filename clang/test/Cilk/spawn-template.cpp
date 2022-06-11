@@ -27,31 +27,31 @@ long foo() {
   return fib(38) + fib_exc(38);
 }
 
-// CHECK-LABEL: define {{.+}}i32 @_Z3fibIiET_S0_(i32 %n)
+// CHECK-LABEL: define {{.+}}i32 @_Z3fibIiET_S0_(i32 noundef %n)
 
 // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETBLK:.+]], label %[[CONTBLK:.+]]
 
 // CHECK: [[DETBLK]]:
 // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME]])
-// CHECK-NEXT: %[[RETVAL:.+]] = call i32 @_Z3fibIiET_S0_
+// CHECK-NEXT: %[[RETVAL:.+]] = call noundef i32 @_Z3fibIiET_S0_
 // CHECK-NEXT: store i32 %[[RETVAL]], i32*
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTBLK]]
 
 // CHECK: [[CONTBLK]]:
-// CHECK: %[[RETVAL2:.+]] = call i32 @_Z3fibIiET_S0_
+// CHECK: %[[RETVAL2:.+]] = call noundef i32 @_Z3fibIiET_S0_
 // CHECK-NEXT: store i32 %[[RETVAL2]]
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
 
-// CHECK-LABEL: define {{.+}}i32 @_Z7fib_excIiET_S0_(i32 %n)
+// CHECK-LABEL: define {{.+}}i32 @_Z7fib_excIiET_S0_(i32 noundef %n)
 
 // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
 // CHECK: detach within %[[SYNCREG:.+]], label %[[DETBLK:.+]], label %[[CONTBLK:.+]] unwind label %[[TFLPAD:.+]]
 
 // CHECK: [[DETBLK]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME]])
-// CHECK: %[[RETVAL:.+]] = invoke i32 @_Z7fib_excIiET_S0_
+// CHECK: %[[RETVAL:.+]] = invoke noundef i32 @_Z7fib_excIiET_S0_
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[DETLPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
@@ -59,7 +59,7 @@ long foo() {
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTBLK]]
 
 // CHECK: [[CONTBLK]]:
-// CHECK: %[[RETVAL2:.+]] = invoke i32 @_Z7fib_excIiET_S0_
+// CHECK: %[[RETVAL2:.+]] = invoke noundef i32 @_Z7fib_excIiET_S0_
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[OUTERLPAD:.+]]
 
 // CHECK: [[INVOKECONT2]]:

@@ -432,7 +432,7 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
   CallInst *cal = dyn_cast<CallInst>(CallSite);
   assert(cal && "Call instruction for task not found.");
   std::vector<Value*> LoadedCapturedArgs;
-  for(auto& a:cal->arg_operands()) {
+  for(auto& a:cal->args()) {
     LoadedCapturedArgs.push_back(a);
   }
 
@@ -662,7 +662,7 @@ void OpenMPABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
 
     // Allow speculative loading from shared data.
     if (Arg.getType()->isPointerTy()) {
-      AttrBuilder B;
+      AttrBuilder B(Context);
       B.addDereferenceableAttr(
           DL.getTypeAllocSize(Arg.getType()->getPointerElementType()));
       //FnArgAttrs.push_back(AttributeSet::get(Context, ++ArgOffset, B));
