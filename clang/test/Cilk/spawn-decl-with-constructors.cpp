@@ -250,18 +250,18 @@ _seq<point2d> hullP(point2d* P, intT n, point2d *Ptmp) {
 
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]]
 // CHECK: [[DETACHED4]]:
-// CHECK: %[[RET4:.+]] = call i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
+// CHECK: %[[RET4:.+]] = call {{.*}}i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
 // CHECK-NEXT: store i64 %[[RET4]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE4]]
 
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED5:.+]], label %[[CONTINUE5:.+]]
 // CHECK: [[DETACHED5]]:
-// CHECK: %[[RET5:.+]] = call i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
+// CHECK: %[[RET5:.+]] = call {{.*}}i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
 // CHECK-NEXT: store i64 %[[RET5]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE5]]
 
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED6:.+]], label %[[CONTINUE6:.+]]
 // CHECK: [[DETACHED6]]:
-// CHECK: %[[RET6:.+]] = call i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
+// CHECK: %[[RET6:.+]] = call {{.*}}i64 @_Z18wrapped_filter_newI8_point2dIdEl10aboveLinePET0_PT_S5_S3_T1_(
 // CHECK-NEXT: store i64 %[[RET6]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE6]]

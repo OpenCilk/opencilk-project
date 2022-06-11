@@ -20,5 +20,5 @@ int main() {
 // CHECK: detach within %{{.+}}, label %[[PFOR_BODY:.+]], label %[[PFOR_INC:.+]]
 
 // CHECK: [[PFOR_BODY]]:
-// CHECK: atomicrmw add i64* getelementptr inbounds ([2 x i64], [2 x i64]* @__profc_main, i64 0, i64 1), i64 1 monotonic
+// CHECK: atomicrmw add i64* getelementptr inbounds ([2 x i64], [2 x i64]* @__profc_main, i32 0, i32 1), i64 1 monotonic
 // CHECK: reattach within %{{.+}}, label %[[PFOR_INC]]

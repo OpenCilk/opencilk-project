@@ -92,10 +92,8 @@
 ; CHECK-O: Running analysis: BasicAA on main
 ; CHECK-O: Running analysis: InnerAnalysisManagerProxy
 ; CHECK-O: Running pass: LoopSimplifyCFGPass on Loop at depth 1 containing: %b
-; CHECK-O: Running pass: IndVarSimplifyPass on Loop at depth 1 containing: %b
 ; CHECK-O: Running pass: LICMPass on Loop at depth 1 containing: %b
 ; CHECK-O: Running pass: EarlyCSEPass on main
-; CHECK-O: Running analysis: MemorySSAAnalysis on main
 ; CHECK-O: Running pass: JumpThreadingPass on main
 ; CHECK-O: Running analysis: LazyValueAnalysis on main
 ; CHECK-O: Running pass: CorrelatedValuePropagationPass on main

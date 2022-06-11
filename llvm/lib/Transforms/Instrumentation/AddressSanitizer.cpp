@@ -656,7 +656,7 @@ char ASanGlobalsMetadataWrapperPass::ID = 0;
 /// AddressSanitizer: instrument the code in module to find memory bugs.
 struct AddressSanitizer {
   AddressSanitizer(Module &M, const GlobalsMetadata *GlobalsMD,
-                   const StackSafetyGlobalInfo *SSGI, TaskInfo &TI,
+                   const StackSafetyGlobalInfo *SSGI, TaskInfo *TI,
                    bool CompileKernel = false, bool Recover = false,
                    bool UseAfterScope = false,
                    AsanDetectStackUseAfterReturnMode UseAfterReturn =
@@ -771,7 +771,7 @@ private:
   Constant *AsanShadowGlobal;
 
   // Analyses
-  TaskInfo &TI;
+  TaskInfo *TI;
 
   // These arrays is indexed by AccessIsWrite, Experiment and log2(AccessSize).
   FunctionCallee AsanErrorCallback[2][2][kNumberOfAccessSizes];
@@ -827,7 +827,7 @@ public:
     TaskInfo &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
     const TargetLibraryInfo *TLI =
         &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
-    AddressSanitizer ASan(*F.getParent(), &GlobalsMD, SSGI, TI, CompileKernel,
+    AddressSanitizer ASan(*F.getParent(), &GlobalsMD, SSGI, &TI, CompileKernel,
                           Recover, UseAfterScope, UseAfterReturn);
     return ASan.instrumentFunction(F, TLI);
   }
@@ -1283,7 +1283,7 @@ PreservedAnalyses AddressSanitizerPass::run(Function &F,
   if (auto *R = MAMProxy.getCachedResult<ASanGlobalsMetadataAnalysis>(M)) {
     TaskInfo &TI = AM.getResult<TaskAnalysis>(F);
     const TargetLibraryInfo *TLI = &AM.getResult<TargetLibraryAnalysis>(F);
-    AddressSanitizer Sanitizer(M, R, nullptr, TI, Options.CompileKernel,
+    AddressSanitizer Sanitizer(M, R, nullptr, &TI, Options.CompileKernel,
                                Options.Recover, Options.UseAfterScope,
                                Options.UseAfterReturn);
     if (Sanitizer.instrumentFunction(F, TLI))
@@ -1334,8 +1334,11 @@ PreservedAnalyses ModuleAddressSanitizerPass::run(Module &M,
   const StackSafetyGlobalInfo *const SSGI =
       ClUseStackSafety ? &MAM.getResult<StackSafetyGlobalAnalysis>(M) : nullptr;
   for (Function &F : M) {
+    TaskInfo *TI = nullptr;
+    if (!F.empty())
+      TI = &FAM.getResult<TaskAnalysis>(F);
     AddressSanitizer FunctionSanitizer(
-        M, &GlobalsMD, SSGI, Options.CompileKernel, Options.Recover,
+        M, &GlobalsMD, SSGI, TI, Options.CompileKernel, Options.Recover,
         Options.UseAfterScope, Options.UseAfterReturn);
     const TargetLibraryInfo &TLI = FAM.getResult<TargetLibraryAnalysis>(F);
     Modified |= FunctionSanitizer.instrumentFunction(F, &TLI);
@@ -1487,7 +1490,7 @@ bool AddressSanitizer::isInterestingAlloca(const AllocaInst &AI) {
        // Promotable allocas are common under -O0.
        (!ClSkipPromotableAllocas || !isAllocaPromotable(&AI)) &&
        (!ClSkipPromotableAllocas ||
-        (TI.isSerial() || !TI.isAllocaParallelPromotable(&AI))) &&
+        (TI->isSerial() || !TI->isAllocaParallelPromotable(&AI))) &&
        // inalloca allocas are not treated as static, and we don't want
        // dynamic alloca instrumentation for them as well.
        !AI.isUsedWithInAlloca() &&

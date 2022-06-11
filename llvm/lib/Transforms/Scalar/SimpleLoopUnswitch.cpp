@@ -2133,7 +2133,7 @@ static void unswitchNontrivialInvariants(
   if (FreezeLoopUnswitchCond) {
     ICFLoopSafetyInfo SafetyInfo;
     SafetyInfo.computeLoopSafetyInfo(&L);
-    InsertFreeze = !SafetyInfo.isGuaranteedToExecute(TI, &DT, &L);
+    InsertFreeze = !SafetyInfo.isGuaranteedToExecute(TI, &DT, TaskI, &L);
   }
 
   // If the edge from this terminator to a successor dominates that successor,

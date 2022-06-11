@@ -12,13 +12,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Transforms/Tapir.h"
 #include "llvm-c/Initialization.h"
 #include "llvm-c/Transforms/Tapir.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Pass.h"
+#include "llvm/PassRegistry.h"
+#include "llvm/Transforms/Tapir.h"
 
 using namespace llvm;
 

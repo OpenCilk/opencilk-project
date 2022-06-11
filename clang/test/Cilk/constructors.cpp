@@ -486,10 +486,10 @@ void array_out() {
   // CHECK: [[CONTINUE2]]:
 
   // CHECK-O0: %[[ARRIDX3:.+]] = getelementptr inbounds %class.Bar, %class.Bar* %[[ARRIDX2]], i64 1
+  // CHECK-O1: %[[ARRIDX3:.+]] = getelementptr inbounds [3 x %class.Bar], [3 x %class.Bar]* %[[ListBar2]], i64 0, i64 1
   // CHECK: %[[TASKFRAME3:.+]] = call token @llvm.taskframe.create()
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]] unwind label %[[TFLPAD3:.+]]
   // CHECK: [[DETACHED3]]:
-  // CHECK-O1: %[[ARRIDX3:.+]] = getelementptr inbounds [3 x %class.Bar], [3 x %class.Bar]* %[[ListBar2]], i64 0, i64 1
   // CHECK: invoke void @_Z7makeBarv(%class.Bar* {{.*}}sret(%class.Bar) {{.*}}%[[ARRIDX3]])
   // CHECK-NEXT: to label %[[INVOKECONT6:.+]] unwind label %[[DETLPAD3:.+]]
   // CHECK: [[INVOKECONT6]]:

@@ -2618,7 +2618,7 @@ enum CXCursorKind {
 
   /** A _Cilk_scope statement.
    */
-  CXCursor_CilkScopeStmt = 298,
+  CXCursor_CilkScopeStmt = 300,
 
   CXCursor_LastStmt = CXCursor_CilkScopeStmt,
 
@@ -2628,7 +2628,7 @@ enum CXCursorKind {
    * The translation unit cursor exists primarily to act as the root
    * cursor for traversing the contents of a translation unit.
    */
-  CXCursor_TranslationUnit = 300,
+  CXCursor_TranslationUnit = 350,
 
   /* Attributes */
   CXCursor_FirstAttr = 400,

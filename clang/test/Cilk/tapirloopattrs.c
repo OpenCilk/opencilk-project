@@ -19,10 +19,10 @@ void parfor_unroll_vec(double *restrict y, double *restrict x, double a, int n) 
     y[i] += a * x[i];
 }
 
-// CHECK: define {{.*}}void @parfor_novec(double* noalias %y, double* noalias %x, double %a, i32 %n)
+// CHECK: define {{.*}}void @parfor_novec(double* noalias noundef %y, double* noalias noundef %x, double noundef %a, i32 noundef %n)
 // CHECK: !llvm.loop [[LOOPID1:![0-9]+]]
 
-// CHECK: define {{.*}}void @parfor_unroll_vec(double* noalias %y, double* noalias %x, double %a, i32 %n)
+// CHECK: define {{.*}}void @parfor_unroll_vec(double* noalias noundef %y, double* noalias noundef %x, double noundef %a, i32 noundef %n)
 // CHECK: !llvm.loop [[LOOPID2:![0-9]+]]
 // CHECK: !llvm.loop [[LOOPID3:![0-9]+]]
 

@@ -1286,39 +1286,35 @@ void ToolChain::AddOpenCilkIncludeDir(const ArgList &Args,
   }
 }
 
-Optional<std::string>
-ToolChain::getOpenCilkRuntimePath(const ArgList &Args) const {
+ToolChain::path_list
+ToolChain::getOpenCilkRuntimePaths(const ArgList &Args) const {
   if (!Args.hasArg(options::OPT_opencilk_resource_dir_EQ))
-    return getRuntimePath();
+    return getRuntimePaths();
 
-  SmallString<128> P;
+  path_list Paths;
+
   // If -opencilk-resource-dir= is specified, try to use that directory, and
   // raise an error if that fails.
   const Arg *A = Args.getLastArg(options::OPT_opencilk_resource_dir_EQ);
 
-  // First try the triple passed to driver as --target=<triple>.
-  P.assign(A->getValue());
-  llvm::sys::path::append(P, "lib", D.getTargetTriple());
-  if (getVFS().exists(P))
-    return llvm::Optional<std::string>(std::string(P.str()));
-
-  // Second try the normalized triple.
-  P.assign(A->getValue());
-  llvm::sys::path::append(P, "lib", Triple.str());
-  if (getVFS().exists(P))
-    return llvm::Optional<std::string>(std::string(P.str()));
-
-  // Third try excluding the triple.
-  P.assign(A->getValue());
-  if (Triple.isOSUnknown()) {
-    llvm::sys::path::append(P, "lib");
-  } else {
-    llvm::sys::path::append(P, "lib", getOSLibName());
+  // Try the triple passed to driver as --target=<triple>.
+  {
+    SmallString<128> P(A->getValue());
+    llvm::sys::path::append(P, "lib", getTriple().str());
+    Paths.push_back(std::string(P.str()));
   }
-  if (getVFS().exists(P))
-    return llvm::Optional<std::string>(std::string(P.str()));
+  // Try excluding the triple.
+  {
+    SmallString<128> P(A->getValue());
+    if (Triple.isOSUnknown()) {
+      llvm::sys::path::append(P, "lib");
+    } else {
+      llvm::sys::path::append(P, "lib", getOSLibName());
+    }
+    Paths.push_back(std::string(P.str()));
+  }
 
-  return None;
+  return Paths;
 }
 
 static void addOpenCilkRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
@@ -1330,16 +1326,18 @@ static void addOpenCilkRuntimeRunPath(const ToolChain &TC, const ArgList &Args,
                     options::OPT_fno_rtlib_add_rpath, true))
     return;
 
-  if (auto CandidateRPath = TC.getOpenCilkRuntimePath(Args)) {
-    if (TC.getVFS().exists(*CandidateRPath)) {
+  bool FoundCandidate = false;
+  for (auto CandidateRPath : TC.getOpenCilkRuntimePaths(Args)) {
+    if (TC.getVFS().exists(CandidateRPath)) {
+      FoundCandidate = true;
       CmdArgs.push_back("-L");
-      CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
+      CmdArgs.push_back(Args.MakeArgString(CandidateRPath.c_str()));
       CmdArgs.push_back("-rpath");
-      CmdArgs.push_back(Args.MakeArgString(CandidateRPath->c_str()));
-      if (Triple.isOSBinFormatELF())
-        CmdArgs.push_back("--enable-new-dtags");
+      CmdArgs.push_back(Args.MakeArgString(CandidateRPath.c_str()));
     }
   }
+  if (FoundCandidate && Triple.isOSBinFormatELF())
+    CmdArgs.push_back("--enable-new-dtags");
 }
 
 static StringRef getArchNameForOpenCilkRTLib(const ToolChain &TC,
@@ -1367,8 +1365,8 @@ Optional<std::string> ToolChain::getOpenCilkBC(const ArgList &Args,
   // Check for runtime files without the architecture first.
   std::string BCBasename =
       getOpenCilkBCBasename(Args, Component, /*AddArch=*/false);
-  if (auto RuntimePath = getOpenCilkRuntimePath(Args)) {
-    SmallString<128> P(*RuntimePath);
+  for (auto RuntimePath : getOpenCilkRuntimePaths(Args)) {
+    SmallString<128> P(RuntimePath);
     llvm::sys::path::append(P, BCBasename);
     if (getVFS().exists(P))
       return llvm::Optional<std::string>(std::string(P.str()));
@@ -1377,8 +1375,8 @@ Optional<std::string> ToolChain::getOpenCilkBC(const ArgList &Args,
   // Fall back to the OpenCilk name with the arch if the no-arch version does
   // not exist.
   BCBasename = getOpenCilkBCBasename(Args, Component, /*AddArch=*/true);
-  if (auto RuntimePath = getOpenCilkRuntimePath(Args)) {
-    SmallString<128> P(*RuntimePath);
+  for (auto RuntimePath : getOpenCilkRuntimePaths(Args)) {
+    SmallString<128> P(RuntimePath);
     llvm::sys::path::append(P, BCBasename);
     if (getVFS().exists(P))
       return llvm::Optional<std::string>(std::string(P.str()));
@@ -1399,7 +1397,7 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
     }
   }
 
-  bool UseAsan = getSanitizerArgs().needsAsanRt();
+  bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
   StringRef OpenCilkBCName =
       Args.hasArg(options::OPT_fopencilk_enable_pedigrees)
           ? (UseAsan ? "opencilk-pedigrees-asan-abi" : "opencilk-pedigrees-abi")
@@ -1450,8 +1448,8 @@ std::string ToolChain::getOpenCilkRT(const ArgList &Args, StringRef Component,
   if (Args.hasArg(options::OPT_opencilk_resource_dir_EQ)) {
     // If opencilk-resource-dir is specified, look for the library in that
     // directory.
-    if (auto RuntimePath = getOpenCilkRuntimePath(Args)) {
-      SmallString<128> P(*RuntimePath);
+    for (auto RuntimePath : getOpenCilkRuntimePaths(Args)) {
+      SmallString<128> P(RuntimePath);
       llvm::sys::path::append(P, RTBasename);
       if (getVFS().exists(P))
         return std::string(P.str());
@@ -1469,8 +1467,8 @@ std::string ToolChain::getOpenCilkRT(const ArgList &Args, StringRef Component,
   // Fall back to the OpenCilk name with the arch if the no-arch version does
   // not exist.
   RTBasename = getOpenCilkRTBasename(Args, Component, Type, /*AddArch=*/true);
-  if (auto RuntimePath = getOpenCilkRuntimePath(Args)) {
-    SmallString<128> P(*RuntimePath);
+  for (auto RuntimePath : getOpenCilkRuntimePaths(Args)) {
+    SmallString<128> P(RuntimePath);
     llvm::sys::path::append(P, RTBasename);
     if (getVFS().exists(P))
       return std::string(P.str());
@@ -1498,7 +1496,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                               Args.hasArg(options::OPT_static);
     bool OnlyStaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk) &&
                                   !Args.hasArg(options::OPT_static);
-    bool UseAsan = getSanitizerArgs().needsAsanRt();
+    bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
     if (OnlyStaticOpenCilk)
       CmdArgs.push_back("-Bstatic");
 

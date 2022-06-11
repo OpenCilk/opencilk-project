@@ -1477,7 +1477,7 @@ public:
 
     // Information about a reference temporary created early in the detached
     // block.
-    Address RefTmp;
+    Address RefTmp = Address::invalid();
     StorageDuration RefTmpSD;
 
     // Optional taskframe created separately from detach.
@@ -1491,8 +1491,7 @@ public:
   public:
     /// Enter a new detach scope
     explicit DetachScope(CodeGenFunction &CGF)
-        : CGF(CGF), ParentScope(CGF.CurDetachScope),
-          RefTmp(nullptr, CharUnits()) {
+        : CGF(CGF), ParentScope(CGF.CurDetachScope) {
       CGF.CurDetachScope = this;
       EnsureTaskFrame();
     }

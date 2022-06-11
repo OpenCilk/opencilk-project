@@ -59,8 +59,6 @@ Sema::ActOnCilkSpawnStmt(SourceLocation SpawnLoc, Stmt *SubStmt) {
   if (!checkCilkContext(*this, SpawnLoc, "_Cilk_spawn"))
     return StmtError();
 
-  DiagnoseUnusedExprResult(SubStmt);
-
   setFunctionHasBranchProtectedScope();
 
   PushFunctionScope();
@@ -110,8 +108,6 @@ StmtResult
 Sema::ActOnCilkScopeStmt(SourceLocation ScopeLoc, Stmt *SubStmt) {
   if (!checkCilkContext(*this, ScopeLoc, "_Cilk_scope"))
     return StmtError();
-
-  DiagnoseUnusedExprResult(SubStmt);
 
   setFunctionHasBranchProtectedScope();
 

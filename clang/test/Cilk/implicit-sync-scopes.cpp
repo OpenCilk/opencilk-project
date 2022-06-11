@@ -30,7 +30,7 @@ void bar(int a) {
 
 /// Test that no sync is inserted in a function with no Cilk constructs.
 
-// CHECK-LABEL: define {{.*}}void @_Z3bari(i32 %a)
+// CHECK-LABEL: define {{.*}}void @_Z3bari(i32 noundef %a)
 // CHECK-NOT: sync
 // CHECK: ret void
 
@@ -43,7 +43,7 @@ void foo(int a) {
   }
 }
 
-// CHECK-LABEL: define {{.*}}void @_Z3fooi(i32 %a)
+// CHECK-LABEL: define {{.*}}void @_Z3fooi(i32 noundef %a)
 // CHECK-NOT: sync
 // CHECK: ret void
 
@@ -163,14 +163,14 @@ int trycatch(int a) {
 
 // CHECK: [[DETACHED]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
 // CHECK: [[CONTINUE]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 2)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 2)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
@@ -234,14 +234,14 @@ int trycatch_destructor(int a) {
 
 // CHECK: [[DETACHED]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
 // CHECK: [[CONTINUE]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 2)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 2)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
@@ -284,7 +284,7 @@ int trycatch_destructor(int a) {
 // CHECK: br i1 %{{.+}}, label %[[CATCH:.+]], label %[[EHCLEANUP:.+]]
 
 // CHECK: [[CATCH]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT]]
 
 // CHECK: [[TRYCONT]]:
@@ -319,7 +319,7 @@ int mix_spawn_trycatch(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: call void @_Z3fooi(i32 1)
+// CHECK-NEXT: call void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE1]]
 
 // CHECK: [[CONTINUE1]]:
@@ -330,14 +330,14 @@ int mix_spawn_trycatch(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG]], label %[[CONTINUE2]]
 
 // CHECK: [[CONTINUE2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 3)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
 // CHECK-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK: [[TRYSYNCCONT]]:
@@ -374,7 +374,7 @@ int mix_spawn_trycatch(int a) {
 // CHECK: br i1 %{{.+}}, label %[[CATCH:.+]], label %[[EHRESUME:.+]]
 
 // CHECK: [[CATCH]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT]]
 
 // CHECK-O0: [[TRYCONT]]:
@@ -418,7 +418,7 @@ int mix_spawn_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[LPAD:.+]]
 
 // CHECK: [[INVOKECONT1]]:
@@ -437,14 +437,14 @@ int mix_spawn_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT2]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG]], label %[[CONTINUE2]]
 
 // CHECK: [[CONTINUE2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 3)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
 // CHECK-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK: [[TRYSYNCCONT]]:
@@ -519,7 +519,7 @@ int mix_spawn_trycatch_destructors(int a) {
 // CHECK: br i1 %{{.+}}, label %[[CATCH:.+]], label %[[TFTRYCLEANUP:.+]]
 
 // CHECK: [[CATCH]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT]]
 
 // CHECK: [[TRYCONT]]:
@@ -578,7 +578,7 @@ int nested_trycatch(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: call void @_Z3fooi(i32 1)
+// CHECK-NEXT: call void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE1]]
 
 // CHECK: [[CONTINUE1]]:
@@ -589,7 +589,7 @@ int nested_trycatch(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
@@ -603,14 +603,14 @@ int nested_trycatch(int a) {
 
 // CHECK: [[DETACHED3]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 3)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 3)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT2]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG2]], label %[[CONTINUE3]]
 
 // CHECK: [[CONTINUE3]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 4)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
 // CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
@@ -641,7 +641,7 @@ int nested_trycatch(int a) {
 // CHECK: br i1 %{{.+}}, label %[[CATCH1:.+]], label %[[TFTRYCLEANUP1:.+]]
 
 // CHECK: [[CATCH1]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT1:.+]]
 
 // CHECK: [[TRYCONT1]]:
@@ -680,7 +680,7 @@ int nested_trycatch(int a) {
 // CHECK: br i1 %{{.+}}, label %[[CATCH2:.+]], label %[[TFTRYCLEANUP2:.+]]
 
 // CHECK: [[CATCH2]]:
-// CHECK: call void @_Z9catchfn_iii(i32 2,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 2,
 // CHECK-O0: br label %[[TRYCONT2]]
 // CHECK-O1: br label %[[TRYSUCONT2]]
 
@@ -741,7 +741,7 @@ int nested_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[LPAD1:.+]]
 
 // CHECK: [[INVOKECONT1]]:
@@ -760,7 +760,7 @@ int nested_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT2]]:
@@ -779,14 +779,14 @@ int nested_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED3]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 3)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 3)
 // CHECK-NEXT: to label %[[INVOKECONT3:.+]] unwind label %[[LPAD3:.+]]
 
 // CHECK: [[INVOKECONT3]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG2]], label %[[CONTINUE3]]
 
 // CHECK: [[CONTINUE3]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 4)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
 // CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
@@ -847,7 +847,7 @@ int nested_trycatch_destructors(int a) {
 // CHECK-O0: br i1 %{{.+}}, label %[[CATCH1:.+]], label %[[EHCLEANUP1:.+]]
 
 // CHECK-O0: [[CATCH1]]:
-// CHECK-O0: call void @_Z9catchfn_iii(i32 1,
+// CHECK-O0: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK-O0: br label %[[TRYCONT1:.+]]
 
 // CHECK-O0: [[TRYCONT1]]:
@@ -900,7 +900,7 @@ int nested_trycatch_destructors(int a) {
 // CHECK: br i1 %{{.+}}, label %[[CATCH2:.+]], label %[[EHCLEANUP2:.+]]
 
 // CHECK: [[CATCH2]]:
-// CHECK: call void @_Z9catchfn_iii(i32 2,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 2,
 // CHECK: br label %[[TRYCONT2]]
 
 // CHECK: [[TRYCONT2]]:
@@ -926,7 +926,7 @@ int nested_trycatch_destructors(int a) {
 // CHECK-O1: br i1 %{{.+}}, label %[[CATCH1:.+]], label %[[EHCLEANUP1:.+]]
 
 // CHECK-O1: [[CATCH1]]:
-// CHECK-O1: call void @_Z9catchfn_iii(i32 1,
+// CHECK-O1: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK-O1: br label %[[TRYCONT1:.+]]
 
 // CHECK-O1: [[TRYCONT1]]:
@@ -981,7 +981,7 @@ int mix_parfor_trycatch(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: call void @_Z3fooi(i32 1)
+// CHECK-NEXT: call void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE1]]
 
 // CHECK: [[CONTINUE1]]:
@@ -993,7 +993,7 @@ int mix_parfor_trycatch(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
@@ -1023,7 +1023,7 @@ int mix_parfor_trycatch(int a) {
 // CHECK-O1: detach within %[[PFORSYNCREG]], label %[[PFORBODY:.+]], label %[[PFORINC:.+]] unwind label %[[PFORUNW:.+]]
 
 // CHECK: [[PFORBODY]]:
-// CHECK: invoke void @_Z3fooi(i32 3)
+// CHECK: invoke void @_Z3fooi(i32 noundef 3)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[PFORLPAD:.+]]
 
 // CHECK: [[INVOKECONT2]]:
@@ -1074,7 +1074,7 @@ int mix_parfor_trycatch(int a) {
 // CHECK: br i1 {{.+}}, label %[[CATCH:.+]], label %[[RESUME:.+]]
 
 // CHECK: [[CATCH]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT:.+]]
 
 // CHECK: [[TRYCONT]]:
@@ -1084,11 +1084,11 @@ int mix_parfor_trycatch(int a) {
 
 // CHECK: [[DETACHED3]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
-// CHECK-NEXT: call void @_Z3fooi(i32 5)
+// CHECK-NEXT: call void @_Z3fooi(i32 noundef 5)
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
 
 // CHECK: [[CONTINUE3]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 6)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 6)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
@@ -1108,7 +1108,7 @@ int mix_parfor_trycatch(int a) {
 // CHECK: [[PFORSUCONT]]:
 // CHECK-O0-NEXT: br label %[[PFOREND:.+]]
 // CHECK-O0: [[PFOREND]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 4)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
 // CHECK-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK: [[TRYSYNCCONT]]:
@@ -1155,7 +1155,7 @@ int mix_parfor_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
@@ -1175,7 +1175,7 @@ int mix_parfor_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT3:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT3]]:
@@ -1228,7 +1228,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1: detach within %[[PFORSYNCREG]], label %[[PFORBODY:.+]], label %[[PFORINC:.+]] unwind label %[[PFORUNW:.+]]
 
 // CHECK: [[PFORBODY]]:
-// CHECK: invoke void @_Z3fooi(i32 3)
+// CHECK: invoke void @_Z3fooi(i32 noundef 3)
 // CHECK-NEXT: to label %[[INVOKECONT4:.+]] unwind label %[[PFORLPAD:.+]]
 
 // CHECK: [[INVOKECONT4]]:
@@ -1254,7 +1254,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1-NEXT: br label %[[B2CLEANUP]]
 
 // CHECK-O1: [[PFORSYNCCONT]]:
-// CHECK-O1: call void @_Z9nothrowfni(i32 4)
+// CHECK-O1: call void @_Z9nothrowfni(i32 noundef 4)
 // CHECK-O1-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK-O1: [[TRYSYNCCONT]]:
@@ -1313,7 +1313,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK: br i1 {{.+}}, label %[[CATCH:.+]], label %[[RESUME:.+]]
 
 // CHECK: [[CATCH]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT]]
 
 // CHECK: [[TRYCONT]]:
@@ -1328,14 +1328,14 @@ int mix_parfor_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED3]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 5)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 5)
 // CHECK-NEXT: to label %[[INVOKECONT6:.+]] unwind label %[[LPAD3:.+]]
 
 // CHECK: [[INVOKECONT6]]:
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
 
 // CHECK: [[CONTINUE3]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 6)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 6)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -1350,7 +1350,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[CATCHLPAD]]
 
 // CHECK-O0: [[PFORSYNCCONT]]:
-// CHECK-O0: call void @_Z9nothrowfni(i32 4)
+// CHECK-O0: call void @_Z9nothrowfni(i32 noundef 4)
 // CHECK-O0-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK-O0: [[TRYSYNCCONT]]:
@@ -1449,14 +1449,14 @@ int spawn_trycatch(int a) {
 
 // CHECK: [[TRYDETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[LPAD1:.+]]
 
 // CHECK: [[INVOKECONT1]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG1]], label %[[TRYDETCONT1]]
 
 // CHECK: [[TRYDETCONT1]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 2)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 2)
 // CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
@@ -1497,7 +1497,7 @@ int spawn_trycatch(int a) {
 // CHECK-O0: br i1 {{.+}}, label %[[CATCH1:.+]], label %[[TASKCLEANUP1:.+]]
 
 // CHECK-O0: [[CATCH1]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT1]]
 
 // CHECK: [[TRYCONT1]]:
@@ -1518,14 +1518,14 @@ int spawn_trycatch(int a) {
 
 // CHECK: [[TRYDETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME4]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 3)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 3)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT2]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG2]], label %[[TRYDETCONT2]]
 
 // CHECK: [[TRYDETCONT2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 4)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
 // CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
@@ -1582,7 +1582,7 @@ int spawn_trycatch(int a) {
 // CHECK-O0: br i1 {{.+}}, label %[[CATCH2:.+]], label %[[TASKCLEANUP2:.+]]
 
 // CHECK-O0: [[CATCH2]]:
-// CHECK: call void @_Z9catchfn_iii(i32 2,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 2,
 // CHECK: br label %[[TRYCONT2]]
 
 // CHECK: [[TRYCONT2]]:
@@ -1594,11 +1594,11 @@ int spawn_trycatch(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME5]])
-// CHECK-NEXT: call void @_Z3fooi(i32 5)
+// CHECK-NEXT: call void @_Z3fooi(i32 noundef 5)
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
 
 // CHECK: [[CONTINUE2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 6)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 6)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 
 // CHECK: [[SYNCCONT2]]:
@@ -1663,7 +1663,7 @@ int spawn_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[LPAD1:.+]]
 
 // CHECK: [[INVOKECONT1]]:
@@ -1687,14 +1687,14 @@ int spawn_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT2]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG1]], label %[[TRYDETCONT1]]
 
 // CHECK: [[TRYDETCONT1]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 3)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
 // CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
@@ -1761,7 +1761,7 @@ int spawn_trycatch_destructors(int a) {
 // CHECK: br i1 {{.+}}, label %[[CATCH1:.+]], label %[[TASKCLEANUP1:.+]]
 
 // CHECK: [[CATCH1]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT1]]
 
 // CHECK: [[TRYCONT1]]:
@@ -1786,14 +1786,14 @@ int spawn_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME5]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 4)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 4)
 // CHECK-NEXT: to label %[[INVOKECONT3:.+]] unwind label %[[LPAD3:.+]]
 
 // CHECK: [[INVOKECONT3]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG2]], label %[[TRYDETCONT2]]
 
 // CHECK: [[TRYDETCONT2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 5)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 5)
 // CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
@@ -1853,7 +1853,7 @@ int spawn_trycatch_destructors(int a) {
 // CHECK: br i1 {{.+}}, label %[[CATCH2:.+]], label %[[TASKCLEANUP2:.+]]
 
 // CHECK: [[CATCH2]]:
-// CHECK: call void @_Z9catchfn_iii(i32 2,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 2,
 // CHECK: br label %[[TRYCONT2]]
 
 // CHECK: [[TRYCONT2]]:
@@ -1871,14 +1871,14 @@ int spawn_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED4]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME6]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 6)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 6)
 // CHECK-NEXT: to label %[[INVOKECONT4:.+]] unwind label %[[LPAD4:.+]]
 
 // CHECK: [[INVOKECONT4]]:
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE4]]
 
 // CHECK: [[CONTINUE4]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 7)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 7)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -1981,7 +1981,7 @@ int parfor_trycatch(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: call void @_Z3fooi(i32 1)
+// CHECK-NEXT: call void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE1]]
 
 // CHECK: [[CONTINUE1]]:
@@ -1995,14 +1995,14 @@ int parfor_trycatch(int a) {
 
 // CHECK: [[TRYDET1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[LPAD1:.+]]
 
 // CHECK: [[INVOKECONT1]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG1]], label %[[TRYDETCONT1]]
 
 // CHECK: [[TRYDETCONT1]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 3)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
 // CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
@@ -2043,7 +2043,7 @@ int parfor_trycatch(int a) {
 // CHECK-O0: br i1 {{.+}}, label %[[CATCH1:.+]], label %[[TASKCLEANUP1:.+]]
 
 // CHECK-O0: [[CATCH1]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT1]]
 
 // CHECK: [[TRYCONT1]]:
@@ -2081,14 +2081,14 @@ int parfor_trycatch(int a) {
 
 // CHECK: [[TRYDET2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 4)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 4)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT2]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG2]], label %[[TRYDETCONT2]]
 
 // CHECK: [[TRYDETCONT2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 5)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 5)
 // CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
@@ -2129,7 +2129,7 @@ int parfor_trycatch(int a) {
 // CHECK-O0: br i1 {{.+}}, label %[[CATCH2:.+]], label %[[TASKCLEANUP2:.+]]
 
 // CHECK-O0: [[CATCH2]]:
-// CHECK: call void @_Z9catchfn_iii(i32 2,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 2,
 // CHECK: br label %[[TRYCONT2]]
 
 // CHECK: [[TRYCONT2]]:
@@ -2162,11 +2162,11 @@ int parfor_trycatch(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME4]])
-// CHECK-NEXT: call void @_Z3fooi(i32 6)
+// CHECK-NEXT: call void @_Z3fooi(i32 noundef 6)
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
 
 // CHECK: [[CONTINUE2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 7)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 7)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 
 // CHECK: [[SYNCCONT2]]:
@@ -2219,7 +2219,7 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME1]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 1)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 1)
 // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[LPAD1:.+]]
 
 // CHECK: [[INVOKECONT1]]:
@@ -2258,14 +2258,14 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDET1]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 2)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 2)
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[LPAD2:.+]]
 
 // CHECK: [[INVOKECONT2]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG1]], label %[[TRYDETCONT1]]
 
 // CHECK: [[TRYDETCONT1]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 3)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
 // CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
@@ -2332,7 +2332,7 @@ int parfor_trycatch_destructors(int a) {
 // CHECK: br i1 {{.+}}, label %[[CATCH1:.+]], label %[[PFORCLEANUP1:.+]]
 
 // CHECK: [[CATCH1]]:
-// CHECK: call void @_Z9catchfn_iii(i32 1,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 1,
 // CHECK: br label %[[TRYCONT1]]
 
 // CHECK: [[TRYCONT1]]:
@@ -2377,14 +2377,14 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDET2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 4)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 4)
 // CHECK-NEXT: to label %[[INVOKECONT3:.+]] unwind label %[[LPAD3:.+]]
 
 // CHECK: [[INVOKECONT3]]:
 // CHECK-NEXT: reattach within %[[TRYSYNCREG2]], label %[[TRYDETCONT2]]
 
 // CHECK: [[TRYDETCONT2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 5)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 5)
 // CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
@@ -2434,7 +2434,7 @@ int parfor_trycatch_destructors(int a) {
 // CHECK: br i1 {{.+}}, label %[[CATCH2:.+]], label %[[PFORCLEANUP2:.+]]
 
 // CHECK: [[CATCH2]]:
-// CHECK: call void @_Z9catchfn_iii(i32 2,
+// CHECK: call void @_Z9catchfn_iii(i32 noundef 2,
 // CHECK: br label %[[TRYCONT2]]
 
 // CHECK: [[TRYCONT2]]:
@@ -2476,14 +2476,14 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[DETACHED2]]:
 // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME4]])
-// CHECK-NEXT: invoke void @_Z3fooi(i32 6)
+// CHECK-NEXT: invoke void @_Z3fooi(i32 noundef 6)
 // CHECK-NEXT: to label %[[INVOKECONT4:.+]] unwind label %[[LPAD4:.+]]
 
 // CHECK: [[INVOKECONT4]]:
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
 
 // CHECK: [[CONTINUE2]]:
-// CHECK-NEXT: call void @_Z9nothrowfni(i32 7)
+// CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 7)
 // CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 // CHECK: [[SYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])

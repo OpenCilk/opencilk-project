@@ -1850,7 +1850,7 @@ define i32 @disabled(i32* noalias nocapture %a, i32* noalias nocapture readonly 
 ; O3DEFAULT-NEXT:    [[TMP47:%.*]] = add nsw <4 x i32> [[TMP46]], [[SHUFFLE]]
 ; O3DEFAULT-NEXT:    [[TMP48:%.*]] = bitcast i32* [[ARRAYIDX2_44]] to <4 x i32>*
 ; O3DEFAULT-NEXT:    store <4 x i32> [[TMP47]], <4 x i32>* [[TMP48]], align 4
-; O3DEFAULT-NEXT:    [[TMP49:%.*]] = load i32, i32* [[A]], align 4
+; O3DEFAULT-NEXT:    [[TMP49:%.*]] = extractelement <4 x i32> [[TMP3]], i64 0
 ; O3DEFAULT-NEXT:    ret i32 [[TMP49]]
 ;
 ; Os-LABEL: @disabled(

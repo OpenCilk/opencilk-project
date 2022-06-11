@@ -1412,16 +1412,12 @@ define void @test_gather_not_profitable_pr48429(i32 %d, float* readonly %ptr, fl
 ; AVX512-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 15
 ; AVX512-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[FOR_BODY_PREHEADER:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; AVX512:       vector.memcheck:
-; AVX512-NEXT:    [[TMP3:%.*]] = add nsw i64 [[IDX_EXT]], 4611686018427387903
-; AVX512-NEXT:    [[TMP4:%.*]] = and i64 [[TMP3]], 4611686018427387903
-; AVX512-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP3]], 4
+; AVX512-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP0]], 4
 ; AVX512-NEXT:    [[TMP6:%.*]] = or i64 [[TMP5]], 2
 ; AVX512-NEXT:    [[SCEVGEP:%.*]] = getelementptr float, float* [[DEST:%.*]], i64 [[TMP6]]
-; AVX512-NEXT:    [[TMP7:%.*]] = add nuw nsw i64 [[TMP4]], 1
-; AVX512-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP7]]
+; AVX512-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP2]]
 ; AVX512-NEXT:    [[SCEVGEP6:%.*]] = getelementptr float, float* [[PTR]], i64 [[IDXPROM]]
-; AVX512-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP4]], 1
-; AVX512-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP8]], [[IDX_EXT]]
+; AVX512-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP2]], [[IDX_EXT]]
 ; AVX512-NEXT:    [[SCEVGEP8:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP9]]
 ; AVX512-NEXT:    [[BOUND0:%.*]] = icmp ugt float* [[SCEVGEP4]], [[DEST]]
 ; AVX512-NEXT:    [[BOUND1:%.*]] = icmp ugt float* [[SCEVGEP]], [[PTR]]
@@ -1610,16 +1606,12 @@ define void @test_gather_not_profitable_pr48429(i32 %d, float* readonly %ptr, fl
 ; FVW2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 3
 ; FVW2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[FOR_BODY_PREHEADER:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; FVW2:       vector.memcheck:
-; FVW2-NEXT:    [[TMP3:%.*]] = add nsw i64 [[IDX_EXT]], 4611686018427387903
-; FVW2-NEXT:    [[TMP4:%.*]] = and i64 [[TMP3]], 4611686018427387903
-; FVW2-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP3]], 4
+; FVW2-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP0]], 4
 ; FVW2-NEXT:    [[TMP6:%.*]] = or i64 [[TMP5]], 2
 ; FVW2-NEXT:    [[SCEVGEP:%.*]] = getelementptr float, float* [[DEST:%.*]], i64 [[TMP6]]
-; FVW2-NEXT:    [[TMP7:%.*]] = add nuw nsw i64 [[TMP4]], 1
-; FVW2-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP7]]
+; FVW2-NEXT:    [[SCEVGEP4:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP2]]
 ; FVW2-NEXT:    [[SCEVGEP6:%.*]] = getelementptr float, float* [[PTR]], i64 [[IDXPROM]]
-; FVW2-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP4]], 1
-; FVW2-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP8]], [[IDX_EXT]]
+; FVW2-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP2]], [[IDX_EXT]]
 ; FVW2-NEXT:    [[SCEVGEP8:%.*]] = getelementptr float, float* [[PTR]], i64 [[TMP9]]
 ; FVW2-NEXT:    [[BOUND0:%.*]] = icmp ugt float* [[SCEVGEP4]], [[DEST]]
 ; FVW2-NEXT:    [[BOUND1:%.*]] = icmp ugt float* [[SCEVGEP]], [[PTR]]
@@ -1640,14 +1632,11 @@ define void @test_gather_not_profitable_pr48429(i32 %d, float* readonly %ptr, fl
 ; FVW2-NEXT:    [[NEXT_GEP:%.*]] = getelementptr float, float* [[PTR]], i64 [[INDEX]]
 ; FVW2-NEXT:    [[TMP11:%.*]] = shl i64 [[INDEX]], 4
 ; FVW2-NEXT:    [[NEXT_GEP16:%.*]] = getelementptr float, float* [[DEST]], i64 [[TMP11]]
-; FVW2-NEXT:    [[TMP12:%.*]] = shl i64 [[INDEX]], 4
-; FVW2-NEXT:    [[TMP13:%.*]] = or i64 [[TMP12]], 16
+; FVW2-NEXT:    [[TMP13:%.*]] = or i64 [[TMP11]], 16
 ; FVW2-NEXT:    [[NEXT_GEP17:%.*]] = getelementptr float, float* [[DEST]], i64 [[TMP13]]
-; FVW2-NEXT:    [[TMP14:%.*]] = shl i64 [[INDEX]], 4
-; FVW2-NEXT:    [[TMP15:%.*]] = or i64 [[TMP14]], 32
+; FVW2-NEXT:    [[TMP15:%.*]] = or i64 [[TMP11]], 32
 ; FVW2-NEXT:    [[NEXT_GEP18:%.*]] = getelementptr float, float* [[DEST]], i64 [[TMP15]]
-; FVW2-NEXT:    [[TMP16:%.*]] = shl i64 [[INDEX]], 4
-; FVW2-NEXT:    [[TMP17:%.*]] = or i64 [[TMP16]], 48
+; FVW2-NEXT:    [[TMP17:%.*]] = or i64 [[TMP11]], 48
 ; FVW2-NEXT:    [[NEXT_GEP19:%.*]] = getelementptr float, float* [[DEST]], i64 [[TMP17]]
 ; FVW2-NEXT:    [[TMP18:%.*]] = getelementptr inbounds float, float* [[NEXT_GEP]], i64 [[IDXPROM]]
 ; FVW2-NEXT:    [[TMP19:%.*]] = bitcast float* [[TMP18]] to <2 x float>*
