@@ -166,10 +166,8 @@ FunctionCallee CilkABI::Get__cilkrts_get_nworkers() {
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::ReadNone);
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
+  AL = AL.addFnAttribute(C, Attribute::ReadNone);
+  AL = AL.addFnAttribute(C, Attribute::NoUnwind);
   FunctionType *FTy = FunctionType::get(Type::getInt32Ty(C), {}, false);
   CilkRTSGetNworkers = M.getOrInsertFunction("__cilkrts_get_nworkers", FTy, AL);
   return CilkRTSGetNworkers;
@@ -192,8 +190,7 @@ FunctionCallee CilkABI::Get__cilkrts_leave_frame() {
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
+  AL = AL.addFnAttribute(C, Attribute::NoUnwind);
   Type *VoidTy = Type::getVoidTy(C);
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   CilkRTSLeaveFrame = M.getOrInsertFunction("__cilkrts_leave_frame", AL, VoidTy,
@@ -235,8 +232,7 @@ FunctionCallee CilkABI::Get__cilkrts_get_tls_worker() {
   LLVMContext &C = M.getContext();
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
   AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
+  AL = AL.addFnAttribute(C, Attribute::NoUnwind);
   CilkRTSGetTLSWorker = M.getOrInsertFunction("__cilkrts_get_tls_worker", AL,
                                               WorkerPtrTy);
 
@@ -250,8 +246,7 @@ FunctionCallee CilkABI::Get__cilkrts_get_tls_worker_fast() {
   LLVMContext &C = M.getContext();
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
   AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
+  AL = AL.addFnAttribute(C, Attribute::NoUnwind);
   CilkRTSGetTLSWorkerFast = M.getOrInsertFunction(
       "__cilkrts_get_tls_worker_fast", AL, WorkerPtrTy);
 
@@ -265,8 +260,7 @@ FunctionCallee CilkABI::Get__cilkrts_bind_thread_1() {
   LLVMContext &C = M.getContext();
   PointerType *WorkerPtrTy = PointerType::getUnqual(WorkerTy);
   AttributeList AL;
-  AL = AL.addAttribute(C, AttributeList::FunctionIndex,
-                       Attribute::NoUnwind);
+  AL = AL.addFnAttribute(C, Attribute::NoUnwind);
   CilkRTSBindThread1 = M.getOrInsertFunction("__cilkrts_bind_thread_1", AL,
                                              WorkerPtrTy);
 
@@ -327,7 +321,11 @@ void CilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
     GEP(B, SF, StackFrameFields::fpcsr)
   };
 
-  B.CreateCall(Asm, Args);
+  CallInst *CI = B.CreateCall(Asm, Args);
+  CI->addParamAttr(
+      0, Attribute::get(C, Attribute::ElementType, Type::getInt32Ty(C)));
+  CI->addParamAttr(
+      1, Attribute::get(C, Attribute::ElementType, Type::getInt16Ty(C)));
 }
 
 /// Helper to find a function with the given name, creating it if it doesn't

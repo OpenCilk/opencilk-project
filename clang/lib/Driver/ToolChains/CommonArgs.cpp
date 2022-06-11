@@ -1005,7 +1005,7 @@ void tools::linkSanitizerRuntimeDeps(const ToolChain &TC,
 
 // CilkSanitizer has different runtime requirements than typical sanitizers.
 bool tools::needsCilkSanitizerDeps(const ToolChain &TC, const ArgList &Args) {
-  const SanitizerArgs &SanArgs = TC.getSanitizerArgs();
+  const SanitizerArgs &SanArgs = TC.getSanitizerArgs(Args);
   if (Args.hasArg(options::OPT_shared) || SanArgs.needsSharedRt()) {
     // Don't link static runtimes into DSOs or if -shared-libasan.
     return false;

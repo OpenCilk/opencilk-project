@@ -210,7 +210,6 @@
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyPass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LCSSAPass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyCFGPass
-; CHECK-POSTLINK-O2-NEXT: Running pass: IndVarSimplifyPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LICMPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: JumpThreadingPass
@@ -223,7 +222,6 @@
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyPass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LCSSAPass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyCFGPass
-; CHECK-POSTLINK-O3-NEXT: Running pass: IndVarSimplifyPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LICMPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: JumpThreadingPass

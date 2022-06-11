@@ -196,22 +196,24 @@ define i1 @test_conditional2(i32 %a, i32 %b, ptr %c) {
 ; CHECK-NEXT:  LBB3_5: ; %for.cond.preheader
 ; CHECK-NEXT:    mov w22, #2
 ; CHECK-NEXT:  LBB3_6: ; %for.cond
-; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    ; =>This Loop Header: Depth=1
+; CHECK-NEXT:    ; Child Loop BB3_7 Depth 2
 ; CHECK-NEXT:    cbz w22, LBB3_9
-; CHECK-NEXT:  ; %bb.7: ; %for.body
-; CHECK-NEXT:    ; in Loop: Header=BB3_6 Depth=1
+; CHECK-NEXT:  LBB3_7: ; %for.body
+; CHECK-NEXT:    ; Parent Loop BB3_6 Depth=1
+; CHECK-NEXT:    ; => This Inner Loop Header: Depth=2
 ; CHECK-NEXT:    sub w22, w22, #1
 ; CHECK-NEXT:    orr w9, w21, w20
 ; CHECK-NEXT:    ldr w10, [x19, w22, sxtw #2]
 ; CHECK-NEXT:    cmp w9, w10
 ; CHECK-NEXT:    b.eq LBB3_6
 ; CHECK-NEXT:  ; %bb.8: ; %if.then
-; CHECK-NEXT:    ; in Loop: Header=BB3_6 Depth=1
+; CHECK-NEXT:    ;   in Loop: Header=BB3_7 Depth=2
 ; CHECK-NEXT:    sxtw x8, w22
 ; CHECK-NEXT:    str w9, [x19, x8, lsl #2]
 ; CHECK-NEXT:    bl _foo
 ; CHECK-NEXT:    mov w8, wzr
-; CHECK-NEXT:    b LBB3_6
+; CHECK-NEXT:    cbnz w22, LBB3_7
 ; CHECK-NEXT:  LBB3_9: ; %for.cond.cleanup
 ; CHECK-NEXT:    ldp x29, x30, [sp, #32] ; 16-byte Folded Reload
 ; CHECK-NEXT:    and w0, w8, #0x1
@@ -239,22 +241,24 @@ define i1 @test_conditional2(i32 %a, i32 %b, ptr %c) {
 ; OUTLINE-ATOMICS-NEXT:    mov w22, #2
 ; OUTLINE-ATOMICS-NEXT:    cset w8, eq
 ; OUTLINE-ATOMICS-NEXT:  LBB3_1: ; %for.cond
-; OUTLINE-ATOMICS-NEXT:    ; =>This Inner Loop Header: Depth=1
+; OUTLINE-ATOMICS-NEXT:    ; =>This Loop Header: Depth=1
+; OUTLINE-ATOMICS-NEXT:    ; Child Loop BB3_2 Depth 2
 ; OUTLINE-ATOMICS-NEXT:    cbz w22, LBB3_4
-; OUTLINE-ATOMICS-NEXT:  ; %bb.2: ; %for.body
-; OUTLINE-ATOMICS-NEXT:    ; in Loop: Header=BB3_1 Depth=1
+; OUTLINE-ATOMICS-NEXT:  LBB3_2: ; %for.body
+; OUTLINE-ATOMICS-NEXT:    ; Parent Loop BB3_1 Depth=1
+; OUTLINE-ATOMICS-NEXT:    ; => This Inner Loop Header: Depth=2
 ; OUTLINE-ATOMICS-NEXT:    sub w22, w22, #1
 ; OUTLINE-ATOMICS-NEXT:    orr w9, w21, w20
 ; OUTLINE-ATOMICS-NEXT:    ldr w10, [x19, w22, sxtw #2]
 ; OUTLINE-ATOMICS-NEXT:    cmp w9, w10
 ; OUTLINE-ATOMICS-NEXT:    b.eq LBB3_1
 ; OUTLINE-ATOMICS-NEXT:  ; %bb.3: ; %if.then
-; OUTLINE-ATOMICS-NEXT:    ; in Loop: Header=BB3_1 Depth=1
+; OUTLINE-ATOMICS-NEXT:    ; in Loop: Header=BB3_2 Depth=2
 ; OUTLINE-ATOMICS-NEXT:    sxtw x8, w22
 ; OUTLINE-ATOMICS-NEXT:    str w9, [x19, x8, lsl #2]
 ; OUTLINE-ATOMICS-NEXT:    bl _foo
 ; OUTLINE-ATOMICS-NEXT:    mov w8, wzr
-; OUTLINE-ATOMICS-NEXT:    b LBB3_1
+; OUTLINE-ATOMICS-NEXT:    cbnz w22, LBB3_2
 ; OUTLINE-ATOMICS-NEXT:  LBB3_4: ; %for.cond.cleanup
 ; OUTLINE-ATOMICS-NEXT:    ldp x29, x30, [sp, #32] ; 16-byte Folded Reload
 ; OUTLINE-ATOMICS-NEXT:    and w0, w8, #0x1

@@ -39,7 +39,7 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       .Case("none", TapirTargetID::None)
       .Case("serial", TapirTargetID::Serial)
       .Case("cheetah", TapirTargetID::Cheetah)
-      .Case("cilk", TapirTargetID::Cilk)
+      .Case("cilkplus", TapirTargetID::Cilk)
       .Case("cuda", TapirTargetID::Cuda)
       .Case("opencilk", TapirTargetID::OpenCilk)
       .Case("openmp", TapirTargetID::OpenMP)

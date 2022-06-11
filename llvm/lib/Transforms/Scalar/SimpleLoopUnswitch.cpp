@@ -2186,7 +2186,7 @@ static void unswitchNontrivialInvariants(
   if (FreezeLoopUnswitchCond) {
     ICFLoopSafetyInfo SafetyInfo;
     SafetyInfo.computeLoopSafetyInfo(&L);
-    InsertFreeze = !SafetyInfo.isGuaranteedToExecute(TI, &DT, &L);
+    InsertFreeze = !SafetyInfo.isGuaranteedToExecute(TI, &DT, TaskI, &L);
   }
 
   // Perform the isGuaranteedNotToBeUndefOrPoison() query before the transform,

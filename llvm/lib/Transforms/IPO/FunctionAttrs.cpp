@@ -1779,7 +1779,7 @@ static void addNoRecurseAttrs(const SCCNodeSet &SCCNodes,
           if (Callee && Callee != F)
             // Ignore certain intrinsics when inferring norecurse.
             switch (Callee->getIntrinsicID()) {
-            default: return false;
+            default: return;
             case Intrinsic::annotation:
             case Intrinsic::assume:
             case Intrinsic::sideeffect:
@@ -1802,7 +1802,6 @@ static void addNoRecurseAttrs(const SCCNodeSet &SCCNodes,
             case Intrinsic::coro_frame:
             case Intrinsic::coro_size:
             case Intrinsic::coro_suspend:
-            case Intrinsic::coro_param:
             case Intrinsic::coro_subfn_addr:
             case Intrinsic::syncregion_start:
             case Intrinsic::detached_rethrow:

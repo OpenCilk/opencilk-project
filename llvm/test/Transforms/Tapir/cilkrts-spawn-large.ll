@@ -512,7 +512,7 @@ fusion.5.loop_detach.dim.0.ls1.preheader:         ; preds = %.split.split, %__ci
   %fusion.5.indvar_address.dim.0.019.ls1.dac4 = phi i64 [ %miditer, %.split.split ], [ %fusion.5.indvar_address.dim.0.019.start.ls1, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount5, 1
   %miditer = add nuw nsw i64 %fusion.5.indvar_address.dim.0.019.ls1.dac4, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %17 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %17, i8** %14, align 8
   %18 = call i8* @llvm.stacksave()
@@ -551,7 +551,7 @@ cilk.sync.savestate.i:                            ; preds = %fusion.5.loop_sync.
   store i64 %.unpack910, i64* %28, align 8
   %29 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %30 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %29, i16* nonnull %30) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %29, i16* nonnull elementtype(i16) %30) #6
   %31 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %32 = call i8* @llvm.frameaddress(i32 0) #6
   %33 = getelementptr inbounds [5 x i8*], [5 x i8*]* %31, i64 0, i64 0
@@ -882,7 +882,7 @@ fusion.loop_detach.dim.0.ls1.preheader:           ; preds = %.split.split, %__ci
   %fusion.indvar_address.dim.0.022.ls1.dac5 = phi i64 [ %miditer, %.split.split ], [ %fusion.indvar_address.dim.0.022.start.ls1, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount6, 1
   %miditer = add nuw nsw i64 %fusion.indvar_address.dim.0.022.ls1.dac5, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %17 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %17, i8** %14, align 8
   %18 = call i8* @llvm.stacksave()
@@ -921,7 +921,7 @@ cilk.sync.savestate.i:                            ; preds = %fusion.loop_sync.di
   store i64 %.unpack1314, i64* %28, align 8
   %29 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %30 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %29, i16* nonnull %30) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %29, i16* nonnull elementtype(i16) %30) #6
   %31 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %32 = call i8* @llvm.frameaddress(i32 0) #6
   %33 = getelementptr inbounds [5 x i8*], [5 x i8*]* %31, i64 0, i64 0
@@ -1100,7 +1100,7 @@ fusion.3.loop_detach.dim.0.ls1.preheader:         ; preds = %.split.split, %__ci
   %fusion.3.indvar_address.dim.0.025.ls1.dac2 = phi i64 [ %miditer, %.split.split ], [ %fusion.3.indvar_address.dim.0.025.start.ls1, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount3, 1
   %miditer = add nuw nsw i64 %fusion.3.indvar_address.dim.0.025.ls1.dac2, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %17 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %17, i8** %14, align 8
   %18 = call i8* @llvm.stacksave()
@@ -1139,7 +1139,7 @@ cilk.sync.savestate.i:                            ; preds = %fusion.3.loop_sync.
   store i64 %.unpack78, i64* %28, align 8
   %29 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %30 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %29, i16* nonnull %30) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %29, i16* nonnull elementtype(i16) %30) #6
   %31 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %32 = call i8* @llvm.frameaddress(i32 0) #6
   %33 = getelementptr inbounds [5 x i8*], [5 x i8*]* %31, i64 0, i64 0
@@ -1421,7 +1421,7 @@ fusion.1.loop_detach.dim.0.ls1.preheader:         ; preds = %.split.split, %__ci
   %fusion.1.indvar_address.dim.0.028.ls1.dac2 = phi i64 [ %miditer, %.split.split ], [ %fusion.1.indvar_address.dim.0.028.start.ls1, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount3, 1
   %miditer = add nuw nsw i64 %fusion.1.indvar_address.dim.0.028.ls1.dac2, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %17 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %17, i8** %14, align 8
   %18 = call i8* @llvm.stacksave()
@@ -1460,7 +1460,7 @@ cilk.sync.savestate.i:                            ; preds = %fusion.1.loop_sync.
   store i64 %.unpack78, i64* %28, align 8
   %29 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %30 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %29, i16* nonnull %30) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %29, i16* nonnull elementtype(i16) %30) #6
   %31 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %32 = call i8* @llvm.frameaddress(i32 0) #6
   %33 = getelementptr inbounds [5 x i8*], [5 x i8*]* %31, i64 0, i64 0
@@ -1918,7 +1918,7 @@ fusion.4.loop_detach.dim.0.ls1.preheader:         ; preds = %.split.split, %__ci
   %fusion.4.indvar_address.dim.0.031.ls1.dac5 = phi i64 [ %miditer, %.split.split ], [ %fusion.4.indvar_address.dim.0.031.start.ls1, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount6, 1
   %miditer = add nuw nsw i64 %fusion.4.indvar_address.dim.0.031.ls1.dac5, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %17 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %17, i8** %14, align 8
   %18 = call i8* @llvm.stacksave()
@@ -1957,7 +1957,7 @@ cilk.sync.savestate.i:                            ; preds = %fusion.4.loop_sync.
   store i64 %.unpack1011, i64* %28, align 8
   %29 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %30 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %29, i16* nonnull %30) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %29, i16* nonnull elementtype(i16) %30) #6
   %31 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %32 = call i8* @llvm.frameaddress(i32 0) #6
   %33 = getelementptr inbounds [5 x i8*], [5 x i8*]* %31, i64 0, i64 0
@@ -2895,7 +2895,7 @@ fusion.2.loop_detach.dim.0.ls1.preheader:         ; preds = %.split.split, %__ci
   %fusion.2.indvar_address.dim.0.034.ls1.dac4 = phi i64 [ %miditer, %.split.split ], [ %fusion.2.indvar_address.dim.0.034.start.ls1, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount5, 1
   %miditer = add nuw nsw i64 %fusion.2.indvar_address.dim.0.034.ls1.dac4, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %17 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %17, i8** %14, align 8
   %18 = call i8* @llvm.stacksave()
@@ -2934,7 +2934,7 @@ cilk.sync.savestate.i:                            ; preds = %fusion.2.loop_sync.
   store i64 %.unpack910, i64* %28, align 8
   %29 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %30 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %29, i16* nonnull %30) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %29, i16* nonnull elementtype(i16) %30) #6
   %31 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %32 = call i8* @llvm.frameaddress(i32 0) #6
   %33 = getelementptr inbounds [5 x i8*], [5 x i8*]* %31, i64 0, i64 0
@@ -3989,7 +3989,7 @@ dot.10.loop_detach.rhs.1.ls2.preheader:           ; preds = %.split.split, %__ci
   %dot.10.indvar_address.rhs.1.038.ls2.dac3 = phi i64 [ %miditer, %.split.split ], [ %dot.10.indvar_address.rhs.1.038.start.ls2, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount4, 1
   %miditer = add nuw nsw i64 %dot.10.indvar_address.rhs.1.038.ls2.dac3, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %117 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %117, i8** %14, align 8
   %118 = call i8* @llvm.stacksave()
@@ -4028,7 +4028,7 @@ cilk.sync.savestate.i:                            ; preds = %dot.10.loop_sync.rh
   store i64 %.unpack89, i64* %128, align 8
   %129 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %130 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %129, i16* nonnull %130) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %129, i16* nonnull elementtype(i16) %130) #6
   %131 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %132 = call i8* @llvm.frameaddress(i32 0) #6
   %133 = getelementptr inbounds [5 x i8*], [5 x i8*]* %131, i64 0, i64 0
@@ -4341,7 +4341,7 @@ dot.10.loop_detach.lhs.0.ls1.preheader:           ; preds = %.split.split, %__ci
   %dot.10.indvar_address.lhs.0.040.ls1.dac3 = phi i64 [ %miditer, %.split.split ], [ %dot.10.indvar_address.lhs.0.040.start.ls1, %.lr.ph.preheader ]
   %halfcount = lshr i64 %itercount4, 1
   %miditer = add nuw nsw i64 %dot.10.indvar_address.lhs.0.040.ls1.dac3, %halfcount
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %11, i16* nonnull %12) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %11, i16* nonnull elementtype(i16) %12) #6
   %24 = call i8* @llvm.frameaddress(i32 0)
   store volatile i8* %24, i8** %14, align 8
   %25 = call i8* @llvm.stacksave()
@@ -4380,7 +4380,7 @@ cilk.sync.savestate.i:                            ; preds = %dot.10.loop_sync.lh
   store i64 %.unpack89, i64* %35, align 8
   %36 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 6
   %37 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 7
-  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull %36, i16* nonnull %37) #6
+  call void asm sideeffect "stmxcsr $0\0A\09fnstcw $1", "*m,*m,~{dirflag},~{fpsr},~{flags}"(i32* nonnull elementtype(i32) %36, i16* nonnull elementtype(i16) %37) #6
   %38 = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %__cilkrts_sf, i64 0, i32 5
   %39 = call i8* @llvm.frameaddress(i32 0) #6
   %40 = getelementptr inbounds [5 x i8*], [5 x i8*]* %38, i64 0, i64 0

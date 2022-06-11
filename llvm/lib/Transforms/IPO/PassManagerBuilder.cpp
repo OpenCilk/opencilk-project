@@ -452,8 +452,8 @@ void PassManagerBuilder::populateModulePassManager(
     // Cleanup the IR after stripminning.
     MPM.add(createTaskSimplifyPass());
     MPM.add(createLoopSimplifyCFGPass());
-    MPM.add(createIndVarSimplifyPass());        // Canonicalize indvars
-    MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap));
+    MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap,
+                           /*AllowSpeculation=*/true));
     MPM.add(createEarlyCSEPass());
     MPM.add(createJumpThreadingPass());         // Thread jumps
     MPM.add(createCorrelatedValuePropagationPass());
@@ -512,7 +512,8 @@ void PassManagerBuilder::populateModulePassManager(
     // rotated form due to GVN or other transformations, and loop spawning
     // relies on the rotated form.  Disable header duplication at -Oz.
     MPM.add(createLoopRotatePass(SizeLevel == 2 ? 0 : -1));
-    MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap));
+    MPM.add(createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap,
+                           /*AllowSpeculation=*/true));
     // Outline Tapir loops as needed.
     MPM.add(createLoopSpawningTIPass());
 

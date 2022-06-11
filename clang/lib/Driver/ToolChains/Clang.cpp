@@ -6177,11 +6177,17 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
       // If an OpenCilk resource directory is specified, check that it is valid.
       if (Args.hasArgNoClaim(options::OPT_opencilk_resource_dir_EQ)) {
-        if (!getToolChain().getOpenCilkRuntimePath(Args)) {
+        bool ValidPathFound = false;
+        for (auto Path : getToolChain().getOpenCilkRuntimePaths(Args)) {
+          if (D.getVFS().exists(Path)) {
+            ValidPathFound = true;
+            break;
+          }
+        }
+        if (!ValidPathFound)
           D.Diag(diag::err_drv_opencilk_resource_dir_missing_lib)
               << Args.getLastArgNoClaim(options::OPT_opencilk_resource_dir_EQ)
                      ->getAsString(Args);
-        }
       }
 
       // Forward flags for enabling pedigrees.

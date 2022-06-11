@@ -375,19 +375,18 @@ Function *llvm::CreateHelper(
     if (Inputs.count(&OldArg) || Outputs.count(&OldArg)) {
       Argument *NewArg = dyn_cast<Argument>(VMap[&OldArg]);
       NewArgAttrs[NewArg->getArgNo()] =
-          OldAttrs.getParamAttributes(OldArg.getArgNo())
+          OldAttrs.getParamAttrs(OldArg.getArgNo())
           .removeAttribute(NewFunc->getContext(), Attribute::Returned);
     }
   }
   } // end timed region
 
   NewFunc->setAttributes(
-      AttributeList::get(NewFunc->getContext(), OldAttrs.getFnAttributes(),
-                         OldAttrs.getRetAttributes(), NewArgAttrs));
+      AttributeList::get(NewFunc->getContext(), OldAttrs.getFnAttrs(),
+                         OldAttrs.getRetAttrs(), NewArgAttrs));
 
   // Remove old return attributes.
-  NewFunc->removeAttributes(
-      AttributeList::ReturnIndex,
+  NewFunc->removeRetAttrs(
       AttributeFuncs::typeIncompatible(NewFunc->getReturnType()));
 
   // Update vector-related attributes in the caller and new function

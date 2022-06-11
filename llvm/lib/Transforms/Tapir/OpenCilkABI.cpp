@@ -66,7 +66,7 @@ static void fixCilkSyncFn(Module &M, Function *Fn) {
     if (CallBase *CB = dyn_cast<CallBase>(&I))
       if (CB->getCalledFunction() == ExceptionRaiseFn ||
           CB->getCalledFunction() == ExceptionResumeFn)
-        CB->removeAttribute(AttributeList::FunctionIndex, Attribute::NoUnwind);
+        CB->removeFnAttr(Attribute::NoUnwind);
 }
 
 // Structure recording information about Cilk ABI functions.

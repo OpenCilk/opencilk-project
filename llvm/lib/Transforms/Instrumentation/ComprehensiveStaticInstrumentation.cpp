@@ -268,7 +268,6 @@ bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
     case Intrinsic::coro_frame:
     case Intrinsic::coro_size:
     case Intrinsic::coro_suspend:
-    case Intrinsic::coro_param:
     case Intrinsic::coro_subfn_addr:
     case Intrinsic::syncregion_start:
     case Intrinsic::taskframe_create:
@@ -867,9 +866,8 @@ void CSIImpl::splitBlocksAtCalls(Function &F, DominatorTree *DT, LoopInfo *LI) {
     SplitBlock(Call->getParent(), Call->getNextNode(), DT, LI);
 }
 
-int CSIImpl::getNumBytesAccessed(Value *Addr, const DataLayout &DL) {
-  Type *OrigPtrTy = Addr->getType();
-  Type *OrigTy = cast<PointerType>(OrigPtrTy)->getElementType();
+int CSIImpl::getNumBytesAccessed(Value *Addr, Type *OrigTy,
+                                 const DataLayout &DL) {
   assert(OrigTy->isSized());
   uint32_t TypeSize = DL.getTypeStoreSizeInBits(OrigTy);
   if (TypeSize % 8 != 0)
@@ -902,7 +900,9 @@ void CSIImpl::instrumentLoadOrStore(Instruction *I,
   bool IsWrite = isa<StoreInst>(I);
   Value *Addr = IsWrite ? cast<StoreInst>(I)->getPointerOperand()
                         : cast<LoadInst>(I)->getPointerOperand();
-  int NumBytes = getNumBytesAccessed(Addr, DL);
+  Type *Ty =
+      IsWrite ? cast<StoreInst>(I)->getValueOperand()->getType() : I->getType();
+  int NumBytes = getNumBytesAccessed(Addr, Ty, DL);
   Type *AddrType = IRB.getInt8PtrTy();
 
   if (NumBytes == -1)
@@ -2314,13 +2314,11 @@ void CSIImpl::computeLoadAndStoreProperties(
 // Update the attributes on the instrumented function that might be invalidated
 // by the inserted instrumentation.
 void CSIImpl::updateInstrumentedFnAttrs(Function &F) {
-  AttrBuilder B;
-  B.addAttribute(Attribute::ReadOnly)
-      .addAttribute(Attribute::ReadNone)
-      .addAttribute(Attribute::ArgMemOnly)
-      .addAttribute(Attribute::InaccessibleMemOnly)
-      .addAttribute(Attribute::InaccessibleMemOrArgMemOnly);
-  F.removeAttributes(AttributeList::FunctionIndex, B);
+  F.removeFnAttr(Attribute::ReadOnly);
+  F.removeFnAttr(Attribute::ReadNone);
+  F.removeFnAttr(Attribute::ArgMemOnly);
+  F.removeFnAttr(Attribute::InaccessibleMemOnly);
+  F.removeFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
 }
 
 void CSIImpl::instrumentFunction(Function &F) {
@@ -2337,13 +2335,14 @@ void CSIImpl::instrumentFunction(Function &F) {
 
   const TargetLibraryInfo *TLI = &GetTLI(F);
 
+  DominatorTree *DT = &GetDomTree(F);
+  LoopInfo &LI = GetLoopInfo(F);
+
   // If we do not assume that calls terminate blocks, or if we're not
   // instrumenting basic blocks, then we're done.
   if (Options.InstrumentBasicBlocks && Options.CallsTerminateBlocks)
-    splitBlocksAtCalls(F);
+    splitBlocksAtCalls(F, DT, &LI);
 
-  DominatorTree *DT = &GetDomTree(F);
-  LoopInfo &LI = GetLoopInfo(F);
 
   if (Options.InstrumentLoops)
     // Simplify loops to prepare for loop instrumentation

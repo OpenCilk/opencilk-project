@@ -169,7 +169,6 @@
 ; CHECK-O2-NEXT: Running pass: LoopSimplifyPass
 ; CHECK-O2-NEXT: Running pass: LCSSAPass
 ; CHECK-O2-NEXT: Running pass: LoopSimplifyCFGPass
-; CHECK-O2-NEXT: Running pass: IndVarSimplifyPass
 ; CHECK-O2-NEXT: Running pass: LICMPass
 ; CHECK-O2-NEXT: Running pass: EarlyCSEPass
 ; CHECK-O2-NEXT: Running pass: JumpThreadingPass
@@ -182,7 +181,6 @@
 ; CHECK-O3-NEXT: Running pass: LoopSimplifyPass
 ; CHECK-O3-NEXT: Running pass: LCSSAPass
 ; CHECK-O3-NEXT: Running pass: LoopSimplifyCFGPass
-; CHECK-O3-NEXT: Running pass: IndVarSimplifyPass
 ; CHECK-O3-NEXT: Running pass: LICMPass
 ; CHECK-O3-NEXT: Running pass: EarlyCSEPass
 ; CHECK-O3-NEXT: Running pass: JumpThreadingPass

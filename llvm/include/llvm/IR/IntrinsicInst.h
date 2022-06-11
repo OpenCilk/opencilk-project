@@ -118,7 +118,6 @@ public:
     case Intrinsic::coro_frame:
     case Intrinsic::coro_size:
     case Intrinsic::coro_suspend:
-    case Intrinsic::coro_param:
     case Intrinsic::coro_subfn_addr:
     case Intrinsic::syncregion_start:
     case Intrinsic::taskframe_create:

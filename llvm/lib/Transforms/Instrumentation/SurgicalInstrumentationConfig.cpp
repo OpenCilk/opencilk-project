@@ -35,8 +35,8 @@ InstrumentationConfig::ReadFromConfigurationFile(const std::string &filename) {
 
   if (!file) {
     llvm::report_fatal_error(
-        "Instrumentation configuration file could not be opened: " +
-        file.getError().message());
+        Twine("Instrumentation configuration file could not be opened: ") +
+        Twine(file.getError().message()));
   }
 
   StringRef contents = file.get()->getBuffer();

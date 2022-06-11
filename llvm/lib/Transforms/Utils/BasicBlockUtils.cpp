@@ -195,8 +195,7 @@ bool llvm::MergeBlockIntoPredecessor(BasicBlock *BB, DomTreeUpdater *DTU,
   Instruction *PTI = PredBB->getTerminator();
   if (PTI->isExceptionalTerminator() || PTI->mayHaveSideEffects())
     return false;
-  // For now, don't break syncs.
-  // TODO: Don't break syncs unless they don't sync anything.
+  // Don't break syncs.
   if (isa<SyncInst>(PredBB->getTerminator())) return false;
   // Don't break entry blocks of detached CFG's.
   for (pred_iterator PI = pred_begin(PredBB), PE = pred_end(PredBB);
