@@ -1305,6 +1305,21 @@ CursorKind.OMP_TARGET_SIMD_DIRECTIVE = CursorKind(270)
 # OpenMP teams distribute directive.
 CursorKind.OMP_TEAMS_DISTRIBUTE_DIRECTIVE = CursorKind(271)
 
+# Cilk cilk_spawn statement.
+CursorKind.CILK_SPAWN_STMT = CursorKind(296)
+
+# Cilk wrapper for an expression preceded by cilk_spawn.
+CursorKind.CILK_SPAWN_EXPR = CursorKind(297)
+
+# Cilk cilk_sync statement.
+CursorKind.CILK_SYNC_STMT = CursorKind(298)
+
+# Cilk cilk_for statement.
+CursorKind.CILK_FOR_STMT = CursorKind(299)
+
+# Cilk cilk_scope statement.
+CursorKind.CILK_SCOPE_STMT = CursorKind(300)
+
 ###
 # Other Kinds
 
