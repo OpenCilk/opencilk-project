@@ -1644,7 +1644,12 @@ bool llvm::splitTaskFrameCreateBlocks(Function &F, DominatorTree *DT,
       LLVM_DEBUG(dbgs() << "Splitting block after " << *TFEnd << "\n");
       BasicBlock::iterator Iter = ++TFEnd->getIterator();
       SplitBlock(TFEnd->getParent(), &*Iter, DT, LI, MSSAU);
-      Iter->getParent()->setName(TFEnd->getParent()->getName()+".tfend");
+      // Try to attach debug info to the new terminator after the taskframe.end
+      // call.
+      Instruction *SplitTerminator = TFEnd->getParent()->getTerminator();
+      if (!SplitTerminator->getDebugLoc())
+        SplitTerminator->setDebugLoc(TFEnd->getDebugLoc());
+      Iter->getParent()->setName(TFEnd->getParent()->getName() + ".tfend");
       Changed = true;
     }
 
