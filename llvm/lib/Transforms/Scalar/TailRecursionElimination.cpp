@@ -424,6 +424,9 @@ class TailRecursionEliminator {
   // The instruction doing the accumulating.
   Instruction *AccumulatorRecursionInstr = nullptr;
 
+  // Map from sync region to return blocks to sync for that sync region.
+  DenseMap<Value *, SmallPtrSet<BasicBlock *, 4>> ReturnBlocksToSync;
+
   TailRecursionEliminator(Function &F, const TargetTransformInfo *TTI,
                           AliasAnalysis *AA, OptimizationRemarkEmitter *ORE,
                           DomTreeUpdater &DTU)
@@ -436,6 +439,8 @@ class TailRecursionEliminator {
   void insertAccumulator(Instruction *AccRecInstr);
 
   bool eliminateCall(CallInst *CI);
+
+  void InsertSyncsIntoReturnBlocks();
 
   void cleanupAndFinalize();
 
@@ -804,7 +809,7 @@ void TailRecursionEliminator::cleanupAndFinalize() {
 
 static void
 getReturnBlocksToSync(BasicBlock *Entry, SyncInst *Sync,
-                      SmallVectorImpl<BasicBlock *> &ReturnBlocksToSync) {
+                      SmallPtrSetImpl<BasicBlock *> &ReturnBlocksToSync) {
   // Walk the CFG from the entry block, stopping traversal at any sync within
   // the same region.  Record all blocks found that are terminated by a return
   // instruction.
@@ -825,7 +830,7 @@ getReturnBlocksToSync(BasicBlock *Entry, SyncInst *Sync,
     // If we find a return, we must add a sync before it if we eliminate a
     // recursive tail call.
     if (isa<ReturnInst>(BB->getTerminator()))
-      ReturnBlocksToSync.push_back(BB);
+      ReturnBlocksToSync.insert(BB);
 
     // Queue up successors to search.
     for (BasicBlock *Succ : successors(BB))
@@ -884,11 +889,11 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
     ReturnInst *Ret =
         dyn_cast<ReturnInst>(Succ->getFirstNonPHIOrDbgOrSyncUnwind(true));
 
-    // After the sync, there might be a block with a sync.unwind instruction and
-    // an unconditional branch to a block containing just a return.  Check for
-    // this structure.
     BasicBlock *BrSucc = nullptr;
     if (!Ret) {
+      // After the sync, there might be a block with a sync.unwind instruction
+      // and an unconditional branch to a block containing just a return.  Check
+      // for this structure.
       if (BranchInst *BI = dyn_cast<BranchInst>(
               Succ->getFirstNonPHIOrDbgOrSyncUnwind(true))) {
         if (BI->isConditional())
@@ -928,8 +933,7 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
     }
 
     // Get returns reachable from newly created loop.
-    SmallVector<BasicBlock *, 8> ReturnBlocksToSync;
-    getReturnBlocksToSync(OldEntryBlock, SI, ReturnBlocksToSync);
+    getReturnBlocksToSync(OldEntryBlock, SI, ReturnBlocksToSync[SyncRegion]);
 
     // If we found a sync.unwind and unconditional branch between the sync and
     // return, first fold the return into this unconditional branch.
@@ -943,7 +947,7 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
     LLVM_DEBUG(dbgs() << "FOLDING: " << *Succ << "INTO SYNC PRED: " << BB);
     FoldReturnIntoUncondBranch(Ret, Succ, &BB, &DTU);
     ++NumRetDuped;
-    
+
     // If all predecessors of Succ have been eliminated by
     // FoldReturnIntoUncondBranch, delete it.  It is important to empty it,
     // because the ret instruction in there is still using a value which
@@ -957,22 +961,10 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
     // If a recursive tail was eliminated, fix up the syncs and sync region in
     // the CFG.
     if (EliminatedCall) {
-      // Move the sync region start to the new entry block.
-      Function *SyncUnwindFn = Intrinsic::getDeclaration(
-          OldEntryBlock->getModule(), Intrinsic::sync_unwind);
-      BasicBlock *NewEntry = &OldEntryBlock->getParent()->getEntryBlock();
-      cast<Instruction>(SyncRegion)->moveBefore(&*(NewEntry->begin()));
-      // Insert syncs before relevant return blocks.
-      for (BasicBlock *RetBlock : ReturnBlocksToSync) {
-        BasicBlock *NewRetBlock =
-            SplitBlock(RetBlock, RetBlock->getTerminator(), &DTU);
-        ReplaceInstWithInst(RetBlock->getTerminator(),
-                            SyncInst::Create(NewRetBlock, SyncRegion));
-
-        if (!OldEntryBlock->getParent()->doesNotThrow())
-          CallInst::Create(SyncUnwindFn, {SyncRegion}, "",
-                           NewRetBlock->getTerminator());
-      }
+      // We defer the restoration of syncs at relevant return blocks until after
+      // all blocks are processed.  This approach simplifies the logic for
+      // eliminating multiple tail calls that are only separated from the return
+      // by a sync, since the CFG won't be perturbed unnecessarily.
     } else {
       // Restore the sync that was eliminated.
       BasicBlock *RetBlock = Ret->getParent();
@@ -987,6 +979,32 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
   }
 
   return false;
+}
+
+void TailRecursionEliminator::InsertSyncsIntoReturnBlocks() {
+  Function *SyncUnwindFn =
+      Intrinsic::getDeclaration(F.getParent(), Intrinsic::sync_unwind);
+  BasicBlock &NewEntry = F.getEntryBlock();
+
+  for (auto ReturnsToSync : ReturnBlocksToSync) {
+    Value *SyncRegion = ReturnsToSync.first;
+    SmallPtrSetImpl<BasicBlock *> &ReturnBlocks = ReturnsToSync.second;
+
+    // Move the sync region start to the new entry block.
+    cast<Instruction>(SyncRegion)->moveBefore(&*(NewEntry.begin()));
+
+    // Insert syncs before relevant return blocks.
+    for (BasicBlock *RetBlock : ReturnBlocks) {
+      BasicBlock *NewRetBlock =
+          SplitBlock(RetBlock, RetBlock->getTerminator(), &DTU);
+      ReplaceInstWithInst(RetBlock->getTerminator(),
+                          SyncInst::Create(NewRetBlock, SyncRegion));
+
+      if (!F.doesNotThrow())
+        CallInst::Create(SyncUnwindFn, {SyncRegion}, "",
+                         NewRetBlock->getTerminator());
+    }
+  }
 }
 
 bool TailRecursionEliminator::eliminate(Function &F,
@@ -1013,6 +1031,9 @@ bool TailRecursionEliminator::eliminate(Function &F,
 
   for (BasicBlock &BB : F)
     MadeChange |= TRE.processBlock(BB);
+
+  if (!TRE.ReturnBlocksToSync.empty())
+    TRE.InsertSyncsIntoReturnBlocks();
 
   TRE.cleanupAndFinalize();
 
