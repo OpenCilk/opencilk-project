@@ -32,12 +32,12 @@ det.cont:                                         ; preds = %det.achd, %if.end
   call void @_Z3fool(i64 %sub)
   sync within %syncreg, label %sync.continue
 ; CHECK: det.cont:
-; CHECK: sync within %syncreg, label %sync.continue
+; CHECK: sync within %syncreg, label %sync.continue1
 
 sync.continue:                                    ; preds = %det.cont
   call void @llvm.sync.unwind(token %syncreg)
   sync within %syncreg, label %sync.continue1
-; CHECK: sync.continue:
+; CHECK: sync.continue1:
 ; CHECK-NEXT: call void @llvm.sync.unwind(token %syncreg)
 ; CHECK-NEXT: br label %[[RETURN:.+]]
 ; CHECK-NOT: sync within %syncreg
