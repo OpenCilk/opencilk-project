@@ -1033,6 +1033,20 @@ private:
   static constexpr PropertyBits PropBits = {8, (64 - 8)};
 };
 
+struct CSISetupImpl {
+public:
+  CSISetupImpl(Module &M, const CSIOptions &Options = CSIOptions())
+      : M(M), Options(Options) {}
+
+  bool run();
+
+private:
+  bool setupFunction(Function &F);
+
+  Module &M;
+  CSIOptions Options;
+};
+
 struct CSIImpl {
 public:
   CSIImpl(Module &M, CallGraph *CG,
@@ -1203,7 +1217,7 @@ protected:
                                             ArrayRef<Value *> DefaultArgs);
 
   /// Return true if the given function should not be instrumented.
-  bool shouldNotInstrumentFunction(Function &F);
+  static bool shouldNotInstrumentFunction(Function &F);
 
   // Update the attributes on the instrumented function that might be
   // invalidated by the inserted instrumentation.
@@ -1521,6 +1535,8 @@ protected:
   // using UnderlyingObjMapTy = DenseMap<Value *, Value *>;
   // mutable UnderlyingObjMapTy UnderlyingObject;
   Value *lookupUnderlyingObject(Value *Addr) const;
+
+  friend struct CSISetupImpl;
 };
 
 } // end namespace llvm

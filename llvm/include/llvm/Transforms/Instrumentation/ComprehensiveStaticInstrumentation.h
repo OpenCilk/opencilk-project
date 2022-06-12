@@ -20,6 +20,17 @@
 
 namespace llvm {
 
+/// CSISetup pass for new pass manager.
+class CSISetupPass : public PassInfoMixin<CSISetupPass> {
+public:
+  CSISetupPass();
+  CSISetupPass(const CSIOptions &Options);
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+
+private:
+  CSIOptions Options;
+};
+
 /// ComprehensiveStaticInstrumentation pass for new pass manager.
 class ComprehensiveStaticInstrumentationPass :
     public PassInfoMixin<ComprehensiveStaticInstrumentationPass> {
