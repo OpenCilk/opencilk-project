@@ -234,6 +234,32 @@ static void setInstrumentationDebugLoc(BasicBlock &Instrumented,
   }
 }
 
+bool CSISetupImpl::run() {
+  bool Changed = false;
+  for (Function &F : M)
+    Changed |= setupFunction(F);
+  return Changed;
+}
+
+bool CSISetupImpl::setupFunction(Function &F) {
+  if (F.empty() || CSIImpl::shouldNotInstrumentFunction(F))
+    return false;
+
+  if (Options.CallsMayThrow)
+    // Promote calls to invokes to insert CSI instrumentation in
+    // exception-handling code.
+    CSIImpl::setupCalls(F);
+
+  // If we do not assume that calls terminate blocks, or if we're not
+  // instrumenting basic blocks, then we're done.
+  if (Options.InstrumentBasicBlocks && Options.CallsTerminateBlocks)
+    CSIImpl::splitBlocksAtCalls(F);
+
+  LLVM_DEBUG(dbgs() << "Setup function:\n" << F);
+
+  return true;
+}
+
 bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
   if (isa<DbgInfoIntrinsic>(I))
     return true;
@@ -2171,6 +2197,7 @@ Value *CSIImpl::lookupUnderlyingObject(Value *Addr) const {
 }
 
 bool CSIImpl::shouldNotInstrumentFunction(Function &F) {
+  Module &M = *F.getParent();
   // Don't instrument standard library calls.
 #ifdef WIN32
   if (F.hasName() && F.getName().find("_") == 0) {
@@ -2342,7 +2369,6 @@ void CSIImpl::instrumentFunction(Function &F) {
   // instrumenting basic blocks, then we're done.
   if (Options.InstrumentBasicBlocks && Options.CallsTerminateBlocks)
     splitBlocksAtCalls(F, DT, &LI);
-
 
   if (Options.InstrumentLoops)
     // Simplify loops to prepare for loop instrumentation
@@ -2618,6 +2644,17 @@ bool ComprehensiveStaticInstrumentationLegacyPass::runOnModule(Module &M) {
   return res;
 }
 
+CSISetupPass::CSISetupPass() : Options(OverrideFromCL(CSIOptions())) {}
+
+CSISetupPass::CSISetupPass(const CSIOptions &Options) : Options(Options) {}
+
+PreservedAnalyses CSISetupPass::run(Module &M, ModuleAnalysisManager &AM) {
+  if (!CSISetupImpl(M, Options).run())
+    return PreservedAnalyses::all();
+
+  return PreservedAnalyses::none();
+}
+
 ComprehensiveStaticInstrumentationPass::ComprehensiveStaticInstrumentationPass()
     : Options(OverrideFromCL(CSIOptions())) {}
 
@@ -2649,6 +2686,9 @@ ComprehensiveStaticInstrumentationPass::run(Module &M,
   auto GetTLI = [&FAM](Function &F) -> TargetLibraryInfo & {
     return FAM.getResult<TargetLibraryAnalysis>(F);
   };
+
+  // Disable additional conversion of calls to invokes.
+  Options.CallsMayThrow = false;
 
   if (!CSIImpl(M, &CG, GetDT, GetLI, GetTI, GetTLI, GetSE, GetTTI, Options)
            .run())

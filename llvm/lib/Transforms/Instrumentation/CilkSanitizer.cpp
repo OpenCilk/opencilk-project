@@ -332,7 +332,7 @@ struct CilkSanitizerImpl : public CSIImpl {
     Options.jitMode = JitMode;
     Options.CallsMayThrow = CallsMayThrow;
   }
-  bool setup();
+  bool setup(bool NeedToSetupCalls);
   bool run();
 
   static StructType *getUnitObjTableType(LLVMContext &C,
@@ -350,7 +350,7 @@ struct CilkSanitizerImpl : public CSIImpl {
 
   void setupBlocks(Function &F, DominatorTree *DT = nullptr,
                    LoopInfo *LI = nullptr);
-  bool setupFunction(Function &F);
+  bool setupFunction(Function &F, bool NeedToSetupCalls);
 
   // Methods for handling FED tables
   void initializeFEDTables() {}
@@ -713,13 +713,13 @@ using SCCNodeSet = SmallSetVector<Function *, 8>;
 
 } // end anonymous namespace
 
-bool CilkSanitizerImpl::setup() {
+bool CilkSanitizerImpl::setup(bool NeedToSetupCalls) {
   // Setup functions for instrumentation.
   for (scc_iterator<CallGraph *> I = scc_begin(CG); !I.isAtEnd(); ++I) {
     const std::vector<CallGraphNode *> &SCC = *I;
     for (CallGraphNode *N : SCC)
       if (Function *F = N->getFunction())
-        setupFunction(*F);
+        setupFunction(*F, NeedToSetupCalls);
   }
   return true;
 }
@@ -3037,7 +3037,7 @@ static bool CheckSanitizeCilkAttr(Function &F) {
   return F.hasFnAttribute(Attribute::SanitizeCilk);
 }
 
-bool CilkSanitizerImpl::setupFunction(Function &F) {
+bool CilkSanitizerImpl::setupFunction(Function &F, bool NeedToSetupCalls) {
   if (F.empty() || shouldNotInstrumentFunction(F) ||
       !CheckSanitizeCilkAttr(F)) {
     LLVM_DEBUG({
@@ -3054,7 +3054,7 @@ bool CilkSanitizerImpl::setupFunction(Function &F) {
   LLVM_DEBUG(dbgs() << "Setting up " << F.getName()
                     << " for instrumentation\n");
 
-  if (Options.CallsMayThrow)
+  if (NeedToSetupCalls && Options.CallsMayThrow)
     // Promote calls to invokes to insert instrumentation in exception-handling
     // code.
     setupCalls(F);
@@ -4754,7 +4754,7 @@ bool CilkSanitizerLegacyPass::runOnModule(Module &M) {
   bool Changed =
       CilkSanitizerImpl(M, CG, GetDomTree, nullptr, GetLoopInfo, nullptr,
                         GetTLI, nullptr, CallsMayThrow, JitMode)
-          .setup();
+          .setup(true);
   Changed |=
       CilkSanitizerImpl(M, CG, GetDomTree, GetTaskInfo, GetLoopInfo,
                         GetRaceInfo, GetTLI, GetSE, CallsMayThrow, JitMode)
@@ -4791,7 +4791,7 @@ PreservedAnalyses CilkSanitizerPass::run(Module &M, ModuleAnalysisManager &AM) {
 
   bool Changed =
       CilkSanitizerImpl(M, &CG, GetDT, nullptr, GetLI, nullptr, GetTLI, nullptr)
-          .setup();
+          .setup(false);
   Changed |=
       CilkSanitizerImpl(M, &CG, GetDT, GetTI, GetLI, GetRI, GetTLI, GetSE)
           .run();
