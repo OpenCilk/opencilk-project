@@ -385,6 +385,10 @@ Function *llvm::CreateHelper(
       AttributeList::get(NewFunc->getContext(), OldAttrs.getFnAttrs(),
                          OldAttrs.getRetAttrs(), NewArgAttrs));
 
+  // Remove prologue data
+  if (NewFunc->hasPrologueData())
+    NewFunc->setPrologueData(nullptr);
+
   // Remove old return attributes.
   NewFunc->removeRetAttrs(
       AttributeFuncs::typeIncompatible(NewFunc->getReturnType()));
