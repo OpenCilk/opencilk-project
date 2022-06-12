@@ -268,6 +268,7 @@ class SimplifyCFGOpt {
   bool simplifyBranch(BranchInst *Branch, IRBuilder<> &Builder);
   bool simplifyUncondBranch(BranchInst *BI, IRBuilder<> &Builder);
   bool simplifyCondBranch(BranchInst *BI, IRBuilder<> &Builder);
+  bool simplifySync(SyncInst *SI);
 
   bool tryToSimplifyUncondBranchWithICmpInIt(ICmpInst *ICI,
                                              IRBuilder<> &Builder);
@@ -2776,7 +2777,8 @@ static Value *isSafeToSpeculateStore(Instruction *I, BasicBlock *BrBB,
         // means it's never concurrently read or written, hence moving the store
         // from under the condition will not introduce a data race.
         auto *AI = dyn_cast<AllocaInst>(getUnderlyingObject(StorePtr));
-        if (AI && !PointerMayBeCaptured(AI, false, true))
+        if (AI && !PointerMayBeCaptured(AI, false, true) &&
+            GetDetachedCtx(LI->getParent()) == GetDetachedCtx(AI->getParent()))
           // Found a previous load, return it.
           return LI;
       }
@@ -6983,14 +6985,6 @@ bool SimplifyCFGOpt::simplifyBranch(BranchInst *Branch, IRBuilder<> &Builder) {
                                    : simplifyCondBranch(Branch, Builder);
 }
 
-static bool BlockIsEntryOfDetachedCtx(const BasicBlock *BB) {
-  if (const BasicBlock *PredBB = BB->getSinglePredecessor())
-    if (const DetachInst *DI = dyn_cast<DetachInst>(PredBB->getTerminator()))
-      if (DI->getDetached() == BB)
-        return true;
-  return false;
-}
-
 bool SimplifyCFGOpt::simplifyUncondBranch(BranchInst *BI,
                                           IRBuilder<> &Builder) {
   BasicBlock *BB = BI->getParent();
@@ -7009,9 +7003,20 @@ bool SimplifyCFGOpt::simplifyUncondBranch(BranchInst *BI,
        (is_contained(LoopHeaders, BB) || is_contained(LoopHeaders, Succ)));
   BasicBlock::iterator I = BB->getFirstNonPHIOrDbg(true)->getIterator();
   if (I->isTerminator() && BB != &BB->getParent()->getEntryBlock() &&
-      !BlockIsEntryOfDetachedCtx(BB) &&
       !NeedCanonicalLoop && TryToSimplifyUncondBranchFromEmptyBlock(BB, DTU))
     return true;
+
+  // If this branch goes to a reattach block with a single predecessor, merge
+  // the two blocks.
+  if (isa<ReattachInst>(Succ->getTerminator()) && Succ->getSinglePredecessor()) {
+    assert(!NeedCanonicalLoop &&
+           "Reattach-terminated successor cannot by a loop header.");
+    // Preserve the name of BB, for cleanliness.
+    std::string BBName = BB->getName().str();
+    MergeBasicBlockIntoOnlyPred(Succ, DTU);
+    Succ->setName(BBName);
+    return true;
+  }
 
   // If the only instruction in the block is a seteq/setne comparison against a
   // constant, try to simplify the block.
@@ -7124,9 +7129,10 @@ bool SimplifyCFGOpt::simplifyCondBranch(BranchInst *BI, IRBuilder<> &Builder) {
       // execute Successor #0 if it branches to Successor #1.
       Instruction *Succ0TI = BI->getSuccessor(0)->getTerminator();
       if (Succ0TI->getNumSuccessors() == 1 &&
-          Succ0TI->getSuccessor(0) == BI->getSuccessor(1))
+          Succ0TI->getSuccessor(0) == BI->getSuccessor(1)) {
         if (SpeculativelyExecuteBB(BI, BI->getSuccessor(0), TTI))
           return requestResimplify();
+      }
     }
   } else if (BI->getSuccessor(1)->getSinglePredecessor()) {
     // If Successor #0 has multiple preds, we may be able to conditionally
@@ -7158,6 +7164,71 @@ bool SimplifyCFGOpt::simplifyCondBranch(BranchInst *BI, IRBuilder<> &Builder) {
         if (PBI != BI && PBI->isConditional())
           if (mergeConditionalStores(PBI, BI, DTU, DL, TTI))
             return requestResimplify();
+
+  return false;
+}
+
+bool SimplifyCFGOpt::simplifySync(SyncInst *SI) {
+  const Value *SyncRegion = SI->getSyncRegion();
+  BasicBlock *Succ = SI->getSuccessor(0);
+
+  // Get the first non-trivial instruction in the successor of the sync.  Along
+  // the way, record a sync_unwind intrinsic for the sync if we find one.
+  Instruction *SyncUnwind = nullptr;
+  BasicBlock::iterator SuccI =
+      Succ->getFirstNonPHIOrDbg(true)->getIterator();
+  if (isSyncUnwind(&*SuccI, SyncRegion)) {
+    SyncUnwind = &*SuccI;
+    if (isa<InvokeInst>(SyncUnwind))
+      // We cannot eliminate syncs with associated sync-unwind that has an
+      // associated landingpad.
+      return false;
+    SuccI = Succ->getFirstNonPHIOrDbgOrSyncUnwind(true)->getIterator();
+  }
+
+  if (!SuccI->isTerminator())
+    // There's nontrivial code in the successor of the sync, so don't eliminate
+    // the sync.
+    return false;
+
+  if (SyncInst *SuccSI = dyn_cast<SyncInst>(&*SuccI)) {
+    if (SuccSI->getSyncRegion() == SyncRegion) {
+      // The successor block is terminated by a sync in the same sync region,
+      // meaning the given sync is redundant.  Eliminate the given sync.
+      if (SyncUnwind)
+        SyncUnwind->eraseFromParent();
+      ReplaceInstWithInst(SI, BranchInst::Create(Succ));
+      return requestResimplify();
+    }
+  }
+
+  // Otherwise check for an unconditional branch terminating the successor
+  // block.
+  if (!isa<BranchInst>(*SuccI))
+    return false;
+
+  BranchInst *BI = dyn_cast<BranchInst>(&*SuccI);
+  if (!BI->isUnconditional())
+    return false;
+
+  // Check if the successor of the unconditional branch simply contains a sync
+  // in the same sync region.
+  BasicBlock::iterator BrSuccI =
+      BI->getSuccessor(0)->getFirstNonPHIOrDbg(true)->getIterator();
+  if (!BrSuccI->isTerminator())
+    // There's nontrivial code in the successor of the sync, so don't eliminate
+    // it.
+    return false;
+  if (SyncInst *SuccSI = dyn_cast<SyncInst>(&*BrSuccI)) {
+    if (SuccSI->getSyncRegion() == SyncRegion) {
+      // The successor block is terminated by a sync in the same sync region,
+      // meaning the given sync is redundant.  Eliminate the given sync.
+      if (SyncUnwind)
+        SyncUnwind->eraseFromParent();
+      ReplaceInstWithInst(SI, BranchInst::Create(Succ));
+      return requestResimplify();
+    }
+  }
 
   return false;
 }
@@ -7566,6 +7637,8 @@ bool SimplifyCFGOpt::simplifyOnce(BasicBlock *BB) {
   case Instruction::IndirectBr:
     Changed |= simplifyIndirectBr(cast<IndirectBrInst>(Terminator));
     break;
+  case Instruction::Sync:
+    Changed |= simplifySync(cast<SyncInst>(Terminator));
   }
 
   return Changed;
