@@ -477,7 +477,8 @@ Function* formatFunctionToTask(Function* extracted, Instruction* CallSite) {
 
   // Load the context struct so that we can access the task's accessed data
   auto *Context = IRBuilder.CreatePointerBitCastOrAddrSpaceCast(
-    IRBuilder.CreateConstGEP2_32(cast<PointerType>(out_args[1]->getType()->getScalarType())->getElementType(), out_args[1], 0, 1), SharedsPtrTy);//.back();
+    // IRBuilder.CreateConstGEP2_32(cast<PointerType>(out_args[1]->getType()->getScalarType())->getElementType(), out_args[1], 0, 1), SharedsPtrTy);//.back();
+      IRBuilder.CreateConstGEP2_32(KmpTaskTWithPrivatesTy, out_args[1], 0, 1), SharedsPtrTy);
 
   std::vector<Value *> ForkedFnArgs;
 
