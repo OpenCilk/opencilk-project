@@ -40,7 +40,7 @@
 // CHECK002-NOT:   {{.*}}basic_linux_libcxx_tree{{/|\\\\}}usr{{/|\\\\}}lib{{/|\\\\}}crti.o
 // CHECK002-NOT:   {{.*}}basic_linux_libcxx_tree{{/|\\\\}}usr{{/|\\\\}}lib{{/|\\\\}}crt1.o
 // CHECK002-NOT:   -lclang_rt.builtins-hexagon
-// CHECK002-NOT:   -lc
+// CHECK002-NOT:   {{-lc\b}}
 // -----------------------------------------------------------------------------
 // Passing --musl -nostartfiles
 // -----------------------------------------------------------------------------
@@ -66,7 +66,7 @@
 // CHECK004:       "-dynamic-linker={{/|\\\\}}lib{{/|\\\\}}ld-musl-hexagon.so.1"
 // CHECK004:       "{{.*}}basic_linux_libcxx_tree{{/|\\\\}}usr{{/|\\\\}}lib{{/|\\\\}}crt1.o"
 // CHECK004-NOT:   -lclang_rt.builtins-hexagon
-// CHECK004-NOT:   -lc
+// CHECK004-NOT:   {{-lc\b}}
 // -----------------------------------------------------------------------------
 // Not Passing -fno-use-init-array when musl is selected
 // -----------------------------------------------------------------------------
