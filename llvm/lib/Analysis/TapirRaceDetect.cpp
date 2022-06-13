@@ -184,9 +184,6 @@ class StratABIList {
   /// Returns whether this type is listed in the given category.
   bool isIn(const Type &Ty, StringRef Category = StringRef()) const {
     const Type *ElTy = &Ty;
-    // Strip any levels of pointer type.
-    while (const PointerType *PtrTy = dyn_cast<PointerType>(ElTy))
-      ElTy = PtrTy->getElementType();
     // We only handle struct types right now.
     if (const StructType *STy = dyn_cast<StructType>(ElTy))
       if (STy->hasName())
