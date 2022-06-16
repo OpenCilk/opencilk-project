@@ -5624,7 +5624,7 @@ public:
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
 
   Expr *BuildHyperobjectLookup(Expr *, bool Pointer = false);
-  Expr *ValidateReducerCallback(Expr *E, unsigned NumArgs);
+  Expr *ValidateReducerCallback(QualType Element, Expr *E, unsigned NumArgs);
 
   ExprResult
   BuildAnonymousStructUnionMemberReference(

@@ -2399,7 +2399,7 @@ static bool CheckReducerParams(QualType T, unsigned NumArgs) {
 }
 
 // Return value is always non-null.
-Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs) {
+Expr *Sema::ValidateReducerCallback(QualType Element, Expr *E, unsigned Args) {
   if (!E)
     E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
                                             SourceLocation());
@@ -2409,6 +2409,12 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs) {
   // If the type is dependent it will be checked again later, if necessary.
   if (T->isDependentType() || T == Context.VoidPtrTy)
     return E;
+
+  if (T->isNonOverloadPlaceholderType()) {
+    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << Args;
+    return new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
+                                               E->getExprLoc());
+  }
 
   if (T->isNullPtrType())
     return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
@@ -2420,14 +2426,32 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs) {
       return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
                                       CK_NullToPointer, E, nullptr,
                                       VK_PRValue, FPOptionsOverride());
-    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << NumArgs;
+    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << Args;
     return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
                                     CK_IntegralToPointer, E, nullptr,
                                     VK_PRValue, FPOptionsOverride());
   }
 
-  if (CheckReducerParams(T, NumArgs)) {
-    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << NumArgs;
+  if (T == Context.OverloadTy) {
+    QualType Ptr = Context.getPointerType(Element);
+    llvm::SmallVector<QualType, 2> ArgTy;
+    ArgTy.push_back(Ptr);
+    if (Args > 1)
+      ArgTy.push_back(Ptr);
+    QualType Fn =
+      BuildFunctionType(Context.VoidTy, ArgTy, E->getExprLoc(),
+                        DeclarationName(), FunctionProtoType::ExtProtoInfo());
+    DeclAccessPair What;
+    bool Multiple = false;
+    if (FunctionDecl *F =
+        ResolveAddressOfOverloadedFunction(E, Fn, true, What, &Multiple)) {
+      T = F->getType();
+      E = BuildDeclRefExpr(F, T, VK_LValue, E->getExprLoc());
+    }
+  }
+
+  if (CheckReducerParams(T, Args)) {
+    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << Args;
     return new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
                                                E->getExprLoc());
   }
@@ -2451,9 +2475,9 @@ QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
       Diag(Loc, *Code) << Result;
   }
 
-  Identity = ValidateReducerCallback(Identity, 1);
-  Reduce = ValidateReducerCallback(Reduce, 2);
-  Destroy = ValidateReducerCallback(Destroy, 1);
+  Identity = ValidateReducerCallback(Element, Identity, 1);
+  Reduce = ValidateReducerCallback(Element, Reduce, 2);
+  Destroy = ValidateReducerCallback(Element, Destroy, 1);
 
   // The result of this function must be HyperobjectType if it is called
   // from C++ template instantiation when rebuilding an existing hyperobject
