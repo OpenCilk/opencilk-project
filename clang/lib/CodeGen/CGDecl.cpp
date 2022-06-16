@@ -593,6 +593,26 @@ namespace {
     }
   };
 
+  struct CallReducerCleanup final : EHScopeStack::Cleanup {
+    const VarDecl &Var;
+
+    CallReducerCleanup(const VarDecl *VarPtr)
+      : Var(*VarPtr) {
+    }
+
+    void Emit(CodeGenFunction &CGF, Flags flags) override {
+      /* The other classes do it this way... */
+      DeclRefExpr DRE(CGF.getContext(), const_cast<VarDecl *>(&Var), false,
+                      Var.getType(), VK_LValue, SourceLocation());
+      llvm::Value *Addr = CGF.EmitDeclRefLValue(&DRE).getPointer(CGF);
+      llvm::Value *AddrVoid =
+	CGF.Builder.CreateBitCast(Addr, CGF.CGM.VoidPtrTy);
+      llvm::Function *Unregister =
+	CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
+      CGF.Builder.CreateCall(Unregister, {AddrVoid});
+    }
+  };
+
   struct CallCleanupFunction final : EHScopeStack::Cleanup {
     llvm::Constant *CleanupFn;
     const CGFunctionInfo &FnInfo;
@@ -1816,6 +1836,66 @@ void CodeGenFunction::emitZeroOrPatternForAutoVarInit(QualType type,
   }
 }
 
+bool CodeGenFunction::getReducer(const VarDecl *D, ReducerCallbacks &CB) {
+  if (const HyperobjectType *H = D->getType()->getAs<HyperobjectType>()) {
+    if (H->hasCallbacks()) {
+      CB.Reduce = H->getReduce();
+      CB.Identity = H->getIdentity();
+      CB.Destroy = H->getDestroy();
+      return true;
+    }
+  }
+  return false;
+}
+
+void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF,
+                                         Address Addr,
+                                         QualType Type) {
+  llvm::Function *F = CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
+  llvm::Value *Arg =
+    CGF.Builder.CreateBitCast(Addr.getPointer(), CGF.CGM.VoidPtrTy);
+  CGF.Builder.CreateCall(F, {Arg});
+  if (const TypedefType *T = Type->getAs<TypedefType>())
+    Type = T->desugar();
+  QualType Inner = cast<HyperobjectType>(Type.getTypePtr())->getElementType();
+  if (const RecordType *rtype = Inner->getAs<RecordType>()) {
+    if (const CXXRecordDecl *record = dyn_cast<CXXRecordDecl>(rtype->getDecl()))
+      if (!record->getDestructor()->isTrivial())
+        destroyCXXObject(CGF, Addr, Inner);
+  }
+}
+
+void CodeGenFunction::EmitReducerInit(const VarDecl *D,
+                                      const ReducerCallbacks &C,
+                                      llvm::Value *Addr) {
+  RValue Identity = EmitAnyExpr(C.Identity);
+  RValue Reduce = EmitAnyExpr(C.Reduce);
+  RValue Destroy = EmitAnyExpr(C.Destroy);
+
+  llvm::Type *SizeType = ConvertType(getContext().getSizeType());
+  unsigned SizeBits = SizeType->getIntegerBitWidth();
+  llvm::Value *Size = nullptr;
+  QualType Type = D->getType();
+  if (uint64_t Bits = getContext().getTypeSize(Type)) {
+    Size =
+      llvm::Constant::getIntegerValue(SizeType,
+                                      llvm::APInt(SizeBits, Bits / 8));
+  } else {
+    auto V = getVLASize(Type);
+    llvm::Value *Size1 = llvm::Constant::getIntegerValue(SizeType, llvm::APInt(64, getContext().getTypeSize(V.Type) / 8));
+    Size = Builder.CreateNUWMul(V.NumElts, Size1);
+  }
+  // TODO: mark this call as registering a local
+  // TODO: add better handling of attribute arguments that evaluate to null
+  SmallVector<llvm::Type *, 1> Types = {SizeType};
+  llvm::Function *F =
+    CGM.getIntrinsic(llvm::Intrinsic::reducer_register, Types);
+  llvm::Value *IdentityV = Identity.getScalarVal();
+  llvm::Value *ReduceV = Reduce.getScalarVal();
+  llvm::Value *DestroyV = Destroy.getScalarVal();
+  Builder.CreateCall(F, {Addr, Size, IdentityV, ReduceV, DestroyV});
+}
+
 void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   assert(emission.Variable && "emission was not valid!");
 
@@ -1825,6 +1905,14 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   const VarDecl &D = *emission.Variable;
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(*this, D.getLocation());
   QualType type = D.getType();
+
+  ReducerCallbacks RCB = {0, 0, 0};
+  bool Reducer = false;
+  if (const HyperobjectType *H = type->getAs<HyperobjectType>()) {
+    type = H->getElementType();
+    assert(!emission.IsEscapingByRef); // block reducers not supported
+    Reducer = getReducer(&D, RCB);
+  }
 
   // If this local has an initializer, emit it now.
   const Expr *Init = D.getInit();
@@ -1883,8 +1971,14 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     return emitZeroOrPatternForAutoVarInit(type, D, Loc);
   };
 
-  if (isTrivialInitializer(Init))
-    return initializeWhatIsTechnicallyUninitialized(Loc);
+  if (isTrivialInitializer(Init)) {
+    initializeWhatIsTechnicallyUninitialized(Loc);
+    if (Reducer)
+      EmitReducerInit(&D, RCB,
+                      Builder.CreateBitCast(emission.Addr.getPointer(),
+                                            CGM.VoidPtrTy));
+    return;
+  }
 
   llvm::Constant *constant = nullptr;
   if (emission.IsConstantAggregate ||
@@ -1913,19 +2007,34 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     initializeWhatIsTechnicallyUninitialized(Loc);
     LValue lv = MakeAddrLValue(Loc, type);
     lv.setNonGC(true);
-    return EmitExprAsInit(Init, &D, lv, capturedByInit);
+    EmitExprAsInit(Init, &D, lv, capturedByInit);
+    if (Reducer)
+      EmitReducerInit(&D, RCB,
+                      Builder.CreateBitCast(emission.Addr.getPointer(),
+                                            CGM.VoidPtrTy));
+    return;
   }
 
   if (!emission.IsConstantAggregate) {
     // For simple scalar/complex initialization, store the value directly.
     LValue lv = MakeAddrLValue(Loc, type);
     lv.setNonGC(true);
-    return EmitStoreThroughLValue(RValue::get(constant), lv, true);
+    EmitStoreThroughLValue(RValue::get(constant), lv, true);
+    if (Reducer)
+      EmitReducerInit(&D, RCB,
+                      Builder.CreateBitCast(emission.Addr.getPointer(),
+                                            CGM.VoidPtrTy));
+    return;
   }
 
   emitStoresForConstant(CGM, D, Builder.CreateElementBitCast(Loc, CGM.Int8Ty),
                         type.isVolatileQualified(), Builder, constant,
                         /*IsAutoInit=*/false);
+
+  if (Reducer)
+    EmitReducerInit(&D, RCB,
+                    Builder.CreateBitCast(emission.Addr.getPointer(),
+                                          CGM.VoidPtrTy));
 }
 
 /// Emit an expression as an initializer for an object (variable, field, etc.)
@@ -2001,15 +2110,23 @@ void CodeGenFunction::emitAutoVarTypeCleanup(
   CleanupKind cleanupKind = NormalAndEHCleanup;
   CodeGenFunction::Destroyer *destroyer = nullptr;
 
+  bool IsReducer = false;
+
   switch (dtorKind) {
   case QualType::DK_none:
     llvm_unreachable("no cleanup for trivially-destructible variable");
 
+  case QualType::DK_hyperobject:
+    IsReducer = true;
+    break;
+
   case QualType::DK_cxx_destructor:
+    if (const HyperobjectType *H = type->getAs<HyperobjectType>())
+      IsReducer = H->hasCallbacks();
     // If there's an NRVO flag on the emission, we need a different
     // cleanup.
     if (emission.NRVOFlag) {
-      assert(!type->isArrayType());
+      assert(!type->isArrayType() && !IsReducer);
       CXXDestructorDecl *dtor = type->getAsCXXRecordDecl()->getDestructor();
       EHStack.pushCleanup<DestroyNRVOVariableCXX>(cleanupKind, addr, type, dtor,
                                                   emission.NRVOFlag);
@@ -2051,6 +2168,10 @@ void CodeGenFunction::emitAutoVarTypeCleanup(
   bool useEHCleanup = (cleanupKind & EHCleanup);
   EHStack.pushCleanup<DestroyObject>(cleanupKind, addr, type, destroyer,
                                      useEHCleanup);
+  if (IsReducer) {
+    assert(!emission.NRVOFlag && "hyperobject cleanup with NRVO");
+    EHStack.pushCleanup<CallReducerCleanup>(NormalAndEHCleanup, var);
+  }
 }
 
 void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
@@ -2103,7 +2224,10 @@ void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
 CodeGenFunction::Destroyer *
 CodeGenFunction::getDestroyer(QualType::DestructionKind kind) {
   switch (kind) {
-  case QualType::DK_none: llvm_unreachable("no destroyer for trivial dtor");
+  case QualType::DK_none:
+    return nullptr;
+  case QualType::DK_hyperobject:
+    return destroyHyperobject;
   case QualType::DK_cxx_destructor:
     return destroyCXXObject;
   case QualType::DK_objc_strong_lifetime:

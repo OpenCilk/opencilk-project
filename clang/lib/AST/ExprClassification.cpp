@@ -677,10 +677,15 @@ static Cl::ModifiableType IsModifiable(ASTContext &Ctx, const Expr *E,
   if (CT->isIncompleteType())
     return Cl::CM_IncompleteType;
 
-  // Records with any const fields (recursively) are not modifiable.
-  if (const RecordType *R = CT->getAs<RecordType>())
+  if (const RecordType *R = CT->getAs<RecordType>()) {
+    // Records with any const fields (recursively) are not modifiable.
     if (R->hasConstFields())
       return Cl::CM_ConstQualifiedField;
+    // Records with hyperobject fields are not assignable as records.
+    // This is an implementation restriction.
+    if (R->hasHyperobjectFields())
+      return Cl::CM_HyperobjectField;
+  }
 
   return Cl::CM_Modifiable;
 }
@@ -736,6 +741,7 @@ Expr::isModifiableLvalue(ASTContext &Ctx, SourceLocation *Loc) const {
   case Cl::CM_ConstQualified: return MLV_ConstQualified;
   case Cl::CM_ConstQualifiedField: return MLV_ConstQualifiedField;
   case Cl::CM_ConstAddrSpace: return MLV_ConstAddrSpace;
+  case Cl::CM_HyperobjectField: return MLV_HyperobjectField;
   case Cl::CM_ArrayType: return MLV_ArrayType;
   case Cl::CM_IncompleteType: return MLV_IncompleteType;
   }

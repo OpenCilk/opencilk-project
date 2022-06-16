@@ -4838,7 +4838,11 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
       getContext().GetGVALinkageForVariable(D) == GVA_AvailableExternally;
   bool NeedsGlobalDtor =
       !IsDefinitionAvailableExternally &&
-      D->needsDestruction(getContext()) == QualType::DK_cxx_destructor;
+      (D->needsDestruction(getContext()) == QualType::DK_cxx_destructor ||
+       D->needsDestruction(getContext()) == QualType::DK_hyperobject);
+  NeedsGlobalCtor =
+      !IsDefinitionAvailableExternally &&
+      D->needsDestruction(getContext()) == QualType::DK_hyperobject;
 
   const VarDecl *InitDecl;
   const Expr *InitExpr = D->getAnyInitializer(InitDecl);

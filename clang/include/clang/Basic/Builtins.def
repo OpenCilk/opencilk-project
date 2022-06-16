@@ -1721,6 +1721,10 @@ BUILTIN(__builtin_ms_va_copy, "vc*&c*&", "n")
 // Arithmetic Fence: to prevent FP reordering and reassociation optimizations
 LANGBUILTIN(__arithmetic_fence, "v.", "tE", ALL_LANGUAGES)
 
+// Tapir.  Rewriting of reducer references happens during sema
+// and needs a builtin to carry the information to codegen.
+BUILTIN(__hyper_lookup, "v*vC*", "nU")
+
 #undef BUILTIN
 #undef LIBBUILTIN
 #undef LANGBUILTIN

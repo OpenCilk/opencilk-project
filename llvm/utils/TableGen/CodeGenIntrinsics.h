@@ -109,6 +109,16 @@ struct CodeGenIntrinsic {
   // True if the intrinsic is marked as speculatable.
   bool isSpeculatable;
 
+  // True if this is an injective function.
+  bool isInjective = false;
+
+  // Tapir reducer-related attributes
+  bool isStrandPure = false;
+  bool isHyperView = false;
+  bool isHyperToken = false;
+  bool isReducerRegister = false;
+  bool isReducerUnregister = false;
+
   enum ArgAttrKind {
     NoCapture,
     NoAlias,

@@ -2294,6 +2294,8 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     Align = EltInfo.Align;
     break;
   }
+  case Type::Hyperobject:
+    return getTypeInfo(cast<HyperobjectType>(T)->getElementType());
   case Type::ObjCObject:
     return getTypeInfo(cast<ObjCObjectType>(T)->getBaseType().getTypePtr());
   case Type::Adjusted:
@@ -3303,6 +3305,60 @@ QualType ASTContext::getComplexType(QualType T) const {
   return QualType(New, 0);
 }
 
+static const IdentifierInfo *getFunction(Expr *E) {
+  if (!E)
+    return nullptr;
+  const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(E->IgnoreImpCasts());
+  if (!DR)
+    return nullptr;
+  const FunctionDecl *F = dyn_cast<FunctionDecl>(DR->getDecl());
+  if (!F)
+    return nullptr;
+  return F->getIdentifier();
+}
+
+QualType ASTContext::getHyperobjectType(QualType T, Expr *R, Expr *I, Expr *D) const {
+  assert(R && I && D);
+  bool RN = HyperobjectType::isNullish(R);
+  bool IN = HyperobjectType::isNullish(I);
+  bool DN = HyperobjectType::isNullish(D);
+
+  const IdentifierInfo *RI = getFunction(R);
+  const IdentifierInfo *II = getFunction(I);
+  const IdentifierInfo *DI = getFunction(D);
+  bool Varies = (!RN && !RI) || (!IN && !II) || (!DN && !DI);
+
+  QualType Canonical;
+  if (!T.isCanonical())
+    Canonical = getHyperobjectType(getCanonicalType(T), R, I, D);
+
+  // Do not unique hyperobject types with variable expressions.
+  if (Varies) {
+    auto *New =
+      new (*this, TypeAlignment)
+      HyperobjectType(T, Canonical, R, RI, I, II, D, DI);
+    Types.push_back(New);
+    return QualType(New, 0);
+  }
+
+  // Unique pointers, to guarantee there is only one pointer of a particular
+  // structure.
+  // TODO: 0 and nullptr are not properly treated as equivalent here.
+  llvm::FoldingSetNodeID ID;
+  HyperobjectType::Profile(ID, T, RI, II, DI);
+
+  void *InsertPos = nullptr;
+  if (HyperobjectType *HT = HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
+    return QualType(HT, 0);
+
+  auto *New =
+    new (*this, TypeAlignment)
+    HyperobjectType(T, Canonical, R, RI, I, II, D, DI);
+  Types.push_back(New);
+  HyperobjectTypes.InsertNode(New, InsertPos);
+  return QualType(New, 0);
+}
+
 /// getPointerType - Return the uniqued reference to the type for a pointer to
 /// the specified type.
 QualType ASTContext::getPointerType(QualType T) const {
@@ -3680,6 +3736,9 @@ QualType ASTContext::getVariableArrayDecayedType(QualType type) const {
     result = getAtomicType(getVariableArrayDecayedType(at->getValueType()));
     break;
   }
+
+  case Type::Hyperobject:
+    return getVariableArrayDecayedType(cast<HyperobjectType>(ty)->getElementType());
 
   case Type::ConstantArray: {
     const auto *cat = cast<ConstantArrayType>(ty);
@@ -8181,6 +8240,10 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
                                /*Field=*/nullptr);
     return;
 
+  case Type::Hyperobject:
+    llvm_unreachable("hyperobject not implemented");
+    return;
+
   case Type::Atomic:
     S += 'A';
     getObjCEncodingForTypeImpl(T->castAs<AtomicType>()->getValueType(), S,
@@ -9368,6 +9431,21 @@ Qualifiers::GC ASTContext::getObjCGCAttrKind(QualType Ty) const {
 //===----------------------------------------------------------------------===//
 //                        Type Compatibility Testing
 //===----------------------------------------------------------------------===//
+
+static QualType mergeHyperobjectTypes(QualType LQ, QualType RQ) {
+  const HyperobjectType *LH = LQ->castAs<HyperobjectType>();
+  const HyperobjectType *RH = RQ->castAs<HyperobjectType>();
+  if (LH->getElementType() != RH->getElementType())
+    return {};
+  bool LeftCallbacks = LH->hasCallbacks(), RightCallbacks = RH->hasCallbacks();
+  if (LeftCallbacks && RightCallbacks)
+    return {};
+  if (LeftCallbacks && !RightCallbacks)
+    return LQ;
+  if (RightCallbacks)
+    return RQ;
+  llvm_unreachable("hyperobjects not uniqued");
+}
 
 /// areCompatVectorTypes - Return true if the two specified vector types are
 /// compatible.
@@ -10712,6 +10790,8 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS, bool OfBlockPointer,
   case Type::Complex:
     // Distinct complex types are incompatible.
     return {};
+  case Type::Hyperobject:
+    return mergeHyperobjectTypes(LHSCan, RHSCan);
   case Type::Vector:
     // FIXME: The merged type should be an ExtVector!
     if (areCompatVectorTypes(LHSCan->castAs<VectorType>(),

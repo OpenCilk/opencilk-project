@@ -892,6 +892,18 @@ void CodeGenIntrinsic::setProperty(Record *R) {
     isSpeculatable = true;
   else if (R->getName() == "IntrHasSideEffects")
     hasSideEffects = true;
+  else if (R->getName() == "IntrInjective")
+    isInjective = true;
+  else if (R->getName() == "IntrStrandPure")
+    isStrandPure = true;
+  else if (R->getName() == "IntrReducerRegister")
+    isReducerRegister = true;
+  else if (R->getName() == "IntrHyperView")
+    isHyperView = true;
+  else if (R->getName() == "IntrHyperToken")
+    isHyperToken = true;
+  else if (R->getName() == "IntrReducerUnregister")
+    isReducerUnregister = true;
   else if (R->isSubClassOf("NoCapture")) {
     unsigned ArgNo = R->getValueAsInt("ArgNo");
     addArgAttribute(ArgNo, NoCapture);

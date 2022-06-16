@@ -1249,6 +1249,9 @@ public:
   QualType RebuildDependentBitIntType(bool IsUnsigned, Expr *NumBitsExpr,
                                       SourceLocation Loc);
 
+  QualType RebuildHyperobjectType(QualType ElementType, Expr *R,
+                                  Expr *I, Expr *D, SourceLocation Loc);
+
   /// Build a new template name given a nested name specifier, a flag
   /// indicating whether the "template" keyword was provided, and the template
   /// that the template name refers to.
@@ -5122,6 +5125,36 @@ QualType TreeTransform<Derived>::TransformComplexType(TypeLocBuilder &TLB,
                                                       ComplexTypeLoc T) {
   // FIXME: recurse?
   return TransformTypeSpecType(TLB, T);
+}
+
+template<typename Derived>
+QualType TreeTransform<Derived>::TransformHyperobjectType
+  (TypeLocBuilder &TLB, HyperobjectTypeLoc TL) {
+  ExprResult NewR, NewI, NewD;
+
+  {
+    const HyperobjectType *H = TL.getTypePtr();
+    EnterExpressionEvaluationContext Context(
+        SemaRef, Sema::ExpressionEvaluationContext::PotentiallyEvaluated);
+    NewR = getDerived().TransformExpr(H->getReduce());
+    NewI = getDerived().TransformExpr(H->getIdentity());
+    NewD = getDerived().TransformExpr(H->getDestroy());
+  }
+  if (NewR.isInvalid() || NewI.isInvalid() || NewD.isInvalid())
+    return QualType();
+
+  QualType ElementType = getDerived().TransformType(TLB, TL.getPointeeLoc());
+  if (ElementType.isNull())
+    return QualType();
+
+  QualType Result =
+    getDerived().RebuildHyperobjectType(ElementType, NewR.get(),
+                                        NewI.get(), NewD.get(),
+                                        TL.getHyperLoc());
+
+  HyperobjectTypeLoc NewT = TLB.push<HyperobjectTypeLoc>(Result);
+  NewT.setHyperLoc(TL.getHyperLoc());
+  return Result;
 }
 
 template <typename Derived>
@@ -15022,6 +15055,14 @@ template <typename Derived>
 QualType TreeTransform<Derived>::RebuildDependentBitIntType(
     bool IsUnsigned, Expr *NumBitsExpr, SourceLocation Loc) {
   return SemaRef.BuildBitIntType(IsUnsigned, NumBitsExpr, Loc);
+}
+
+template<typename Derived>
+QualType TreeTransform<Derived>::RebuildHyperobjectType(QualType ElementType,
+                                                        Expr *R, Expr *I,
+                                                        Expr *D,
+                                                        SourceLocation Loc) {
+  return SemaRef.BuildHyperobjectType(ElementType, R, I, D, Loc);
 }
 
 template<typename Derived>

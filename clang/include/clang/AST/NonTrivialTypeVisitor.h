@@ -34,6 +34,8 @@ template <class Derived, class RetTy = void> struct DestructedTypeVisitor {
       return asDerived().visitStruct(FT, std::forward<Ts>(Args)...);
     case QualType::DK_none:
       return asDerived().visitTrivial(FT, std::forward<Ts>(Args)...);
+    case QualType::DK_hyperobject:
+      llvm_unreachable("hyperobject destruction not implemented");
     case QualType::DK_cxx_destructor:
       return asDerived().visitCXXDestructor(FT, std::forward<Ts>(Args)...);
     case QualType::DK_objc_weak_lifetime:

@@ -4423,7 +4423,7 @@ def err_param_default_argument_on_parameter_pack : Error<
   "parameter pack cannot have a default argument">;
 def err_uninitialized_member_for_assign : Error<
   "cannot define the implicit copy assignment operator for %0, because "
-  "non-static %select{reference|const}1 member %2 cannot use copy "
+  "non-static %select{reference|const|hyperobject}1 member %2 cannot use copy "
   "assignment operator">;
 def err_uninitialized_member_in_ctor : Error<
   "%select{constructor for %1|"
@@ -10576,6 +10576,44 @@ def note_exits_cilk_for : Note<
   "jump exits the scope of a '_Cilk_for'">;
 def err_jump_out_of_cilk_for : Error<
   "cannot jump out of '_Cilk_for' statement">;
+
+def attribute_requires_cilk : Warning<
+  "%0 ignored when OpenCilk not in use">,
+  InGroup<DiagGroup<"required-cilk">>;
+
+def variable_length_hyperobject : Error<
+   "variable length type %0 may not be a hyperobject">;
+
+def confusing_hyperobject : Error<
+   "type %0 may not be a hyperobject">;
+
+def incomplete_hyperobject : Error<
+   "incomplete type %0 may not be a hyperobject">;
+
+def nested_hyperobject : Error<
+   "type %0, which contains a hyperobject, may not be a hyperobject">;
+
+def reducer_callbacks_not_allowed: Warning<
+   "reducer callbacks not implemented for structure members">,
+    InGroup<CilkIgnored>;
+
+def err_invalid_reducer_callback : Error<
+  "reducer callback must be function with %0 pointer parameter%s0"
+>;
+
+def note_protected_by_reducer : Note<
+  "jump bypasses initialization of variable with __attribute__((reducer))">;
+
+def err_hyperobject_param : Error<"parameter is hyperobject">;
+
+def err_hyperobject_cast : Error<"cast to hyperobject">;
+
+def err_hyperobject_struct_assign : Error<
+    "unimplemented assignment to structure with hyperobject member">;
+
+def no_reducer_array : Warning<
+    "array of reducer not implemented">,
+    InGroup<CilkIgnored>;
 } // end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {

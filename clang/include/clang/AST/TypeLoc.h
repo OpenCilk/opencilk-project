@@ -1925,6 +1925,26 @@ class ComplexTypeLoc : public InheritingConcreteTypeLoc<TypeSpecTypeLoc,
                                                         ComplexType> {
 };
 
+class HyperobjectTypeLoc :
+    public PointerLikeTypeLoc<HyperobjectTypeLoc, HyperobjectType> {
+public:
+  SourceLocation getHyperLoc() const {
+    return getSigilLoc();
+  }
+
+  void setHyperLoc(SourceLocation Loc) {
+    setSigilLoc(Loc);
+  }
+
+  void initializeLocal(ASTContext &Context, SourceLocation Loc) {
+    setSigilLoc(Loc);
+  }
+
+  QualType getInnerType() const {
+    return getTypePtr()->getElementType();
+  }
+};
+
 struct TypeofLocInfo {
   SourceLocation TypeofLoc;
   SourceLocation LParenLoc;

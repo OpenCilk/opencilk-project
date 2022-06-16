@@ -971,6 +971,10 @@ DEF_TRAVERSE_TYPE(BuiltinType, {})
 
 DEF_TRAVERSE_TYPE(ComplexType, { TRY_TO(TraverseType(T->getElementType())); })
 
+DEF_TRAVERSE_TYPE(HyperobjectType, {
+    TRY_TO(TraverseType(T->getElementType()));
+  })
+
 DEF_TRAVERSE_TYPE(PointerType, { TRY_TO(TraverseType(T->getPointeeType())); })
 
 DEF_TRAVERSE_TYPE(BlockPointerType,
@@ -1210,6 +1214,10 @@ DEF_TRAVERSE_TYPELOC(BuiltinType, {})
 
 // FIXME: ComplexTypeLoc is unfinished
 DEF_TRAVERSE_TYPELOC(ComplexType, {
+  TRY_TO(TraverseType(TL.getTypePtr()->getElementType()));
+})
+
+DEF_TRAVERSE_TYPELOC(HyperobjectType, {
   TRY_TO(TraverseType(TL.getTypePtr()->getElementType()));
 })
 

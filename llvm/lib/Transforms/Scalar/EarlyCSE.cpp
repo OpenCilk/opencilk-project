@@ -1519,6 +1519,13 @@ bool EarlyCSE::processNode(DomTreeNode *Node) {
           LLVM_DEBUG(dbgs() << "Skipping due to debug counter\n");
           continue;
         }
+        // Inst is known to be a call instruction here.
+        if (cast<CallInst>(Inst).isStrandPure() &&
+            Inst.getParent() != InVal.first->getParent()) {
+          // TODO: Teach this pass about spindles.
+          LLVM_DEBUG(dbgs() << "Skipping due to strand pure block crossing\n");
+          continue;
+        }
         if (!Inst.use_empty())
           Inst.replaceAllUsesWith(InVal.first);
         salvageKnowledge(&Inst, &AC);

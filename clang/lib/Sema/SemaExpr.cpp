@@ -511,6 +511,8 @@ ExprResult Sema::DefaultFunctionArrayConversion(Expr *E, bool Diagnose) {
     E = result.get();
   }
 
+  E = BuildHyperobjectLookup(E);
+
   QualType Ty = E->getType();
   assert(!Ty.isNull() && "DefaultFunctionArrayConversion - missing type");
 
@@ -673,6 +675,10 @@ ExprResult Sema::DefaultLvalueConversion(Expr *E) {
   }
 
   CheckForNullPointerDereference(*this, E);
+
+  E = BuildHyperobjectLookup(E);
+  T = E->getType();
+
   if (const ObjCIsaExpr *OISA = dyn_cast<ObjCIsaExpr>(E->IgnoreParenCasts())) {
     NamedDecl *ObjectGetClass = LookupSingleName(TUScope,
                                      &Context.Idents.get("object_getClass"),
@@ -2072,6 +2078,71 @@ NonOdrUseReason Sema::getNonOdrUseReasonInCurrentContext(ValueDecl *D) {
   // All remaining non-variable cases constitute an odr-use. For variables, we
   // need to wait and see how the expression is used.
   return NOUR_None;
+}
+
+Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
+  if (!Pointer && !E->isLValue())
+    return E;
+
+  if (getLangOpts().getCilk() != LangOptions::Cilk_opencilk)
+    return E;
+
+  QualType InputType = E->getType();
+  if (Pointer) {
+    const PointerType *PT = InputType->getAs<PointerType>();
+    if (!PT)
+      return E;
+    InputType = PT->getPointeeType();
+  }
+
+  const HyperobjectType *HT = InputType->getAs<HyperobjectType>();
+  if (!HT)
+    return E;
+
+  // For now all hyperobjects use the same lookup function.
+  IdentifierInfo *ID = PP.getIdentifierInfo("__hyper_lookup");
+  ValueDecl *Builtin =
+      dyn_cast<ValueDecl>
+      (LazilyCreateBuiltin(ID, ID->getBuiltinID(),
+                           /* Scope = */ nullptr,
+                           /* ForRedeclaration = */ false,
+                           SourceLocation()));
+  // __hyper_lookup must be defined in Builtins.def.
+  assert(Builtin && "no __hyper_lookup builtin");
+
+  DeclRefExpr *Lookup = BuildDeclRefExpr(Builtin, Builtin->getType(),
+                                         VK_PRValue, SourceLocation(), nullptr);
+
+  QualType ResultType =
+    HT->getElementType().withFastQualifiers(InputType.getLocalFastQualifiers());
+  QualType Ptr = Context.getPointerType(ResultType);
+
+  Expr *VarAddr;
+  if (Pointer)
+    VarAddr = E;
+  else
+    VarAddr = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr,
+                                    VK_PRValue, OK_Ordinary,
+                                    SourceLocation(), false,
+                                    CurFPFeatureOverrides());
+
+  ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(),
+				  { VarAddr }, E->getExprLoc(), nullptr);
+
+  auto *Casted =
+    ImplicitCastExpr::Create(Context, Ptr,
+			     CK_BitCast /*???*/,
+			     Call.get(), nullptr, VK_PRValue,
+			     CurFPFeatureOverrides());
+  if (Pointer)
+    return Casted;
+
+  auto *Deref =
+    UnaryOperator::Create(Context, Casted, UO_Deref, ResultType,
+                          VK_LValue, OK_Ordinary, SourceLocation(),
+                          false, CurFPFeatureOverrides());
+
+  return Deref;
 }
 
 /// BuildDeclRefExpr - Build an expression that references a
@@ -4589,6 +4660,9 @@ static void captureVariablyModifiedType(ASTContext &Context, QualType T,
     case Type::Atomic:
       T = cast<AtomicType>(Ty)->getValueType();
       break;
+    case Type::Hyperobject:
+      T = cast<HyperobjectType>(Ty)->getElementType();
+      break;
     }
   } while (!T.isNull() && T->isVariablyModifiedType());
 }
@@ -6658,6 +6732,9 @@ static FunctionDecl *rewriteBuiltinFunctionDecl(Sema *Sema, ASTContext &Context,
 
   if (!Context.BuiltinInfo.hasPtrArgsOrResult(FDecl->getBuiltinID()) || !FT ||
       ArgExprs.size() < FT->getNumParams())
+    return nullptr;
+
+  if (FDecl->getBuiltinID() == Builtin::BI__builtin_addressof)
     return nullptr;
 
   bool NeedsNewDecl = false;
@@ -10197,6 +10274,8 @@ Sema::CheckSingleAssignmentConstraints(QualType LHSType, ExprResult &CallerRHS,
   // We need to be able to tell the caller whether we diagnosed a problem, if
   // they ask us to issue diagnostics.
   assert((ConvertRHS || !Diagnose) && "can't indicate whether we diagnosed");
+
+  LHSType = LHSType.stripHyperobject();
 
   // If ConvertRHS is false, we want to leave the caller's RHS untouched. Sadly,
   // we can't avoid *all* modifications at the moment, so we need some somewhere
@@ -14074,6 +14153,9 @@ static bool CheckForModifiableLvalue(Expr *E, SourceLocation Loc, Sema &S) {
   case Expr::MLV_SubObjCPropertySetting:
     DiagID = diag::err_no_subobject_property_setting;
     break;
+  case Expr::MLV_HyperobjectField:
+    DiagID = diag::err_hyperobject_struct_assign;
+    break;
   }
 
   SourceRange Assign;
@@ -15201,6 +15283,9 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
     CheckForIllegalSpawn(*this, RHS.get());
   CheckForIllegalSpawn(*this, LHS.get());
 
+  if (BinaryOperator::isAssignmentOp(Opc))
+    LHS = BuildHyperobjectLookup(LHS.get());
+
   switch (Opc) {
   case BO_Assign:
     ResultTy = CheckAssignmentOperands(LHS.get(), RHS, OpLoc, QualType(), Opc);
@@ -15653,7 +15738,8 @@ static ExprResult BuildOverloadedBinOp(Sema &S, Scope *Sc, SourceLocation OpLoc,
   }
 
   // Check for illegal spawns
-  if (!BinaryOperator::isAssignmentOp(Opc))
+  if (!BinaryOperator::isAssignmentOp(Opc) ||
+      BinaryOperator::isCompoundAssignmentOp(Opc))
     CheckForIllegalSpawn(S, RHS);
   CheckForIllegalSpawn(S, LHS);
 
@@ -15673,8 +15759,8 @@ ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
   std::tie(LHS, RHS) = CorrectDelayedTyposInBinOp(*this, Opc, LHSExpr, RHSExpr);
   if (!LHS.isUsable() || !RHS.isUsable())
     return ExprError();
-  LHSExpr = LHS.get();
-  RHSExpr = RHS.get();
+  LHSExpr = BuildHyperobjectLookup(LHS.get());
+  RHSExpr = BuildHyperobjectLookup(RHS.get());
 
   // We want to end up calling one of checkPseudoObjectAssignment
   // (if the LHS is a pseudo-object), BuildOverloadedBinOp (if
@@ -15859,6 +15945,7 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
   case UO_PreDec:
   case UO_PostInc:
   case UO_PostDec:
+    Input = BuildHyperobjectLookup(InputExpr);
     resultType = CheckIncrementDecrementOperand(*this, Input.get(), VK, OK,
                                                 OpLoc,
                                                 Opc == UO_PreInc ||
@@ -15868,6 +15955,8 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
     CanOverflow = isOverflowingIntegerType(Context, resultType);
     break;
   case UO_AddrOf:
+    // Before CheckAddressOfOperand
+    Input = BuildHyperobjectLookup(InputExpr);
     resultType = CheckAddressOfOperand(Input, OpLoc);
     CheckAddressOfNoDeref(InputExpr);
     RecordModifiableNonNullParam(*this, InputExpr);
@@ -16004,6 +16093,7 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
     break;
   case UO_Real:
   case UO_Imag:
+    Input = BuildHyperobjectLookup(InputExpr);
     resultType = CheckRealImagOperand(*this, Input, OpLoc, Opc == UO_Real);
     // _Real maps ordinary l-values into ordinary l-values. _Imag maps ordinary
     // complex l-values to ordinary l-values and all other values to r-values.

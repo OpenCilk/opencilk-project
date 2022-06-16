@@ -1353,6 +1353,8 @@ def warn_cilk_for_following_grainsize: Warning<
 def warn_pragma_cilk_grainsize_equals: Warning<
   "'#pragma cilk grainsize' no longer requires '='">,
   InGroup<SourceUsesCilkPlus>;
+def error_hyperobject_arguments: Error<
+  "hyperobject must have 0, 2, or 3 callbacks">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

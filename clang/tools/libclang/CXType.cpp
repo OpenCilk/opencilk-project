@@ -93,6 +93,7 @@ static CXTypeKind GetTypeKind(QualType T) {
     case Type::Builtin:
       return GetBuiltinTypeKind(cast<BuiltinType>(TP));
     TKCASE(Complex);
+    TKCASE(Hyperobject);
     TKCASE(Pointer);
     TKCASE(BlockPointer);
     TKCASE(LValueReference);
@@ -601,6 +602,7 @@ CXString clang_getTypeKindSpelling(enum CXTypeKind K) {
     TKIND(ObjCClass);
     TKIND(ObjCSel);
     TKIND(Complex);
+    TKIND(Hyperobject);
     TKIND(Pointer);
     TKIND(BlockPointer);
     TKIND(LValueReference);
@@ -837,6 +839,9 @@ CXType clang_getElementType(CXType CT) {
       break;
     case Type::Complex:
       ET = cast<ComplexType> (TP)->getElementType();
+      break;
+    case Type::Hyperobject:
+      ET = cast<HyperobjectType> (TP)->getElementType();
       break;
     default:
       break;

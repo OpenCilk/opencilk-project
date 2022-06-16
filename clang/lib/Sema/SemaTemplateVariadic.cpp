@@ -927,6 +927,12 @@ bool Sema::containsUnexpandedParameterPacks(Declarator &D) {
       // These declarator chunks cannot contain any parameter packs.
       break;
 
+    case DeclaratorChunk::Hyperobject:
+      for (const Expr *Arg : Chunk.Hyper.Arg)
+        if (Arg->containsUnexpandedParameterPack())
+          return true;
+      break;
+
     case DeclaratorChunk::Array:
       if (Chunk.Arr.NumElts &&
           Chunk.Arr.NumElts->containsUnexpandedParameterPack())

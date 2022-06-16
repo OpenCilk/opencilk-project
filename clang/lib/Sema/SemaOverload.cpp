@@ -1554,7 +1554,7 @@ TryImplicitConversion(Sema &S, Expr *From, QualType ToType,
   //   given Conversion rank, in spite of the fact that a copy/move
   //   constructor (i.e., a user-defined conversion function) is
   //   called for those cases.
-  QualType FromType = From->getType();
+  QualType FromType = From->getType().stripHyperobject();
   if (ToType->getAs<RecordType>() && FromType->getAs<RecordType>() &&
       (S.Context.hasSameUnqualifiedType(FromType, ToType) ||
        S.IsDerivedFrom(From->getBeginLoc(), FromType, ToType))) {
@@ -1802,7 +1802,7 @@ static bool IsStandardConversion(Sema &S, Expr* From, QualType ToType,
                                  StandardConversionSequence &SCS,
                                  bool CStyle,
                                  bool AllowObjCWritebackConversion) {
-  QualType FromType = From->getType();
+  QualType FromType = From->getType().stripHyperobject();
 
   // Standard conversions (C++ [conv])
   SCS.setAsIdentityConversion();
@@ -13734,6 +13734,11 @@ void Sema::LookupOverloadedBinOp(OverloadCandidateSet &CandidateSet,
                                  OverloadedOperatorKind Op,
                                  const UnresolvedSetImpl &Fns,
                                  ArrayRef<Expr *> Args, bool PerformADL) {
+  assert(Args[0]->getType()->getTypeClass() != Type::Hyperobject &&
+         "hyperobjects not allowed in overloading");
+  assert(Args[1]->getType()->getTypeClass() != Type::Hyperobject &&
+         "hyperobjects not allowed in overloading");
+
   SourceLocation OpLoc = CandidateSet.getLocation();
 
   OverloadedOperatorKind ExtraOp =

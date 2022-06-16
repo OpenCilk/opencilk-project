@@ -6188,6 +6188,10 @@ bool UnnamedLocalNoLinkageFinder::VisitComplexType(const ComplexType* T) {
   return Visit(T->getElementType());
 }
 
+bool UnnamedLocalNoLinkageFinder::VisitHyperobjectType(const HyperobjectType* T) {
+  return Visit(T->getElementType());
+}
+
 bool UnnamedLocalNoLinkageFinder::VisitPointerType(const PointerType* T) {
   return Visit(T->getPointeeType());
 }

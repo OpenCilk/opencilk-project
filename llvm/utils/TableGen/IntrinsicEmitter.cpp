@@ -842,7 +842,10 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
         Intrinsic.isNoReturn || Intrinsic.isNoCallback || Intrinsic.isNoSync ||
         Intrinsic.isNoFree || Intrinsic.isWillReturn || Intrinsic.isCold ||
         Intrinsic.isNoDuplicate || Intrinsic.isNoMerge ||
-        Intrinsic.isConvergent || Intrinsic.isSpeculatable) {
+        Intrinsic.isConvergent || Intrinsic.isSpeculatable ||
+        Intrinsic.isInjective || Intrinsic.isStrandPure ||
+        Intrinsic.isReducerRegister || Intrinsic.isReducerUnregister ||
+        Intrinsic.isHyperView || Intrinsic.isHyperToken) {
       unsigned ID = UniqFnAttributes.find(&Intrinsic)->second;
       OS << "      AS[" << numAttrs++ << "] = {AttributeList::FunctionIndex, "
          << "getIntrinsicFnAttributeSet(C, " << ID << ")};\n";

@@ -106,6 +106,9 @@ def FnRetThunkExtern : EnumAttr<"fn_ret_thunk_extern", [FnAttr]>;
 /// Pass structure in an alloca.
 def InAlloca : TypeAttr<"inalloca", [ParamAttr]>;
 
+/// Distinct arguments to this function yield distinct return values.
+def Injective : EnumAttr<"injective", [FnAttr]>;
+
 /// Source said inlining was desirable.
 def InlineHint : EnumAttr<"inlinehint", [FnAttr]>;
 
@@ -211,6 +214,12 @@ def ReadNone : EnumAttr<"readnone", [ParamAttr]>;
 
 /// Function only reads from memory.
 def ReadOnly : EnumAttr<"readonly", [ParamAttr]>;
+
+/// Tapir reducer-related attributes.
+def HyperView : EnumAttr<"hyper_view", [FnAttr]>;
+def HyperToken : EnumAttr<"hyper_token", [FnAttr]>;
+def ReducerRegister : EnumAttr<"reducer_register", [FnAttr]>;
+def ReducerUnregister : EnumAttr<"reducer_unregister", [FnAttr]>;
 
 /// Return value is always equal to this argument.
 def Returned : EnumAttr<"returned", [ParamAttr]>;

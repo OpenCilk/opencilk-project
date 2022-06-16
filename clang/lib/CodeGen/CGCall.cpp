@@ -2184,6 +2184,8 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
       FuncAttrs.addAttribute(llvm::Attribute::Convergent);
     if (TargetDecl->hasAttr<StealableAttr>())
       FuncAttrs.addAttribute(llvm::Attribute::Stealable);
+    if (TargetDecl->hasAttr<InjectiveAttr>())
+      FuncAttrs.addAttribute(llvm::Attribute::Injective);
 
     if (const FunctionDecl *Fn = dyn_cast<FunctionDecl>(TargetDecl)) {
       AddAttributesFromFunctionProtoType(
@@ -2225,10 +2227,23 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
     } else if (TargetDecl->hasAttr<NoAliasAttr>()) {
       FuncAttrs.addMemoryAttr(llvm::MemoryEffects::argMemOnly());
       FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
-    } else if (TargetDecl->hasAttr<StrandPureAttr>()) {
+    }
+    if (TargetDecl->hasAttr<StrandPureAttr>()) {
       FuncAttrs.addAttribute(llvm::Attribute::StrandPure);
       FuncAttrs.addAttribute(llvm::Attribute::ReadOnly);
       FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
+    }
+    if (TargetDecl->hasAttr<ReducerRegisterAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::ReducerRegister);
+    }
+    if (TargetDecl->hasAttr<ReducerUnregisterAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::ReducerUnregister);
+    }
+    if (TargetDecl->hasAttr<HyperViewAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::HyperView);
+    }
+    else if (TargetDecl->hasAttr<HyperTokenAttr>()) {
+      FuncAttrs.addAttribute(llvm::Attribute::HyperToken);
     }
     if (TargetDecl->hasAttr<RestrictAttr>())
       RetAttrs.addAttribute(llvm::Attribute::NoAlias);
@@ -5426,6 +5441,12 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
 
   AllocAlignAttrEmitter AllocAlignAttrEmitter(*this, TargetDecl, CallArgs);
   Attrs = AllocAlignAttrEmitter.TryEmitAsCallSiteAttribute(Attrs);
+
+  // If this call might lead to exit() make sure the runtime can
+  // be shutdown cleanly.
+  if (CurSyncRegion && !ScopeIsSynced && !InvokeDest &&
+      Attrs.hasFnAttr(llvm::Attribute::NoReturn))
+    EmitImplicitSyncCleanup(nullptr);
 
   // Emit the actual call/invoke instruction.
   llvm::CallBase *CI;

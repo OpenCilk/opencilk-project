@@ -1652,7 +1652,7 @@ llvm::Constant *ConstantEmitter::tryEmitPrivateForVarInit(const VarDecl &D) {
   }
   InConstantContext = D.hasConstantInitialization();
 
-  QualType destType = D.getType();
+  QualType destType = D.getType().stripHyperobject();
 
   // Try to emit the initializer.  Note that this can allow some things that
   // are not allowed by tryEmitPrivateForMemory alone.

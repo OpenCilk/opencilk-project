@@ -3055,6 +3055,11 @@ void MicrosoftCXXNameMangler::mangleType(const ComplexType *T, Qualifiers,
   mangleArtificialTagType(TTK_Struct, TemplateMangling, {"__clang"});
 }
 
+void MicrosoftCXXNameMangler::mangleType(const HyperobjectType *H, Qualifiers,
+                                         SourceRange Range) {
+  llvm_unreachable("hyperobject not implemented for Microsoft ABI");
+}
+
 // Returns true for types that mangleArtificialTagType() gets called for with
 // TTK_Union, TTK_Struct, TTK_Class and where compatibility with MSVC's
 // mangling matters.
