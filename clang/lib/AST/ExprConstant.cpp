@@ -11462,6 +11462,7 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
     return EvaluateBuiltinClassifyType(
         CanTy->castAs<AtomicType>()->getValueType(), LangOpts);
 
+  case Type::Hyperobject:
   case Type::BlockPointer:
   case Type::Vector:
   case Type::ExtVector:
@@ -15510,7 +15511,7 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
   }
 
   SourceLocation DeclLoc = VD->getLocation();
-  QualType DeclTy = VD->getType();
+  QualType DeclTy = VD->getType().stripHyperobject();
   return CheckConstantExpression(Info, DeclLoc, DeclTy, Value,
                                  ConstantExprKind::Normal) &&
          CheckMemoryLeaks(Info);

@@ -755,6 +755,27 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
       return false;
     break;
 
+  case Type::Hyperobject: {
+    const HyperobjectType *H1 = cast<HyperobjectType>(T1);
+    const HyperobjectType *H2 = cast<HyperobjectType>(T2);
+    Expr *R1 = H1->getReduce(), *R2 = H2->getReduce();
+    Expr *I1 = H1->getIdentity(), *I2 = H2->getIdentity();
+    Expr *D1 = H1->getDestroy(), *D2 = H2->getDestroy();
+    if (!!R1 != !!R2 || !!I2 != !!I2 || !!D1 != !!D2)
+      return false;
+    if (R1 && !IsStructurallyEquivalent(Context, R1, R2))
+      return false;
+    if (I1 && !IsStructurallyEquivalent(Context, I1, I2))
+      return false;
+    if (D1 && !IsStructurallyEquivalent(Context, D1, D2))
+      return false;
+    if (!IsStructurallyEquivalent(Context,
+                                  cast<HyperobjectType>(T1)->getElementType(),
+                                  cast<HyperobjectType>(T2)->getElementType()))
+      return false;
+    break;
+  }
+
   case Type::Adjusted:
   case Type::Decayed:
     if (!IsStructurallyEquivalent(Context,

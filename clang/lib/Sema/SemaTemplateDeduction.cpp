@@ -1626,6 +1626,9 @@ static Sema::TemplateDeductionResult DeduceTemplateArgumentsByTypeMatch(
     case Type::SubstTemplateTypeParmPack:
       llvm_unreachable("Type nodes handled above");
 
+     case Type::Hyperobject:
+       llvm_unreachable("Implement me");
+ 
     case Type::Auto:
       // C++23 [temp.deduct.funcaddr]/3:
       //   A placeholder type in the return type of a function template is a
@@ -6179,6 +6182,13 @@ MarkUsedTemplateParameters(ASTContext &Ctx, QualType T,
     if (!OnlyDeduced)
       MarkUsedTemplateParameters(Ctx,
                                  cast<ComplexType>(T)->getElementType(),
+                                 OnlyDeduced, Depth, Used);
+    break;
+
+  case Type::Hyperobject:
+    if (!OnlyDeduced)
+      MarkUsedTemplateParameters(Ctx,
+                                 cast<HyperobjectType>(T)->getElementType(),
                                  OnlyDeduced, Depth, Used);
     break;
 
