@@ -250,6 +250,10 @@ bool TypePrinter::canPrefixQualifiers(const Type *T,
       CanPrefixQualifiers = true;
       break;
 
+    case Type::Hyperobject:
+      CanPrefixQualifiers = true; /* or maybe false */
+      break;
+
     case Type::ObjCObjectPointer:
       CanPrefixQualifiers = T->isObjCIdType() || T->isObjCClassType() ||
         T->isObjCQualifiedIdType() || T->isObjCQualifiedClassType();
@@ -391,6 +395,32 @@ void TypePrinter::printComplexBefore(const ComplexType *T, raw_ostream &OS) {
 }
 
 void TypePrinter::printComplexAfter(const ComplexType *T, raw_ostream &OS) {
+  printAfter(T->getElementType(), OS);
+}
+
+void TypePrinter::printHyperobjectBefore(const HyperobjectType *T,
+                                         raw_ostream &OS) {
+  SaveAndRestore<bool> NonEmptyPH(HasEmptyPlaceHolder, false);
+  printBefore(T->getElementType(), OS);
+  OS << "_Hyperobject";
+  if (T->hasCallbacks()) {
+    Expr *R = T->getReduce();
+    Expr *I = T->getIdentity();
+    Expr *D = T->getDestroy();
+    OS << '(';
+    R->printPretty(OS, nullptr, Policy);
+    OS << ", ";
+    I->printPretty(OS, nullptr, Policy);
+    if (!HyperobjectType::isNullish(D)) {
+      OS << ", ";
+      D->printPretty(OS, nullptr, Policy);
+    }
+    OS << ")";
+  }
+}
+
+void TypePrinter::printHyperobjectAfter(const HyperobjectType *T,
+                                        raw_ostream &OS) {
   printAfter(T->getElementType(), OS);
 }
 

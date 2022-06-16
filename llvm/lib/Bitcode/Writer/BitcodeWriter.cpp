@@ -852,6 +852,16 @@ static uint64_t getAttrKindEncoding(Attribute::AttrKind Kind) {
     return bitc::ATTR_KIND_CORO_ONLY_DESTROY_WHEN_COMPLETE;
   case Attribute::DeadOnUnwind:
     return bitc::ATTR_KIND_DEAD_ON_UNWIND;
+  case Attribute::Injective:
+    return bitc::ATTR_KIND_INJECTIVE;
+  case Attribute::HyperToken:
+    return bitc::ATTR_KIND_HYPER_TOKEN;
+  case Attribute::HyperView:
+    return bitc::ATTR_KIND_HYPER_VIEW;
+  case Attribute::ReducerUnregister:
+    return bitc::ATTR_KIND_REDUCER_UNREGISTER;
+  case Attribute::ReducerRegister:
+    return bitc::ATTR_KIND_REDUCER_REGISTER;
   case Attribute::EndAttrKinds:
     llvm_unreachable("Can not encode end-attribute kinds marker.");
   case Attribute::None:

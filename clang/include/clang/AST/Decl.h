@@ -1389,6 +1389,8 @@ public:
   /// Returns a pointer to the value if evaluation succeeded, 0 otherwise.
   APValue *evaluateValue() const;
 
+  bool isReducer() const;
+
 private:
   APValue *evaluateValueImpl(SmallVectorImpl<PartialDiagnosticAt> &Notes,
                              bool IsConstantInitialization) const;

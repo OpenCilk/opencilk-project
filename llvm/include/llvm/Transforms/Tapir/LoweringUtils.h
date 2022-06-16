@@ -236,6 +236,9 @@ public:
   /// Lower a Tapir sync instruction SI.
   virtual void lowerSync(SyncInst &SI) = 0;
 
+  virtual void lowerReducerOperation(CallBase *Call) {
+  }
+
   /// Lower calls to the tapir.runtime.{start,end} intrinsics.  Only
   /// tapir.runtime.start intrinsics are stored; uses of those intrinsics
   /// identify the tapir.runtime.end intrinsics to lower.

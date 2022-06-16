@@ -306,6 +306,10 @@ void TypeLocWriter::VisitComplexTypeLoc(ComplexTypeLoc TL) {
   addSourceLocation(TL.getNameLoc());
 }
 
+void TypeLocWriter::VisitHyperobjectTypeLoc(HyperobjectTypeLoc TL) {
+  Record.AddSourceLocation(TL.getHyperLoc());
+}
+
 void TypeLocWriter::VisitPointerTypeLoc(PointerTypeLoc TL) {
   addSourceLocation(TL.getStarLoc());
 }

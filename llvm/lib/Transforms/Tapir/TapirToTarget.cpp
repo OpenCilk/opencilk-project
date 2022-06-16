@@ -224,6 +224,7 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
   SmallVector<CallInst *, 8> GrainsizeCalls;
   SmallVector<CallInst *, 8> TaskFrameAddrCalls;
   SmallVector<CallInst *, 8> TapirRTCalls;
+  SmallVector<CallBase *, 8> ReducerOperations;
   for (BasicBlock &BB : F) {
     for (Instruction &I : BB) {
       // Record calls to get Tapir-loop grainsizes.
@@ -245,6 +246,14 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
       // Record sync instructions in this function.
       if (SyncInst *SI = dyn_cast<SyncInst>(&I))
         Syncs.push_back(SI);
+
+      if (!dyn_cast<CallBase>(&I))
+        continue;
+
+      if (isTapirIntrinsic(Intrinsic::hyper_lookup, &I, nullptr) ||
+          isTapirIntrinsic(Intrinsic::reducer_register, &I, nullptr) ||
+          isTapirIntrinsic(Intrinsic::reducer_unregister, &I, nullptr))
+        ReducerOperations.push_back(cast<CallInst>(&I));
     }
   }
 
@@ -274,6 +283,12 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
   while (!Syncs.empty()) {
     SyncInst *SI = Syncs.pop_back_val();
     Target->lowerSync(*SI);
+    Changed = true;
+  }
+
+  while (!ReducerOperations.empty()) {
+    CallBase *CI = ReducerOperations.pop_back_val();
+    Target->lowerReducerOperation(CI);
     Changed = true;
   }
 

@@ -300,6 +300,7 @@ public:
     MLV_ConstQualified,
     MLV_ConstQualifiedField,
     MLV_ConstAddrSpace,
+    MLV_HyperobjectField,
     MLV_ArrayType,
     MLV_NoSetterProperty,
     MLV_MemberFunction,
@@ -351,6 +352,7 @@ public:
       CM_ConstQualifiedField,
       CM_ConstAddrSpace,
       CM_ArrayType,
+      CM_HyperobjectField,
       CM_IncompleteType
     };
 
