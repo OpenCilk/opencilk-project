@@ -9,6 +9,6 @@ struct S _Hyperobject shyper;
 // CHECK: call void @_ZN1SC1Ev
 // CHECK-NOT: call void @llvm.reducer.register
 // CHECK-NOT: call void @llvm.reducer.unregister
-// CHECK: call void @_ZN1SD1Ev(%struct.S* nonnull align 4 dereferenceable(4) @shyper)
+// CHECK: call void @_ZN1SD1Ev(%struct.S* noundef nonnull align 4 dereferenceable(4) @shyper)
 // CHECK-NOT: call void @llvm.reducer.register
 // CHECK-NOT: call void @llvm.reducer.unregister
