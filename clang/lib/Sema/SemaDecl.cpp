@@ -8191,7 +8191,7 @@ void Sema::CheckVariableDeclarationType(VarDecl *NewVD) {
 
   bool isVM = T->isVariablyModifiedType();
   if (isVM || NewVD->hasAttr<CleanupAttr>() ||
-      NewVD->hasAttr<BlocksAttr>())
+      NewVD->hasAttr<BlocksAttr>() || NewVD->getType()->isHyperobjectType())
     setFunctionHasBranchProtectedScope();
 
   if ((isVM && NewVD->hasLinkage()) ||
@@ -12809,7 +12809,7 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
     return;
 
   if (VarDecl *Var = dyn_cast<VarDecl>(RealDecl)) {
-    QualType Type = Var->getType();
+    QualType Type = Var->getType().stripHyperobject();
 
     // C++1z [dcl.dcl]p1 grammar implies that an initializer is mandatory.
     if (isa<DecompositionDecl>(RealDecl)) {
@@ -13314,7 +13314,7 @@ void Sema::CheckCompleteVariableDeclaration(VarDecl *var) {
   }
 
 
-  QualType type = var->getType();
+  QualType type = var->getType().stripHyperobject();
 
   if (var->hasAttr<BlocksAttr>())
     getCurFunction()->addByrefBlockVar(var);
@@ -13639,6 +13639,14 @@ void Sema::FinalizeDeclaration(Decl *ThisDecl) {
   // FIXME: Warn on unused var template partial specializations.
   if (VD->isFileVarDecl() && !isa<VarTemplatePartialSpecializationDecl>(VD))
     MarkUnusedFileScopedDecl(VD);
+
+  // This is only a shallow search.  See also SemaType.cpp ContainsHyperobject.
+  if (VD->getType()->isArrayType()) {
+    const ArrayType *A = VD->getType()->getAsArrayTypeUnsafe();
+    const HyperobjectType *H = A->getElementType()->getAs<HyperobjectType>();
+    if (H && H->hasCallbacks())
+      Diag(VD->getLocation(), diag::no_reducer_array);
+  }
 
   // Now we have parsed the initializer and can update the table of magic
   // tag values.
@@ -13966,6 +13974,12 @@ Decl *Sema::ActOnParamDeclarator(Scope *S, Declarator &D) {
 
   if (getLangOpts().OpenCL)
     deduceOpenCLAddressSpace(New);
+
+  if (New->getType()->getTypeClass() == Type::Hyperobject) {
+    Diag(New->getLocation(), diag::err_hyperobject_param);
+    // Disabling the parameter is easier than making argument passing work.
+    New->setInvalidDecl();
+  }
 
   return New;
 }
@@ -17509,6 +17523,14 @@ void Sema::ActOnFields(Scope *S, SourceLocation RecLoc, Decl *EnclosingDecl,
     if (FD->isInvalidDecl()) {
       EnclosingDecl->setInvalidDecl();
       continue;
+    }
+
+    if (!FDTy->isDependentType()) {
+      if (const HyperobjectType *HT = FDTy->getAs<HyperobjectType>()) {
+        if (HT->hasCallbacks())
+          Diag(FD->getLocation(), diag::reducer_callbacks_not_allowed)
+            << FD->getDeclName();
+      }
     }
 
     // C99 6.7.2.1p2:

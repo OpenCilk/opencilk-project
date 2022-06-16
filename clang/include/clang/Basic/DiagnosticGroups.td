@@ -946,6 +946,7 @@ def Move : DiagGroup<"move", [
 def SourceUsesCilkPlus : DiagGroup<"source-uses-cilk-plus">;
 def CilkPlusLoopControlVarModification : DiagGroup<"cilk-loop-control-var-modification">;
 def ReturnCilkSpawn : DiagGroup<"return-cilk-spawn">;
+def CilkIgnored : DiagGroup<"cilk-ignored">;
 
 def Extra : DiagGroup<"extra", [
     DeprecatedCopy,

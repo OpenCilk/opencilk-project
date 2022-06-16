@@ -5011,6 +5011,7 @@ bool Parser::isKnownToBeTypeSpecifier(const Token &Tok) const {
   case tok::kw___int128:
   case tok::kw_signed:
   case tok::kw_unsigned:
+  case tok::kw__Hyperobject:
   case tok::kw__Complex:
   case tok::kw__Imaginary:
   case tok::kw_void:
@@ -5094,6 +5095,7 @@ bool Parser::isTypeSpecifierQualifier() {
   case tok::kw___int128:
   case tok::kw_signed:
   case tok::kw_unsigned:
+  case tok::kw__Hyperobject:
   case tok::kw__Complex:
   case tok::kw__Imaginary:
   case tok::kw_void:
@@ -5265,6 +5267,7 @@ bool Parser::isDeclarationSpecifier(bool DisambiguatingWithExpression) {
   case tok::kw___int128:
   case tok::kw_signed:
   case tok::kw_unsigned:
+  case tok::kw__Hyperobject:
   case tok::kw__Complex:
   case tok::kw__Imaginary:
   case tok::kw_void:
@@ -5734,6 +5737,9 @@ static bool isPtrOperatorToken(tok::TokenKind Kind, const LangOptions &Lang,
       Lang.getOpenCLCompatibleVersion() >= 200)
     return true;
 
+  if (Kind == tok::kw__Hyperobject)
+    return true;
+
   if (!Lang.CPlusPlus)
     return false;
 
@@ -5867,7 +5873,70 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
   SourceLocation Loc = ConsumeToken();  // Eat the *, ^, & or &&.
   D.SetRangeEnd(Loc);
 
-  if (Kind == tok::star || Kind == tok::caret) {
+  if (Kind == tok::kw__Hyperobject) {
+    // Is a hyperobject.
+    DeclSpec DS(AttrFactory);
+
+    ParseTypeQualifierListOpt(DS, AR_GNUAttributesParsedAndRejected,
+                              true, !D.mayOmitIdentifier());
+
+    Expr *Reduce = nullptr, *Identity = nullptr, *Destroy = nullptr;
+    if (Tok.is(tok::l_paren)) {
+      SourceLocation Open = ConsumeParen(); // Eat the parenthesis
+      SmallVector<Expr *, 3> Args;
+      SmallVector<SourceLocation, 3> Commas;
+      bool Reported = false, Error = false;
+      SourceLocation Close = Tok.getLocation();
+
+      if (!Tok.is(tok::r_paren))
+        Reported = ParseSimpleExpressionList(Args, Commas);
+      if (Tok.is(tok::r_paren))
+        Close = ConsumeParen(); // Eat the parenthesis
+      else
+        SkipUntil(tok::r_paren, StopAtSemi);
+
+      if (!Reported) {
+        for (const Expr *Arg : Args) {
+          if (Arg->containsErrors()) {
+            Reported = true;
+            break;
+          }
+        }
+      }
+        
+      switch (Args.size()) {
+      case 0:
+        break;
+      case 3:
+        Destroy = Args[2];
+        LLVM_FALLTHROUGH;
+      case 2:
+        Identity = Args[0];
+        Reduce = Args[1];
+        break;
+      default:
+        Error = true;
+        break;
+      }
+      if (Error && !Reported)
+        Diag(Loc, diag::error_hyperobject_arguments) <<
+          SourceRange(Open, Close);
+    }
+
+    D.ExtendWithDeclSpec(DS);
+
+    // Recursively parse the declarator.
+    ParseDeclaratorInternal(D, DirectDeclParser);
+    if (getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
+      D.AddTypeInfo(DeclaratorChunk::getHyperobject(
+                          DS.getTypeQualifiers(),
+                          Loc, SourceLocation(), SourceLocation(),
+                          Identity, Reduce, Destroy),
+                    std::move(DS.getAttributes()), SourceLocation());
+    else
+      Diag(Loc, diag::attribute_requires_cilk) << Kind;
+  }
+  else if (Kind == tok::star || Kind == tok::caret) {
     // Is a pointer.
     DeclSpec DS(AttrFactory);
 
@@ -7253,6 +7322,7 @@ void Parser::ParseMisplacedBracketDeclarator(Declarator &D) {
       break;
     case DeclaratorChunk::Array:
     case DeclaratorChunk::Function:
+    case DeclaratorChunk::Hyperobject:
     case DeclaratorChunk::Paren:
       break;
     }

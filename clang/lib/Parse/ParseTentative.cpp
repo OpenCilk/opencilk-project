@@ -1414,6 +1414,9 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
     // OpenCL pipe
   case tok::kw_pipe:
 
+    // Cilk
+  case tok::kw__Hyperobject:
+
     // GNU
   case tok::kw_restrict:
   case tok::kw__Complex:

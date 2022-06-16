@@ -3490,6 +3490,12 @@ void ItaniumRTTIBuilder::BuildVTablePointer(const Type *Ty) {
     VTableName = "_ZTVN10__cxxabiv123__fundamental_type_infoE";
     break;
 
+  case Type::Hyperobject:
+    // XXX needs work
+    BuildVTablePointer
+      (cast<HyperobjectType>(Ty)->getElementType().getTypePtr());
+    return;
+
   case Type::ConstantArray:
   case Type::IncompleteArray:
   case Type::VariableArray:
@@ -3746,6 +3752,9 @@ llvm::Constant *ItaniumRTTIBuilder::BuildTypeInfo(
   case Type::Auto:
   case Type::DeducedTemplateSpecialization:
     llvm_unreachable("Undeduced type shouldn't get here");
+
+  case Type::Hyperobject:
+    llvm_unreachable("Hyperobject shouldn't get here");
 
   case Type::Pipe:
     break;
