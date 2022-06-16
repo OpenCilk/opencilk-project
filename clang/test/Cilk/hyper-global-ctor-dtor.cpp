@@ -7,7 +7,7 @@ void identity_long(struct S *v);
 void reduce_long(S *l, S *r);
 
 // CHECK-LABEL: cxx_global_var_init
-// CHECK: call void @_ZN1SC1Ei(%struct.S* nonnull align 4 dereferenceable(4) @global, i32 1)
+// CHECK: call void @_ZN1SC1Ei(%struct.S* noundef nonnull align 4 dereferenceable(4) @global, i32 noundef 1)
 // CHECK: call void @llvm.reducer.register.i64
 S _Hyperobject(identity_long, reduce_long, 0) global(1);
 
