@@ -774,6 +774,18 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
         OS << LS << "Attribute::Convergent";
       if (Intrinsic.isSpeculatable)
         OS << LS << "Attribute::Speculatable";
+      if (Intrinsic.isInjective)
+        OS << LS << "Attribute::Injective";
+      if (Intrinsic.isStrandPure)
+        OS << LS << "Attribute::StrandPure";
+      if (Intrinsic.isReducerRegister)
+        OS << LS << "Attribute::ReducerRegister";
+      if (Intrinsic.isReducerUnregister)
+        OS << LS << "Attribute::ReducerUnregister";
+      if (Intrinsic.isHyperView)
+        OS << LS << "Attribute::HyperView";
+      if (Intrinsic.isHyperToken)
+        OS << LS << "Attribute::HyperToken";
 
       switch (Intrinsic.ModRef) {
       case CodeGenIntrinsic::NoMem:

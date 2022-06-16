@@ -157,6 +157,9 @@ static ScopePair GetDiagForGotoScopeDecl(Sema &S, const Decl *D) {
     if (VD->hasAttr<CleanupAttr>())
       return ScopePair(diag::note_protected_by_cleanup,
                        diag::note_exits_cleanup);
+    if (VD->isReducer())
+      return ScopePair(diag::note_protected_by_reducer,
+                       diag::note_exits_cleanup);
 
     if (VD->hasLocalStorage()) {
       switch (VD->getType().isDestructedType()) {
@@ -173,6 +176,7 @@ static ScopePair GetDiagForGotoScopeDecl(Sema &S, const Decl *D) {
                          diag::note_exits_dtor);
 
       case QualType::DK_cxx_destructor:
+      case QualType::DK_hyperobject:
         OutDiag = diag::note_exits_dtor;
         break;
 
@@ -261,6 +265,7 @@ void JumpScopeChecker::BuildScopeInformation(VarDecl *D,
     std::pair<unsigned,unsigned> Diags;
     switch (destructKind) {
       case QualType::DK_cxx_destructor:
+      case QualType::DK_hyperobject:
         Diags = ScopePair(diag::note_enters_block_captures_cxx_obj,
                           diag::note_exits_block_captures_cxx_obj);
         break;

@@ -3421,7 +3421,9 @@ enum CXTypeKind {
   CXType_OCLIntelSubgroupAVCImeDualRefStreamin = 175,
 
   CXType_ExtVector = 176,
-  CXType_Atomic = 177
+  CXType_Atomic = 177,
+
+  CXType_Hyperobject = 178
 };
 
 /**
