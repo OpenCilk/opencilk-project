@@ -2382,27 +2382,11 @@ QualType Sema::BuildReferenceType(QualType T, bool SpelledAsLValue,
   return Context.getRValueReferenceType(T);
 }
 
-static bool CheckReducerParams(QualType T, unsigned NumArgs) {
-  if (T->isPointerType())
-    T = T->getPointeeType();
-  if (!T->isFunctionType())
-    return true;
-  if (const FunctionProtoType *F = T->getAs<FunctionProtoType>()) {
-    if (F->getNumParams() != NumArgs)
-      return true;
-    for (unsigned I = 0; I < NumArgs; ++I) {
-      if (!F->getParamType(I)->isPointerType())
-        return true;
-    }
-  }
-  return false;
-}
-
 // Return value is always non-null.
-Expr *Sema::ValidateReducerCallback(QualType Element, Expr *E, unsigned Args) {
+Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
+                                    SourceLocation Loc) {
   if (!E)
-    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
-                                            SourceLocation());
+    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy, Loc);
 
   QualType T = E->getType();
 
@@ -2410,58 +2394,70 @@ Expr *Sema::ValidateReducerCallback(QualType Element, Expr *E, unsigned Args) {
   if (T->isDependentType() || T == Context.VoidPtrTy)
     return E;
 
-  if (T->isNonOverloadPlaceholderType()) {
-    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << Args;
-    return new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
-                                               E->getExprLoc());
-  }
-
   if (T->isNullPtrType())
     return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
                                     CK_NullToPointer, E, nullptr,
                                     VK_PRValue, FPOptionsOverride());
 
-  if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(E)) {
-    if (L->getValue().isNullValue())
-      return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
-                                      CK_NullToPointer, E, nullptr,
-                                      VK_PRValue, FPOptionsOverride());
-    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << Args;
-    return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
-                                    CK_IntegralToPointer, E, nullptr,
-                                    VK_PRValue, FPOptionsOverride());
-  }
-
-  if (T == Context.OverloadTy) {
-    QualType Ptr = Context.getPointerType(Element);
-    llvm::SmallVector<QualType, 2> ArgTy;
-    ArgTy.push_back(Ptr);
-    if (Args > 1)
-      ArgTy.push_back(Ptr);
-    QualType Fn =
-      BuildFunctionType(Context.VoidTy, ArgTy, E->getExprLoc(),
-                        DeclarationName(), FunctionProtoType::ExtProtoInfo());
-    DeclAccessPair What;
-    bool Multiple = false;
-    if (FunctionDecl *F =
-        ResolveAddressOfOverloadedFunction(E, Fn, true, What, &Multiple)) {
-      T = F->getType();
-      E = BuildDeclRefExpr(F, T, VK_LValue, E->getExprLoc());
-    }
-  }
-
-  if (CheckReducerParams(T, Args)) {
-    Diag(E->getExprLoc(), diag::err_invalid_reducer_callback) << Args;
-    return new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
-                                               E->getExprLoc());
-  }
-
-  if (T->isFunctionType())
+  if (T->isFunctionType()) {
     E = ImplicitCastExpr::Create(Context, Context.getPointerType(T),
                                  CK_FunctionToPointerDecay, E,
                                  nullptr, VK_PRValue, FPOptionsOverride());
+    T = E->getType(); // Context.getDecayedType(T);
+  }
 
-  return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, CK_BitCast, E,
+  CastKind Cast = CK_BitCast;
+
+  if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(E)) {
+    if (L->getValue().isNullValue())
+      return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
+                                      CK_NullToPointer, E,
+                                      nullptr, VK_PRValue,
+                                      FPOptionsOverride());
+    Cast = CK_IntegralToPointer;
+  }
+
+  // TODO: The compiler should allow
+  // Ptr = Context.getPointerType(Element)
+  // and generate a thunk that accepts void *.
+
+  QualType Ptr = Context.VoidPtrTy;
+  llvm::SmallVector<QualType, 2> ArgTy;
+  ArgTy.push_back(Ptr);
+  if (NumArgs > 1) {
+    ArgTy.push_back(Ptr);
+    assert(NumArgs == 2);
+  }
+  // TODO: Give these types names for better error messages.
+  QualType FnTy =
+    BuildFunctionType(Context.VoidTy, ArgTy, E->getExprLoc(),
+                      DeclarationName(), FunctionProtoType::ExtProtoInfo());
+  FnTy = BuildPointerType(FnTy, E->getExprLoc(), DeclarationName());
+
+  if (T == Context.OverloadTy) {
+    DeclAccessPair What;
+    bool Multiple = false;
+    if (FunctionDecl *F =
+        ResolveAddressOfOverloadedFunction(E, FnTy, true, What, &Multiple)) {
+      T = F->getType();
+      E = BuildDeclRefExpr(F, T, VK_LValue, E->getExprLoc());
+      T = Context.getPointerType(T);
+      E = ImplicitCastExpr::Create(Context, T, CK_FunctionToPointerDecay, E,
+                                   nullptr, VK_PRValue, FPOptionsOverride());
+    }
+  }
+
+  AssignConvertType Mismatch =
+    CheckAssignmentConstraints(E->getExprLoc(), FnTy, T);
+
+  if (DiagnoseAssignmentResult(Mismatch, E->getExprLoc(), FnTy, T, E,
+                               AA_Passing)) {
+    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
+                                            E->getExprLoc());
+    Cast = CK_NullToPointer;
+  }
+
+  return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, Cast, E,
                                   nullptr, VK_PRValue, FPOptionsOverride());
 }
 
@@ -2475,9 +2471,9 @@ QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
       Diag(Loc, *Code) << Result;
   }
 
-  Identity = ValidateReducerCallback(Element, Identity, 1);
-  Reduce = ValidateReducerCallback(Element, Reduce, 2);
-  Destroy = ValidateReducerCallback(Element, Destroy, 1);
+  Identity = ValidateReducerCallback(Identity, 1, Loc);
+  Reduce = ValidateReducerCallback(Reduce, 2, Loc);
+  Destroy = ValidateReducerCallback(Destroy, 1, Loc);
 
   // The result of this function must be HyperobjectType if it is called
   // from C++ template instantiation when rebuilding an existing hyperobject
