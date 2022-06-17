@@ -2,8 +2,8 @@
 // RUN: %clang_cc1 %s -x c -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
-extern void identity(double * value);
-extern void reduce(double* left, double* right);
+extern void identity(void * value);
+extern void reduce(void* left, void* right);
 
 typedef long _Hyperobject *long_hp;
 typedef long _Hyperobject long_h;

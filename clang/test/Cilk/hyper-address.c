@@ -7,8 +7,8 @@
 // This does not compile in C++ because function overloading requires
 // an exact match for hyperobject types.  C allows assigning to a
 // generic hyperobject.
-void identity(long * value);
-void reduce(long* left, long* right);
+void identity(void * value);
+void reduce(void* left, void* right);
 extern void consume_view(long *);
 extern void consume_hyper(long _Hyperobject *);
 // CHECK_LABEL: assorted_addresses

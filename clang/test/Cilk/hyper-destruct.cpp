@@ -30,7 +30,7 @@ public:
   ~Bag();
 
   static void identity(void *value);
-  static void reduce(Bag<T> *left, Bag<T> *right);
+  static void reduce(void *left, void *right);
 };
 
 template <typename T>
@@ -39,8 +39,7 @@ Bag<T>::~Bag()
 }
 
 template<typename T>
-using Bag_red = Bag<T> _Hyperobject(Bag<T>::identity,
- Bag<T>::reduce);
+using Bag_red = Bag<T> _Hyperobject(Bag<T>::identity, Bag<T>::reduce);
 
 void f()
 {

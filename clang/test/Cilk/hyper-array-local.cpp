@@ -1,7 +1,7 @@
 // RUN: %clang_cc1 %s -x c -triple aarch64-freebsd -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // RUN: %clang_cc1 %s -x c++ -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
-extern void identity_long(long *);
-extern void reduce_long(long *, long *);
+extern void identity_long(void *);
+extern void reduce_long(void *, void *);
 
 typedef long _Hyperobject(identity_long, reduce_long) rlong __attribute__((aligned(16)));
 

@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 %s -fopencilk -verify -fsyntax-only
-extern void identity_short(short *);
-extern void reduce_short(short *, short *);
+extern void identity_short(void *);
+extern void reduce_short(void *, void *);
 
 int into(int x)
 {
