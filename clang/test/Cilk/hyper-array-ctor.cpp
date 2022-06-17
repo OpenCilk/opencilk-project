@@ -4,8 +4,10 @@ template <typename T>
 struct Constructed {
   Constructed();
   ~Constructed();
-  static void identity(Constructed<T> *);
-  static void reduce(Constructed<T> *left, Constructed<T> *right);
+  //static void identity(Constructed<T> *);
+  //static void reduce(Constructed<T> *left, Constructed<T> *right);
+  static void identity(void *);
+  static void reduce(void *left, void *right);
 };
 
 // Make sure hyperobjects pass through (template using) unharmed.

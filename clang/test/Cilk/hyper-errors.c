@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 %s -fopencilk -verify -fsyntax-only
-// RUN: %clang_cc1 -x c++ %s -fopencilk -verify -fsyntax-only
+// RUN: %clang_cc1 %s -fopencilk -verify -fsyntax-only -Werror=incompatible-function-pointer-types -Werror=int-conversion
+// RUN: %clang_cc1 %s -x c++ -fopencilk -verify -fsyntax-only
 struct C { int _Hyperobject c; };
 struct C _Hyperobject c; // expected-error{{type 'struct C', which contains a hyperobject, may not be a hyperobject}}
 long _Hyperobject d; // expected-note{{previous definition}}
@@ -21,9 +21,10 @@ struct D {
 };
 
 int _Hyperobject(reduce, identity) h;
-  // expected-error@-1{{reducer callback must be function with 1 pointer parameter}}
-  // expected-error@-2{{reducer callback must be function with 2 pointer parameters}}
+  // expected-error@-1{{incompatible function pointer types passing 'void (*)(void *, void *)' to parameter of type 'void (*)(void *)'}}
+  // expected-error@-2{{incompatible function pointer types passing 'void (*)(void *)' to parameter of type 'void (*)(void *, void *)'}}
 
 int _Hyperobject(x) i; // expected-error{{use of undeclared identifier 'x'}}
 int _Hyperobject(0) j; // expected-error{{hyperobject must have 0, 2, or 3 callbacks}}
 int _Hyperobject(0,0,0,0) k; // expected-error{{hyperobject must have 0, 2, or 3 callbacks}}
+int _Hyperobject(0, 1) x; // expected-error{{incompatible integer to pointer conversion passing 'int' to parameter of type 'void (*)(void *, void *)'}}
