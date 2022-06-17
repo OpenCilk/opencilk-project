@@ -2,11 +2,12 @@
 template<typename VIEW>
 struct reducer
 {
-  static void reduce(VIEW *, VIEW *);
-  static void identity(VIEW *);
+  static void identity(void *);
+  static void reduce(void *, void *);
   char pad;
   // Registration of structure members is not implemented.
-  VIEW _Hyperobject(identity, reduce) value; // expected-warning{{reducer callbacks not implemented}}
+  VIEW _Hyperobject(identity, reduce) value;
+  // expected-warning@-1{{reducer callbacks not implemented}}
   reducer();
   ~reducer();
 };
