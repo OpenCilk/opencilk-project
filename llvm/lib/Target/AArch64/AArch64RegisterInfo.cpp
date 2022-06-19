@@ -496,6 +496,12 @@ unsigned AArch64RegisterInfo::getBaseRegister() const { return AArch64::X19; }
 bool AArch64RegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
 
+  // For stealable functions, where the stack pointer can change dramatically
+  // during execution, the base pointer is the only reliable way to reference
+  // local variables.
+  if (MF.getFunction().hasFnAttribute(Attribute::Stealable))
+    return true;
+
   // In the presence of variable sized objects or funclets, if the fixed stack
   // size is large enough that referencing from the FP won't result in things
   // being in range relatively often, we can use a base pointer to allow access
