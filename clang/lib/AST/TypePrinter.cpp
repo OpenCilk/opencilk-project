@@ -404,13 +404,13 @@ void TypePrinter::printHyperobjectBefore(const HyperobjectType *T,
   printBefore(T->getElementType(), OS);
   OS << "_Hyperobject";
   if (T->hasCallbacks()) {
-    Expr *R = T->getReduce();
     Expr *I = T->getIdentity();
+    Expr *R = T->getReduce();
     Expr *D = T->getDestroy();
     OS << '(';
-    R->printPretty(OS, nullptr, Policy);
-    OS << ", ";
     I->printPretty(OS, nullptr, Policy);
+    OS << ", ";
+    R->printPretty(OS, nullptr, Policy);
     if (!HyperobjectType::isNullish(D)) {
       OS << ", ";
       D->printPretty(OS, nullptr, Policy);
