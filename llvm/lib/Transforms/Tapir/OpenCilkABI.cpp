@@ -632,6 +632,22 @@ void OpenCilkABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
       LandingPadInst *LPad = BB.getLandingPadInst();
       Instruction *InsertPt = &*BB.getFirstInsertionPt();
       IRBuilder<> Builder(InsertPt);
+      // Try to find debug information for the ABI call.  First check the
+      // landing pad.
+      if (!Builder.getCurrentDebugLocation())
+        Builder.SetCurrentDebugLocation(LPad->getDebugLoc());
+      // Next, check later in the block
+      if (!Builder.getCurrentDebugLocation()) {
+        BasicBlock::iterator BI = Builder.GetInsertPoint();
+        BasicBlock::const_iterator BE(Builder.GetInsertBlock()->end());
+        while (BI != BE) {
+          if (DebugLoc Loc = BI->getDebugLoc()) {
+            Builder.SetCurrentDebugLocation(Loc);
+            break;
+          }
+          ++BI;
+        }
+      }
 
       Value *Sel = Builder.CreateExtractValue(LPad, 1, "sel");
       Builder.CreateCall(CILKRTS_FUNC(enter_landingpad), {SF, Sel});
