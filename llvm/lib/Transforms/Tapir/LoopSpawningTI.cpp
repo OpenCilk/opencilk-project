@@ -1059,6 +1059,7 @@ static Value *computeGrainsize(TapirLoopInfo *TL) {
   BasicBlock *Preheader = TL->getLoop()->getLoopPreheader();
   Module *M = Preheader->getModule();
   IRBuilder<> B(Preheader->getTerminator());
+  B.SetCurrentDebugLocation(TL->getDebugLoc());
   return B.CreateCall(
       Intrinsic::getDeclaration(M, Intrinsic::tapir_loop_grainsize,
                                 { IdxTy }), { TripCount });
