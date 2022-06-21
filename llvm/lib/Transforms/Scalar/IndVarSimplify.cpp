@@ -139,6 +139,7 @@ class IndVarSimplify {
 
   SmallVector<WeakTrackingVH, 16> DeadInsts;
   bool WidenIndVars;
+  bool TapirLoopsOnly;
 
   bool handleFloatingPointIV(Loop *L, PHINode *PH);
   bool rewriteNonIntegerIVs(Loop *L);
@@ -166,9 +167,9 @@ public:
   IndVarSimplify(LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
                  const DataLayout &DL, TargetLibraryInfo *TLI,
                  TargetTransformInfo *TTI, MemorySSA *MSSA, TaskInfo *TI,
-                 bool WidenIndVars)
+                 bool WidenIndVars, bool TapirLoopsOnly)
       : LI(LI), SE(SE), DT(DT), DL(DL), TLI(TLI), TTI(TTI), TI(TI),
-        WidenIndVars(WidenIndVars) {
+        WidenIndVars(WidenIndVars), TapirLoopsOnly(TapirLoopsOnly) {
     if (MSSA)
       MSSAU = std::make_unique<MemorySSAUpdater>(MSSA);
   }
@@ -1973,6 +1974,8 @@ bool IndVarSimplify::run(Loop *L) {
     return false;
 
   bool IsTapirLoop = (nullptr != getTaskIfTapirLoop(L, TI));
+  if (TapirLoopsOnly && !IsTapirLoop)
+    return false;
   bool Changed = false;
   // If there are any floating-point recurrences, attempt to
   // transform them to use integer recurrences.
@@ -2140,7 +2143,27 @@ PreservedAnalyses IndVarSimplifyPass::run(Loop &L, LoopAnalysisManager &AM,
   const DataLayout &DL = F->getParent()->getDataLayout();
 
   IndVarSimplify IVS(&AR.LI, &AR.SE, &AR.DT, DL, &AR.TLI, &AR.TTI, AR.MSSA,
-                     &AR.TI, WidenIndVars && AllowIVWidening);
+                     &AR.TI, WidenIndVars && AllowIVWidening,
+                     /*TapirLoopsOnly=*/false);
+  if (!IVS.run(&L))
+    return PreservedAnalyses::all();
+
+  auto PA = getLoopPassPreservedAnalyses();
+  PA.preserveSet<CFGAnalyses>();
+  if (AR.MSSA)
+    PA.preserve<MemorySSAAnalysis>();
+  return PA;
+}
+
+PreservedAnalyses TapirIndVarSimplifyPass::run(Loop &L, LoopAnalysisManager &AM,
+                                               LoopStandardAnalysisResults &AR,
+                                               LPMUpdater &) {
+  Function *F = L.getHeader()->getParent();
+  const DataLayout &DL = F->getParent()->getDataLayout();
+
+  IndVarSimplify IVS(&AR.LI, &AR.SE, &AR.DT, DL, &AR.TLI, &AR.TTI, AR.MSSA,
+                     &AR.TI, WidenIndVars && AllowIVWidening,
+                     /*TapirLoopsOnly=*/true);
   if (!IVS.run(&L))
     return PreservedAnalyses::all();
 
