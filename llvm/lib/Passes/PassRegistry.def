@@ -562,6 +562,7 @@ LOOP_PASS("guard-widening", GuardWideningPass())
 LOOP_PASS("loop-bound-split", LoopBoundSplitPass())
 LOOP_PASS("loop-reroll", LoopRerollPass())
 LOOP_PASS("loop-versioning-licm", LoopVersioningLICMPass())
+LOOP_PASS("tapir-indvars", TapirIndVarSimplifyPass())
 #undef LOOP_PASS
 
 #ifndef LOOP_PASS_WITH_PARAMS

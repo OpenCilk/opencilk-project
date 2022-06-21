@@ -1333,16 +1333,21 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // Stripmine Tapir loops, if pass is enabled.
   if (PTO.LoopStripmine && Level != OptimizationLevel::O1 &&
       !Level.isOptimizingForSize()) {
+    LoopPassManager LPM1, LPM2;
+    LPM1.addPass(TapirIndVarSimplifyPass());
+    OptimizePM.addPass(
+        createFunctionToLoopPassAdaptor(std::move(LPM1),
+                                        /*UseMemorySSA=*/true,
+                                        /*UseBlockFrequencyInfo=*/true));
     OptimizePM.addPass(LoopStripMinePass());
     // Cleanup tasks after stripmining loops.
     OptimizePM.addPass(TaskSimplifyPass());
     // Cleanup after stripmining loops.
-    LoopPassManager LPM;
-    LPM.addPass(LoopSimplifyCFGPass());
-    LPM.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
-                         /*AllowSpeculation=*/true));
+    LPM2.addPass(LoopSimplifyCFGPass());
+    LPM2.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
+                          /*AllowSpeculation=*/true));
     OptimizePM.addPass(
-        createFunctionToLoopPassAdaptor(std::move(LPM),
+        createFunctionToLoopPassAdaptor(std::move(LPM2),
                                         /*UseMemorySSA=*/true,
                                         /*UseBlockFrequencyInfo=*/true));
     // Don't run IndVarSimplify at this point, as it can actually inhibit
