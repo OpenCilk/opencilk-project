@@ -931,10 +931,12 @@ bool OpenCilkABI::processOrdinaryFunction(Function &F, BasicBlock *TFEntry) {
 
   // If any calls to tapir.runtime.{start,end} were found in this taskframe that
   // need processing, lower them now.
-  if (!TapirRTCalls[TFEntry].empty())
+  if (!TapirRTCalls[TFEntry].empty()) {
     LowerTapirRTCalls(F, TFEntry);
+    Changed = true;
+  }
 
-  return true;
+  return Changed;
 }
 
 void OpenCilkABI::postProcessHelper(Function &F) {}
