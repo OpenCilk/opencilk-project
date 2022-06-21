@@ -1839,8 +1839,8 @@ void CodeGenFunction::emitZeroOrPatternForAutoVarInit(QualType type,
 bool CodeGenFunction::getReducer(const VarDecl *D, ReducerCallbacks &CB) {
   if (const HyperobjectType *H = D->getType()->getAs<HyperobjectType>()) {
     if (H->hasCallbacks()) {
-      CB.Reduce = H->getReduce();
       CB.Identity = H->getIdentity();
+      CB.Reduce = H->getReduce();
       CB.Destroy = H->getDestroy();
       return true;
     }

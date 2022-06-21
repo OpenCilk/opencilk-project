@@ -3205,18 +3205,18 @@ HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
   : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
     ElementType(Element), Identity(i), Reduce(r), Destroy(d),
     IdentityID(ii), ReduceID(ri), DestroyID(di),
-    Bare(isNullish(r) && isNullish(i) && isNullish(d)) {
+    Bare(isNullish(i) && isNullish(r) && isNullish(d)) {
 }
 
 void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID) const {
-  Profile(ID, getElementType(), ReduceID, IdentityID, DestroyID);
+  Profile(ID, getElementType(), IdentityID, ReduceID, DestroyID);
 }
 
 void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
                               const IdentifierInfo *I, const IdentifierInfo *R,
                               const IdentifierInfo *D) {
   ID.AddPointer(Pointee.getAsOpaquePtr());
-  // In normal use all of I, R, D will be non-null or none of them will be.
+  // In normal use both I, R will be non-null or neither of them will be.
   if (I)
     ID.AddString(I->getName());
   if (R)

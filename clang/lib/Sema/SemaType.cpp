@@ -2478,7 +2478,7 @@ QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
   // The result of this function must be HyperobjectType if it is called
   // from C++ template instantiation when rebuilding an existing hyperobject
   // type.
-  return Context.getHyperobjectType(Result, Reduce, Identity, Destroy);
+  return Context.getHyperobjectType(Result, Identity, Reduce, Destroy);
 }
 
 /// Build a Read-only Pipe type.

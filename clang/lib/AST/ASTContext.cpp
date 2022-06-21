@@ -3317,26 +3317,26 @@ static const IdentifierInfo *getFunction(Expr *E) {
   return F->getIdentifier();
 }
 
-QualType ASTContext::getHyperobjectType(QualType T, Expr *R, Expr *I, Expr *D) const {
-  assert(R && I && D);
-  bool RN = HyperobjectType::isNullish(R);
+QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) const {
+  assert(I && R && D);
   bool IN = HyperobjectType::isNullish(I);
+  bool RN = HyperobjectType::isNullish(R);
   bool DN = HyperobjectType::isNullish(D);
 
-  const IdentifierInfo *RI = getFunction(R);
   const IdentifierInfo *II = getFunction(I);
+  const IdentifierInfo *RI = getFunction(R);
   const IdentifierInfo *DI = getFunction(D);
-  bool Varies = (!RN && !RI) || (!IN && !II) || (!DN && !DI);
+  bool Varies = (!IN && !II) || (!RN && !RI) || (!DN && !DI);
 
   QualType Canonical;
   if (!T.isCanonical())
-    Canonical = getHyperobjectType(getCanonicalType(T), R, I, D);
+    Canonical = getHyperobjectType(getCanonicalType(T), I, R, D);
 
   // Do not unique hyperobject types with variable expressions.
   if (Varies) {
     auto *New =
       new (*this, TypeAlignment)
-      HyperobjectType(T, Canonical, R, RI, I, II, D, DI);
+      HyperobjectType(T, Canonical, I, II, R, RI, D, DI);
     Types.push_back(New);
     return QualType(New, 0);
   }
@@ -3345,7 +3345,7 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *R, Expr *I, Expr *D) c
   // structure.
   // TODO: 0 and nullptr are not properly treated as equivalent here.
   llvm::FoldingSetNodeID ID;
-  HyperobjectType::Profile(ID, T, RI, II, DI);
+  HyperobjectType::Profile(ID, T, II, RI, DI);
 
   void *InsertPos = nullptr;
   if (HyperobjectType *HT = HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
@@ -3353,7 +3353,7 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *R, Expr *I, Expr *D) c
 
   auto *New =
     new (*this, TypeAlignment)
-    HyperobjectType(T, Canonical, R, RI, I, II, D, DI);
+    HyperobjectType(T, Canonical, I, II, R, RI, D, DI);
   Types.push_back(New);
   HyperobjectTypes.InsertNode(New, InsertPos);
   return QualType(New, 0);
