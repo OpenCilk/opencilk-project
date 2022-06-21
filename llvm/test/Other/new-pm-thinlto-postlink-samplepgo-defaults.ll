@@ -162,6 +162,9 @@
 ; CHECK-O-NEXT: Running pass: RecomputeGlobalsAAPass
 ; CHECK-O-NEXT: Running pass: Float2IntPass
 ; CHECK-O-NEXT: Running pass: LowerConstantIntrinsicsPass
+; CHECK-O2-NEXT: Running pass: LoopSimplifyPass
+; CHECK-O2-NEXT: Running pass: LCSSAPass
+; CHECK-O2-NEXT: Running pass: TapirIndVarSimplifyPass
 ; CHECK-O2-NEXT: Running pass: LoopStripMinePass
 ; CHECK-O2-NEXT: Running pass: TaskSimplifyPass
 ; CHECK-O2-NEXT: Running pass: LoopSimplifyPass
@@ -177,6 +180,9 @@
 ; CHECK-O3-NEXT: Running pass: ControlHeightReductionPass
 ; CHECK-O3-NEXT: Running analysis: RegionInfoAnalysis
 ; CHECK-O3-NEXT: Running analysis: DominanceFrontierAnalysis
+; CHECK-O3-NEXT: Running pass: LoopSimplifyPass
+; CHECK-O3-NEXT: Running pass: LCSSAPass
+; CHECK-O3-NEXT: Running pass: TapirIndVarSimplifyPass
 ; CHECK-O3-NEXT: Running pass: LoopStripMinePass
 ; CHECK-O3-NEXT: Running pass: TaskSimplifyPass
 ; CHECK-O3-NEXT: Running pass: LoopSimplifyPass

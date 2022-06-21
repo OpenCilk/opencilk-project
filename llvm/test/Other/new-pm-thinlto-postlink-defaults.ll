@@ -172,6 +172,9 @@
 ; CHECK-POSTLINK-O-NEXT: Running pass: Float2IntPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: LowerConstantIntrinsicsPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: ControlHeightReductionPass
+; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyPass
+; CHECK-POSTLINK-O2-NEXT: Running pass: LCSSAPass
+; CHECK-POSTLINK-O2-NEXT: Running pass: TapirIndVarSimplifyPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopStripMinePass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyPass on foo
@@ -184,6 +187,9 @@
 ; CHECK-POSTLINK-O2-NEXT: Running pass: CorrelatedValuePropagationPass
 ; CHECK-POSTLINK-O2-NEXT: Invalidating analysis: LazyValueAnalysis
 ; CHECK-POSTLINK-O2-NEXT: Running pass: InstCombinePass
+; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyPass
+; CHECK-POSTLINK-O3-NEXT: Running pass: LCSSAPass
+; CHECK-POSTLINK-O3-NEXT: Running pass: TapirIndVarSimplifyPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopStripMinePass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: TaskSimplifyPass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyPass on foo
