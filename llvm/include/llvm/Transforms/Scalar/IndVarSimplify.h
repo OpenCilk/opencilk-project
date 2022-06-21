@@ -32,6 +32,17 @@ public:
                         LoopStandardAnalysisResults &AR, LPMUpdater &U);
 };
 
+class TapirIndVarSimplifyPass : public PassInfoMixin<TapirIndVarSimplifyPass> {
+  /// Perform IV widening during the pass.
+  bool WidenIndVars;
+
+public:
+  TapirIndVarSimplifyPass(bool WidenIndVars = true)
+      : WidenIndVars(WidenIndVars) {}
+  PreservedAnalyses run(Loop &L, LoopAnalysisManager &AM,
+                        LoopStandardAnalysisResults &AR, LPMUpdater &U);
+};
+
 } // end namespace llvm
 
 #endif // LLVM_TRANSFORMS_SCALAR_INDVARSIMPLIFY_H
