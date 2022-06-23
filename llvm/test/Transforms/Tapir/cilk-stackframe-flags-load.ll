@@ -134,8 +134,8 @@ sync.continue:                                    ; preds = %do.end
 ; CHECK: sync.continue:
 ; CHECK: call {{.*}}void @fft_aux(
 ; CHECK: %[[FLAG_LOAD:.+]] = load i32, i32* %[[FLAGS]]
-; CHECK: %[[TRUNC:.+]] = trunc i32 %[[FLAG_LOAD]] to i8
-; CHECK-NEXT: %[[CMP:.+]] = icmp sgt i8 %[[TRUNC]], -1
+; CHECK: %[[AND:.+]] = and i32 %[[FLAG_LOAD]], 128
+; CHECK-NEXT: %[[CMP:.+]] = icmp eq i32 %[[AND]], 0
 ; CHECK-NEXT: br i1 %[[CMP]], label %[[TRUE:.+]], label %[[FALSE:.[a-zA-Z0-9_\.]+]]
 
 ; CHECK: [[FALSE]]:

@@ -4,6 +4,7 @@
 ;
 ; RUN: opt < %s -tapir2target -tapir-target=opencilk -use-opencilk-runtime-bc -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -globaldce -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target,globaldce' -tapir-target=opencilk -use-opencilk-runtime-bc -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
+; RUN: opt < %s -passes='tapir2target' -tapir-target=opencilk -use-opencilk-runtime-bc -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s --check-prefix=CHECK-NODCE
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -22,6 +23,8 @@ attributes #0 = { noinline nounwind optnone uwtable "correctly-rounded-divide-sq
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{!"clang version 11.1.0 (git@github.com:OpenCilk/opencilk-project.git a64c17613c8e15c431484644b758f036b071e92d)"}
 
+; CHECK-NODCE: @__cilkrts_stack_frame_align = private
+; CHECK-NOT: @__cilkrts_stack_frame_align
 ; CHECK-NOT: define {{.*}}@__cilkrts_enter_frame(
 ; CHECK-NOT: define {{.*}}@__cilkrts_enter_frame_fast(
 ; CHECK-NOT: define {{.*}}@__cilkrts_detach(

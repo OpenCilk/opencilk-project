@@ -223,6 +223,9 @@ void OpenCilkABI::prepareModule() {
         M.getGlobalVariable("__cilkrts_stack_frame_align", true)) {
       if (auto Align = AlignVar->getAlign())
         StackFrameAlign = Align.getValue();
+      // Mark this variable with private linkage, to avoid linker failures when
+      // compiling with no optimizations.
+      AlignVar->setLinkage(GlobalValue::PrivateLinkage);
     }
   } else if (DebugABICalls) {
     if (StackFrameTy->isOpaque()) {
