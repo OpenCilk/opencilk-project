@@ -18,11 +18,11 @@
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/Orc/ExecutorProcessControl.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
-#include "llvm/ExecutionEngine/Orc/TargetProcessControl.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
@@ -35,7 +35,6 @@ namespace orc {
 
 class KaleidoscopeJIT {
 private:
-  std::unique_ptr<TargetProcessControl> TPC;
   std::unique_ptr<ExecutionSession> ES;
 
   DataLayout DL;
@@ -113,10 +112,9 @@ private:
   };
 
 public:
-  KaleidoscopeJIT(std::unique_ptr<TargetProcessControl> TPC,
-                  std::unique_ptr<ExecutionSession> ES,
+  KaleidoscopeJIT(std::unique_ptr<ExecutionSession> ES,
                   JITTargetMachineBuilder JTMB, DataLayout DL)
-      : TPC(std::move(TPC)), ES(std::move(ES)), DL(std::move(DL)),
+      : ES(std::move(ES)), DL(std::move(DL)),
         Mangle(*this->ES, this->DL),
         ObjectLayer(*this->ES,
                     []() { return std::make_unique<SectionMemoryManager>(); }),
@@ -138,19 +136,20 @@ public:
 
   static Expected<std::unique_ptr<KaleidoscopeJIT>> Create() {
     auto SSP = std::make_shared<SymbolStringPool>();
-    auto TPC = SelfTargetProcessControl::Create(SSP);
-    if (!TPC)
-      return TPC.takeError();
+    auto EPC = SelfExecutorProcessControl::Create();
+    if (!EPC)
+      return EPC.takeError();
 
-    auto ES = std::make_unique<ExecutionSession>(std::move(SSP));
+    auto ES = std::make_unique<ExecutionSession>(std::move(*EPC));
 
-    JITTargetMachineBuilder JTMB((*TPC)->getTargetTriple());
+    JITTargetMachineBuilder JTMB(
+        ES->getExecutorProcessControl().getTargetTriple());
 
     auto DL = JTMB.getDefaultDataLayoutForTarget();
     if (!DL)
       return DL.takeError();
 
-    return std::make_unique<KaleidoscopeJIT>(std::move(*TPC), std::move(ES),
+    return std::make_unique<KaleidoscopeJIT>(std::move(ES),
                                              std::move(JTMB), std::move(*DL));
   }
 
