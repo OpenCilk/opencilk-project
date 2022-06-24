@@ -106,7 +106,8 @@ inline CallInst *isFreeCall(Value *I, const TargetLibraryInfo *TLI,
 bool isAllocRemovable(const CallBase *V, const TargetLibraryInfo *TLI);
 
 /// Gets the alignment argument for an aligned_alloc-like function
-Value *getAllocAlignment(const CallBase *V, const TargetLibraryInfo *TLI);
+Value *getAllocAlignment(const CallBase *V, const TargetLibraryInfo *TLI,
+                         bool IgnoreBuiltinAttr = false);
 
 /// Return the size of the requested allocation.  With a trivial mapper, this is
 /// identical to calling getObjectSize(..., Exact).  A mapper function can be
@@ -115,6 +116,11 @@ Value *getAllocAlignment(const CallBase *V, const TargetLibraryInfo *TLI);
 Optional<APInt> getAllocSize(const CallBase *CB,
                              const TargetLibraryInfo *TLI,
                              std::function<const Value*(const Value*)> Mapper);
+
+/// Gets the size arguments for the requested allocation.
+std::pair<Value *, Value *> getAllocSizeArgs(const CallBase *CB,
+                                             const TargetLibraryInfo *TLI,
+                                             bool IgnoreBuiltinAttr = false);
 
 /// If this allocation function initializes memory to a fixed value, return
 /// said value in the requested type.  Otherwise, return nullptr.

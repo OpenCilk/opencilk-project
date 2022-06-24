@@ -4393,118 +4393,41 @@ static Value *getHeapObject(Value *I) {
 bool CilkSanitizerImpl::getAllocFnArgs(
     const Instruction *I, SmallVectorImpl<Value*> &AllocFnArgs,
     Type *SizeTy, Type *AddrTy, const TargetLibraryInfo &TLI) {
-  const Function *Called = dyn_cast<CallBase>(I)->getCalledFunction();;
+  const CallBase *CB = dyn_cast<CallBase>(I);
 
-  LibFunc F;
-  bool FoundLibFunc = TLI.getLibFunc(*Called, F);
-  if (!FoundLibFunc)
+  std::pair<Value *, Value *> SizeArgs =
+      getAllocSizeArgs(CB, &TLI, /*IgnoreBuiltinAttr=*/true);
+  // If the first size argument is null, then we failed to get size arguments
+  // for this call.
+  if (!SizeArgs.first)
     return false;
 
-  switch(F) {
-  default: return false;
-    // TODO: Add aligned new's to this list after they're added to TLI.
-  case LibFunc_malloc:
-  case LibFunc_valloc:
-  case LibFunc_Znwj:
-  case LibFunc_ZnwjRKSt9nothrow_t:
-  case LibFunc_Znwm:
-  case LibFunc_ZnwmRKSt9nothrow_t:
-  case LibFunc_Znaj:
-  case LibFunc_ZnajRKSt9nothrow_t:
-  case LibFunc_Znam:
-  case LibFunc_ZnamRKSt9nothrow_t:
-  case LibFunc_msvc_new_int:
-  case LibFunc_msvc_new_int_nothrow:
-  case LibFunc_msvc_new_longlong:
-  case LibFunc_msvc_new_longlong_nothrow:
-  case LibFunc_msvc_new_array_int:
-  case LibFunc_msvc_new_array_int_nothrow:
-  case LibFunc_msvc_new_array_longlong:
-  case LibFunc_msvc_new_array_longlong_nothrow:
-    {
-      // Allocated size
-      if (isa<CallInst>(I))
-        AllocFnArgs.push_back(cast<CallInst>(I)->getArgOperand(0));
-      else
-        AllocFnArgs.push_back(cast<InvokeInst>(I)->getArgOperand(0));
-      // Number of elements = 1
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
-      // Alignment = 0
-      // TODO: Fix this for aligned new's, once they're added to TLI.
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
-      // Old pointer = NULL
-      AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-      return true;
-    }
-  case LibFunc_ZnwjSt11align_val_t:
-  case LibFunc_ZnwmSt11align_val_t:
-  case LibFunc_ZnajSt11align_val_t:
-  case LibFunc_ZnamSt11align_val_t:
-  case LibFunc_ZnwjSt11align_val_tRKSt9nothrow_t:
-  case LibFunc_ZnwmSt11align_val_tRKSt9nothrow_t:
-  case LibFunc_ZnajSt11align_val_tRKSt9nothrow_t:
-  case LibFunc_ZnamSt11align_val_tRKSt9nothrow_t: {
-    if (const CallInst *CI = dyn_cast<CallInst>(I)) {
-      AllocFnArgs.push_back(CI->getArgOperand(0));
-      // Number of elements = 1
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
-      // Alignment
-      AllocFnArgs.push_back(CI->getArgOperand(1));
-      // Old pointer = NULL
-      AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-    } else {
-      const InvokeInst *II = cast<InvokeInst>(I);
-      AllocFnArgs.push_back(II->getArgOperand(0));
-      // Number of elements = 1
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
-      // Alignment
-      AllocFnArgs.push_back(II->getArgOperand(1));
-      // Old pointer = NULL
-      AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-    }
-    return true;
-  }
-  case LibFunc_calloc:
-    {
-      const CallInst *CI = cast<CallInst>(I);
-      // Allocated size
-      AllocFnArgs.push_back(CI->getArgOperand(1));
-      // Number of elements
-      AllocFnArgs.push_back(CI->getArgOperand(0));
-      // Alignment = 0
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
-      // Old pointer = NULL
-      AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-      return true;
-    }
-  case LibFunc_realloc:
-  case LibFunc_reallocf:
-    {
-      const CallInst *CI = cast<CallInst>(I);
-      // Allocated size
-      AllocFnArgs.push_back(CI->getArgOperand(1));
-      // Number of elements = 1
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
-      // Alignment = 0
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
-      // Old pointer
-      AllocFnArgs.push_back(CI->getArgOperand(0));
-      return true;
-    }
-  case LibFunc_aligned_alloc:
-    {
-      const CallInst *CI = cast<CallInst>(I);
-      // Allocated size
-      AllocFnArgs.push_back(CI->getArgOperand(1));
-      // Number of elements = 1
-      AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
-      // Alignment
-      AllocFnArgs.push_back(CI->getArgOperand(0));
-      // Old pointer = NULL
-      AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-      return true;
-    }
-  }
+  Value *AlignmentArg = getAllocAlignment(CB, &TLI, /*IgnoreBuiltinAttr=*/true);
+
+  // Push the size arguments.
+  AllocFnArgs.push_back(SizeArgs.first);
+  // The second size argument is the number of elements allocated (i.e., for
+  // calloc-like functions).
+  if (SizeArgs.second)
+    AllocFnArgs.push_back(SizeArgs.second);
+  else
+    // Report number of elements == 1.
+    AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
+
+  // Push the alignment argument or 0 if there is no alignment argument.
+  if (AlignmentArg)
+    AllocFnArgs.push_back(AlignmentArg);
+  else
+    AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
+
+  // Return the old pointer argument for realloc-like functions or nullptr for
+  // other allocation functions.
+  if (isReallocLikeFn(CB, &TLI))
+    AllocFnArgs.push_back(CB->getArgOperand(0));
+  else
+    AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
+
+  return true;
 }
 
 bool CilkSanitizerImpl::instrumentAllocFnLibCall(Instruction *I,
