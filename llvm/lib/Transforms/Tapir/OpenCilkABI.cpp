@@ -20,6 +20,7 @@
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
@@ -69,12 +70,56 @@ static void fixCilkSyncFn(Module &M, Function *Fn) {
         CB->removeFnAttr(Attribute::NoUnwind);
 }
 
+namespace {
+
+// Custom DiagnosticInfo for linking the OpenCilk ABI bitcode file.
+class OpenCilkABILinkDiagnosticInfo : public DiagnosticInfo {
+  const Module *SrcM;
+  const Twine &Msg;
+
+public:
+  OpenCilkABILinkDiagnosticInfo(DiagnosticSeverity Severity, const Module *SrcM,
+                                const Twine &Msg)
+      : DiagnosticInfo(DK_Lowering, Severity), SrcM(SrcM), Msg(Msg) {}
+  void print(DiagnosticPrinter &DP) const override {
+    DP << "linking module '" << SrcM->getModuleIdentifier() << "': " << Msg;
+  }
+};
+
+// Custom DiagnosticHandler to handle diagnostics arising when linking the
+// OpenCilk ABI bitcode file.
+class OpenCilkABIDiagnosticHandler final : public DiagnosticHandler {
+  const Module *SrcM;
+  DiagnosticHandler *OrigHandler;
+
+public:
+  OpenCilkABIDiagnosticHandler(const Module *SrcM,
+                               DiagnosticHandler *OrigHandler)
+      : SrcM(SrcM), OrigHandler(OrigHandler) {}
+
+  bool handleDiagnostics(const DiagnosticInfo &DI) override {
+    if (DI.getKind() != DK_Linker)
+      return OrigHandler->handleDiagnostics(DI);
+
+    std::string MsgStorage;
+    {
+      raw_string_ostream Stream(MsgStorage);
+      DiagnosticPrinterRawOStream DP(Stream);
+      DI.print(DP);
+    }
+    return OrigHandler->handleDiagnostics(
+        OpenCilkABILinkDiagnosticInfo(DI.getSeverity(), SrcM, MsgStorage));
+  }
+};
+
 // Structure recording information about Cilk ABI functions.
 struct CilkRTSFnDesc {
   StringRef FnName;
   FunctionType *FnType;
   FunctionCallee &FnCallee;
 };
+
+} // namespace
 
 void OpenCilkABI::setOptions(const TapirTargetOptions &Options) {
   if (!isa<OpenCilkABIOptions>(Options))
@@ -105,6 +150,10 @@ void OpenCilkABI::prepareModule() {
                       << RuntimeBCPath << "\n");
     SMDiagnostic SMD;
 
+    // Get the original DiagnosticHandler for this context.
+    std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
+        C.getDiagnosticHandler();
+
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
     std::unique_ptr<Module> ExternalModule = parseIRFile(RuntimeBCPath, SMD, C);
@@ -112,6 +161,11 @@ void OpenCilkABI::prepareModule() {
     if (!ExternalModule)
       C.emitError("OpenCilkABI: Failed to parse bitcode ABI file: " +
                   Twine(RuntimeBCPath));
+
+    // Setup an OpenCilkABIDiagnosticHandler for this context, to handle
+    // diagnostics that arise from linking ExternalModule.
+    C.setDiagnosticHandler(std::make_unique<OpenCilkABIDiagnosticHandler>(
+        ExternalModule.get(), OrigDiagHandler.get()));
 
     // Link the external module into the current module, copying over global
     // values.
@@ -142,6 +196,9 @@ void OpenCilkABI::prepareModule() {
     if (Fail)
       C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
                   Twine(RuntimeBCPath));
+
+    // Restore the original DiagnosticHandler for this context.
+    C.setDiagnosticHandler(std::move(OrigDiagHandler));
   }
 
   // Get or create local definitions of Cilk RTS structure types.
