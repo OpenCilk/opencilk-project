@@ -12,6 +12,7 @@
 #include "lld/Common/LLVM.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include <vector>
 
 namespace llvm {
@@ -39,6 +40,8 @@ uint64_t getZOptionValue(llvm::opt::InputArgList &args, int id, StringRef key,
 std::vector<StringRef> getLines(MemoryBufferRef mb);
 
 StringRef getFilenameWithoutExe(StringRef path);
+
+llvm::TapirTargetID parseTapirTarget(StringRef tapirTarget);
 
 } // namespace args
 } // namespace lld
