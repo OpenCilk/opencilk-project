@@ -1990,7 +1990,8 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   if (config->mingw || config->debugDwarf)
     config->warnLongSectionNames = false;
 
-  config->opencilkABIBitcodeFile = args.getLastArgValue(OPT_opencilk_abi_bitcode);
+  config->opencilkABIBitcodeFile =
+      args.getLastArgValue(OPT_opencilk_abi_bitcode);
   config->tapirTarget =
       args::parseTapirTarget(args.getLastArgValue(OPT_tapir_target));
 

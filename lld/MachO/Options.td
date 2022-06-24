@@ -130,6 +130,12 @@ def cs_profile_generate: Flag<["--"], "cs-profile-generate">,
     HelpText<"Perform context senstive PGO instrumentation">, Group<grp_lld>;
 def cs_profile_path: Joined<["--"], "cs-profile-path=">,
     HelpText<"Context sensitive profile file path">, Group<grp_lld>;
+def tapir_target: Joined<["--"], "tapir-target=">,
+    HelpText<"Specify the target for Tapir lowering">,
+    Group<grp_lld>;
+def opencilk_abi_bitcode: Joined<["--"], "opencilk-abi-bitcode=">,
+    HelpText<"Path to the OpenCilk ABI bitcode file">,
+    Group<grp_lld>;
 
 // This is a complete Options.td compiled from Apple's ld(1) manpage
 // dated 2018-03-07 and cross checked with ld64 source code in repo

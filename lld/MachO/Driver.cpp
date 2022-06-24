@@ -1641,6 +1641,10 @@ bool link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
   config->csProfileGenerate = args.hasArg(OPT_cs_profile_generate);
   config->csProfilePath = args.getLastArgValue(OPT_cs_profile_path);
   config->generateUuid = !args.hasArg(OPT_no_uuid);
+  config->tapirTarget =
+      args::parseTapirTarget(args.getLastArgValue(OPT_tapir_target));
+  config->opencilkABIBitcodeFile =
+      args.getLastArgValue(OPT_opencilk_abi_bitcode);
 
   for (const Arg *arg : args.filtered(OPT_alias)) {
     config->aliasedSymbols.push_back(
