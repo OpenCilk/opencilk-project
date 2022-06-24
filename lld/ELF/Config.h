@@ -128,7 +128,7 @@ struct Configuration {
   llvm::StringRef printSymbolOrder;
   llvm::StringRef soName;
   llvm::StringRef sysroot;
-  llvm::TapirTargetID tapirTarget;
+  llvm::TapirTargetID tapirTarget = llvm::TapirTargetID::None;
   llvm::StringRef thinLTOCacheDir;
   llvm::StringRef thinLTOIndexOnlyArg;
   llvm::StringRef whyExtract;

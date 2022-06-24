@@ -22,6 +22,7 @@
 #include "llvm/TextAPI/Architecture.h"
 #include "llvm/TextAPI/Platform.h"
 #include "llvm/TextAPI/Target.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 
 #include <vector>
 
@@ -186,6 +187,9 @@ struct Configuration {
   bool zeroModTime = false;
 
   llvm::StringRef osoPrefix;
+
+  llvm::TapirTargetID tapirTarget = llvm::TapirTargetID::None;
+  llvm::StringRef opencilkABIBitcodeFile;
 
   llvm::MachO::Architecture arch() const { return platformInfo.target.Arch; }
 
