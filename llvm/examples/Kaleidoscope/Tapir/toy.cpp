@@ -8,6 +8,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
@@ -39,8 +40,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#define PARFOR_RACE_BUG true
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -878,13 +877,23 @@ static std::unique_ptr<KaleidoscopeJIT> TheJIT;
 static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
 static ExitOnError ExitOnErr;
 
-static TapirTargetID TheTapirTarget;
-static std::string OpenCilkRuntimeBCPath;
+// Variables for codegen for the current task scope.
+
+// TaskScopeEntry keeps track of the entry basic block of the function
+// or nested task being emitted.
+static BasicBlock *TaskScopeEntry = nullptr;
+
+// TaskScopeSyncRegion keeps track of a call to
+// @llvm.syncregion.start() in TaskScopeEntry, if one exists.
+static Value *TaskScopeSyncRegion = nullptr;
+
+// Flags controlled from the command line.
 static bool Optimize = true;
 static bool RunCilksan = false;
-// Variables for codegen for the current task scope.
-static BasicBlock *TaskScopeEntry = nullptr;
-static Value *TaskScopeSyncRegion = nullptr;
+static bool PrintIR = false;
+// Options related to Tapir lowering.
+static TapirTargetID TheTapirTarget;
+static std::string OpenCilkRuntimeBCPath;
 
 Value *LogErrorV(const char *Str) {
   LogError(Str);
@@ -948,8 +957,9 @@ Value *VariableExprAST::codegen() {
   if (!isa<AllocaInst>(V))
     return V;
 
+  AllocaInst *A = cast<AllocaInst>(V);
   // Load the value.
-  return Builder->CreateLoad(V, Name.c_str());
+  return Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
 }
 
 Value *UnaryExprAST::codegen() {
@@ -1214,7 +1224,8 @@ Value *ForExprAST::codegen() {
 
   // Reload, increment, and restore the alloca.  This handles the case where
   // the body of the loop mutates the variable.
-  Value *CurVar = Builder->CreateLoad(Alloca, VarName.c_str());
+  Value *CurVar =
+      Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, VarName.c_str());
   Value *NextVar = Builder->CreateFAdd(CurVar, StepVal, "nextvar");
   Builder->CreateStore(NextVar, Alloca);
 
@@ -1324,18 +1335,22 @@ Value *SpawnExprAST::codegen() {
   // Create a sync region for the local function or task scope, if necessary.
   if (!TaskScopeSyncRegion)
     TaskScopeSyncRegion = CreateSyncRegion(*TheModule);
+  // Get the sync region for this task scope.
   Value *SyncRegion = TaskScopeSyncRegion;
   Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
-  // Create the detach and continue blocks.  Insert the continue block at the
-  // end of the function.
+  // Create the detach and continue blocks.  Insert the continue block
+  // at the end of the function.
   BasicBlock *DetachBB = BasicBlock::Create(*TheContext, "detachbb",
                                             TheFunction);
-  BasicBlock *ContinBB = BasicBlock::Create(*TheContext, "continbb");
+  // We hold off inserting ContinueBB into TheFunction until after we
+  // emit the spawned statement, to make the final LLVM IR a bit
+  // cleaner.
+  BasicBlock *ContinueBB = BasicBlock::Create(*TheContext, "continbb");
 
   // Create the detach and prepare to emit the spawned expression starting in
   // the detach block.
-  Builder->CreateDetach(DetachBB, ContinBB, SyncRegion);
+  Builder->CreateDetach(DetachBB, ContinueBB, SyncRegion);
   Builder->SetInsertPoint(DetachBB);
 
   // Emit the spawned computation.
@@ -1347,11 +1362,11 @@ Value *SpawnExprAST::codegen() {
       return nullptr;
 
     // Emit a reattach to the continue block.
-    Builder->CreateReattach(ContinBB, SyncRegion);
+    Builder->CreateReattach(ContinueBB, SyncRegion);
   }
 
-  TheFunction->getBasicBlockList().push_back(ContinBB);
-  Builder->SetInsertPoint(ContinBB);
+  TheFunction->getBasicBlockList().push_back(ContinueBB);
+  Builder->SetInsertPoint(ContinueBB);
 
   // Return a default value of 0.0.
   return Constant::getNullValue(Type::getDoubleTy(*TheContext));
@@ -1361,6 +1376,7 @@ Value *SyncExprAST::codegen() {
   // Create a sync region for the local function or task scope, if necessary.
   if (!TaskScopeSyncRegion)
     TaskScopeSyncRegion = CreateSyncRegion(*TheModule);
+  // Get the sync region for this task scope.
   Value *SyncRegion = TaskScopeSyncRegion;
   Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
@@ -1417,32 +1433,23 @@ static std::vector<Metadata *> GetTapirLoopMetadata() {
 //   sync within sr, aftersync
 // aftersync:
 Value *ParForExprAST::codegen() {
-#if PARFOR_RACE_BUG
-  // Create an alloca for the variable in the entry block.
-  AllocaInst *Alloca =
-    CreateTaskEntryBlockAlloca(VarName, Type::getInt64Ty(*TheContext));
-#endif // PARFOR_RACE_BUG
+  Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
   // Emit the start code first, without 'variable' in scope.
   Value *StartVal = Start->codegen();
   if (!StartVal)
     return nullptr;
 
-#if PARFOR_RACE_BUG
-  // Store the value into the alloca.
-  Builder->CreateStore(StartVal, Alloca);
-#endif // PARFOR_RACE_BUG
-
   // Make the new basic block for the loop header, inserting after current
   // block.
-  Function *TheFunction = Builder->GetInsertBlock()->getParent();
   BasicBlock *PreheaderBB = Builder->GetInsertBlock();
   BasicBlock *CondBB = BasicBlock::Create(*TheContext, "pcond", TheFunction);
   BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "ploop", TheFunction);
   BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterloop");
 
-  // Create a sync region just for the loop, so we can sync the loop iterations
-  // separately from other computation.
+  // [Tapir] Create a sync region just for the loop, so we can sync
+  // the loop iterations separately from other spawns in the same
+  // function.
   Value *SyncRegion = CreateSyncRegion(*TheFunction->getParent());
 
   // Insert an explicit fall through from the current block to the CondBB.
@@ -1451,22 +1458,18 @@ Value *ParForExprAST::codegen() {
   // Start insertion in CondBB.
   Builder->SetInsertPoint(CondBB);
 
-#if !PARFOR_RACE_BUG
   // Start the PHI node with an entry for Start.
+  // [Tapir] Note: For the LoopSpawning pass to work, we ensure that
+  // Variable is an integer.
   PHINode *Variable =
       Builder->CreatePHI(Type::getInt64Ty(*TheContext), 2, VarName);
   Variable->addIncoming(StartVal, PreheaderBB);
-#endif // !PARFOR_RACE_BUG
 
   // Within the parallel loop, we use new different copies of the variable.
   // Save any existing variables that are shadowed.
   Value *OldVal = NamedValues[VarName];
-#if PARFOR_RACE_BUG
-  NamedValues[VarName] = Alloca;
-#else
   // For the end condition, use the PHI node as the variable VarName.
   NamedValues[VarName] = Variable;
-#endif
 
   // If the end is a binary expression, force it to produce an integer result.
   End->setIntegerRes();
@@ -1474,6 +1477,8 @@ Value *ParForExprAST::codegen() {
   Value *EndCond = End->codegen();
   if (!EndCond)
     return nullptr;
+  // [Tapir] Note: For the LoopSpawning pass to work, we ensure that
+  // EndCond is an integer.
   if (!EndCond->getType()->isIntegerTy())
     EndCond = Builder->CreateFPToSI(EndCond, Type::getInt64Ty(*TheContext));
 
@@ -1487,32 +1492,32 @@ Value *ParForExprAST::codegen() {
   // Start insertion in LoopBB.
   Builder->SetInsertPoint(LoopBB);
 
-  // Create a block for detaching the loop body and a block for the continuation
-  // of the detach.
+  // [Tapir] Create a block for detaching the loop body and a block
+  // for the continuation of the detach.
   BasicBlock *DetachBB =
     BasicBlock::Create(*TheContext, "ploop.bodyentry", TheFunction);
   BasicBlock *ContinueBB =
     BasicBlock::Create(*TheContext, "ploop.continue");
 
-  // Insert a detach to spawn the loop body.
+  // [Tapir] Insert a detach to spawn the loop body.
   Builder->CreateDetach(DetachBB, ContinueBB, SyncRegion);
   Builder->SetInsertPoint(DetachBB);
 
-  // Emit the spawned loop body.
+  // [Tapir] Emit the spawned loop body.
   {
-    // Create a nested task scope corresponding to the loop body.
+    // [Tapir] Create a nested task scope corresponding to the loop
+    // body, to allow for nested spawns and parallel loops in the
+    // parallel-loop body.
     TaskScopeRAII TaskScope(DetachBB);
 
-#if !PARFOR_RACE_BUG
-    // To avoid races, within the parallel loop's body, the variable is stored
-    // in a task-local allocation. Create an alloca in the task's entry block
-    // for this version of the variable.
+    // To avoid races, within the parallel loop's body, the variable
+    // is stored in a task-local allocation. Create an alloca in the
+    // task's entry block for this version of the variable.
     AllocaInst *VarAlloca =
       CreateTaskEntryBlockAlloca(VarName, Type::getInt64Ty(*TheContext));
     // Store the value into the alloca.
     Builder->CreateStore(Variable, VarAlloca);
     NamedValues[VarName] = VarAlloca;
-#endif // !PARFOR_RACE_BUG
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but
@@ -1520,8 +1525,8 @@ Value *ParForExprAST::codegen() {
     if (!Body->codegen())
       return nullptr;
 
-    // Emit the reattach to terminate the task containing the body of the
-    // parallel loop.
+    // [Tapir] Emit the reattach to terminate the task containing the
+    // body of the parallel loop.
     Builder->CreateReattach(ContinueBB, SyncRegion);
   }
 
@@ -1539,20 +1544,17 @@ Value *ParForExprAST::codegen() {
       return nullptr;
   } else {
     // If not specified, use 1.
+    // [Tapir] For the LoopSpawning pass to work, we ensure that
+    // StepVal is an integer.
     StepVal = ConstantInt::get(*TheContext, APSInt::get(1));
   }
-#if PARFOR_RACE_BUG
-  Value *CurVar = Builder->CreateLoad(Alloca, VarName.c_str());
-  Value *NextVar = Builder->CreateAdd(CurVar, StepVal, "nextvar");
-  Builder->CreateStore(NextVar, Alloca);
-#else
   Value *NextVar = Builder->CreateAdd(Variable, StepVal, "nextvar");
-#endif // PARFOR_RACE_BUG
 
   // Insert a back edge to CondBB
   BranchInst *BackEdge = Builder->CreateBr(CondBB);
 
-  // Emit loop metadata
+  // [Tapir] Emit loop metadata, so LoopSpawning will work on this
+  // loop.
   std::vector<Metadata *> LoopMetadata = GetTapirLoopMetadata();
   if (!LoopMetadata.empty()) {
     auto TempNode = MDNode::getTemporary(*TheContext, None);
@@ -1562,10 +1564,8 @@ Value *ParForExprAST::codegen() {
     BackEdge->setMetadata(LLVMContext::MD_loop, LoopID);
   }
 
-#if !PARFOR_RACE_BUG
   // Add a new entry to the PHI node for the backedge.
   Variable->addIncoming(NextVar, ContinueBB);
-#endif // !PARFOR_RACE_BUG
 
   // Emit the "after loop" block.
   TheFunction->getBasicBlockList().push_back(AfterBB);
@@ -1573,11 +1573,11 @@ Value *ParForExprAST::codegen() {
   // Any new code will be inserted in AfterBB.
   Builder->SetInsertPoint(AfterBB);
 
-  // Create the "after loop" block and insert it.
+  // [Tapir] Create the "after sync" block and insert it.
   BasicBlock *AfterSync =
       BasicBlock::Create(*TheContext, "aftersync", TheFunction);
 
-  // Insert a sync for the loop.
+  // [Tapir] Insert a sync for the loop.
   Builder->CreateSync(AfterSync, SyncRegion);
   Builder->SetInsertPoint(AfterSync);
 
@@ -1773,6 +1773,9 @@ static void InitializeModuleAndPassManager() {
   if (RunCilksan)
     TheMPM->add(createCilkSanitizerLegacyPass(/*CallsMayThrow*/false));
 
+  if (PrintIR)
+    TheMPM->add(createPrintFunctionPass(errs(), "IR dump"));
+
   // Add Tapir lowering passes.
   AddTapirLoweringPasses();
 }
@@ -1780,9 +1783,6 @@ static void InitializeModuleAndPassManager() {
 static void HandleDefinition() {
   if (auto FnAST = ParseDefinition()) {
     if (auto *FnIR = FnAST->codegen()) {
-      fprintf(stderr, "Read function definition:");
-      FnIR->print(errs());
-      fprintf(stderr, "\n");
       ExitOnErr(TheJIT->addModule(
           ThreadSafeModule(std::move(TheModule), std::move(TheContext))));
       InitializeModuleAndPassManager();
@@ -1796,9 +1796,6 @@ static void HandleDefinition() {
 static void HandleExtern() {
   if (auto ProtoAST = ParseExtern()) {
     if (auto *FnIR = ProtoAST->codegen()) {
-      fprintf(stderr, "Read extern: ");
-      FnIR->print(errs());
-      fprintf(stderr, "\n");
       FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
     }
   } else {
@@ -1873,8 +1870,11 @@ static void MainLoop() {
 
 static int usage(char *argv[]) {
   errs() << "Usage: " << argv[0]
-         << " --lower-tapir-to {cilk|none}"
+         << " [-h|--help]"
+         << " [--lower-tapir-to {cilk|none}]"
          << " [--run-cilksan]"
+         << " [--print-ir]"
+         << " [-O[0-3]]"
          << "\n";
   return 1;
 }
@@ -1885,7 +1885,9 @@ int main(int argc, char *argv[]) {
 
   // Parse command-line arguments
   for (int i = 1; i < argc; ++i) {
-    if (std::string(argv[i]) == "--lower-tapir-to") {
+    if (std::string(argv[i]) == "-h" || std::string(argv[i]) == "--help") {
+      return usage(argv);
+    } else if (std::string(argv[i]) == "--lower-tapir-to") {
       std::string targetStr = std::string(argv[++i]);
       if (targetStr == "cilk") {
         TheTapirTarget = TapirTargetID::OpenCilk;
@@ -1896,6 +1898,8 @@ int main(int argc, char *argv[]) {
       }
     } else if (std::string(argv[i]) == "--run-cilksan") {
       RunCilksan = true;
+    } else if (std::string(argv[i]) == "--print-ir") {
+      PrintIR = true;
     } else if (std::string(argv[i]) == "-O0") {
       Optimize = false;
     } else if ((std::string(argv[i]) == "-O1") ||
