@@ -182,6 +182,7 @@ tools.extend([
     ToolSubst('Kaleidoscope-Ch6', unresolved='ignore'),
     ToolSubst('Kaleidoscope-Ch7', unresolved='ignore'),
     ToolSubst('Kaleidoscope-Ch8', unresolved='ignore'),
+    ToolSubst('Kaleidoscope-Tapir', unresolved='ignore'),
     ToolSubst('LLJITWithThinLTOSummaries', unresolved='ignore'),
     ToolSubst('LLJITWithRemoteDebugging', unresolved='ignore'),
     ToolSubst('OrcV2CBindingsBasicUsage', unresolved='ignore'),
