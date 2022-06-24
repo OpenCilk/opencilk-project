@@ -43,6 +43,8 @@ StringRef getFilenameWithoutExe(StringRef path);
 
 llvm::TapirTargetID parseTapirTarget(StringRef tapirTarget);
 
+bool validTapirTarget(llvm::TapirTargetID TargetID);
+
 } // namespace args
 } // namespace lld
 
