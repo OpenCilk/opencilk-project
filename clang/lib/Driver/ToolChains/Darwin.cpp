@@ -518,6 +518,27 @@ static void renderRemarksOptions(const ArgList &Args, ArgStringList &CmdArgs,
   }
 }
 
+static void renderTapirLoweringOptions(const ArgList &Args,
+                                       ArgStringList &CmdArgs,
+                                       const ToolChain &TC,
+				       bool LinkerIsLLD) {
+  if (!(TC.getDriver().isUsingLTO() && LinkerIsLLD))
+    return;
+
+  if (Args.hasArg(options::OPT_fcilkplus) ||
+      Args.hasArg(options::OPT_fopencilk) ||
+      Args.hasArg(options::OPT_ftapir_EQ)) {
+    if (const Arg *A = Args.getLastArg(options::OPT_ftapir_EQ))
+      CmdArgs.push_back(Args.MakeArgString(
+          Twine("--tapir-target=") + A->getValue()));
+    else if (Args.hasArg(options::OPT_fopencilk)) {
+      CmdArgs.push_back("--tapir-target=opencilk");
+      TC.AddOpenCilkABIBitcode(Args, CmdArgs, /*IsLTO=*/true);
+    } else if (Args.hasArg(options::OPT_fcilkplus))
+      CmdArgs.push_back("--tapir-target=cilkplus");
+  }
+}
+
 void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfo &Output,
                                   const InputInfoList &Inputs,
@@ -568,6 +589,8 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
       checkRemarksOptions(getToolChain().getDriver(), Args,
                           getToolChain().getTriple()))
     renderRemarksOptions(Args, CmdArgs, getToolChain().getTriple(), Output, JA);
+
+  renderTapirLoweringOptions(Args, CmdArgs, getToolChain(), LinkerIsLLD);
 
   // Propagate the -moutline flag to the linker in LTO.
   if (Arg *A =
@@ -3099,7 +3122,7 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
           << A->getAsString(Args);
     if (IsLTO)
       CmdArgs.push_back(
-          Args.MakeArgString("--plugin-opt=opencilk-abi-bitcode=" + P));
+          Args.MakeArgString("--opencilk-abi-bitcode=" + P));
   }
 
   bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
@@ -3117,11 +3140,8 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
     SmallString<128> P(RuntimePath);
     llvm::sys::path::append(P, BitcodeFilename);
     if (getVFS().exists(P)) {
-      if (IsLTO)
-        CmdArgs.push_back(
-            Args.MakeArgString("--plugin-opt=opencilk-abi-bitcode=" + P));
-      else
-        CmdArgs.push_back(Args.MakeArgString("--opencilk-abi-bitcode=" + P));
+      // The same argument works regardless of IsLTO.
+      CmdArgs.push_back(Args.MakeArgString("--opencilk-abi-bitcode=" + P));
       return;
     }
   }

@@ -92,6 +92,12 @@ def no_call_graph_profile_sort : Flag<["--"], "no-call-graph-profile-sort">,
 def print_symbol_order: Joined<["--"], "print-symbol-order=">,
     HelpText<"Print a symbol order specified by --call-graph-profile-sort into the specified file">,
     Group<grp_lld>;
+def tapir_target: Joined<["--"], "tapir-target=">,
+    HelpText<"Specify the target for Tapir lowering">,
+    Group<grp_lld>;
+def opencilk_abi_bitcode: Joined<["--"], "opencilk-abi-bitcode=">,
+    HelpText<"Path to the OpenCilk ABI bitcode file">,
+    Group<grp_lld>;
 
 // This is a complete Options.td compiled from Apple's ld(1) manpage
 // dated 2018-03-07 and cross checked with ld64 source code in repo
