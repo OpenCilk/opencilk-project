@@ -631,6 +631,7 @@ static std::string createResponseFile(const opt::InputArgList &args,
     case OPT_deffile:
     case OPT_manifestinput:
     case OPT_natvis:
+    case OPT_opencilk_abi_bitcode:
       os << arg->getSpelling() << quote(rewritePath(arg->getValue())) << '\n';
       break;
     case OPT_order: {
@@ -1756,6 +1757,10 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
 
   config->lldmapFile = getMapFile(args, OPT_lldmap, OPT_lldmap_file);
   config->mapFile = getMapFile(args, OPT_map, OPT_map_file);
+
+  config->opencilkABIBitcodeFile = args.getLastArgValue(OPT_opencilk_abi_bitcode);
+  config->tapirTarget =
+      args::parseTapirTarget(args.getLastArgValue(OPT_tapir_target));
 
   if (config->lldmapFile != "" && config->lldmapFile == config->mapFile) {
     warn("/lldmap and /map have the same output file '" + config->mapFile +

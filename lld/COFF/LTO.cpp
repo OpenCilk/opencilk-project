@@ -85,6 +85,8 @@ static lto::Config createConfig() {
   c.AlwaysEmitRegularLTOObj = !config->ltoObjPath.empty();
   c.UseNewPM = config->ltoNewPassManager;
   c.DebugPassManager = config->ltoDebugPassManager;
+  c.TapirTarget = config->tapirTarget;
+  c.OpenCilkABIBitcodeFile = std::string(config->opencilkABIBitcodeFile);
   c.CSIRProfile = std::string(config->ltoCSProfileFile);
   c.RunCSIRInstr = config->ltoCSProfileGenerate;
   c.PGOWarnMismatch = config->ltoPGOWarnMismatch;
