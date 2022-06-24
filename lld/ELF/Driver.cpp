@@ -1247,6 +1247,7 @@ static void readConfigs(opt::InputArgList &args) {
   config->nostdlib = args.hasArg(OPT_nostdlib);
   config->oFormatBinary = isOutputFormatBinary(args);
   config->omagic = args.hasFlag(OPT_omagic, OPT_no_omagic, false);
+  config->opencilkABIBitcodeFile = args.getLastArgValue(OPT_opencilk_abi_bitcode);
   config->optRemarksFilename = args.getLastArgValue(OPT_opt_remarks_filename);
   config->optStatsFilename = args.getLastArgValue(OPT_plugin_opt_stats_file);
 
@@ -1304,6 +1305,7 @@ static void readConfigs(opt::InputArgList &args) {
   config->splitStackAdjustSize = args::getInteger(args, OPT_split_stack_adjust_size, 16384);
   config->strip = getStrip(args);
   config->sysroot = args.getLastArgValue(OPT_sysroot);
+  config->tapirTarget = args::parseTapirTarget(args.getLastArgValue(OPT_tapir_target));
   config->target1Rel = args.hasFlag(OPT_target1_rel, OPT_target1_abs, false);
   config->target2 = getTarget2(args);
   config->thinLTOCacheDir = args.getLastArgValue(OPT_thinlto_cache_dir);
