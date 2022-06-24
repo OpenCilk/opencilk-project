@@ -17,6 +17,7 @@
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/CachePruning.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include <cstdint>
 #include <map>
 #include <set>
@@ -212,6 +213,10 @@ struct Configuration {
 
   // Used for /mapinfo.
   bool mapInfo = false;
+
+  // Used for Tapir target.
+  llvm::StringRef opencilkABIBitcodeFile;
+  llvm::TapirTargetID tapirTarget;
 
   // Used for /thinlto-index-only:
   llvm::StringRef thinLTOIndexOnlyArg;

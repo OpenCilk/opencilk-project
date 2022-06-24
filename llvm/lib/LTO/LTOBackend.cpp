@@ -270,6 +270,10 @@ static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
 
   std::unique_ptr<TargetLibraryInfoImpl> TLII(
       new TargetLibraryInfoImpl(Triple(TM->getTargetTriple())));
+  TLII->setTapirTarget(Conf.TapirTarget);
+  TLII->setTapirTargetOptions(
+      std::make_unique<OpenCilkABIOptions>(Conf.OpenCilkABIBitcodeFile));
+  TLII->addTapirTargetLibraryFunctions();
   if (Conf.Freestanding)
     TLII->disableAllFunctions();
   FAM.registerPass([&] { return TargetLibraryAnalysis(*TLII); });
@@ -408,6 +412,10 @@ static void codegen(const Config &Conf, TargetMachine *TM,
 
   legacy::PassManager CodeGenPasses;
   TargetLibraryInfoImpl TLII(Triple(Mod.getTargetTriple()));
+  TLII.setTapirTarget(Conf.TapirTarget);
+  TLII.setTapirTargetOptions(
+      std::make_unique<OpenCilkABIOptions>(Conf.OpenCilkABIBitcodeFile));
+  TLII.addTapirTargetLibraryFunctions();
   CodeGenPasses.add(new TargetLibraryInfoWrapperPass(TLII));
   CodeGenPasses.add(
       createImmutableModuleSummaryIndexWrapperPass(&CombinedIndex));

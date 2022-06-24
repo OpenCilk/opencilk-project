@@ -94,6 +94,9 @@ struct Config {
   /// Target for lowering Tapir constructs
   TapirTargetID TapirTarget = TapirTargetID::None;
 
+  // Path to OpenCilk runtime bitcode file.
+  std::string OpenCilkABIBitcodeFile;
+
   /// If this field is set, the set of passes run in the middle-end optimizer
   /// will be the one specified by the string. Only works with the new pass
   /// manager as the old one doesn't have this ability.

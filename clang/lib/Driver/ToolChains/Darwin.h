@@ -612,7 +612,8 @@ public:
   getOpenCilkRuntimePaths(const llvm::opt::ArgList &Args) const override;
 
   void AddOpenCilkABIBitcode(const llvm::opt::ArgList &Args,
-                             llvm::opt::ArgStringList &CmdArgs) const override;
+                             llvm::opt::ArgStringList &CmdArgs,
+                             bool IsLTO = false) const override;
 
   void AddLinkTapirRuntime(const llvm::opt::ArgList &Args,
                            llvm::opt::ArgStringList &CmdArgs) const override;

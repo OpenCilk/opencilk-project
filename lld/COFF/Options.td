@@ -232,6 +232,9 @@ def include_optional : Joined<["/", "-", "/?", "-?"], "includeoptional:">,
 def kill_at : F<"kill-at">;
 def lldmingw : F<"lldmingw">;
 def noseh : F<"noseh">;
+def opencilk_abi_bitcode : P<
+    "opencilk-abi-bitcode",
+    "Path to OpenCilk ABI bitcode file">;
 def osversion : P_priv<"osversion">;
 def output_def : Joined<["/", "-", "/?", "-?"], "output-def:">;
 def pdb_source_path : P<"pdbsourcepath",
@@ -241,6 +244,7 @@ def rsp_quoting : Joined<["--"], "rsp-quoting=">,
 def start_lib : F<"start-lib">,
   HelpText<"Start group of objects treated as if they were in a library">;
 defm stdcall_fixup : B_priv<"stdcall-fixup">;
+def tapir_target : P<"tapir-target", "Specify the target for Tapir lowering">;
 def thinlto_emit_imports_files :
     F<"thinlto-emit-imports-files">,
     HelpText<"Emit .imports files with -thinlto-index-only">;

@@ -11,6 +11,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Path.h"
 
@@ -93,4 +94,17 @@ StringRef lld::args::getFilenameWithoutExe(StringRef path) {
   if (path.endswith_insensitive(".exe"))
     return sys::path::stem(path);
   return sys::path::filename(path);
+}
+
+TapirTargetID lld::args::parseTapirTarget(StringRef tapirTarget) {
+  return llvm::StringSwitch<TapirTargetID>(tapirTarget)
+      .Case("none", TapirTargetID::None)
+      .Case("serial", TapirTargetID::Serial)
+      .Case("cheetah", TapirTargetID::Cheetah)
+      .Case("cilkplus", TapirTargetID::Cilk)
+      .Case("cuda", TapirTargetID::Cuda)
+      .Case("opencilk", TapirTargetID::OpenCilk)
+      .Case("openmp", TapirTargetID::OpenMP)
+      .Case("qthreads", TapirTargetID::Qthreads)
+      .Default(TapirTargetID::Last_TapirTargetID);
 }

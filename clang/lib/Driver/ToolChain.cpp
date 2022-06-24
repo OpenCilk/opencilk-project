@@ -1488,7 +1488,8 @@ Optional<std::string> ToolChain::getOpenCilkBC(const ArgList &Args,
 }
 
 void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
-                                      ArgStringList &CmdArgs) const {
+                                      ArgStringList &CmdArgs,
+                                      bool IsLTO) const {
   // If --opencilk-abi-bitcode= is specified, use that specified path.
   if (Args.hasArg(options::OPT_opencilk_abi_bitcode_EQ)) {
     const Arg *A = Args.getLastArg(options::OPT_opencilk_abi_bitcode_EQ);
@@ -1497,6 +1498,9 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
       getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
           << A->getAsString(Args);
     }
+    if (IsLTO)
+      CmdArgs.push_back(
+          Args.MakeArgString("--plugin-opt=opencilk-abi-bitcode=" + P));
   }
 
   bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
@@ -1505,8 +1509,12 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
           ? (UseAsan ? "opencilk-pedigrees-asan-abi" : "opencilk-pedigrees-abi")
           : (UseAsan ? "opencilk-asan-abi" : "opencilk-abi");
   if (auto OpenCilkABIBCFilename = getOpenCilkBC(Args, OpenCilkBCName)) {
-    CmdArgs.push_back(
-        Args.MakeArgString("--opencilk-abi-bitcode=" + *OpenCilkABIBCFilename));
+    if (IsLTO)
+      CmdArgs.push_back(Args.MakeArgString("--plugin-opt=opencilk-abi-bitcode=" +
+                                           *OpenCilkABIBCFilename));
+    else
+      CmdArgs.push_back(Args.MakeArgString("--opencilk-abi-bitcode=" +
+                                           *OpenCilkABIBCFilename));
     return;
   }
 

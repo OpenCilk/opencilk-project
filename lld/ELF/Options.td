@@ -577,6 +577,7 @@ defm lto_whole_program_visibility: BB<"lto-whole-program-visibility",
   "Asserts that the LTO link does not have whole program visibility">;
 def disable_verify: F<"disable-verify">;
 defm mllvm: Eq<"mllvm", "Additional arguments to forward to LLVM's option processing">;
+defm opencilk_abi_bitcode: EEq<"opencilk-abi-bitcode", "Path to OpenCilk ABI bitcode file">;
 def opt_remarks_filename: Separate<["--"], "opt-remarks-filename">,
   HelpText<"YAML output file for optimization remarks">;
 defm opt_remarks_hotness_threshold: EEq<"opt-remarks-hotness-threshold",
@@ -601,6 +602,7 @@ defm shuffle_sections: EEq<"shuffle-sections",
   "Shuffle matched sections using the given seed before mapping them to the output sections. "
   "If -1, reverse the section order. If 0, use a random seed">,
   MetaVarName<"<section-glob>=<seed>">;
+defm tapir_target: Eq<"tapir-target", "Specify the target for Tapir lowering">;
 def thinlto_cache_dir: JJ<"thinlto-cache-dir=">,
   HelpText<"Path to ThinLTO cached object file directory">;
 defm thinlto_cache_policy: EEq<"thinlto-cache-policy", "Pruning policy for the ThinLTO cache">;
@@ -640,6 +642,9 @@ def plugin_opt_opaque_pointers: F<"plugin-opt=opaque-pointers">,
   HelpText<"Use opaque pointers in IR during LTO (default)">;
 def plugin_opt_no_opaque_pointers: F<"plugin-opt=no-opaque-pointers">,
   HelpText<"Use typed pointers in IR during LTO">;
+def: J<"plugin-opt=opencilk-abi-bitcode=">,
+  Alias<opencilk_abi_bitcode>,
+  HelpText<"Alias for --opencilk-abi-bitcode">;
 def: J<"plugin-opt=opt-remarks-filename=">,
   Alias<opt_remarks_filename>,
   HelpText<"Alias for --opt-remarks-filename">;
@@ -660,6 +665,9 @@ def: J<"plugin-opt=sample-profile=">,
 def: F<"plugin-opt=save-temps">, Alias<save_temps>, HelpText<"Alias for --save-temps">;
 def plugin_opt_stats_file: J<"plugin-opt=stats-file=">,
   HelpText<"Filename to write LTO statistics to">;
+def: J<"plugin-opt=tapir-target=">,
+  Alias<tapir_target>,
+  HelpText<"Alias for --tapir-target=">;
 def: F<"plugin-opt=thinlto-emit-imports-files">,
   Alias<thinlto_emit_imports_files>,
   HelpText<"Alias for --thinlto-emit-imports-files">;

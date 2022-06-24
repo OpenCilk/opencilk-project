@@ -192,6 +192,7 @@ std::string elf::createResponseFile(const opt::InputArgList &args) {
     case OPT_export_dynamic_symbol_list:
     case OPT_just_symbols:
     case OPT_library_path:
+    case OPT_opencilk_abi_bitcode:
     case OPT_retain_symbols_file:
     case OPT_rpath:
     case OPT_script:

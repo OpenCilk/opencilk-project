@@ -767,6 +767,7 @@ static std::string createResponseFile(const opt::InputArgList &args,
     case OPT_deffile:
     case OPT_manifestinput:
     case OPT_natvis:
+    case OPT_opencilk_abi_bitcode:
       os << arg->getSpelling() << quote(rewritePath(arg->getValue())) << '\n';
       break;
     case OPT_order: {
@@ -1933,6 +1934,10 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   // when -debug:dwarf is requested.
   if (config->mingw || config->debugDwarf)
     config->warnLongSectionNames = false;
+
+  config->opencilkABIBitcodeFile = args.getLastArgValue(OPT_opencilk_abi_bitcode);
+  config->tapirTarget =
+      args::parseTapirTarget(args.getLastArgValue(OPT_tapir_target));
 
   if (config->incremental && args.hasArg(OPT_profile)) {
     warn("ignoring '/incremental' due to '/profile' specification");
