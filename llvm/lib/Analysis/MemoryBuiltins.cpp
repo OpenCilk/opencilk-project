@@ -363,6 +363,27 @@ static bool CheckedZextOrTrunc(APInt &I, unsigned IntTyBits) {
   return true;
 }
 
+std::pair<Value *, Value *>
+llvm::getAllocSizeArgs(const CallBase *CB, const TargetLibraryInfo *TLI) {
+  // Note: This handles both explicitly listed allocation functions and
+  // allocsize.  The code structure could stand to be cleaned up a bit.
+  const std::optional<AllocFnsTy> FnData = getAllocationSize(CB, TLI);
+  if (!FnData)
+    return std::make_pair(nullptr, nullptr);
+
+  // Don't handle strdup-like functions.
+  if (FnData->AllocTy == StrDupLike)
+    return std::make_pair(nullptr, nullptr);
+
+  if (FnData->SndParam < 0)
+    // Only have 1 size parameter.
+    return std::make_pair(CB->getArgOperand(FnData->FstParam), nullptr);
+
+  // Have 2 size parameters.
+  return std::make_pair(CB->getArgOperand(FnData->FstParam),
+                        CB->getArgOperand(FnData->SndParam));
+}
+
 std::optional<APInt>
 llvm::getAllocSize(const CallBase *CB, const TargetLibraryInfo *TLI,
                    function_ref<const Value *(const Value *)> Mapper) {
