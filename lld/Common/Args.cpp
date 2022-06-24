@@ -108,3 +108,7 @@ TapirTargetID lld::args::parseTapirTarget(StringRef tapirTarget) {
       .Case("qthreads", TapirTargetID::Qthreads)
       .Default(TapirTargetID::Last_TapirTargetID);
 }
+
+bool lld::args::validTapirTarget(TapirTargetID TargetID) {
+  return TargetID < TapirTargetID::Last_TapirTargetID;
+}

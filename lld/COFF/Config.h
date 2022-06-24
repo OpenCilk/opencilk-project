@@ -216,7 +216,7 @@ struct Configuration {
 
   // Used for Tapir target.
   llvm::StringRef opencilkABIBitcodeFile;
-  llvm::TapirTargetID tapirTarget;
+  llvm::TapirTargetID tapirTarget = llvm::TapirTargetID::None;
 
   // Used for /thinlto-index-only:
   llvm::StringRef thinLTOIndexOnlyArg;

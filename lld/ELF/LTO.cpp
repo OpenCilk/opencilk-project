@@ -152,7 +152,8 @@ static lto::Config createConfig() {
   c.DebugPassManager = config->ltoDebugPassManager;
   c.DwoDir = std::string(config->dwoDir);
 
-  c.TapirTarget = config->tapirTarget;
+  if (args::validTapirTarget(config->tapirTarget))
+    c.TapirTarget = config->tapirTarget;
   c.OpenCilkABIBitcodeFile = std::string(config->opencilkABIBitcodeFile);
 
   c.HasWholeProgramVisibility = config->ltoWholeProgramVisibility;
