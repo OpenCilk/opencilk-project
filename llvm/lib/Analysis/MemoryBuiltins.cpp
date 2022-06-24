@@ -193,7 +193,8 @@ getAllocationData(const Value *V, AllocType AllocTy,
 }
 
 static Optional<AllocFnsTy> getAllocationSize(const Value *V,
-                                              const TargetLibraryInfo *TLI) {
+                                              const TargetLibraryInfo *TLI,
+                                              bool IgnoreBuiltinAttr = false) {
   bool IsNoBuiltinCall;
   const Function *Callee =
       getCalledFunction(V, IsNoBuiltinCall);
@@ -202,7 +203,7 @@ static Optional<AllocFnsTy> getAllocationSize(const Value *V,
 
   // Prefer to use existing information over allocsize. This will give us an
   // accurate AllocTy.
-  if (!IsNoBuiltinCall)
+  if (IgnoreBuiltinAttr || !IsNoBuiltinCall)
     if (Optional<AllocFnsTy> Data =
             getAllocationDataForFunction(Callee, AnyAlloc, TLI))
       return Data;
@@ -293,11 +294,12 @@ bool llvm::isAllocRemovable(const CallBase *CB, const TargetLibraryInfo *TLI) {
   return isAllocLikeFn(CB, TLI);
 }
 
-Value *llvm::getAllocAlignment(const CallBase *V,
-                               const TargetLibraryInfo *TLI) {
-  assert(isAllocationFn(V, TLI));
+Value *llvm::getAllocAlignment(const CallBase *V, const TargetLibraryInfo *TLI,
+                               bool IgnoreBuiltinAttr) {
+  assert(isAllocationFn(V, TLI, IgnoreBuiltinAttr));
 
-  const Optional<AllocFnsTy> FnData = getAllocationData(V, AnyAlloc, TLI);
+  const Optional<AllocFnsTy> FnData =
+      getAllocationData(V, AnyAlloc, TLI, IgnoreBuiltinAttr);
   if (!FnData.hasValue() || FnData->AlignParam < 0) {
     return nullptr;
   }
@@ -318,6 +320,29 @@ static bool CheckedZextOrTrunc(APInt &I, unsigned IntTyBits) {
   if (I.getBitWidth() != IntTyBits)
     I = I.zextOrTrunc(IntTyBits);
   return true;
+}
+
+std::pair<Value *, Value *>
+llvm::getAllocSizeArgs(const CallBase *CB, const TargetLibraryInfo *TLI,
+                       bool IgnoreBuiltinAttr) {
+  // Note: This handles both explicitly listed allocation functions and
+  // allocsize.  The code structure could stand to be cleaned up a bit.
+  const Optional<AllocFnsTy> FnData =
+      getAllocationSize(CB, TLI, IgnoreBuiltinAttr);
+  if (!FnData)
+    return std::make_pair(nullptr, nullptr);
+
+  // Don't handle strdup-like functions.
+  if (FnData->AllocTy == StrDupLike)
+    return std::make_pair(nullptr, nullptr);
+
+  if (FnData->SndParam < 0)
+    // Only have 1 size parameter.
+    return std::make_pair(CB->getArgOperand(FnData->FstParam), nullptr);
+
+  // Have 2 size parameters.
+  return std::make_pair(CB->getArgOperand(FnData->FstParam),
+                        CB->getArgOperand(FnData->SndParam));
 }
 
 Optional<APInt>
