@@ -191,6 +191,7 @@ private:
 
 namespace {
 struct CilkSanitizerImpl : public CSIImpl {
+  // Class to manage inserting instrumentation without static race detection.
   class SimpleInstrumentor {
   public:
     SimpleInstrumentor(CilkSanitizerImpl &CilkSanImpl, TaskInfo &TI,
@@ -220,12 +221,9 @@ struct CilkSanitizerImpl : public CSIImpl {
     const TargetLibraryInfo *TLI;
 
     SmallPtrSet<DetachInst *, 8> Detaches;
-
-    SmallVector<Instruction *, 8> DelayedSimpleInsts;
-    SmallVector<std::pair<Instruction *, unsigned>, 8> DelayedMemIntrinsics;
-    SmallVector<Instruction *, 8> DelayedCalls;
   };
 
+  // Class to manage inserting instrumentation with static race detection.
   class Instrumentor {
   public:
     Instrumentor(CilkSanitizerImpl &CilkSanImpl, RaceInfo &RI, TaskInfo &TI,
@@ -623,6 +621,11 @@ ModulePass *llvm::createCilkSanitizerLegacyPass(bool CallsMayThrow,
 
 uint64_t ObjectTable::add(Instruction &I, Value *Obj) {
   uint64_t ID = getId(&I);
+  if (isa<UndefValue>(Obj)) {
+    add(ID, -1, "", "", "(undef)");
+    return ID;
+  }
+
   // First, if the underlying object is a global variable, get that variable's
   // debug information.
   if (GlobalVariable *GV = dyn_cast<GlobalVariable>(Obj)) {
@@ -2389,14 +2392,37 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
                                                      unsigned OperandNum) {
   Function *F = I->getFunction();
   bool LocalRace = RI.mightRaceLocally(I);
+  unsigned LocalRaceMR = static_cast<unsigned>(MAAPValue::NoAccess);
+  if (LocalRace && isModSet(RI.getLocalRaceModRef(I)))
+    LocalRaceMR |= static_cast<unsigned>(MAAPValue::Mod);
+  if (LocalRace && isRefSet(RI.getLocalRaceModRef(I)))
+    LocalRaceMR |= static_cast<unsigned>(MAAPValue::Ref);
   AAResults *AA = RI.getAA();
   MemoryLocation Loc = getMemoryLocation(I, OperandNum, TLI);
   Value *MAAPChk = IRB.getTrue();
+  if (LocalRace)
+    return IRB.getFalse();
+
   // Check the recorded race data for I.
   for (const RaceInfo::RaceData &RD : RI.getRaceData(I)) {
+    LLVM_DEBUG(dbgs() << "  Race Data:\n  Ptr = " << *RD.getPtr() << "\n");
+    LLVM_DEBUG(RaceInfo::printRaceType(RD.Type, dbgs() << "  "));
+    LLVM_DEBUG(dbgs() << "\n");
+    LLVM_DEBUG(dbgs() << "    current MAAPChk = " << *MAAPChk << "\n");
     // Skip race data for different operands of the same instruction.
     if (OperandNum != RD.OperandNum)
       continue;
+
+    // If this racer is opaque, then we can't create a valid MAAP check for it.
+    if (RaceInfo::isOpaqueRace(RD.Type))
+      return IRB.getFalse();
+
+    // If this racer is local, then skip it.  We've already accommodated local
+    // races via runtime pointer checks, if available.
+    if (RaceInfo::isLocalRace(RD.Type))
+      continue;
+
+    LLVM_DEBUG(dbgs() << "  Getting objects for racer\n");
 
     SmallPtrSet<const Value *, 1> Objects;
     RI.getObjectsFor(RD.Access, Objects);
@@ -2416,32 +2442,38 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
     }
 
     for (const Value *Obj : Objects) {
+      LLVM_DEBUG(dbgs() << "  Object " << *Obj << "\n");
+      LLVM_DEBUG(dbgs() << "    current MAAPChk = " << *MAAPChk << "\n");
       // Ignore objects that are not involved in races.
       if (!RI.ObjectInvolvedInRace(Obj))
         continue;
 
       // If we find an object with no MAAP, give up.
       if (!LocalMAAPs.count(Obj)) {
-        LLVM_DEBUG(dbgs() << "No local MAAP found for obj " << *Obj << "\n"
+        LLVM_DEBUG(dbgs() << "No local MAAP found for object " << *Obj << "\n"
                           << "  I: " << *I << "\n"
                           << "  Ptr: " << *RD.Access.getPointer() << "\n");
         return IRB.getFalse();
       }
 
       Value *FlagLoad = readMAAPVal(LocalMAAPs[Obj], IRB);
+      LLVM_DEBUG(dbgs() << "  FlagLoad " << *FlagLoad << "\n");
+
       // If we're dealing with a local race, then don't suppress based on the
       // race-type information from the MAAP value.  For function arguments,
       // that MAAP value reflects potential races via an ancestor, which should
       // not disable checking of local races.
-      Value *FlagCheck;
-      if (LocalRace)
-        FlagCheck =
-            getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::ModRef));
-      else
-        FlagCheck = IRB.CreateAnd(
-            FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
-      MAAPChk = IRB.CreateAnd(
-          MAAPChk, IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck));
+      Value *LocalCheck;
+      Value *FlagCheck = IRB.CreateAnd(
+          FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
+      LLVM_DEBUG(dbgs() << "  FlagCheck " << *FlagCheck << "\n");
+      LocalCheck = IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck);
+      LLVM_DEBUG(dbgs() << "  LocalCheck " << *LocalCheck << "\n");
+
+      // Add the check.
+      MAAPChk = IRB.CreateAnd(MAAPChk, LocalCheck);
+      LLVM_DEBUG(dbgs() << "  MAAPChk " << *MAAPChk << "\n");
+
       // Get the dynamic no-alias bit from the MAAP value.
       Value *NoAliasCheck = IRB.CreateICmpNE(
           getMAAPIRValue(IRB, 0),
@@ -2451,6 +2483,7 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
 
       if (RD.Racer.isValid()) {
         for (const Value *RObj : RacerObjects) {
+          LLVM_DEBUG(dbgs() << "  Racer Object " << *RObj << "\n");
           // If the racer object matches Obj, there's no need to check a flag.
           if (RObj == Obj) {
             MAAPChk = IRB.getFalse();
@@ -2469,13 +2502,15 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
           }
 
           Value *FlagLoad = readMAAPVal(LocalMAAPs[RObj], IRB);
-          Value *FlagCheck;
-          if (LocalRace)
-            FlagCheck =
-                getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::ModRef));
-          else
-            FlagCheck =
-                IRB.CreateAnd(FlagLoad, getMAAPIRValue(IRB, LocalRaceVal));
+          LLVM_DEBUG(dbgs() << "  FlagLoad " << *FlagLoad << "\n");
+          Value *LocalCheck;
+          Value *FlagCheck = IRB.CreateAnd(
+              FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
+          LLVM_DEBUG(dbgs() << "  FlagCheck " << *FlagCheck << "\n");
+          LocalCheck = IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck);
+          LLVM_DEBUG(dbgs() << "  LocalCheck " << *LocalCheck << "\n");
+
+          // Add the check.
           Value *RObjNoAliasFlag = IRB.CreateAnd(
               FlagLoad,
               getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
@@ -2483,9 +2518,8 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
               IRB.CreateICmpNE(getMAAPIRValue(IRB, 0), RObjNoAliasFlag);
           MAAPChk = IRB.CreateAnd(
               MAAPChk,
-              IRB.CreateOr(
-                  IRB.CreateOr(NoAliasCheck, RObjNoAliasCheck),
-                  IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck)));
+              IRB.CreateOr(IRB.CreateOr(NoAliasCheck, RObjNoAliasCheck),
+                           LocalCheck));
         }
       }
 
@@ -2506,25 +2540,24 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
           return IRB.getFalse();
         }
 
+        LLVM_DEBUG(dbgs() << "  Argument " << Arg << "\n");
+
         // Incorporate the MAAP value for this argument if we don't have
         // a dynamic no-alias bit set.
         Value *FlagLoad = readMAAPVal(LocalMAAPs[&Arg], IRB);
         Value *FlagCheck;
-        if (LocalRace)
-          FlagCheck =
-              getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::ModRef));
-        else
-          FlagCheck = IRB.CreateAnd(
-              FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
+        FlagCheck = IRB.CreateAnd(
+            FlagLoad, getMAAPIRValue(IRB, RaceTypeToFlagVal(RD.Type)));
+        Value *LocalCheck = IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck);
+
         Value *ArgNoAliasFlag = IRB.CreateAnd(
             FlagLoad,
             getMAAPIRValue(IRB, static_cast<unsigned>(MAAPValue::NoAlias)));
         Value *ArgNoAliasCheck =
             IRB.CreateICmpNE(getMAAPIRValue(IRB, 0), ArgNoAliasFlag);
         MAAPChk = IRB.CreateAnd(
-            MAAPChk,
-            IRB.CreateOr(IRB.CreateOr(NoAliasCheck, ArgNoAliasCheck),
-                         IRB.CreateICmpEQ(getMAAPIRValue(IRB, 0), FlagCheck)));
+            MAAPChk, IRB.CreateOr(IRB.CreateOr(NoAliasCheck, ArgNoAliasCheck),
+                                  LocalCheck));
       }
     }
   }
@@ -2542,13 +2575,15 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
 
     if (MAAPChecks) {
       Value *MAAPChk = getMAAPCheck(I, IRB);
-      Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-          IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
-          /*LI*/ nullptr);
-      IRB.SetInsertPoint(CheckTerm);
-      if (Loc)
-        IRB.SetCurrentDebugLocation(Loc);
+      if (MAAPChk != IRB.getFalse()) {
+        Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+            IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
+            /*LI*/ nullptr);
+        IRB.SetInsertPoint(CheckTerm);
+      }
     }
+    if (Loc)
+      IRB.SetCurrentDebugLocation(Loc);
     if (isa<LoadInst>(I) || isa<StoreInst>(I))
       Result |= CilkSanImpl.instrumentLoadOrStore(I, IRB);
     else if (isa<AtomicRMWInst>(I) || isa<AtomicCmpXchgInst>(I))
@@ -2568,13 +2603,15 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
 
     if (MAAPChecks) {
       Value *MAAPChk = getMAAPCheck(I, IRB, OperandNum);
-      Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-          IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
-          /*LI*/ nullptr);
-      IRB.SetInsertPoint(CheckTerm);
-      if (Loc)
-        IRB.SetCurrentDebugLocation(Loc);
+      if (MAAPChk != IRB.getFalse()) {
+        Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+            IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
+            /*LI*/ nullptr);
+        IRB.SetInsertPoint(CheckTerm);
+      }
     }
+    if (Loc)
+      IRB.SetCurrentDebugLocation(Loc);
     Result |= CilkSanImpl.instrumentAnyMemIntrinAcc(I, OperandNum, IRB);
   }
   return Result;
@@ -2634,6 +2671,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
   bool Result = false;
   SmallPtrSet<SyncInst *, 4> Syncs;
   SmallPtrSet<Loop *, 4> Loops;
+  SmallPtrSet<Instruction *, 16> InstrumentedAllocFns;
 
   // Instrument allocas and allocation-function calls that may be involved in a
   // race.
@@ -2646,12 +2684,25 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
     }
   }
   for (Instruction *I : AllocationFnCalls) {
+    // Instrument any allocation-function calls that may allocate memory
+    // involved in a race.
+    //
+    // Note that, without MAAP checks, we must be more conservative about
+    // considering what memory allocations might be involved in checking for
+    // races.  For example, suppose a function call in a loop uses memory that
+    // is malloc'd and free'd within that loop.  Static analysis might determine
+    // no race is possible on that memory, but a MAAP check is needed to
+    // communicate that static information to the function at runtime in order
+    // to avoid dynamic checks on the same location returned by repeated calls
+    // to malloc.
+
     // FIXME: This test won't identify posix_memalign calls as needing
     // instrumentation, because posix_memalign modifies a pointer to the pointer
     // to the object.
-    if (CilkSanImpl.ObjectMRForRace.count(I) ||
+    if (!MAAPChecks || CilkSanImpl.ObjectMRForRace.count(I) ||
         CilkSanImpl.lookupPointerMayBeCaptured(I)) {
       CilkSanImpl.instrumentAllocationFn(I, DT, TLI);
+      InstrumentedAllocFns.insert(I);
       getDetachesForInstruction(I);
       Result = true;
     }
@@ -2662,7 +2713,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
     // If the pointer corresponds to an allocation function call in this
     // function, or if the pointer is involved in a race, then instrument it.
     if (Instruction *PtrI = dyn_cast<Instruction>(Ptr)) {
-      if (AllocationFnCalls.count(PtrI)) {
+      if (InstrumentedAllocFns.count(PtrI)) {
         CilkSanImpl.instrumentFree(I, TLI);
         getDetachesForInstruction(I);
         Result = true;
@@ -2778,7 +2829,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     // Get the insertion point in the preheader of the loop.
     Loop *L = LI.getLoopFor(I->getParent());
     assert(L->getLoopPreheader() && "No preheader for loop");
-    Instruction *PreheaderInsertPt =
+    Instruction *InsertPt =
         getLoopBlockInsertPt(L->getLoopPreheader(), CilkSanImpl.CsanBeforeLoop,
                              /*AfterHook*/ false);
 
@@ -2820,10 +2871,10 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     LLVMContext &Ctx = CilkSanImpl.M.getContext();
     SCEVExpander Expander(*SE, DL, "cilksan");
 
-    Value *AddrVal = Expander.expandCodeFor(Addr, Type::getInt8PtrTy(Ctx),
-                                            PreheaderInsertPt);
-    Value *RangeVal = Expander.expandCodeFor(RangeExpr, Type::getInt64Ty(Ctx),
-                                             PreheaderInsertPt);
+    Value *AddrVal =
+        Expander.expandCodeFor(Addr, Type::getInt8PtrTy(Ctx), InsertPt);
+    Value *RangeVal =
+        Expander.expandCodeFor(RangeExpr, Type::getInt64Ty(Ctx), InsertPt);
     HoistedHookArgs[I] = std::make_pair(AddrVal, RangeVal);
   }
 
@@ -2962,18 +3013,20 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
     // For now, there shouldn't be a reason to return false since we already
     // verified the size, stride, and tripcount.
     Loop *L = LI.getLoopFor(I->getParent());
-    Instruction *PreheaderInsertPt =
+    Instruction *InsertPt =
         getLoopBlockInsertPt(L->getLoopPreheader(), CilkSanImpl.CsanBeforeLoop,
                              /*AfterLoop*/ false);
-    IRBuilder<> IRB(PreheaderInsertPt);
+    IRBuilder<> IRB(InsertPt);
     if (MAAPChecks) {
       Value *MAAPChk = getMAAPCheck(I, IRB);
-      Instruction *CheckTerm =
-          SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
-                                    PreheaderInsertPt, false, nullptr, DT, &LI);
-      IRB.SetInsertPoint(CheckTerm);
+      if (MAAPChk != IRB.getFalse()) {
+        Instruction *CheckTerm =
+            SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
+                                      InsertPt, false, nullptr, DT, &LI);
+        IRB.SetInsertPoint(CheckTerm);
+      }
     }
-
+    IRB.SetCurrentDebugLocation(searchForDebugLoc(I));
     CilkSanImpl.instrumentLoadOrStoreHoisted(
         I, HoistedHookArgs[I].first, HoistedHookArgs[I].second, IRB, LocalId);
     Result = true;
@@ -3040,12 +3093,14 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
       IRBuilder<> IRB(&*InsertPt);
       if (MAAPChecks) {
         Value *MAAPChk = getMAAPCheck(I, IRB);
-        Instruction *CheckTerm =
-            SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
-                                      &*InsertPt, false, nullptr, DT, &LI);
-        IRB.SetInsertPoint(CheckTerm);
+        if (MAAPChk != IRB.getFalse()) {
+          Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+              IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), &*InsertPt, false,
+              nullptr, DT, &LI);
+          IRB.SetInsertPoint(CheckTerm);
+        }
       }
-
+      IRB.SetCurrentDebugLocation(searchForDebugLoc(I));
       CilkSanImpl.instrumentLoadOrStoreHoisted(
           I, SunkHookArgs[HookArgsKey].first, SunkHookArgs[HookArgsKey].second,
           IRB, LocalId);
@@ -3198,38 +3253,55 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
 
     // Record the memory accesses in the basic block
     for (Instruction &Inst : BB) {
-      bool canCoalesce = false;
-      // if the instruction is in a loop and can only race via ancestor,
-      // and size < stride, store it.
+      bool CanCoalesce = false;
+      // If the instruction is in a loop and can only race via ancestor, and
+      // size < stride, store it.
       if (L && EnableStaticRaceDetection && LoopHoisting &&
           SafetyInfo.isGuaranteedToExecute(Inst, DT, &TI, L)) {
-        // TODO: for now, only look @ loads and stores. Add atomics later.
+        // TODO: For now, only look at loads and stores.  Add atomics later.
         //       Need to add any others?
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
-          bool raceViaAncestor = false;
-          bool otherRace = false;
+          bool RaceViaAncestor = false;
+          bool OtherRace = false;
           for (const RaceInfo::RaceData &RD : RI.getRaceData(&Inst)) {
             if (RaceInfo::isRaceViaAncestor(RD.Type)) {
-              raceViaAncestor = true;
-            } else if (RaceInfo::isLocalRace(RD.Type) ||
-                       RaceInfo::isOpaqueRace(RD.Type)) {
-              otherRace = true;
+              RaceViaAncestor = true;
+            } else if (RaceInfo::isOpaqueRace(RD.Type)) {
+              LLVM_DEBUG(dbgs() << "Can't hoist or sink instrumentation for "
+                                << Inst << "\n  Opaque race.\n");
+              OtherRace = true;
               break;
+            } else if (RaceInfo::isLocalRace(RD.Type)) {
+              if (!RD.Racer.isValid()) {
+                LLVM_DEBUG(dbgs()
+                           << "Can't hoist or sink instrumentation for " << Inst
+                           << "\n  Local race with opaque racer.\n");
+                OtherRace = true;
+                break;
+              } else if (LI.getLoopFor(RD.Racer.I->getParent()) == L) {
+                LLVM_DEBUG(dbgs()
+                           << "Can't hoist or sink instrumentation for " << Inst
+                           << "\n  Local race with racer in same loop: "
+                           << *RD.Racer.I << "\n");
+                OtherRace = true;
+                break;
+              }
+              RaceViaAncestor = true;
             }
           }
-          // if this instruction can only race via an ancestor, see if it
-          // can be hoisted.
-          if (raceViaAncestor && !otherRace) {
+          // If this instruction can only race via an ancestor, see if it can be
+          // hoisted.
+          if (RaceViaAncestor && !OtherRace) {
             const SCEV *Size = SE.getElementSize(&Inst);
             const SCEV *V = SE.getSCEV(getLoadStorePointerOperand(&Inst));
-            // if not an AddRecExpr, don't proceed
+            // If not an AddRecExpr, don't proceed
             if (const SCEVAddRecExpr *SrcAR = dyn_cast<SCEVAddRecExpr>(V)) {
               const SCEV *Stride = SrcAR->getStepRecurrence(SE);
               const SCEV *Diff;
               if (SE.isKnownNonNegative(Stride)) {
                 Diff = SE.getMinusSCEV(Size, Stride);
               } else {
-                // if we can't compare size and stride,
+                // If we can't compare size and stride,
                 // SE.isKnownNonNegative(Diff) will be false.
                 Diff = SE.getAddExpr(Size, Stride);
               }
@@ -3241,24 +3313,44 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
               if (SE.isKnownNonNegative(Diff)) {
                 if (!isa<SCEVCouldNotCompute>(TripCount) &&
                     SE.isAvailableAtLoopEntry(SrcAR->getStart(), L)) {
-                  // can hoist if |stride| <= |size| and the tripcount is known
-                  // and the start is available at loop entry.
+                  // Can hoist if stride <= size and the tripcount is known and
+                  // the start is available at loop entry.
                   LoopInstToHoist.insert(&Inst);
-                  canCoalesce = true;
+                  CanCoalesce = true;
+                  LLVM_DEBUG(dbgs() << "Can hoist instrumentation for " << Inst << "\n");
                 } else if (!isa<SCEVCouldNotCompute>(
                                SE.getConstantMaxBackedgeTakenCount(L))) {
-                  // can sink if |stride| <= |size| and the tripcount is
-                  // unknown but guaranteed to be finite.
+                  // Can sink if stride <= size and the tripcount is unknown but
+                  // guaranteed to be finite.
                   LoopInstToSink.insert(&Inst);
-                  canCoalesce = true;
+                  CanCoalesce = true;
+                  LLVM_DEBUG(dbgs() << "Can sink instrumentation for " << Inst << "\n");
+                } else {
+                  LLVM_DEBUG(dbgs()
+                             << "Can't hoist or sink instrumentation for "
+                             << Inst << "\n  TripCount = " << *TripCount
+                             << "\n  SrcAR->getStart() = " << *SrcAR->getStart()
+                             << "\n  SE.getConstantMaxBackedgeTakenCount(L) = "
+                             << *SE.getConstantMaxBackedgeTakenCount(L)
+                             << "\n");
                 }
+              } else {
+                LLVM_DEBUG(dbgs() << "Can't hoist instrumentation for " << Inst
+                                  << "\n  Diff SCEV not known non-negative: "
+                                  << *Diff << "\n");
               }
+            } else {
+              LLVM_DEBUG(
+                  dbgs()
+                  << "Can't hoist or sink instrumentation for " << Inst
+                  << "\n  SCEV for load/store pointer operand not AddRecExpr: "
+                  << *V << ": " << V->getSCEVType() << "\n");
             }
           }
         }
       }
 
-      if (!canCoalesce) {
+      if (!CanCoalesce) {
         // TODO: Handle VAArgInst
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst))
           LocalLoadsAndStores.push_back(&Inst);
