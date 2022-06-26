@@ -311,9 +311,7 @@ public:
 private:
   using PtrAccessSet = SetVector<MemAccessInfo>;
 
-  void checkForRacesHelper(const Task *T,
-                           // SmallVectorImpl<const Task *> &AncestorMPTasks,
-                           RaceInfo::ResultTy &Result,
+  void checkForRacesHelper(const Task *T, RaceInfo::ResultTy &Result,
                            RaceInfo::ObjectMRTy &ObjectMRForRace);
   bool checkOpaqueAccesses(GeneralAccess &GA1, GeneralAccess &GA2);
   void evaluateMaybeParallelAccesses(GeneralAccess &GA1, GeneralAccess &GA2,
@@ -341,9 +339,6 @@ private:
   ScalarEvolution &SE;
 
   const TargetLibraryInfo *TLI;
-  // // An alias set tracker to partition the access set by underlying object and
-  // // intrinsic property (such as TBAA metadata).
-  // AliasSetTracker AST;
   SmallPtrSet<Value *, 4> ArgumentPtrs;
   AccessToUnderlyingObjMap &AccessToObjs;
 
@@ -591,8 +586,6 @@ void AccessPtrAnalysis::addFunctionArgument(Value *Arg) {
 }
 
 void AccessPtrAnalysis::addAccess(Instruction *I) {
-  // The AST can handle LoadInst, StoreInst, VAArgInst, AnyMemSetInst,
-  // AnyMemTransferInst, and function calls.
   if (checkInstructionForRace(I, TLI)) {
 
     // Exclude calls to functions in ABIList.
@@ -614,7 +607,6 @@ void AccessPtrAnalysis::addAccess(Instruction *I) {
       }
     }
 
-    // AST.add(I);
     SmallVector<GeneralAccess, 1> GA;
     GetGeneralAccesses(I, GA, DI.getAA(), TLI);
     TaskAccessMap[TI.getTaskFor(I->getParent())].append(GA.begin(), GA.end());
@@ -658,8 +650,8 @@ void AccessPtrAnalysis::addAccess(Instruction *I) {
         }
 
         if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(Obj))
-          // Constant and thread-local variables cannot race.
-          if (GV->isConstant() || GV->isThreadLocal())
+          // Constant variables cannot race.
+          if (GV->isConstant())
             continue;
 
         if (isa<Function>(Obj))
@@ -889,8 +881,6 @@ bool AccessPtrAnalysis::checkDependence(std::unique_ptr<Dependence> D,
       // Typically, CommonTaskLoop is a subloop of CommonLoop.  But that doesn't
       // have to be true, e.g., if CommonLoop appears in an exit of
       // CommonTaskLoop.
-      // assert((!CommonTaskLoop || CommonTaskLoop->contains(CommonLoop)) &&
-      //        "Loop for common task does not contain common loop.");
       CommonLoop = CommonTaskLoop;
     }
     // Update MaxLoopDepthToCheck
@@ -1235,6 +1225,12 @@ AccessPtrAnalysis::underlyingObjectsAlias(const GeneralAccess &GAA,
   return AliasResult::NoAlias;
 }
 
+static bool isThreadLocalObject(const Value *V) {
+  if (const GlobalValue *GV = dyn_cast<GlobalValue>(V))
+    return GV->isThreadLocal();
+  return false;
+}
+
 void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
     GeneralAccess &GA1, GeneralAccess &GA2, RaceInfo::ResultTy &Result,
     RaceInfo::ObjectMRTy &ObjectMRForRace) {
@@ -1273,7 +1269,12 @@ void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
             F, GA2.getPtr()->getType()->getPointerAddressSpace()))
       return;
 
+    // If the underlying objects cannot alias, then skip the check.
     if (AliasResult::NoAlias == underlyingObjectsAlias(GA1, GA2))
+      return;
+
+    // If both objects are thread-local, then skip the check.
+    if (isThreadLocalObject(GA1.getPtr()) && isThreadLocalObject(GA2.getPtr()))
       return;
 
     LLVM_DEBUG(
@@ -1295,38 +1296,25 @@ void AccessPtrAnalysis::evaluateMaybeParallelAccesses(
 }
 
 void AccessPtrAnalysis::checkForRacesHelper(
-    const Task *T, /*SmallVectorImpl<const Task *> &AncestorMPTasks,*/
-    RaceInfo::ResultTy &Result, RaceInfo::ObjectMRTy &ObjectMRForRace) {
-  // // AncestorMPTasks contains instructions that might race with anything in this
-  // // task.
-  // for (const Task *MPT : AncestorMPTasks) {
-  //   LLVM_DEBUG(dbgs() << "Testing Task@" << T->getEntry()->getName()
-  //              << " against Task@" << MPT->getEntry()->getName()
-  //              << "\n");
-  //   for (GeneralAccess GA1 : TaskAccessMap[T])
-  //     for (const Task *SubMPT : depth_first(MPT))
-  //       for (GeneralAccess GA2 : TaskAccessMap[SubMPT])
-  //         evaluateMaybeParallelAccesses(GA1, GA2, Result);
-  // }
-
-  // size_t OrigSize = AncestorMPTasks.size();
+    const Task *T, RaceInfo::ResultTy &Result,
+    RaceInfo::ObjectMRTy &ObjectMRForRace) {
   SmallPtrSet<const Spindle *, 4> Visited;
 
   // Now handle each spindle in this task.
   for (const Spindle *S :
          depth_first<InTask<Spindle *>>(T->getEntrySpindle())) {
     LLVM_DEBUG(dbgs() << "Testing Spindle@" << S->getEntry()->getName()
-               << "\n");
+                      << "\n");
     for (GeneralAccess GA : SpindleAccessMap[S]) {
       if (GA.getPtr()) {
         LLVM_DEBUG({
-            dbgs() << "GA Underlying objects:\n";
-            for (const Value *Obj : AccessToObjs[MemAccessInfo(GA.getPtr(),
-                                                               GA.isMod())])
-              dbgs() << "    " << *Obj << "\n";
-          });
-        for (const Value *Obj : AccessToObjs[MemAccessInfo(GA.getPtr(),
-                                                           GA.isMod())]) {
+          dbgs() << "GA Underlying objects:\n";
+          for (const Value *Obj :
+               AccessToObjs[MemAccessInfo(GA.getPtr(), GA.isMod())])
+            dbgs() << "    " << *Obj << "\n";
+        });
+        for (const Value *Obj :
+             AccessToObjs[MemAccessInfo(GA.getPtr(), GA.isMod())]) {
           if (isa<AllocaInst>(Obj))
             // Races on alloca'd objects are checked locally.
             continue;
@@ -1351,20 +1339,16 @@ void AccessPtrAnalysis::checkForRacesHelper(
           }
 
           if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(Obj)) {
-            // Constant and thread-local variables cannot race.
-            assert(!GV->isConstant() && !GV->isThreadLocal() &&
-                   "Constant or thread-local GV should be excluded.");
-            if (!GV->hasPrivateLinkage() && !GV->hasInternalLinkage()) {
+            // Constant variables cannot race.
+            assert(!GV->isConstant() && "Constant GV should be excluded.");
+            if (GV->hasPrivateLinkage() || GV->hasInternalLinkage()) {
               // Races are only possible with ancestor functions in this module.
               LLVM_DEBUG(dbgs() << "Setting race via private/internal global:\n"
                                 << "  GA.I: " << *GA.I << "\n"
                                 << "  GV: " << *GV << "\n");
-              // TODO: Add suppressions for private and internal global
-              // variables, then record this as a potential ancestor race
-              // instead of an opaque race
-              //
-              // recordAncestorRace(GA, GV, Result, ObjectMRForRace);
-              recordOpaqueRace(GA, GV, Result, ObjectMRForRace);
+              // TODO: Add MAAPs for private and internal global variables.
+              recordAncestorRace(GA, GV, Result, ObjectMRForRace);
+              // recordOpaqueRace(GA, GV, Result, ObjectMRForRace);
             } else {
               // Record the possible opaque race.
               LLVM_DEBUG(dbgs() << "Setting opaque race:\n"
@@ -1385,7 +1369,7 @@ void AccessPtrAnalysis::checkForRacesHelper(
           }
 
           if (!isa<Instruction>(Obj)) {
-            dbgs() << "Unexpected underlying object: " << *Obj << "\n";
+            dbgs() << "ALERT: Unexpected underlying object: " << *Obj << "\n";
           }
 
           // Record the possible opaque race.
@@ -1398,7 +1382,7 @@ void AccessPtrAnalysis::checkForRacesHelper(
     }
     for (const Task *MPT : MPTasks.TaskList[S]) {
       LLVM_DEBUG(dbgs() << "Testing against Task@" << MPT->getEntry()->getName()
-                 << "\n");
+                        << "\n");
       for (const Task *SubMPT : depth_first(MPT))
         for (GeneralAccess GA1 : SpindleAccessMap[S])
           for (GeneralAccess GA2 : TaskAccessMap[SubMPT])
@@ -1411,12 +1395,7 @@ void AccessPtrAnalysis::checkForRacesHelper(
         // Skip successor spindles we've seen before.
         if (!Visited.insert(Succ).second)
           continue;
-        // AncestorMPTasks.append(MPTasks.TaskList[S].begin(),
-        //                        MPTasks.TaskList[S].end());
-        checkForRacesHelper(Succ->getParentTask(), /*AncestorMPTasks,*/ Result,
-                            ObjectMRForRace);
-        // AncestorMPTasks.erase(AncestorMPTasks.begin() + OrigSize,
-        //                       AncestorMPTasks.end());
+        checkForRacesHelper(Succ->getParentTask(), Result, ObjectMRForRace);
       }
     }
   }
@@ -1607,7 +1586,7 @@ void RTPtrCheckAnalysis::collectStridedAccess(Value *MemAccess) {
                   "at most once.\n");
     return;
   }
-  LLVM_DEBUG(dbgs() << "TapirRDA: Found a strided access that we can version.");
+  LLVM_DEBUG(dbgs() << "TapirRD: Found a strided access that we can version.");
 
   SymbolicStrides[Ptr] = Stride;
   StrideSet.insert(Stride);
@@ -1975,9 +1954,7 @@ void AccessPtrAnalysis::processAccessPtrs(
       }
     }
   }
-  // SmallVector<const Task *, 4> RootMPTasks;
-  checkForRacesHelper(TI.getRootTask(), /*RootMPTasks,*/ Result,
-                      ObjectMRForRace);
+  checkForRacesHelper(TI.getRootTask(), Result, ObjectMRForRace);
 
   // Based on preliminary experiments, it doesn't appear that getRTPtrChecks,
   // which is adapted from LoopAccessAnalysis, comes up with enough runtime
@@ -2029,34 +2006,34 @@ void RaceInfo::print(raw_ostream &OS) const {
   printRaceType(OverallRT, OS);
   OS << "\n";
   for (auto Res : Result) {
-    OS << *Res.first << "\n";
+    OS << "  Result: " << *Res.first << "\n";
     for (auto &RD : Res.second) {
       if (RD.getPtr())
-        OS << "    " << *RD.getPtr();
+        OS << "    ptr: " << *RD.getPtr();
       else
-        OS << "    null";
-      OS << "\n    ";
-      printRaceType(RD.Type, OS);
+        OS << "    nullptr";
+      OS << "\n";
+      printRaceType(RD.Type, OS.indent(6));
       if (RD.Racer.isValid()) {
-        OS << "\n    Racer:";
-        OS << "\n      I = " << *RD.Racer.I;
-        OS << "\n      Loc = ";
+        OS << "\n      Racer:";
+        OS << "\n        I = " << *RD.Racer.I;
+        OS << "\n        Loc = ";
         if (!RD.Racer.Loc)
           OS << "nullptr";
         else if (RD.Racer.Loc->Ptr == RD.getPtr())
           OS << "same pointer";
         else
           OS << *RD.Racer.Loc->Ptr;
-        OS << "\n      OperandNum = ";
+        OS << "\n        OperandNum = ";
         if (RD.Racer.OperandNum == static_cast<unsigned>(-1))
           OS << "none";
         else
           OS << RD.Racer.OperandNum;
-        OS << "\n      ModRef = " << (RD.Racer.isMod() ? "Mod " : "")
+        OS << "\n        ModRef = " << (RD.Racer.isMod() ? "Mod " : "")
            << (RD.Racer.isRef() ? "Ref" : "");
       }
       else
-        OS << "\n    Opaque racer";
+        OS << "\n      Opaque racer";
       OS << "\n";
     }
   }
@@ -2069,18 +2046,6 @@ void RaceInfo::print(raw_ostream &OS) const {
       OS << " Ref";
     OS << "\n";
   }
-  // OS << "RT pointer checks:\n";
-  // for (auto &RtChecks : AllPtrRtChecks) {
-  //   OS << RtChecks.first->getHeader()->getName() << ":\n";
-  //   RtChecks.second->print(OS);
-  // }
-  // for (Loop *TopLevelLoop : LI)
-  //   for (Loop *L : depth_first(TopLevelLoop))
-  //     if (AllPtrRtChecks.count(L)) {
-  //       auto &RtChecks = AllPtrRtChecks.find(L);
-  //       OS.indent(2) << L->getHeader()->getName() << ":\n";
-  //       (*RtChecks)->print(OS);
-  //     }
 }
 
 // The main analysis routine.
