@@ -3680,12 +3680,37 @@ bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
 FunctionCallee CilkSanitizerImpl::getOrInsertSynthesizedHook(StringRef Name,
                                                              FunctionType *T,
                                                              AttributeList AL) {
-  // TODO: Modify this routine to insert a call to a default library hook for
-  // any call to a library function or intrinsic that the Cilksan runtime does
-  // not recognize.  To do this, we may want to modify the CilkSanitizer pass
-  // accept a list of hooks recognized by the Cilksan runtime, e.g., in the form
-  // of a bitcode file.
-  return M.getOrInsertFunction(Name, T, AL);
+  // If no bitcode file has been linked, then we cannot check if it contains a
+  // particular library hook.  Simply return the hook.  If the Cilksan library
+  // doesn't contain that hook, the linker will raise an error.
+  if (!LinkedBitcode)
+    return M.getOrInsertFunction(Name, T, AL);
+
+  // Check if the linked bitcode file contains the library hook.  If it does,
+  // return that hook.
+  if (FunctionsInBitcode.contains(std::string(Name)))
+    return M.getOrInsertFunction(Name, T, AL);
+
+  // We did not find the library hook in the linked bitcode file.  Synthesize a
+  // default version of the hook that simply calls __csan_default_libhook.
+  FunctionCallee NewHook = M.getOrInsertFunction(Name, T, AL);
+  Function *NewHookFn = cast<Function>(NewHook.getCallee());
+  BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", NewHookFn);
+  IRBuilder<> IRB(ReturnInst::Create(M.getContext(), Entry));
+
+  // Insert a call to the default library function hook
+  Type *IDType = IRB.getInt64Ty();
+  FunctionType *DefaultHookTy =
+      FunctionType::get(IRB.getVoidTy(),
+                        {/*call_id*/
+                         IDType, /*func_id*/ IDType,
+                         /*MAAP_count*/ IRB.getInt8Ty()},
+                        /*isVarArg*/ false);
+  FunctionCallee DefaultHook =
+      M.getOrInsertFunction("__csan_default_libhook", DefaultHookTy);
+  IRB.CreateCall(DefaultHook, {NewHookFn->getArg(0), NewHookFn->getArg(1),
+                               NewHookFn->getArg(2)});
+  return NewHook;
 }
 
 bool CilkSanitizerImpl::instrumentIntrinsicCall(
