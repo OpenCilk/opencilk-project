@@ -33,6 +33,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include <list>
 #include <map>
 #include <plugin-api.h>
@@ -222,6 +223,23 @@ namespace options {
   static std::string cs_profile_path;
   static bool cs_pgo_gen = false;
 
+  // Tapir lowering options.
+  static TapirTargetID tapir_target = TapirTargetID::Last_TapirTargetID;
+  static std::string opencilk_abi_bitcode_file;
+
+  static TapirTargetID parseTapirTarget(StringRef tapirTarget) {
+    return StringSwitch<TapirTargetID>(tapirTarget)
+        .Case("none", TapirTargetID::None)
+        .Case("serial", TapirTargetID::Serial)
+        .Case("cheetah", TapirTargetID::Cheetah)
+        .Case("cilkplus", TapirTargetID::Cilk)
+        .Case("cuda", TapirTargetID::Cuda)
+        .Case("opencilk", TapirTargetID::OpenCilk)
+        .Case("openmp", TapirTargetID::OpenMP)
+        .Case("qthreads", TapirTargetID::Qthreads)
+        .Default(TapirTargetID::Last_TapirTargetID);
+  }
+
   static void process_plugin_option(const char *opt_)
   {
     if (opt_ == nullptr)
@@ -314,6 +332,10 @@ namespace options {
       opaque_pointers = true;
     } else if (opt == "no-opaque-pointers") {
       opaque_pointers = false;
+    } else if (opt.consume_front("tapir-target=")) {
+      tapir_target = parseTapirTarget(std::string(opt));
+    } else if (opt.consume_front("opencilk-abi-bitcode=")) {
+      opencilk_abi_bitcode_file = std::string(opt);
     } else {
       // Save this option to pass to the code generator.
       // ParseCommandLineOptions() expects argv[0] to be program name. Lazily
@@ -963,6 +985,12 @@ static std::unique_ptr<LTO> createLTO(IndexWriteCallback OnIndexWrite,
   Conf.OpaquePointers = options::opaque_pointers;
 
   Conf.StatsFile = options::stats_file;
+
+  if (options::tapir_target != TapirTargetID::Last_TapirTargetID) {
+    Conf.TapirTarget = options::tapir_target;
+    Conf.OpenCilkABIBitcodeFile = options::opencilk_abi_bitcode_file;
+  }
+
   return std::make_unique<LTO>(std::move(Conf), Backend,
                                 options::ParallelCodeGenParallelismLevel);
 }
