@@ -600,6 +600,28 @@ static bool isTaskFrameUnwind(const BasicBlock *UnwindEdge) {
   return isTaskFrameResume(UnwindEdge->getTerminator());
 }
 
+static void splitTaskFrameEnds(Instruction *TFCreate) {
+  // Split taskframe.end that use TFCreate.
+  SmallVector<Instruction *, 8> TFEndToSplit;
+  for (User *U : TFCreate->users())
+    if (IntrinsicInst *UI = dyn_cast<IntrinsicInst>(U))
+      if (Intrinsic::taskframe_end == UI->getIntrinsicID())
+        TFEndToSplit.push_back(UI);
+
+  for (Instruction *TFEnd : TFEndToSplit) {
+    if (TFEnd != TFEnd->getParent()->getTerminator()->getPrevNode()) {
+      BasicBlock::iterator Iter = ++TFEnd->getIterator();
+      SplitBlock(TFEnd->getParent(), &*Iter);
+      // Try to attach debug info to the new terminator after the taskframe.end
+      // call.
+      Instruction *SplitTerminator = TFEnd->getParent()->getTerminator();
+      if (!SplitTerminator->getDebugLoc())
+        SplitTerminator->setDebugLoc(TFEnd->getDebugLoc());
+      Iter->getParent()->setName(TFEnd->getParent()->getName() + ".tfend");
+    }
+  }
+}
+
 // Recursively handle inlined tasks.
 static void HandleInlinedTasksHelper(
     SmallPtrSetImpl<BasicBlock *> &BlocksToProcess,
@@ -632,6 +654,10 @@ static void HandleInlinedTasksHelper(
           BlocksToProcess.insert(NewBB);
         } else
           NewBB = BB;
+
+        // Split any blocks containing taskframe.end intrinsics that use
+        // TFCreate.
+        splitTaskFrameEnds(TFCreate);
 
         // Create an unwind edge for the taskframe.
         BasicBlock *TaskFrameUnwindEdge = CreateSubTaskUnwindEdge(
@@ -703,11 +729,13 @@ static void HandleInlinedTasksHelper(
         BasicBlock *SubTaskUnwindEdge = CreateSubTaskUnwindEdge(
             Intrinsic::detached_rethrow, DI->getSyncRegion(), UnwindEdge,
             Unreachable, DI);
+
         // Recursively check all blocks in the detached task.
         HandleInlinedTasksHelper(BlocksToProcess, DI->getDetached(),
                                  SubTaskUnwindEdge, Unreachable,
                                  CurrentTaskFrame, &Worklist, Invoke,
                                  InlinedLPads);
+
         // If the new unwind edge is not used, remove it.
         if (pred_empty(SubTaskUnwindEdge))
           SubTaskUnwindEdge->eraseFromParent();
