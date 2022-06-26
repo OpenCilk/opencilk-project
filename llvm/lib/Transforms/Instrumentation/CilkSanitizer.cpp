@@ -3064,6 +3064,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(
   CsiLoadStoreProperty Prop;
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
     Prop.setAlignment(LI->getAlignment());
+    Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
     // Instrument the load
     Value *CsiId = LoadFED.localToGlobalId(LocalId, IRB);
     Value *Args[] = {CsiId, Addr, Size, Prop.getValue(IRB)};
@@ -3071,6 +3072,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(
     IRB.SetInstDebugLocation(Call);
   } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
     Prop.setAlignment(SI->getAlignment());
+    Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
     // Instrument the store
     Value *CsiId = StoreFED.localToGlobalId(LocalId, IRB);
     Value *Args[] = {CsiId, Addr, Size, Prop.getValue(IRB)};
@@ -3508,6 +3510,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
   CsiLoadStoreProperty Prop;
   Prop.setAlignment(Alignment);
   Prop.setIsAtomic(I->isAtomic());
+  Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
   if (IsWrite) {
     // Instrument store
     uint64_t LocalId = StoreFED.add(*I);
@@ -3541,7 +3544,6 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
 }
 
 bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
-  CsiLoadStoreProperty Prop;
   Value *Addr;
   Type *Ty;
   if (AtomicRMWInst *RMWI = dyn_cast<AtomicRMWInst>(I)) {
@@ -3565,7 +3567,9 @@ bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
   if (!(InstrumentationSet & SHADOWMEMORY))
     return true;
 
+  CsiLoadStoreProperty Prop;
   Prop.setIsAtomic(true);
+  Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
   uint64_t LocalId = StoreFED.add(*I);
   uint64_t StoreObjId = StoreObj.add(*I, lookupUnderlyingObject(Addr));
   assert(LocalId == StoreObjId &&
@@ -4013,6 +4017,7 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
 
       Value *Addr = M->getDest();
       Prop.setAlignment(M->getDestAlignment());
+      Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
       // Instrument the store
       uint64_t StoreId = StoreFED.add(*I);
 
@@ -4038,6 +4043,7 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
 
       Value *Addr = M->getSource();
       Prop.setAlignment(M->getSourceAlignment());
+      Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
       // Instrument the load
       uint64_t LoadId = LoadFED.add(*I);
 
@@ -4063,6 +4069,7 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
 
     Value *Addr = M->getDest();
     Prop.setAlignment(M->getDestAlignment());
+    Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
     uint64_t LocalId = StoreFED.add(*I);
 
     // TODO: Don't recalculate underlying objects
