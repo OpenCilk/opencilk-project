@@ -811,6 +811,7 @@ public:
                         IntegerType::get(C, PropBits.IsOnStack),
                         IntegerType::get(C, PropBits.MayBeCaptured),
                         IntegerType::get(C, PropBits.IsAtomic),
+                        IntegerType::get(C, PropBits.IsThreadLocal),
                         IntegerType::get(C, PropBits.LoadReadBeforeWriteInBB),
                         IntegerType::get(C, PropBits.Padding)));
   }
@@ -837,6 +838,8 @@ public:
   void setMayBeCaptured(bool v) { PropValue.Fields.MayBeCaptured = v; }
   /// Set the value of the IsAtomic property.
   void setIsAtomic(bool v) { PropValue.Fields.IsAtomic = v; }
+  /// Set the value of the IsThreadLocal property.
+  void setIsThreadLocal(bool v) { PropValue.Fields.IsThreadLocal = v; }
   /// Set the value of the LoadReadBeforeWriteInBB property.
   void setLoadReadBeforeWriteInBB(bool v) {
     PropValue.Fields.LoadReadBeforeWriteInBB = v;
@@ -852,8 +855,9 @@ private:
       unsigned IsOnStack : 1;
       unsigned MayBeCaptured : 1;
       unsigned IsAtomic : 1;
+      unsigned IsThreadLocal : 1;
       unsigned LoadReadBeforeWriteInBB : 1;
-      uint64_t Padding : 50;
+      uint64_t Padding : 49;
     } Fields;
     uint64_t Bits;
   } Property;
@@ -868,13 +872,14 @@ private:
     int IsOnStack;
     int MayBeCaptured;
     int IsAtomic;
+    int IsThreadLocal;
     int LoadReadBeforeWriteInBB;
     int Padding;
   } PropertyBits;
 
   /// The number of bits representing each property.
   static constexpr PropertyBits PropBits = {
-      8, 1, 1, 1, 1, 1, 1, (64 - 8 - 1 - 1 - 1 - 1 - 1 - 1)};
+      8, 1, 1, 1, 1, 1, 1, 1, (64 - 8 - 1 - 1 - 1 - 1 - 1 - 1 - 1)};
 };
 
 class CsiAllocaProperty : public CsiProperty {
@@ -1071,6 +1076,7 @@ public:
   static bool isVtableAccess(Instruction *I);
   static bool addrPointsToConstantData(Value *Addr);
   static bool isAtomic(Instruction *I);
+  static bool isThreadLocalObject(Value *Obj);
   static bool getAllocFnArgs(const Instruction *I,
                              SmallVectorImpl<Value *> &AllocFnArgs,
                              Type *SizeTy, Type *AddrTy,

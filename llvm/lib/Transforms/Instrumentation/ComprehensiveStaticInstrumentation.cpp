@@ -2265,6 +2265,12 @@ bool CSIImpl::isAtomic(Instruction *I) {
   return false;
 }
 
+bool CSIImpl::isThreadLocalObject(Value *Obj) {
+  if (GlobalValue *GV = dyn_cast<GlobalValue>(Obj))
+    return GV->isThreadLocal();
+  return false;
+}
+
 void CSIImpl::computeLoadAndStoreProperties(
     SmallVectorImpl<std::pair<Instruction *, CsiLoadStoreProperty>>
         &LoadAndStoreProperties,
@@ -2294,6 +2300,8 @@ void CSIImpl::computeLoadAndStoreProperties(
       // Set may-be-captured property
       Prop.setMayBeCaptured(isa<GlobalValue>(Obj) ||
                             PointerMayBeCaptured(Addr, true, true));
+      // Set is-thread-local property
+      Prop.setIsThreadLocal(isThreadLocalObject(Obj));
       LoadAndStoreProperties.push_back(std::make_pair(I, Prop));
     } else {
       LoadInst *Load = cast<LoadInst>(I);
@@ -2312,6 +2320,8 @@ void CSIImpl::computeLoadAndStoreProperties(
       // Set may-be-captured property
       Prop.setMayBeCaptured(isa<GlobalValue>(Obj) ||
                             PointerMayBeCaptured(Addr, true, true));
+      // Set is-thread-local property
+      Prop.setIsThreadLocal(isThreadLocalObject(Obj));
       // Set load-read-before-write-in-bb property
       bool HasBeenSeen = WriteTargets.count(Addr) > 0;
       Prop.setLoadReadBeforeWriteInBB(HasBeenSeen);
