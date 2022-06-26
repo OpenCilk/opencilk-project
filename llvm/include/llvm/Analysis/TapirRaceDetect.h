@@ -189,6 +189,29 @@ public:
       }
       return RT;
     }
+
+    ModRefInfo getLocalRaceModRef(
+        const Instruction *I,
+        const SmallPtrSetImpl<const Value *> *Filter = nullptr) const {
+      if (!count(I))
+        return ModRefInfo::NoModRef;
+
+      ModRefInfo MRI = ModRefInfo::NoModRef;
+      // Union the recorded local race mod-ref info
+      for (RaceData &RD : lookup(I)) {
+        if (RaceType::Local != RD.Type)
+          continue;
+        if (Filter && RD.Racer.isValid() && Filter->count(RD.Racer.I))
+          continue;
+        if (!RD.Racer.isValid())
+          return ModRefInfo::ModRef;
+        if (RD.Racer.isMod())
+          MRI = unionModRef(MRI, ModRefInfo::Mod);
+        if (RD.Racer.isRef())
+          MRI = unionModRef(MRI, ModRefInfo::Ref);
+      }
+      return MRI;
+    }
   };
   using ObjectMRTy = DenseMap<const Value *, ModRefInfo>;
   using PtrChecksTy =
@@ -251,6 +274,12 @@ public:
       for (auto &RD : Res.second)
         RT = unionRaceTypes(RT, RD.Type);
     return RT;
+  }
+
+  ModRefInfo getLocalRaceModRef(
+      const Instruction *I,
+      const SmallPtrSetImpl<const Value *> *Filter = nullptr) const {
+    return Result.getLocalRaceModRef(I, Filter);
   }
 
   void getObjectsFor(Instruction *I, SmallPtrSetImpl<const Value *> &Objects);
