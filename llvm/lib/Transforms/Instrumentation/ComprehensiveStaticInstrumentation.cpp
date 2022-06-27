@@ -28,6 +28,8 @@
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
@@ -2035,6 +2037,47 @@ void CSIImpl::finalizeCsi() {
   CNCtor->addCalledFunction(Call, CNFunc);
 }
 
+namespace {
+// Custom DiagnosticInfo for linking a tool bitcode file.
+class CSILinkDiagnosticInfo : public DiagnosticInfo {
+  const Module *SrcM;
+  const Twine &Msg;
+
+public:
+  CSILinkDiagnosticInfo(DiagnosticSeverity Severity, const Module *SrcM,
+                        const Twine &Msg)
+      : DiagnosticInfo(DK_Lowering, Severity), SrcM(SrcM), Msg(Msg) {}
+  void print(DiagnosticPrinter &DP) const override {
+    DP << "linking module '" << SrcM->getModuleIdentifier() << "': " << Msg;
+  }
+};
+
+// Custom DiagnosticHandler to handle diagnostics arising when linking a tool
+// bitcode file.
+class CSIDiagnosticHandler final : public DiagnosticHandler {
+  const Module *SrcM;
+  DiagnosticHandler *OrigHandler;
+
+public:
+  CSIDiagnosticHandler(const Module *SrcM, DiagnosticHandler *OrigHandler)
+      : SrcM(SrcM), OrigHandler(OrigHandler) {}
+
+  bool handleDiagnostics(const DiagnosticInfo &DI) override {
+    if (DI.getKind() != DK_Linker)
+      return OrigHandler->handleDiagnostics(DI);
+
+    std::string MsgStorage;
+    {
+      raw_string_ostream Stream(MsgStorage);
+      DiagnosticPrinterRawOStream DP(Stream);
+      DI.print(DP);
+    }
+    return OrigHandler->handleDiagnostics(
+        CSILinkDiagnosticInfo(DI.getSeverity(), SrcM, MsgStorage));
+  }
+};
+} // namespace
+
 static GlobalVariable *copyGlobalArray(const char *Array, Module &M) {
   // Get the current set of static global constructors.
   if (GlobalVariable *GVA = M.getNamedGlobal(Array)) {
@@ -2108,8 +2151,19 @@ void CSIImpl::linkInToolFromBitcode(const std::string &BitcodePath) {
     SMDiagnostic SMD;
 
     std::unique_ptr<Module> ToolModule = parseIRFile(BitcodePath, SMD, C);
-    if (!ToolModule)
+    if (!ToolModule) {
       C.emitError("CSI: Failed to parse bitcode file: " + BitcodePath);
+      return;
+    }
+
+    // Get the original DiagnosticHandler for this context.
+    std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
+        C.getDiagnosticHandler();
+
+    // Setup a CSIDiagnosticHandler for this context, to handle
+    // diagnostics that arise from linking ToolModule.
+    C.setDiagnosticHandler(std::make_unique<CSIDiagnosticHandler>(
+                               ToolModule.get(), OrigDiagHandler.get()));
 
     // Get list of functions in ToolModule.
     for (Function &TF : *ToolModule)
@@ -2154,6 +2208,9 @@ void CSIImpl::linkInToolFromBitcode(const std::string &BitcodePath) {
         });
     if (Fail)
       C.emitError("CSI: Failed to link bitcode file: " + Twine(BitcodePath));
+
+    // Restore the original DiagnosticHandler for this context.
+    C.setDiagnosticHandler(std::move(OrigDiagHandler));
 
     restoreGlobalArray("llvm.global_ctors", M, GVCtorCopy, BitcodeAddsCtors);
     restoreGlobalArray("llvm.global_dtors", M, GVDtorCopy, BitcodeAddsDtors);
