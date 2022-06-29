@@ -5148,8 +5148,8 @@ QualType TreeTransform<Derived>::TransformHyperobjectType
     return QualType();
 
   QualType Result =
-    getDerived().RebuildHyperobjectType(ElementType, NewR.get(),
-                                        NewI.get(), NewD.get(),
+    getDerived().RebuildHyperobjectType(ElementType, NewI.get(),
+                                        NewR.get(), NewD.get(),
                                         TL.getHyperLoc());
 
   HyperobjectTypeLoc NewT = TLB.push<HyperobjectTypeLoc>(Result);
@@ -15059,10 +15059,10 @@ QualType TreeTransform<Derived>::RebuildDependentBitIntType(
 
 template<typename Derived>
 QualType TreeTransform<Derived>::RebuildHyperobjectType(QualType ElementType,
-                                                        Expr *R, Expr *I,
+                                                        Expr *I, Expr *R,
                                                         Expr *D,
                                                         SourceLocation Loc) {
-  return SemaRef.BuildHyperobjectType(ElementType, R, I, D, Loc);
+  return SemaRef.BuildHyperobjectType(ElementType, I, R, D, Loc);
 }
 
 template<typename Derived>
