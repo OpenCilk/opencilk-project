@@ -345,7 +345,7 @@ void PTXLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
       assert(Bytes->getType()->isIntegerTy(64));
 
       PointerType *PT = dyn_cast<PointerType>(V->getType());
-      IntegerType *IntT = dyn_cast<IntegerType>(PT->getElementType());
+      IntegerType *IntT = dyn_cast<IntegerType>(PT->getPointerElementType());
       assert(IntT && "Expected integer type");
 
       Constant *Fn = ConstantDataArray::getString(Ctx, CI->getName());
