@@ -150,10 +150,6 @@ void OpenCilkABI::prepareModule() {
                       << RuntimeBCPath << "\n");
     SMDiagnostic SMD;
 
-    // Get the original DiagnosticHandler for this context.
-    std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
-        C.getDiagnosticHandler();
-
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
     std::unique_ptr<Module> ExternalModule = parseIRFile(RuntimeBCPath, SMD, C);
@@ -161,6 +157,10 @@ void OpenCilkABI::prepareModule() {
     if (!ExternalModule)
       C.emitError("OpenCilkABI: Failed to parse bitcode ABI file: " +
                   Twine(RuntimeBCPath));
+
+    // Get the original DiagnosticHandler for this context.
+    std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
+        C.getDiagnosticHandler();
 
     // Setup an OpenCilkABIDiagnosticHandler for this context, to handle
     // diagnostics that arise from linking ExternalModule.
