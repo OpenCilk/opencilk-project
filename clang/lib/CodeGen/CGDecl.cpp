@@ -593,26 +593,6 @@ namespace {
     }
   };
 
-  struct CallReducerCleanup final : EHScopeStack::Cleanup {
-    const VarDecl &Var;
-
-    CallReducerCleanup(const VarDecl *VarPtr)
-      : Var(*VarPtr) {
-    }
-
-    void Emit(CodeGenFunction &CGF, Flags flags) override {
-      /* The other classes do it this way... */
-      DeclRefExpr DRE(CGF.getContext(), const_cast<VarDecl *>(&Var), false,
-                      Var.getType(), VK_LValue, SourceLocation());
-      llvm::Value *Addr = CGF.EmitDeclRefLValue(&DRE).getPointer(CGF);
-      llvm::Value *AddrVoid =
-	CGF.Builder.CreateBitCast(Addr, CGF.CGM.VoidPtrTy);
-      llvm::Function *Unregister =
-	CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
-      CGF.Builder.CreateCall(Unregister, {AddrVoid});
-    }
-  };
-
   struct CallCleanupFunction final : EHScopeStack::Cleanup {
     llvm::Constant *CleanupFn;
     const CGFunctionInfo &FnInfo;
@@ -1855,9 +1835,7 @@ void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF,
   llvm::Value *Arg =
     CGF.Builder.CreateBitCast(Addr.getPointer(), CGF.CGM.VoidPtrTy);
   CGF.Builder.CreateCall(F, {Arg});
-  if (const TypedefType *T = Type->getAs<TypedefType>())
-    Type = T->desugar();
-  QualType Inner = cast<HyperobjectType>(Type.getTypePtr())->getElementType();
+  QualType Inner = Type.stripHyperobject();
   if (const RecordType *rtype = Inner->getAs<RecordType>()) {
     if (const CXXRecordDecl *record = dyn_cast<CXXRecordDecl>(rtype->getDecl()))
       if (!record->getDestructor()->isTrivial())
@@ -2168,10 +2146,6 @@ void CodeGenFunction::emitAutoVarTypeCleanup(
   bool useEHCleanup = (cleanupKind & EHCleanup);
   EHStack.pushCleanup<DestroyObject>(cleanupKind, addr, type, destroyer,
                                      useEHCleanup);
-  if (IsReducer) {
-    assert(!emission.NRVOFlag && "hyperobject cleanup with NRVO");
-    EHStack.pushCleanup<CallReducerCleanup>(NormalAndEHCleanup, var);
-  }
 }
 
 void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
