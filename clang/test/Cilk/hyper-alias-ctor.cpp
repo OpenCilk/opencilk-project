@@ -23,4 +23,3 @@ void f()
   // CHECK: call void @llvm.reducer.unregister
   // CHECK: call void @_ZN11ConstructedIiED1Ev
 }
-
