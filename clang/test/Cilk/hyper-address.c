@@ -23,6 +23,7 @@ void assorted_addresses()
   // CHECK: call void @[[FN2:.*consume_view]]
   consume_view(&sum);
   // CHECK: call void @llvm.reducer.unregister
+  // CHECK-NOT: call void @llvm.reducer.unregister
   // CHECK: ret void
 }
 

@@ -1,6 +1,5 @@
 // A comment line.
-// RUN: %clang_cc1 %s -std=c11 -O1 -fopencilk -ftapir=none -verify -S -emit-llvm -o - | FileCheck %s
-// XFAIL: *
+// RUN: %clang_cc1 %s -std=c11 -O1 -fopencilk -ftapir=none -S -emit-llvm -o - | FileCheck %s
 
 #define ADD(SFX, T) \
   static void add_##SFX(void *l, void *r) { *(T *)l += *(T *)r; }
@@ -48,8 +47,8 @@ void define_int_reducer(long *out)
   _Cilk_for (int i = 0; i < 3900; ++i)
     sum += i;
   *out = sum;
-  // CHECK: llvm.reducer.unregister
-  // CHECK-NOT: llvm.reducer.unregister
+  // CHECK: call void @llvm.reducer.unregister
+  // CHECK-NOT: call void @llvm.reducer.unregister
 }
 
 // CHECK-LABEL: define_float_reducer
@@ -62,6 +61,6 @@ void define_float_reducer(float *out)
   _Cilk_for (int i = 0; i < 3900; ++i)
     sum += i;
   *out = sum;
-  // CHECK: llvm.reducer.unregister
-  // CHECK-NOT: llvm.reducer.unregister
+  // CHECK: call void @llvm.reducer.unregister
+  // CHECK-NOT: call void @llvm.reducer.unregister
 }
