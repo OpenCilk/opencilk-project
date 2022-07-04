@@ -1311,6 +1311,10 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
           if (auto O = ContainsHyperobject(Arg.getAsType()))
             return O;
           break;
+        case TemplateArgument::Integral:
+        case TemplateArgument::NullPtr:
+        case TemplateArgument::Null:
+          break;
         default:
           return diag::confusing_hyperobject;
         }
