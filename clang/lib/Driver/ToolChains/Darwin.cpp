@@ -3128,10 +3128,6 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
   bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
   SmallString<128> BitcodeFilename(UseAsan ? "libopencilk-asan-abi"
                                            : "libopencilk-abi");
-  // If pedigrees are enabled, use the pedigree-enabled ABI bitcode instead.
-  if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
-    BitcodeFilename.assign(UseAsan ? "libopencilk-pedigrees-asan-abi"
-                                   : "libopencilk-pedigrees-abi");
   BitcodeFilename += "_";
   BitcodeFilename += getOSLibraryNameSuffix();
   BitcodeFilename += ".bc";

@@ -1402,10 +1402,7 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
   }
 
   bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
-  StringRef OpenCilkBCName =
-      Args.hasArg(options::OPT_fopencilk_enable_pedigrees)
-          ? (UseAsan ? "opencilk-pedigrees-asan-abi" : "opencilk-pedigrees-abi")
-          : (UseAsan ? "opencilk-asan-abi" : "opencilk-abi");
+  StringRef OpenCilkBCName = UseAsan ? "opencilk-asan-abi" : "opencilk-abi";
   if (auto OpenCilkABIBCFilename = getOpenCilkBC(Args, OpenCilkBCName)) {
     if (IsLTO)
       CmdArgs.push_back(Args.MakeArgString("--plugin-opt=opencilk-abi-bitcode=" +
