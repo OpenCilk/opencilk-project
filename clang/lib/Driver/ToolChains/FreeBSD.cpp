@@ -313,8 +313,10 @@ void freebsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
       linkSanitizerRuntimeDeps(ToolChain, CmdArgs);
     if (NeedsXRayDeps)
       linkXRayRuntimeDeps(ToolChain, CmdArgs);
-    if (NeedsCilkSanitizerDeps)
+    if (NeedsCilkSanitizerDeps) {
       linkCilkSanitizerRuntimeDeps(Args, ToolChain, CmdArgs);
+      CmdArgs.push_back("-lstdthreads");
+    }
     // FIXME: For some reason GCC passes -lgcc and -lgcc_s before adding
     // the default system libraries. Just mimic this for now.
     if (Profiling)
