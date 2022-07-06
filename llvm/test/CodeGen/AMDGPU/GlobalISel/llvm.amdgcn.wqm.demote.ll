@@ -3,7 +3,6 @@
 ; RUN: llc -global-isel -march=amdgcn -mcpu=gfx900 -verify-machineinstrs < %s | FileCheck -check-prefix=GFX9 %s
 ; RUN: llc -global-isel -march=amdgcn -mcpu=gfx1010 -mattr=+wavefrontsize32,-wavefrontsize64 -verify-machineinstrs < %s | FileCheck -check-prefix=GFX10-32 %s
 ; RUN: llc -global-isel -march=amdgcn -mcpu=gfx1010 -mattr=-wavefrontsize32,+wavefrontsize64 -verify-machineinstrs < %s | FileCheck -check-prefix=GFX10-64 %s
-; XFAIL: *
 
 define amdgpu_ps void @static_exact(float %arg0, float %arg1) {
 ; SI-LABEL: static_exact:
