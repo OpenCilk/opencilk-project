@@ -1,6 +1,8 @@
 // RUN: %clang_cc1 %s -x c++ -O1 -fopencilk -verify -S -emit-llvm -disable-llvm-passes -o - | FileCheck %s
 // expected-no-diagnostics
 
+template <typename T> static void zero(void *v);
+
 template <typename T> static void zero(void *v) {
     *static_cast<T *>(v) = static_cast<T>(0);
 }
@@ -17,6 +19,9 @@ extern double X[], Y[];
 // CHECK-LABEL: mult_direct
 template<typename T>
 T mult_direct(T *x, T *y) {
+  reducer_opadd<T> * a = nullptr;
+  reducer_opadd<T> * b = a;
+
   reducer_opadd<T> result_reducer = 0;
   // CHECK: call void @llvm.reducer.register
   // CHECK-NOT: call i8* @llvm.hyper.lookup

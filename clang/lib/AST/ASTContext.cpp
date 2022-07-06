@@ -3305,16 +3305,22 @@ QualType ASTContext::getComplexType(QualType T) const {
   return QualType(New, 0);
 }
 
-static const IdentifierInfo *getFunction(Expr *E) {
-  if (!E)
+static const FunctionDecl *getFunction(Expr *E) {
+  if (!E || E->getType()->isDependentType())
     return nullptr;
+  E = E->IgnoreImpCasts();
+  if (const UnaryOperator *U = dyn_cast<UnaryOperator>(E)) {
+    if (U->getOpcode() != UO_AddrOf)
+      return nullptr;
+    E = U->getSubExpr();
+  }
   const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(E->IgnoreImpCasts());
   if (!DR)
     return nullptr;
   const FunctionDecl *F = dyn_cast<FunctionDecl>(DR->getDecl());
   if (!F)
     return nullptr;
-  return F->getIdentifier();
+  return F->getFirstDecl();
 }
 
 QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) const {
@@ -3323,10 +3329,10 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) c
   bool RN = HyperobjectType::isNullish(R);
   bool DN = HyperobjectType::isNullish(D);
 
-  const IdentifierInfo *II = getFunction(I);
-  const IdentifierInfo *RI = getFunction(R);
-  const IdentifierInfo *DI = getFunction(D);
-  bool Varies = (!IN && !II) || (!RN && !RI) || (!DN && !DI);
+  const FunctionDecl *IF = getFunction(I);
+  const FunctionDecl *RF = getFunction(R);
+  const FunctionDecl *DF = getFunction(D);
+  bool Varies = (!IN && !IF) || (!RN && !RF) || (!DN && !DF);
 
   QualType Canonical;
   if (!T.isCanonical())
@@ -3336,7 +3342,7 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) c
   if (Varies) {
     auto *New =
       new (*this, TypeAlignment)
-      HyperobjectType(T, Canonical, I, II, R, RI, D, DI);
+      HyperobjectType(T, Canonical, I, IF, R, RF, D, DF);
     Types.push_back(New);
     return QualType(New, 0);
   }
@@ -3345,7 +3351,7 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) c
   // structure.
   // TODO: 0 and nullptr are not properly treated as equivalent here.
   llvm::FoldingSetNodeID ID;
-  HyperobjectType::Profile(ID, T, II, RI, DI);
+  HyperobjectType::Profile(ID, T, IF, RF, DF);
 
   void *InsertPos = nullptr;
   if (HyperobjectType *HT = HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
@@ -3353,7 +3359,7 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) c
 
   auto *New =
     new (*this, TypeAlignment)
-    HyperobjectType(T, Canonical, I, II, R, RI, D, DI);
+    HyperobjectType(T, Canonical, I, IF, R, RF, D, DF);
   Types.push_back(New);
   HyperobjectTypes.InsertNode(New, InsertPos);
   return QualType(New, 0);

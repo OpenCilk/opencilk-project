@@ -3199,12 +3199,12 @@ bool HyperobjectType::isNullish(Expr *E) {
 }
 
 HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
-                                 Expr *i, const IdentifierInfo *ii,
-                                 Expr *r, const IdentifierInfo *ri,
-                                 Expr *d, const IdentifierInfo *di)
+                                 Expr *i, const FunctionDecl *ifn,
+                                 Expr *r, const FunctionDecl *rfn,
+                                 Expr *d, const FunctionDecl *dfn)
   : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
     ElementType(Element), Identity(i), Reduce(r), Destroy(d),
-    IdentityID(ii), ReduceID(ri), DestroyID(di),
+    IdentityID(ifn), ReduceID(rfn), DestroyID(dfn),
     Bare(isNullish(i) && isNullish(r) && isNullish(d)) {
 }
 
@@ -3213,16 +3213,16 @@ void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID) const {
 }
 
 void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
-                              const IdentifierInfo *I, const IdentifierInfo *R,
-                              const IdentifierInfo *D) {
+                              const FunctionDecl *I, const FunctionDecl *R,
+                              const FunctionDecl *D) {
   ID.AddPointer(Pointee.getAsOpaquePtr());
-  // In normal use both I, R will be non-null or neither of them will be.
+  // In normal use both I and R will be non-null or neither of them will be.
   if (I)
-    ID.AddString(I->getName());
+    ID.AddPointer(I);
   if (R)
-    ID.AddString(R->getName());
+    ID.AddPointer(R);
   if (D)
-    ID.AddString(D->getName());
+    ID.AddPointer(D);
 }
 
 StringRef FunctionType::getNameForCallConv(CallingConv CC) {

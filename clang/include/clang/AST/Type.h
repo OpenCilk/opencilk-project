@@ -6579,13 +6579,13 @@ class HyperobjectType final : public Type, public llvm::FoldingSetNode {
 
   QualType ElementType;
   Expr *Identity, *Reduce, *Destroy;
-  const IdentifierInfo *IdentityID, *ReduceID, *DestroyID;
+  const FunctionDecl *IdentityID, *ReduceID, *DestroyID;
   bool Bare;
 
   HyperobjectType(QualType Element, QualType CanonicalPtr,
-                  Expr *i, const IdentifierInfo *ii,
-                  Expr *r, const IdentifierInfo *ri,
-                  Expr *d, const IdentifierInfo *di);
+                  Expr *i, const FunctionDecl *ifn,
+                  Expr *r, const FunctionDecl *rfn,
+                  Expr *d, const FunctionDecl *dfn);
 
 public:
   QualType getElementType() const { return ElementType; }
@@ -6604,9 +6604,9 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
-                      const IdentifierInfo *I,
-                      const IdentifierInfo *R,
-                      const IdentifierInfo *D);
+                      const FunctionDecl *I,
+                      const FunctionDecl *R,
+                      const FunctionDecl *D);
 
   static bool classof(const Type *T) {
     return T->getTypeClass() == Hyperobject;
