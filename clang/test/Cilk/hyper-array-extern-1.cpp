@@ -12,6 +12,7 @@ int read_array_hyper(unsigned i)
   // CHECK: %[[ARRAYIDX:.+]] = getelementptr inbounds
   // CHECK: %[[KEY:.+]] = bitcast i32* %[[ARRAYIDX]] to i8*
   // CHECK: %[[VIEWRAW:.+]] = call i8* @llvm.hyper.lookup(i8* %[[KEY]])
+  // CHECK-NOT: call i8* @llvm.hyper.lookup
   // CHECK: %[[VIEW:.+]] = bitcast i8* %[[VIEWRAW]] to i32*
   // CHECK: %[[VAL:.+]] = load i32, i32* %[[VIEW]]
   // CHECK: ret i32 %[[VAL]]

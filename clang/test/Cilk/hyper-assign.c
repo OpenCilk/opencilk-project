@@ -19,6 +19,7 @@ long chain_assign()
 long simple_assign(long val)
 {
   // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i64* @x to i8*))
+  // CHECK-NOT: call i8* @llvm.hyper.lookup(i8* bitcast (i64* @x to i8*))
   // CHECK: store i64
   return x = val;
 }
