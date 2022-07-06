@@ -2392,11 +2392,6 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
                                                      unsigned OperandNum) {
   Function *F = I->getFunction();
   bool LocalRace = RI.mightRaceLocally(I);
-  unsigned LocalRaceMR = static_cast<unsigned>(MAAPValue::NoAccess);
-  if (LocalRace && isModSet(RI.getLocalRaceModRef(I)))
-    LocalRaceMR |= static_cast<unsigned>(MAAPValue::Mod);
-  if (LocalRace && isRefSet(RI.getLocalRaceModRef(I)))
-    LocalRaceMR |= static_cast<unsigned>(MAAPValue::Ref);
   AAResults *AA = RI.getAA();
   MemoryLocation Loc = getMemoryLocation(I, OperandNum, TLI);
   Value *MAAPChk = IRB.getTrue();
@@ -2429,17 +2424,6 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPCheck(Instruction *I,
 
     // If we have a valid racer, get the objects that that racer might access.
     SmallPtrSet<const Value *, 1> RacerObjects;
-    unsigned LocalRaceVal = static_cast<unsigned>(MAAPValue::NoAccess);
-    if (RD.Racer.isValid()) {
-      assert(RaceInfo::isLocalRace(RD.Type) && "Valid racer for nonlocal race");
-      RI.getObjectsFor(
-          RaceInfo::MemAccessInfo(RD.Racer.getPtr(), RD.Racer.isMod()),
-          RacerObjects);
-      if (RD.Racer.isMod())
-        LocalRaceVal |= static_cast<unsigned>(MAAPValue::Mod);
-      if (RD.Racer.isRef())
-        LocalRaceVal |= static_cast<unsigned>(MAAPValue::Ref);
-    }
 
     for (const Value *Obj : Objects) {
       LLVM_DEBUG(dbgs() << "  Object " << *Obj << "\n");
