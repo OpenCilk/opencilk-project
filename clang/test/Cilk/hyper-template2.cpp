@@ -18,6 +18,7 @@ reducer<short> r; // expected-note{{in instantiation}}
 
 // CHECK-LABEL: _Z1fv
 // CHECK: call i8* @llvm.hyper.lookup
+// CHECK-NOT: call i8* @llvm.hyper.lookup
 // CHECK: load i16
 // CHECK: sext i16
 // CHECK: ret i32
