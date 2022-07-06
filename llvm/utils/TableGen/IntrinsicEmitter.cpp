@@ -391,6 +391,24 @@ std::optional<bool> compareFnAttributes(const CodeGenIntrinsic *L,
   if (L->isStrictFP != R->isStrictFP)
     return R->isStrictFP;
 
+  if (L->isInjective != R->isInjective)
+    return R->isInjective;
+
+  if (L->isStrandPure != R->isStrandPure)
+    return R->isStrandPure;
+
+  if (L->isReducerRegister != R->isReducerRegister)
+    return R->isReducerRegister;
+
+  if (L->isReducerUnregister != R->isReducerUnregister)
+    return R->isReducerUnregister;
+
+  if (L->isHyperView != R->isHyperView)
+    return R->isHyperView;
+
+  if (L->isHyperToken != R->isHyperToken)
+    return R->isHyperToken;
+
   // Try to order by readonly/readnone attribute.
   uint32_t LK = L->ME.toIntValue();
   uint32_t RK = R->ME.toIntValue();
@@ -527,6 +545,18 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
       OS << "      Attribute::get(C, Attribute::Speculatable),\n";
     if (Intrinsic.isStrictFP)
       OS << "      Attribute::get(C, Attribute::StrictFP),\n";
+    if (Intrinsic.isInjective)
+      OS << "      Attribute::get(C, Attribute::Injective),\n";
+    if (Intrinsic.isStrandPure)
+      OS << "      Attribute::get(C, Attribute::StrandPure),\n";
+    if (Intrinsic.isReducerRegister)
+      OS << "      Attribute::get(C, Attribute::ReducerRegister),\n";
+    if (Intrinsic.isReducerUnregister)
+      OS << "      Attribute::get(C, Attribute::ReducerUnregister),\n";
+    if (Intrinsic.isHyperView)
+      OS << "      Attribute::get(C, Attribute::HyperView),\n";
+    if (Intrinsic.isHyperToken)
+      OS << "      Attribute::get(C, Attribute::HyperToken),\n";
 
     MemoryEffects ME = Intrinsic.ME;
     // TODO: IntrHasSideEffects should affect not only readnone intrinsics.
