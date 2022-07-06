@@ -225,7 +225,7 @@ void OpenCilkABI::prepareModule() {
 
   // Create an array of CilkRTS functions, with their associated types and
   // FunctionCallee member variables in the OpenCilkABI class.
-  SmallVector<CilkRTSFnDesc, 17> CilkRTSFunctions({
+  CilkRTSFnDesc CilkRTSFunctions[] = {
       {"__cilkrts_enter_frame", CilkRTSFnTy, CilkRTSEnterFrame},
       {"__cilkrts_enter_frame_helper", CilkRTSFnTy, CilkRTSEnterFrameHelper},
       {"__cilkrts_detach", CilkRTSFnTy, CilkRTSDetach},
@@ -249,7 +249,7 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
-  });
+  };
 
   if (UseOpenCilkRuntimeBC) {
     // Add attributes to internalized functions.
