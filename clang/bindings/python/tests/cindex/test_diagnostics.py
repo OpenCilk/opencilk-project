@@ -77,7 +77,7 @@ class TestDiagnostics(unittest.TestCase):
         self.assertEqual(d.location.line, 1)
         self.assertEqual(d.location.column, 11)
 
-        self.assertEqual(d.category_number, 2)
+        self.assertEqual(d.category_number, 3)
         self.assertEqual(d.category_name, 'Semantic Issue')
 
     def test_diagnostic_option(self):
