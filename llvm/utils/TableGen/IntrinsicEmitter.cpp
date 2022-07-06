@@ -620,6 +620,24 @@ struct AttributeComparator {
     if (L->hasSideEffects != R->hasSideEffects)
       return R->hasSideEffects;
 
+    if (L->isInjective != R->isInjective)
+      return R->isInjective;
+
+    if (L->isStrandPure != R->isStrandPure)
+      return R->isStrandPure;
+
+    if (L->isReducerRegister != R->isReducerRegister)
+      return R->isReducerRegister;
+
+    if (L->isReducerUnregister != R->isReducerUnregister)
+      return R->isReducerUnregister;
+
+    if (L->isHyperView != R->isHyperView)
+      return R->isHyperView;
+
+    if (L->isHyperToken != R->isHyperToken)
+      return R->isHyperToken;
+
     // Try to order by readonly/readnone attribute.
     CodeGenIntrinsic::ModRefBehavior LK = L->ModRef;
     CodeGenIntrinsic::ModRefBehavior RK = R->ModRef;
@@ -751,7 +769,10 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
         Intrinsic.isNoReturn || Intrinsic.isNoSync || Intrinsic.isNoFree ||
         Intrinsic.isWillReturn || Intrinsic.isCold || Intrinsic.isNoDuplicate ||
         Intrinsic.isNoMerge || Intrinsic.isConvergent ||
-        Intrinsic.isSpeculatable) {
+        Intrinsic.isSpeculatable || Intrinsic.isInjective ||
+        Intrinsic.isStrandPure || Intrinsic.isReducerRegister ||
+        Intrinsic.isReducerUnregister || Intrinsic.isHyperView ||
+        Intrinsic.isHyperToken) {
       OS << "      const Attribute::AttrKind Atts[] = {";
       ListSeparator LS(",");
       if (!Intrinsic.canThrow)
