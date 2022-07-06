@@ -1415,8 +1415,8 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
 }
 
 // Given that O1 != O2, return NoAlias if they can not alias.
-static AliasResult
-UnderlyingNoAlias(const Value *O1, const Value *O2, AAQueryInfo &AAQI) {
+static AliasResult UnderlyingNoAlias(const Value *O1, const Value *O2,
+                                     AAQueryInfo &AAQI) {
   assert(O1 != O2 && "identical arguments to UnderlyingNoAlias");
 
   // If V1/V2 point to two different objects, we know that we have no alias.

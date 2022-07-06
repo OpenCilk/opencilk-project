@@ -1828,12 +1828,11 @@ bool CodeGenFunction::getReducer(const VarDecl *D, ReducerCallbacks &CB) {
   return false;
 }
 
-void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF,
-                                         Address Addr,
+void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF, Address Addr,
                                          QualType Type) {
   llvm::Function *F = CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
   llvm::Value *Arg =
-    CGF.Builder.CreateBitCast(Addr.getPointer(), CGF.CGM.VoidPtrTy);
+      CGF.Builder.CreateBitCast(Addr.getPointer(), CGF.CGM.VoidPtrTy);
   CGF.Builder.CreateCall(F, {Arg});
   QualType Inner = Type.stripHyperobject();
   if (const RecordType *rtype = Inner->getAs<RecordType>()) {
@@ -1855,12 +1854,12 @@ void CodeGenFunction::EmitReducerInit(const VarDecl *D,
   llvm::Value *Size = nullptr;
   QualType Type = D->getType();
   if (uint64_t Bits = getContext().getTypeSize(Type)) {
-    Size =
-      llvm::Constant::getIntegerValue(SizeType,
-                                      llvm::APInt(SizeBits, Bits / 8));
+    Size = llvm::Constant::getIntegerValue(SizeType,
+                                           llvm::APInt(SizeBits, Bits / 8));
   } else {
     auto V = getVLASize(Type);
-    llvm::Value *Size1 = llvm::Constant::getIntegerValue(SizeType, llvm::APInt(64, getContext().getTypeSize(V.Type) / 8));
+    llvm::Value *Size1 = llvm::Constant::getIntegerValue(
+        SizeType, llvm::APInt(64, getContext().getTypeSize(V.Type) / 8));
     Size = Builder.CreateNUWMul(V.NumElts, Size1);
   }
   // TODO: mark this call as registering a local

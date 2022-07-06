@@ -2115,8 +2115,8 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   DeclRefExpr *Lookup = BuildDeclRefExpr(Builtin, Builtin->getType(),
                                          VK_PRValue, SourceLocation(), nullptr);
 
-  QualType ResultType =
-    HT->getElementType().withFastQualifiers(InputType.getLocalFastQualifiers());
+  QualType ResultType = HT->getElementType().withFastQualifiers(
+      InputType.getLocalFastQualifiers());
   QualType Ptr = Context.getPointerType(ResultType);
 
   Expr *VarAddr;
