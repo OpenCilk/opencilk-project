@@ -2099,6 +2099,8 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   if (!HT)
     return E;
 
+  bool Difficult = InputType->isDependentType();
+
   // For now all hyperobjects use the same lookup function.
   IdentifierInfo *ID = PP.getIdentifierInfo("__hyper_lookup");
   ValueDecl *Builtin =
@@ -2120,20 +2122,49 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   Expr *VarAddr;
   if (Pointer)
     VarAddr = E;
-  else
+  else if (Difficult) {
+    IdentifierInfo *BAI = PP.getIdentifierInfo("__builtin_addressof");
+    ValueDecl *BAV =
+      dyn_cast<ValueDecl>
+      (LazilyCreateBuiltin(BAI, BAI->getBuiltinID(),
+                           /* Scope = */ nullptr,
+                           /* ForRedeclaration = */ false,
+                           SourceLocation()));
+    assert(BAV && "no __builtin_addressof builtin");
+    DeclRefExpr *BAD = BuildDeclRefExpr(BAV, Builtin->getType(),
+                                        VK_PRValue, SourceLocation(),
+                                        nullptr);
+
+    ExprResult Address = BuildCallExpr(nullptr, BAD, E->getExprLoc(),
+                                       { E }, E->getExprLoc(), nullptr);
+    assert(Address.isUsable());
+    VarAddr = Address.get();
+  } else {
     VarAddr = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr,
                                     VK_PRValue, OK_Ordinary,
                                     SourceLocation(), false,
                                     CurFPFeatureOverrides());
-
+  }
   ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(),
 				  { VarAddr }, E->getExprLoc(), nullptr);
 
-  auto *Casted =
-    ImplicitCastExpr::Create(Context, Ptr,
-			     CK_BitCast /*???*/,
-			     Call.get(), nullptr, VK_PRValue,
-			     CurFPFeatureOverrides());
+  // Template expansion normally strips out implicit casts,
+  // so make this explicit in C++.
+  CastExpr *Casted = nullptr;
+  if (Difficult)
+    Casted = CXXStaticCastExpr::Create(Context, Ptr, VK_PRValue,
+                                       CK_BitCast, Call.get(), nullptr,
+                                       Context.CreateTypeSourceInfo(Ptr),
+                                       FPOptionsOverride(),
+                                       SourceLocation(),
+                                       SourceLocation(),
+                                       SourceRange());
+  else
+    Casted = ImplicitCastExpr::Create(Context, Ptr,
+                                      CK_BitCast,
+                                      Call.get(), nullptr, VK_PRValue,
+                                      CurFPFeatureOverrides());
+
   if (Pointer)
     return Casted;
 
