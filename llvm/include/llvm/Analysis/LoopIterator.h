@@ -104,6 +104,7 @@ public:
 
 private:
   Loop *L;
+  SmallPtrSet<BasicBlock *, 4> TaskExitBlocks;
 
   /// Map each block to its postorder number. A block is only mapped after it is
   /// preorder visited by DFS. It's postorder number is initially zero and set
@@ -112,8 +113,14 @@ private:
   std::vector<BasicBlock*> PostBlocks;
 
 public:
-  LoopBlocksDFS(Loop *Container) :
-    L(Container), PostNumbers(NextPowerOf2(Container->getNumBlocks())) {
+  LoopBlocksDFS(Loop *Container)
+      : L(Container), PostNumbers(NextPowerOf2(Container->getNumBlocks())) {
+    PostBlocks.reserve(Container->getNumBlocks());
+  }
+  LoopBlocksDFS(Loop *Container, bool IncludeTaskExits)
+      : L(Container), PostNumbers(NextPowerOf2(Container->getNumBlocks())) {
+    if (IncludeTaskExits)
+      L->getTaskExits(TaskExitBlocks);
     PostBlocks.reserve(Container->getNumBlocks());
   }
 
@@ -123,7 +130,9 @@ public:
   void perform(LoopInfo *LI);
 
   /// Return true if postorder numbers are assigned to all loop blocks.
-  bool isComplete() const { return PostBlocks.size() == L->getNumBlocks(); }
+  bool isComplete() const {
+    return PostBlocks.size() == (L->getNumBlocks() + TaskExitBlocks.size());
+  }
 
   /// Iterate over the cached postorder blocks.
   POIterator beginPostorder() const {
@@ -175,6 +184,8 @@ private:
 
 public:
   LoopBlocksRPO(Loop *Container) : DFS(Container) {}
+  LoopBlocksRPO(Loop *Container, bool IncludeTaskExits)
+      : DFS(Container, IncludeTaskExits) {}
 
   /// Traverse the loop blocks and store the DFS result.
   void perform(LoopInfo *LI) {
@@ -229,7 +240,7 @@ public:
   ///
   /// TODO: If anyone is interested, we could record preorder numbers here.
   bool visitPreorder(BasicBlock *BB) {
-    if (!DFS.L->contains(LI->getLoopFor(BB)))
+    if (!DFS.L->contains(LI->getLoopFor(BB)) && !DFS.TaskExitBlocks.count(BB))
       return false;
 
     return DFS.PostNumbers.insert(std::make_pair(BB, 0)).second;
