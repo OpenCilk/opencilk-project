@@ -1150,6 +1150,13 @@ static BasicBlock *buildClonedLoopBlocks(
     if (!SkipBlock(LoopBB))
       CloneBlock(LoopBB);
 
+  // Clone any task-exit blocks in the loop as well.
+  SmallPtrSet<BasicBlock*, 8> TaskExitBlocks;
+  L.getTaskExits(TaskExitBlocks);
+  for (auto *LoopBB : TaskExitBlocks)
+    if (!SkipBlock(LoopBB))
+      CloneBlock(LoopBB);
+
   // Split all the loop exit edges so that when we clone the exit blocks, if
   // any of the exit blocks are *also* a preheader for some other loop, we
   // don't create multiple predecessors entering the loop header.
@@ -2150,7 +2157,7 @@ static void unswitchNontrivialInvariants(
   // Compute the parent loop now before we start hacking on things.
   Loop *ParentL = L.getParentLoop();
   // Get blocks in RPO order for MSSA update, before changing the CFG.
-  LoopBlocksRPO LBRPO(&L);
+  LoopBlocksRPO LBRPO(&L, /*IncludeTaskExits*/ true);
   if (MSSAU)
     LBRPO.perform(&LI);
 
@@ -2865,7 +2872,7 @@ static bool isSafeForNoNTrivialUnswitching(Loop &L, LoopInfo &LI) {
   // loops "out of thin air". If we ever discover important use cases for doing
   // this, we can add support to loop unswitch, but it is a lot of complexity
   // for what seems little or no real world benefit.
-  LoopBlocksRPO RPOT(&L);
+  LoopBlocksRPO RPOT(&L, /*IncludeTaskExits*/ true);
   RPOT.perform(&LI);
   if (containsIrreducibleCFG<const BasicBlock *>(RPOT, LI))
     return false;
