@@ -1459,20 +1459,83 @@ static AliasResult UnderlyingNoAlias(const Value *O1, const Value *O2,
   return AliasResult::MayAlias;
 }
 
-// TODO: C_VIEW and C_STRAND may be redundant
-#define C_INJECTIVE  0x01
-#define C_PURE       0x02 // including strand pure function in same strand
-#define C_VIEW       0x04
-#define C_STRAND     0x08 // excluding strand pure function in same strand
-
-static const std::pair<Attribute::AttrKind, int> AttrTable[] = {
-  {Attribute::Injective, C_INJECTIVE},
-  {Attribute::HyperView, C_VIEW},
-  {Attribute::StrandPure, C_STRAND},
+namespace {
+// TODO: Consider moving this code to AliasAnalysis.h, to make it accessible to
+// other alias analyses.
+// TODO: TapirFnBehavior::View and TapirFnBehavior::Strand may be redundant.
+enum class TapirFnBehavior : uint8_t {
+  None = 0,
+  Injective = 1,
+  Pure = 2, // including strand pure function in same strand
+  View = 4,
+  InjectiveOrPureOrView = Injective | Pure | View,
+  Strand = 8, // excluding strand pure function in same strand
+  Any = InjectiveOrPureOrView | Strand,
 };
 
+static const std::pair<Attribute::AttrKind, TapirFnBehavior>
+    TapirFnAttrTable[] = {
+        {Attribute::Injective, TapirFnBehavior::Injective},
+        {Attribute::HyperView, TapirFnBehavior::View},
+        {Attribute::StrandPure, TapirFnBehavior::Strand},
+};
+
+static inline bool noTapirFnBehavior(const TapirFnBehavior TFB) {
+  return (static_cast<uint8_t>(TFB) &
+          static_cast<uint8_t>(TapirFnBehavior::Any)) ==
+         static_cast<uint8_t>(TapirFnBehavior::None);
+}
+static inline bool isInjectiveSet(const TapirFnBehavior TFB) {
+  return (static_cast<uint8_t>(TFB) &
+          static_cast<uint8_t>(TapirFnBehavior::Injective)) ==
+         static_cast<uint8_t>(TapirFnBehavior::Injective);
+}
+static inline bool isPureSet(const TapirFnBehavior TFB) {
+  return (static_cast<uint8_t>(TFB) &
+          static_cast<uint8_t>(TapirFnBehavior::Pure)) ==
+         static_cast<uint8_t>(TapirFnBehavior::Pure);
+}
+static inline bool isViewSet(const TapirFnBehavior TFB) {
+  return (static_cast<uint8_t>(TFB) &
+          static_cast<uint8_t>(TapirFnBehavior::Pure)) ==
+         static_cast<uint8_t>(TapirFnBehavior::Pure);
+}
+static inline bool isInjectiveOrPureOrViewSet(const TapirFnBehavior TFB) {
+  return static_cast<uint8_t>(TFB) &
+         static_cast<uint8_t>(TapirFnBehavior::InjectiveOrPureOrView);
+}
+static inline bool isStrandSet(const TapirFnBehavior TFB) {
+  return (static_cast<uint8_t>(TFB) &
+          static_cast<uint8_t>(TapirFnBehavior::Strand)) ==
+         static_cast<uint8_t>(TapirFnBehavior::Strand);
+}
+static inline TapirFnBehavior setPure(const TapirFnBehavior TFB) {
+  return TapirFnBehavior(static_cast<uint8_t>(TFB) |
+                         static_cast<uint8_t>(TapirFnBehavior::Pure));
+}
+static inline TapirFnBehavior clearPure(const TapirFnBehavior TFB) {
+  return TapirFnBehavior(static_cast<uint8_t>(TFB) &
+                         ~static_cast<uint8_t>(TapirFnBehavior::Pure));
+}
+static inline TapirFnBehavior clearStrand(const TapirFnBehavior TFB) {
+  return TapirFnBehavior(static_cast<uint8_t>(TFB) &
+                         ~static_cast<uint8_t>(TapirFnBehavior::Strand));
+}
+static inline TapirFnBehavior unionTapirFnBehavior(const TapirFnBehavior TFB1,
+                                                   const TapirFnBehavior TFB2) {
+  return TapirFnBehavior(static_cast<uint8_t>(TFB1) |
+                         static_cast<uint8_t>(TFB2));
+}
+static inline TapirFnBehavior
+intersectTapirFnBehavior(const TapirFnBehavior TFB1,
+                         const TapirFnBehavior TFB2) {
+  return TapirFnBehavior(static_cast<uint8_t>(TFB1) &
+                         static_cast<uint8_t>(TFB2));
+}
+} // namespace
+
 // Tapir/OpenCilk code has some simple optimization opportunities.
-// 1. Some runtime functions are injections, i.e. they return nonaliasing
+// 1. Some runtime functions are injections, i.e., they return nonaliasing
 // pointers when given nonaliasing arguments.
 // 2. Some runtime functions are pure, or pure within a region of execution,
 // which means the return values MustAlias if the arguments are identical.
@@ -1480,31 +1543,31 @@ static const std::pair<Attribute::AttrKind, int> AttrTable[] = {
 // argument does not alias (for simplicity, this implies injective).
 // 4. Token lookups return a value that does not alias any alloca or global.
 static const Value *getRecognizedArgument(const Value *V, bool InSameSpindle,
-                                         const Value *&Fn, int &Behavior) {
+                                          const Value *&Fn,
+                                          TapirFnBehavior &Behavior) {
   const CallInst *C = dyn_cast<CallInst>(V);
   if (!C)
     return nullptr;
   unsigned NumOperands = C->getNumOperands();
   if (NumOperands != 2)
     return nullptr;
-  for (auto E : AttrTable) {
+  for (auto E : TapirFnAttrTable) {
     if (C->hasFnAttr(E.first))
-      Behavior |= E.second;
+      Behavior = unionTapirFnBehavior(Behavior, E.second);
   }
 
-  // Make C_STRAND and C_PURE mutually exclusive.
-  if (Behavior & C_STRAND) {
+  // Make TapirFnBehavior::Strand and TapirFnBehavior::Pure mutually exclusive.
+  if (isStrandSet(Behavior)) {
     if (InSameSpindle)
-      Behavior = (Behavior & ~C_STRAND) | C_PURE;
+      Behavior = setPure(clearStrand(Behavior));
     else
-      Behavior &= ~C_PURE;
-  }
-  else if (C->doesNotAccessMemory() && C->doesNotThrow() &&
-           C->hasFnAttr(Attribute::WillReturn)) {
-    Behavior |= C_PURE;
+      Behavior = clearPure(Behavior);
+  } else if (C->doesNotAccessMemory() && C->doesNotThrow() &&
+             C->hasFnAttr(Attribute::WillReturn)) {
+    Behavior = setPure(Behavior);
   }
 
-  if (Behavior == 0)
+  if (noTapirFnBehavior(Behavior))
     return nullptr;
   Fn = C->getCalledOperand();
   return C->getOperand(0);
@@ -1518,13 +1581,14 @@ BasicAAResult::checkInjectiveArguments(const Value *V1, const Value *O1,
   // O1 and O2 are the underlying objects stripped of GEP as well
 
   const Value *Fn1 = nullptr, *Fn2 = nullptr;
-  int Behavior1 = 0, Behavior2 = 0;
+  TapirFnBehavior Behavior1 = TapirFnBehavior::None,
+                  Behavior2 = TapirFnBehavior::None;
   bool InSameSpindle = AAQI.AssumeSameSpindle;
   const Value *A1 = getRecognizedArgument(V1, InSameSpindle, Fn1, Behavior1);
   const Value *A2 = getRecognizedArgument(V2, InSameSpindle, Fn2, Behavior2);
 
-  if ((Behavior1 & (C_INJECTIVE|C_PURE|C_VIEW)) == 0 &&
-      (Behavior2 & (C_INJECTIVE|C_PURE|C_VIEW)) == 0)
+  if (!isInjectiveOrPureOrViewSet(Behavior1) &&
+      !isInjectiveOrPureOrViewSet(Behavior2))
     return AliasResult::MayAlias;
 
   // At least one value is a call to an understood function
@@ -1538,11 +1602,11 @@ BasicAAResult::checkInjectiveArguments(const Value *V1, const Value *O1,
 
   // Pure functions return equal values given equal arguments.
   AliasResult Equal =
-      (Behavior1 & Behavior2 & C_PURE) ?
+      isPureSet(intersectTapirFnBehavior(Behavior1, Behavior2)) ?
       AliasResult::MustAlias : AliasResult::MayAlias;
 
   // This is for testing.  The intended use is with pointer arguments.
-  if (A1 && A2 && (Behavior1 & C_INJECTIVE)) {
+  if (A1 && A2 && isInjectiveSet(Behavior1)) {
     if (const ConstantInt *I1 = dyn_cast<ConstantInt>(A1)) {
       if (const ConstantInt *I2 = dyn_cast<ConstantInt>(A2))
         return I1->getValue() == I2->getValue() ?
@@ -1569,23 +1633,23 @@ BasicAAResult::checkInjectiveArguments(const Value *V1, const Value *O1,
   if (!A1) {
     if (!Known2)
       return AliasResult::MayAlias;
-    if (O1 == U2)            // 1
+    if (O1 == U2)              // 1
       return AliasResult::MayAlias;
-    if (Behavior2 & C_VIEW)  // 2
+    if (isViewSet(Behavior2))  // 2
       return UnderlyingNoAlias(O1, U2, AAQI);
     return AliasResult::MayAlias;
   }
   if (!A2) {
     if (!Known1)
       return AliasResult::MayAlias;
-    if (U1 == O2)            // 1
+    if (U1 == O2)              // 1
       return AliasResult::MayAlias;
-    if (Behavior1 & C_VIEW)  // 2
+    if (isViewSet(Behavior1))  // 2
       return UnderlyingNoAlias(U1, O2, AAQI);
     return AliasResult::MayAlias;
   }
 
-  if (!(Behavior1 & C_INJECTIVE))
+  if (!isInjectiveSet(Behavior1))
     return AliasResult::MayAlias;
 
   // Two calls to the same function with the same value.
@@ -1663,11 +1727,7 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
       checkInjectiveArguments(V1, O1, V2, O2, AAQI);
   if (InjectiveResult == AliasResult::NoAlias)
     return AliasResult::NoAlias;
-  // There used to be variables V1AAInfo and V2AAInfo here:
-  //    return V1AAInfo == V2AAInfo ?
-  //        AliasResult::MustAlias : AliasResult::MayAlias;
- 
-  if (InjectiveResult == AliasResult::MustAlias)
+  else if (InjectiveResult == AliasResult::MustAlias)
     return AliasResult::MayAlias;
 
   if (O1 != O2 && UnderlyingNoAlias(O1, O2, AAQI) == AliasResult::NoAlias)
