@@ -689,6 +689,12 @@ CodeGenIntrinsic::CodeGenIntrinsic(Record *R,
   isConvergent = false;
   isSpeculatable = false;
   hasSideEffects = false;
+  isInjective = false;
+  isStrandPure = false;
+  isHyperView = false;
+  isHyperToken = false;
+  isReducerRegister = false;
+  isReducerUnregister = false;
 
   if (DefName.size() <= 4 || DefName.substr(0, 4) != "int_")
     PrintFatalError(DefLoc,

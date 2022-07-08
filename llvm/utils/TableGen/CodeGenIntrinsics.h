@@ -110,14 +110,14 @@ struct CodeGenIntrinsic {
   bool isSpeculatable;
 
   // True if this is an injective function.
-  bool isInjective = false;
+  bool isInjective;
 
   // Tapir reducer-related attributes
-  bool isStrandPure = false;
-  bool isHyperView = false;
-  bool isHyperToken = false;
-  bool isReducerRegister = false;
-  bool isReducerUnregister = false;
+  bool isStrandPure;
+  bool isHyperView;
+  bool isHyperToken;
+  bool isReducerRegister;
+  bool isReducerUnregister;
 
   enum ArgAttrKind {
     NoCapture,
