@@ -346,6 +346,10 @@ public:
 
   void VisitHyperobjectType(const HyperobjectType *T) {
     Visit(T->getElementType());
+    if (T->getIdentity())
+      Visit(T->getIdentity());
+    if (T->getReduce())
+      Visit(T->getReduce());
   }
   void VisitComplexType(const ComplexType *T) { Visit(T->getElementType()); }
   void VisitLocInfoType(const LocInfoType *T) {
