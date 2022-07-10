@@ -218,7 +218,7 @@ static bool taskCanReachContinuation(Task *T) {
 }
 
 static bool detachImmediatelySyncs(DetachInst *DI) {
-  Instruction *I = DI->getParent()->getFirstNonPHIOrDbgOrLifetime();
+  Instruction *I = DI->getContinue()->getFirstNonPHIOrDbgOrLifetime();
   return isa<SyncInst>(I);
 }
 
