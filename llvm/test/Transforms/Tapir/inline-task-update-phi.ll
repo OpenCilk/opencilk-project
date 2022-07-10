@@ -8,7 +8,7 @@ $_ZN5outerC2ERKS_ = comdat any
 
 $_ZNSt5arrayI5outerLm2EED2Ev = comdat any
 
-define dso_local void @main() local_unnamed_addr #0 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
+define dso_local void @main() local_unnamed_addr personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 entry:
   invoke void @_ZN5outerC2ERKS_()
           to label %invoke.cont unwind label %lpad
@@ -84,7 +84,6 @@ declare token @llvm.syncregion.start() #2
 
 declare dso_local void @_Znwm() local_unnamed_addr #1
 
-attributes #0 = { "target-cpu"="x86-64" }
 attributes #1 = { "use-soft-float"="false" }
 attributes #2 = { argmemonly nounwind willreturn }
 attributes #3 = { builtin }
