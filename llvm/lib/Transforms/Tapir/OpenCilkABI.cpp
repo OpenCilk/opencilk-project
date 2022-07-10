@@ -227,10 +227,10 @@ void OpenCilkABI::prepareModule() {
   FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
   FunctionType *Reg32Ty =
       FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
-              VoidPtrTy, VoidPtrTy}, false);
+              VoidPtrTy}, false);
   FunctionType *Reg64Ty =
       FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty, VoidPtrTy,
-              VoidPtrTy, VoidPtrTy}, false);
+              VoidPtrTy}, false);
 
   // Create an array of CilkRTS functions, with their associated types and
   // FunctionCallee member variables in the OpenCilkABI class.
