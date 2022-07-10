@@ -760,14 +760,11 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
     const HyperobjectType *H2 = cast<HyperobjectType>(T2);
     Expr *R1 = H1->getReduce(), *R2 = H2->getReduce();
     Expr *I1 = H1->getIdentity(), *I2 = H2->getIdentity();
-    Expr *D1 = H1->getDestroy(), *D2 = H2->getDestroy();
-    if (!!I2 != !!I2 || !!R1 != !!R2 || !!D1 != !!D2)
+    if (!!I2 != !!I2 || !!R1 != !!R2)
       return false;
     if (I1 && !IsStructurallyEquivalent(Context, I1, I2))
       return false;
     if (R1 && !IsStructurallyEquivalent(Context, R1, R2))
-      return false;
-    if (D1 && !IsStructurallyEquivalent(Context, D1, D2))
       return false;
     if (!IsStructurallyEquivalent(Context,
                                   cast<HyperobjectType>(T1)->getElementType(),

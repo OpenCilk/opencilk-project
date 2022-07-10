@@ -7,14 +7,12 @@ public:
   void reduce(ostream_view* other);
   static void reduce(void *left_v, void *right_v);
   static void identity(void *view);
-  static void destruct(void *view);
 };
 
 template<typename Char>
   using ostream_reducer = ostream_view<Char>
     _Hyperobject(&ostream_view<Char>::identity,
-                 &ostream_view<Char>::reduce,
-                 &ostream_view<Char>::destruct);
+                 &ostream_view<Char>::reduce);
 
 void f()
 {
