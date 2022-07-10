@@ -6395,14 +6395,13 @@ class HyperobjectType final : public Type, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   QualType ElementType;
-  Expr *Identity, *Reduce, *Destroy;
-  const FunctionDecl *IdentityID, *ReduceID, *DestroyID;
+  Expr *Identity, *Reduce;
+  const FunctionDecl *IdentityID, *ReduceID;
   bool Bare;
 
   HyperobjectType(QualType Element, QualType CanonicalPtr,
                   Expr *i, const FunctionDecl *ifn,
-                  Expr *r, const FunctionDecl *rfn,
-                  Expr *d, const FunctionDecl *dfn);
+                  Expr *r, const FunctionDecl *rfn);
 
 public:
   QualType getElementType() const { return ElementType; }
@@ -6411,7 +6410,6 @@ public:
 
   Expr *getIdentity() const { return Identity; }
   Expr *getReduce() const { return Reduce; }
-  Expr *getDestroy() const { return Destroy; }
 
   bool hasCallbacks() const { return !Bare; }
 
@@ -6422,8 +6420,7 @@ public:
 
   static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
                       const FunctionDecl *I,
-                      const FunctionDecl *R,
-                      const FunctionDecl *D);
+                      const FunctionDecl *R);
 
   static bool classof(const Type *T) {
     return T->getTypeClass() == Hyperobject;
