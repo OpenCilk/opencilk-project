@@ -45,5 +45,5 @@ void f()
 {
   Bag_red<int> b1;
   // Ensure that the destructor is emitted.
-  // CHECK: define linkonce_odr void @_ZN3BagIiED2Ev
+  // CHECK: define linkonce_odr {{.+}} @_ZN3BagIiED2Ev
 }

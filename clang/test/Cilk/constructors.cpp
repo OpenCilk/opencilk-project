@@ -1,5 +1,6 @@
 // RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fopencilk -ftapir=none -triple x86_64-unknown-linux-gnu -std=c++11 -emit-llvm %s -o - | FileCheck %s --check-prefixes CHECK,CHECK-O0
 // RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fopencilk -ftapir=none -triple x86_64-unknown-linux-gnu -std=c++11 -O1 -mllvm -simplify-taskframes=false -emit-llvm %s -o - | FileCheck %s --check-prefixes CHECK,CHECK-O1
+// expected-no-diagnostics
 
 class Baz {
 public:
