@@ -12,7 +12,7 @@ struct reducer
   ~reducer();
 };
 
-// CHECK: call void @_ZN7reducerIsEC1Ev
+// CHECK: call {{.+}} @_ZN7reducerIsEC1Ev
 // CHECK: @_ZN7reducerIsED1Ev
 reducer<short> r; // expected-note{{in instantiation}}
 
