@@ -7393,7 +7393,7 @@ static bool serializeDetachToImmediateSync(BasicBlock *BB,
     SmallVector<Instruction *, 4> ReattachPreds;
     for (BasicBlock *PredBB : predecessors(BB)) {
       if (DetachInst *DI = dyn_cast<DetachInst>(PredBB->getTerminator())) {
-        // This transformation gets too complicated the detached task might
+        // This transformation gets too complicated if the detached task might
         // throw, so abort.
         if (DI->hasUnwindDest())
           return false;
@@ -7407,6 +7407,24 @@ static bool serializeDetachToImmediateSync(BasicBlock *BB,
     for (DetachInst *DI : DetachPreds) {
       BasicBlock *Detached = DI->getDetached();
 
+      // If this detached task uses a taskframe, mark those taskframe
+      // instrinsics to be erased.
+      SmallVector<Instruction *, 2> ToErase;
+      if (Value *TaskFrame = getTaskFrameUsed(Detached)) {
+        // If this detach uses a taskframe, record that taskframe.use.
+        for (User *U : TaskFrame->users()) {
+          if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(U)) {
+            if (Intrinsic::taskframe_use == II->getIntrinsicID())
+              ToErase.push_back(II);
+            else
+              // We need more complicated logic to effectively inline this
+              // taskframe, so abort.
+              return false;
+          }
+        }
+        ToErase.push_back(cast<Instruction>(TaskFrame));
+      }
+
       // Replace the detach with a branch to the detached block.
       BB->removePredecessor(DI->getParent());
       ReplaceInstWithInst(DI, BranchInst::Create(Detached));
@@ -7418,6 +7436,11 @@ static bool serializeDetachToImmediateSync(BasicBlock *BB,
       // appropriate entry block.
       MoveStaticAllocasInBlock(cast<Instruction>(SyncRegion)->getParent(),
                                Detached, ReattachPreds);
+
+      // Erase any instructions marked to be erased.
+      for (Instruction *I : ToErase)
+        I->eraseFromParent();
+
       // We should not need to add new llvm.stacksave/llvm.stackrestore
       // intrinsics, because we're not introducing new alloca's into a loop.
       Changed = true;
@@ -7441,9 +7464,20 @@ static bool serializeDetachToImmediateSync(BasicBlock *BB,
 /// a reattach or predecessor does terminate with detach.
 static bool serializeTrivialDetachedBlock(BasicBlock *BB, DomTreeUpdater *DTU) {
   Instruction *I = BB->getFirstNonPHIOrDbgOrLifetime();
+  SmallVector<Instruction *, 2> ToErase;
   // Skip a possible taskframe.use intrinsic in the task.
-  if (isTapirIntrinsic(Intrinsic::taskframe_use, I))
+  if (isTapirIntrinsic(Intrinsic::taskframe_use, I)) {
+    Value *TaskFrame = cast<IntrinsicInst>(I)->getArgOperand(0);
+    // Check for any other uses of TaskFrame.
+    for (User *U : TaskFrame->users())
+      if (U != I)
+        // We found another use of the taskframe, making it too complicated for
+        // us to handle.  Abort.
+        return false;
+    ToErase.push_back(I);
+    ToErase.push_back(cast<Instruction>(TaskFrame));
     I = &*(++(I->getIterator()));
+  }
   if (ReattachInst *RI = dyn_cast<ReattachInst>(I)) {
     // This detached block is empty.
     // Scan predecessors to verify that all of them detach BB.
@@ -7469,6 +7503,9 @@ static bool serializeTrivialDetachedBlock(BasicBlock *BB, DomTreeUpdater *DTU) {
       if (DTU)
         DTU->applyUpdates({{DominatorTree::Delete, PredBB, Continue}});
     }
+    // Erase any instructions marked to be erased.
+    for (Instruction *I : ToErase)
+      I->eraseFromParent();
     // Serialize the reattach: replace it with an unconditional branch.
     ReplaceInstWithInst(RI, BranchInst::Create(RI->getSuccessor(0)));
     return true;
@@ -7495,6 +7532,24 @@ static bool serializeDetachOfUnreachable(BasicBlock *BB, DomTreeUpdater *DTU) {
       // These detaches are too complicated for SimplifyCFG to handle.  Abort.
       return false;
 
+    // If this detached task uses a taskframe, mark those taskframe instrinsics
+    // to be erased.
+    SmallVector<Instruction *, 2> ToErase;
+    if (Value *TaskFrame = getTaskFrameUsed(DI->getDetached())) {
+      // If this detach uses a taskframe, remove that taskframe.
+      for (User *U : TaskFrame->users()) {
+        if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(U)) {
+          if (Intrinsic::taskframe_use == II->getIntrinsicID())
+            ToErase.push_back(II);
+          else
+            // We need more complicated logic to effectively inline this
+            // taskframe, so abort.
+            return false;
+        }
+      }
+      ToErase.push_back(cast<Instruction>(TaskFrame));
+    }
+
     // Remove the predecessor through the detach from the continue block.
     Continue->removePredecessor(BB);
     // Update DTU if available.
@@ -7502,6 +7557,9 @@ static bool serializeDetachOfUnreachable(BasicBlock *BB, DomTreeUpdater *DTU) {
       DTU->applyUpdates({{DominatorTree::Delete, BB, Continue}});
     // Replace the detach with a branch to the detached block.
     ReplaceInstWithInst(DI, BranchInst::Create(DI->getDetached()));
+    // Erase any instructions marked to be erased.
+    for (Instruction *I : ToErase)
+      I->eraseFromParent();
     return true;
   }
   return false;
