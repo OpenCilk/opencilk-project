@@ -71,7 +71,7 @@ D: Loop unrolling with run-time trip counts.
 
 N: John Carr
 E: jfc@mit.edu
-D: OpenCilk frontend, Tapir lowering to OpenCilk
+D: OpenCilk frontend, Tapir lowering to OpenCilk, _Hyperobject type, Tapir function attributes
 
 N: Chandler Carruth
 E: chandlerc@gmail.com
