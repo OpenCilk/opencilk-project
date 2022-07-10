@@ -973,6 +973,10 @@ DEF_TRAVERSE_TYPE(ComplexType, { TRY_TO(TraverseType(T->getElementType())); })
 
 DEF_TRAVERSE_TYPE(HyperobjectType, {
     TRY_TO(TraverseType(T->getElementType()));
+    if (Stmt *I = T->getIdentity())
+      TRY_TO(TraverseStmt(I));
+    if (Stmt *R = T->getReduce())
+      TRY_TO(TraverseStmt(R));
   })
 
 DEF_TRAVERSE_TYPE(PointerType, { TRY_TO(TraverseType(T->getPointeeType())); })
@@ -1218,7 +1222,12 @@ DEF_TRAVERSE_TYPELOC(ComplexType, {
 })
 
 DEF_TRAVERSE_TYPELOC(HyperobjectType, {
-  TRY_TO(TraverseType(TL.getTypePtr()->getElementType()));
+  const HyperobjectType *H = TL.getTypePtr();
+  TRY_TO(TraverseType(H->getElementType()));
+  if (Stmt *I = H->getIdentity())
+    TRY_TO(TraverseStmt(I));
+  if (Stmt *R = H->getReduce())
+    TRY_TO(TraverseStmt(R));
 })
 
 DEF_TRAVERSE_TYPELOC(PointerType,
