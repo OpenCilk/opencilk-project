@@ -1441,8 +1441,7 @@ def int_hyper_lookup
 
 // TODO: Change tablegen to allow function pointer types in intrinsics.
 def int_reducer_register
-    : Intrinsic<[], [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty,
-                     llvm_ptr_ty, llvm_ptr_ty],
+    : Intrinsic<[], [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty],
      [IntrWillReturn, IntrInaccessibleMemOnly, IntrReducerRegister]>;
 
 def int_reducer_unregister

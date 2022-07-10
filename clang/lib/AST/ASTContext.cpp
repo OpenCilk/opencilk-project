@@ -3323,26 +3323,24 @@ static const FunctionDecl *getFunction(Expr *E) {
   return F->getFirstDecl();
 }
 
-QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) const {
-  assert(I && R && D);
+QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R) const {
+  assert(I && R);
   bool IN = HyperobjectType::isNullish(I);
   bool RN = HyperobjectType::isNullish(R);
-  bool DN = HyperobjectType::isNullish(D);
 
   const FunctionDecl *IF = getFunction(I);
   const FunctionDecl *RF = getFunction(R);
-  const FunctionDecl *DF = getFunction(D);
-  bool Varies = (!IN && !IF) || (!RN && !RF) || (!DN && !DF);
+  bool Varies = (!IN && !IF) || (!RN && !RF);
 
   QualType Canonical;
   if (!T.isCanonical())
-    Canonical = getHyperobjectType(getCanonicalType(T), I, R, D);
+    Canonical = getHyperobjectType(getCanonicalType(T), I, R);
 
   // Do not unique hyperobject types with variable expressions.
   if (Varies) {
     auto *New =
       new (*this, TypeAlignment)
-      HyperobjectType(T, Canonical, I, IF, R, RF, D, DF);
+      HyperobjectType(T, Canonical, I, IF, R, RF);
     Types.push_back(New);
     return QualType(New, 0);
   }
@@ -3351,7 +3349,7 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) c
   // structure.
   // TODO: 0 and nullptr are not properly treated as equivalent here.
   llvm::FoldingSetNodeID ID;
-  HyperobjectType::Profile(ID, T, IF, RF, DF);
+  HyperobjectType::Profile(ID, T, IF, RF);
 
   void *InsertPos = nullptr;
   if (HyperobjectType *HT = HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
@@ -3359,7 +3357,7 @@ QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) c
 
   auto *New =
     new (*this, TypeAlignment)
-    HyperobjectType(T, Canonical, I, IF, R, RF, D, DF);
+    HyperobjectType(T, Canonical, I, IF, R, RF);
   Types.push_back(New);
   HyperobjectTypes.InsertNode(New, InsertPos);
   return QualType(New, 0);

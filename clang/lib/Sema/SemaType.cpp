@@ -2466,8 +2466,7 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
 }
 
 QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
-                                    Expr *Reduce, Expr *Destroy,
-                                    SourceLocation Loc) {
+                                    Expr *Reduce, SourceLocation Loc) {
   QualType Result = Element;
   if (!RequireCompleteType(Loc, Element, CompleteTypeKind::Normal,
                            diag::incomplete_hyperobject)) {
@@ -2477,12 +2476,11 @@ QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
 
   Identity = ValidateReducerCallback(Identity, 1, Loc);
   Reduce = ValidateReducerCallback(Reduce, 2, Loc);
-  Destroy = ValidateReducerCallback(Destroy, 1, Loc);
 
   // The result of this function must be HyperobjectType if it is called
   // from C++ template instantiation when rebuilding an existing hyperobject
   // type.
-  return Context.getHyperobjectType(Result, Identity, Reduce, Destroy);
+  return Context.getHyperobjectType(Result, Identity, Reduce);
 }
 
 /// Build a Read-only Pipe type.
@@ -5864,8 +5862,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
 
     case DeclaratorChunk::Hyperobject: {
       T = S.BuildHyperobjectType(T, DeclType.Hyper.Arg[0], 
-                                 DeclType.Hyper.Arg[1], DeclType.Hyper.Arg[2],
-                                 DeclType.Loc);
+                                 DeclType.Hyper.Arg[1], DeclType.Loc);
       break;
     }
     }

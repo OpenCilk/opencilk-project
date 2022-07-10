@@ -1572,11 +1572,10 @@ struct DeclaratorChunk {
   struct HyperobjectTypeInfo {
     SourceLocation LParenLoc;
     SourceLocation RParenLoc;
-    Expr *Arg[3];
+    Expr *Arg[2];
     void destroy() {
       Arg[0] = nullptr;
       Arg[1] = nullptr;
-      Arg[2] = nullptr;
     }
   };
 
@@ -1723,7 +1722,7 @@ struct DeclaratorChunk {
                                         SourceLocation Loc,
                                         SourceLocation LParen,
                                         SourceLocation RParen,
-                                        Expr *E0, Expr *E1, Expr *E2) {
+                                        Expr *E0, Expr *E1) {
     DeclaratorChunk I;
     I.Kind            = Hyperobject;
     I.Loc             = Loc;
@@ -1731,7 +1730,6 @@ struct DeclaratorChunk {
     I.Hyper.RParenLoc = RParen;
     I.Hyper.Arg[0]    = E0;
     I.Hyper.Arg[1]    = E1;
-    I.Hyper.Arg[2]    = E2;
     return I;
   }
 

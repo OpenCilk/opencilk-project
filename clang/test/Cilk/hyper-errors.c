@@ -25,6 +25,6 @@ int _Hyperobject(reduce, identity) h;
   // expected-error@-2{{incompatible function pointer types passing 'void (*)(void *)' to parameter of type 'void (*)(void *, void *)'}}
 
 int _Hyperobject(x) i; // expected-error{{use of undeclared identifier 'x'}}
-int _Hyperobject(0) j; // expected-error{{hyperobject must have 0, 2, or 3 callbacks}}
-int _Hyperobject(0,0,0,0) k; // expected-error{{hyperobject must have 0, 2, or 3 callbacks}}
+int _Hyperobject(0) j; // expected-error{{hyperobject must have 0 or 2 callbacks}}
+int _Hyperobject(0,0,0,0) k; // expected-error{{hyperobject must have 0 or 2 callbacks}}
 int _Hyperobject(0, 1) x; // expected-error{{incompatible integer to pointer conversion passing 'int' to parameter of type 'void (*)(void *, void *)'}}

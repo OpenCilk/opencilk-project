@@ -1023,7 +1023,7 @@ void CodeGenFunction::GenerateCXXGlobalVarDeclInitFunc(llvm::Function *Fn,
   if (getLangOpts().HLSL)
     CGM.getHLSLRuntime().annotateHLSLResource(D, Addr);
 
-  ReducerCallbacks RCB = {0, 0, 0};
+  ReducerCallbacks RCB = {0, 0};
   if (getReducer(D, RCB)) {
     llvm::Value *Addr =
       Builder.CreateBitCast(CGM.GetAddrOfGlobalVar(D, nullptr), CGM.VoidPtrTy);
