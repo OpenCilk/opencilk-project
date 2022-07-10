@@ -84,19 +84,19 @@ void rule_of_four() {
   // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
   // CHECK: [[CONTINUE3]]:
   _Cilk_spawn useBar(b0);
-  // CHECK: %[[TASKFRAME4:.+]] = call token @llvm.taskframe.create()
+  // CHECK-O0: %[[TASKFRAME4:.+]] = call token @llvm.taskframe.create()
   // CHECK: %[[AGGTMP2:.+]] = alloca %class.Bar
   // CHECK: invoke void @_ZN3BarC1ERKS_(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP2]], %class.Bar* {{.*}}dereferenceable(16) %[[b0:.+]])
   // CHECK-NEXT: to label %[[INVOKECONT3:.+]] unwind label %[[TFLPAD4:.+]]
   // CHECK: [[INVOKECONT3]]:
-  // CHECK: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]] unwind label %[[TFLPAD4:.+]]
-  // CHECK: [[DETACHED4]]:
+  // CHECK-O0: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]] unwind label %[[TFLPAD4:.+]]
+  // CHECK-O0: [[DETACHED4]]:
   // CHECK: invoke void @_Z6useBar3Bar(%class.Bar* {{.*}}%[[AGGTMP2]])
   // CHECK-NEXT: to label %[[INVOKECONT4:.+]] unwind label %[[DETLPAD4:.+]]
   // CHECK: [[INVOKECONT4]]:
   // CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP2]])
-  // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE4]]
-  // CHECK: [[CONTINUE4]]:
+  // CHECK-O0-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE4]]
+  // CHECK-O0: [[CONTINUE4]]:
 
   // CHECK: [[DETLPAD]]:
   // CHECK-NEXT: landingpad
@@ -141,14 +141,12 @@ void rule_of_four() {
   // CHECK-NEXT: landingpad
   // CHECK-NEXT: cleanup
   // CHECK-O0: br label %[[EHCLEANUP:.+]]
-  // CHECK-O1: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME4]],
-  // CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind
 
-  // CHECK: [[DETLPAD4]]:
-  // CHECK-NEXT: landingpad
-  // CHECK-NEXT: cleanup
-  // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
-  // CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD4]]
+  // CHECK-O0: [[DETLPAD4]]:
+  // CHECK-O0-NEXT: landingpad
+  // CHECK-O0-NEXT: cleanup
+  // CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+  // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD4]]
 
   // CHECK-O0: [[EHCLEANUP]]:
   // CHECK-O0: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME4]],
@@ -203,16 +201,16 @@ void derived_class() {
   // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
   // CHECK: [[CONTINUE2]]:
   b6 = _Cilk_spawn makeDBarFromBar(b7);
-  // CHECK: %[[TASKFRAME3:.+]] = call token @llvm.taskframe.create()
+  // CHECK-O0: %[[TASKFRAME3:.+]] = call token @llvm.taskframe.create()
   // CHECK: %[[AGGTMP3:.+]] = alloca %class.Bar
   // CHECK: %[[REFTMP3:.+]] = alloca %class.DBar
   // CHECK: %[[AGGTMP2:.+]] = alloca %class.Bar
   // CHECK: invoke void @_ZN3BarC1ERKS_(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP2]], %class.Bar* {{.*}}dereferenceable(16) %[[b7:.+]])
   // CHECK-NEXT: to label %[[INVOKECONT6:.+]] unwind label %[[TFLPAD3:.+]]
   // CHECK: [[INVOKECONT6]]:
-  // CHECK: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]] unwind label %[[TFLPAD3]]
-  // CHECK: [[DETACHED3]]:
-  // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
+  // CHECK-O0: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]] unwind label %[[TFLPAD3]]
+  // CHECK-O0: [[DETACHED3]]:
+  // CHECK-O0: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
   // CHECK-O1-NEXT: %[[REFTMP3ADDR:.+]] = bitcast %class.DBar* %[[REFTMP3]] to i8*
   // CHECK-O1-NEXT: call void @llvm.lifetime.start.p0i8(i64 16, i8* nonnull %[[REFTMP3ADDR]])
   // CHECK: invoke void @_Z15makeDBarFromBar3Bar(%class.DBar* {{.*}}sret(%class.DBar) {{.*}}%[[REFTMP3]], %class.Bar* {{.*}}%[[AGGTMP2]])
@@ -230,8 +228,8 @@ void derived_class() {
   // CHECK-NEXT: call void @_ZN4DBarD1Ev(%class.DBar* {{.*}}dereferenceable(16) %[[REFTMP3]])
   // CHECK-O1-NEXT: call void @llvm.lifetime.end.p0i8(i64 16, i8* nonnull %[[REFTMP3ADDR]])
   // CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP2]])
-  // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
-  // CHECK: [[CONTINUE3]]:
+  // CHECK-O0-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
+  // CHECK-O0: [[CONTINUE3]]:
 
   // CHECK: [[DETLPAD]]:
   // CHECK-NEXT: landingpad
@@ -274,8 +272,6 @@ void derived_class() {
   // CHECK: [[TFLPAD3]]:
   // CHECK-NEXT: landingpad
   // CHECK-NEXT: cleanup
-  // CHECK-O1-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-  // CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind
 
   // CHECK: [[DETLPAD3]]:
   // CHECK-NEXT: landingpad
@@ -289,8 +285,8 @@ void derived_class() {
   // CHECK-NEXT: landingpad
   // CHECK-NEXT: cleanup
 
-  // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
-  // CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD3]]
+  // CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+  // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD3]]
 
   // CHECK-O0: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
   // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind
@@ -341,16 +337,16 @@ void two_classes() {
   // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
   // CHECK: [[CONTINUE2]]:
   b9 = _Cilk_spawn makeBazFromBar(b11);
-  // CHECK: %[[TASKFRAME3:.+]] = call token @llvm.taskframe.create()
+  // CHECK-O0: %[[TASKFRAME3:.+]] = call token @llvm.taskframe.create()
   // CHECK: %[[AGGTMP3:.+]] = alloca %class.Bar
   // CHECK: %[[REFTMP3:.+]] = alloca %class.Baz
   // CHECK: %[[AGGTMP2:.+]] = alloca %class.Bar
   // CHECK: invoke void @_ZN3BarC1ERKS_(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP2]], %class.Bar* {{.*}}dereferenceable(16) %[[b11:.+]])
   // CHECK-NEXT: to label %[[INVOKECONT6:.+]] unwind label %[[TFLPAD3:.+]]
   // CHECK: [[INVOKECONT6]]:
-  // CHECK-NEXT: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]] unwind label %[[TFLPAD3]]
-  // CHECK: [[DETACHED3]]:
-  // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
+  // CHECK-O0-NEXT: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]] unwind label %[[TFLPAD3]]
+  // CHECK-O0: [[DETACHED3]]:
+  // CHECK-O0: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
   // CHECK-O1-NEXT: %[[REFTMP3ADDR:.+]] = getelementptr inbounds %class.Baz, %class.Baz* %[[REFTMP3]], i64 0, i32 0
   // CHECK-O1-NEXT: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[REFTMP3ADDR]])
   // CHECK: invoke void @_Z14makeBazFromBar3Bar(%class.Baz* {{.*}}sret(%class.Baz) {{.*}}%[[REFTMP3]], %class.Bar* {{.*}}%[[AGGTMP2]])
@@ -366,8 +362,8 @@ void two_classes() {
   // CHECK-NEXT: call void @_ZN3BazD1Ev(%class.Baz* {{.*}}dereferenceable(1) %[[REFTMP3]])
   // CHECK-O1-NEXT: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[REFTMP3ADDR]])
   // CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP2]])
-  // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
-  // CHECK: [[CONTINUE3]]:
+  // CHECK-O0-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
+  // CHECK-O0: [[CONTINUE3]]:
 
   // CHECK: [[DETLPAD]]:
   // CHECK-NEXT: landingpad
@@ -410,8 +406,6 @@ void two_classes() {
   // CHECK: [[TFLPAD3]]:
   // CHECK-NEXT: landingpad
   // CHECK-NEXT: cleanup
-  // CHECK-O1-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
-  // CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind
 
   // CHECK: [[DETLPAD3]]:
   // CHECK-NEXT: landingpad
@@ -425,8 +419,8 @@ void two_classes() {
   // CHECK-NEXT: landingpad
   // CHECK-NEXT: cleanup
 
-  // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
-  // CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD3]]
+  // CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+  // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD3]]
 
   // CHECK-O0: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME3]],
   // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind
@@ -497,15 +491,15 @@ void array_out() {
 
   // CHECK-O0: %[[ARRIDX4:.+]] = getelementptr inbounds %class.Bar, %class.Bar* %[[ARRIDX3]], i64 1
   // CHECK-O1: %[[ARRIDX4:.+]] = getelementptr inbounds [3 x %class.Bar], [3 x %class.Bar]* %[[ListBar2]], i64 0, i64 2
-  // CHECK: %[[TASKFRAME4:.+]] = call token @llvm.taskframe.create()
+  // CHECK-O0: %[[TASKFRAME4:.+]] = call token @llvm.taskframe.create()
   // CHECK: %[[REFTMP2:.+]] = alloca %class.Baz
   // CHECK: %[[AGGTMP3:.+]] = alloca %class.Bar
   // CHECK: invoke void @_ZN3BarC1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP3]])
   // CHECK-NEXT: to label %[[INVOKECONT7:.+]] unwind label %[[TFLPAD4:.+]]
   // CHECK: [[INVOKECONT7]]:
-  // CHECK-NEXT: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]] unwind label %[[TFLPAD4]]
-  // CHECK: [[DETACHED4]]:
-  // CHECK: call void @llvm.taskframe.use(token %[[TASKFRAME4]])
+  // CHECK-O0-NEXT: detach within %[[SYNCREG]], label %[[DETACHED4:.+]], label %[[CONTINUE4:.+]] unwind label %[[TFLPAD4]]
+  // CHECK-O0: [[DETACHED4]]:
+  // CHECK-O0: call void @llvm.taskframe.use(token %[[TASKFRAME4]])
   // CHECK-O1-NEXT: %[[REFTMP2ADDR:.+]] = getelementptr inbounds %class.Baz, %class.Baz* %[[REFTMP2]], i64 0, i32 0
   // CHECK-O1-NEXT: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[REFTMP2ADDR]])
   // CHECK: invoke void @_Z14makeBazFromBar3Bar(%class.Baz* {{.*}}sret(%class.Baz) {{.*}}%[[REFTMP2]], %class.Bar* {{.*}}%[[AGGTMP3]])
@@ -517,8 +511,8 @@ void array_out() {
   // CHECK-NEXT: call void @_ZN3BazD1Ev(%class.Baz* {{.*}}dereferenceable(1) %[[REFTMP2]])
   // CHECK-O1-NEXT: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[REFTMP2ADDR]])
   // CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(16) %[[AGGTMP3]])
-  // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE4]]
-  // CHECK: [[CONTINUE4]]:
+  // CHECK-O0-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE4]]
+  // CHECK-O0: [[CONTINUE4]]:
 
   // CHECK: [[TFLPAD]]:
   // CHECK-NEXT: landingpad
@@ -575,8 +569,6 @@ void array_out() {
   // CHECK: [[TFLPAD4]]:
   // CHECK-NEXT: landingpad
   // CHECK-NEXT: cleanup
-  // CHECK-O1-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME4]],
-  // CHECK-O1-NEXT: to label %[[UNREACHABLE]] unwind
 
   // CHECK: [[DETLPAD4]]:
   // CHECK-NEXT: landingpad
@@ -586,8 +578,8 @@ void array_out() {
   // CHECK-NEXT: landingpad
   // CHECK-NEXT: cleanup
 
-  // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
-  // CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD4]]
+  // CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+  // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind label %[[TFLPAD4]]
 
   // CHECK-O0: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME4]],
   // CHECK-O0-NEXT: to label %[[UNREACHABLE]] unwind

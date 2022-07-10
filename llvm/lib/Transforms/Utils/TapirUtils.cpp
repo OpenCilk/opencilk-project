@@ -812,6 +812,17 @@ void llvm::InlineTaskFrameResumes(Value *TaskFrame, DominatorTree *DT) {
     handleTaskFrameResume(TaskFrame, TFR, DT);
 }
 
+static void startSerializingTaskFrame(Value *TaskFrame,
+                                      SmallVectorImpl<Instruction *> &ToErase,
+                                      DominatorTree *DT) {
+  for (User *U : TaskFrame->users())
+    if (Instruction *UI = dyn_cast<Instruction>(U))
+      if (isTapirIntrinsic(Intrinsic::taskframe_use, UI))
+        ToErase.push_back(UI);
+
+  InlineTaskFrameResumes(TaskFrame, DT);
+}
+
 void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
                            BasicBlock *EHContinue, Value *LPadValInEHContinue,
                            SmallVectorImpl<Instruction *> &Reattaches,
@@ -827,8 +838,9 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   Value *SyncRegion = DI->getSyncRegion();
 
   // If the spawned task has a taskframe, serialize the taskframe.
+  SmallVector<Instruction *, 8> ToErase;
   if (Value *TaskFrame = getTaskFrameUsed(TaskEntry))
-    InlineTaskFrameResumes(TaskFrame, DT);
+    startSerializingTaskFrame(TaskFrame, ToErase, DT);
 
   // Clone any EH blocks that need cloning.
   if (EHBlocksToClone) {
@@ -898,6 +910,10 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   if (DI->hasUnwindDest())
     Unwind->removePredecessor(Spawner);
   ReplaceInstWithInst(DI, BranchInst::Create(TaskEntry));
+
+  // Erase instructions marked to be erased.
+  for (Instruction *I : ToErase)
+    I->eraseFromParent();
 
   // Update dominator tree.
   if (DT) {
