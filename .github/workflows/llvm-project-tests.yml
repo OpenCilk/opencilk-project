@@ -27,7 +27,7 @@ concurrency:
 
 env:
   # Workaround for build faliure on Mac OS X: llvm.org/PR46190, https://github.com/actions/virtual-environments/issues/2274
-  CPLUS_INCLUDE_PATH: /usr/local/Cellar/llvm@13/13.0.1/include/c++/v1:/Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/usr/include
+  CPLUS_INCLUDE_PATH: /usr/local/Cellar/llvm/14.0.6/include/c++/v1:/usr/local/Cellar/llvm@13/13.0.1/include/c++/v1:/Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/usr/include
 
 jobs:
   lit-tests:
@@ -50,6 +50,10 @@ jobs:
         uses: llvm/actions/setup-windows@main
         with:
           arch: amd64
+      - name: Check macOS (for debugging)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          find /usr/local -name "cmath*"
       # On Windows, starting with win19/20220814.1, cmake choose the 32-bit
       # python3.10.6 libraries instead of the 64-bit libraries when building
       # lldb.  Using this setup-python action to make 3.10 the default
