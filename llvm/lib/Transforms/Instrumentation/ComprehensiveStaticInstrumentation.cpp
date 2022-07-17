@@ -758,6 +758,10 @@ void CSIImpl::initializeTapirHooks() {
 // Prepare any calls in the CFG for instrumentation, e.g., by making sure any
 // call that can throw is modeled with an invoke.
 void CSIImpl::setupCalls(Function &F) {
+  // If F does not throw, then no need to promote calls to invokes.
+  if (F.doesNotThrow())
+    return;
+
   promoteCallsInTasksToInvokes(F, "csi.cleanup");
 }
 
@@ -2469,8 +2473,9 @@ void CSIImpl::instrumentFunction(Function &F) {
         Detaches.push_back(DI);
       } else if (SyncInst *SI = dyn_cast<SyncInst>(&I)) {
         Syncs.push_back(SI);
-        if (isSyncUnwind(
-                SI->getSuccessor(0)->getFirstNonPHIOrDbgOrLifetime())) {
+        if (isSyncUnwind(SI->getSuccessor(0)->getFirstNonPHIOrDbgOrLifetime(),
+                         /*SyncRegion=*/nullptr, /*CheckForInvoke=*/true)) {
+          dbgs() << "Sync " << *SI << "has unwind\n" << F;
           SyncsWithUnwinds.insert(SI);
           BBsToIgnore.insert(SI->getSuccessor(0));
         }
