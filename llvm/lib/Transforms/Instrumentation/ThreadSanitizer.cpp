@@ -47,6 +47,7 @@
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 
 using namespace llvm;
 
@@ -575,6 +576,9 @@ bool ThreadSanitizer::sanitizeFunction(Function &F,
         Intrinsic::getDeclaration(F.getParent(), Intrinsic::returnaddress),
         IRB.getInt32(0));
     IRB.CreateCall(TsanFuncEntry, ReturnAddress);
+
+    if (ClHandleCxxExceptions && !F.doesNotThrow())
+      promoteCallsInTasksToInvokes(F, "tsan_cleanup");
 
     EscapeEnumerator EE(F, "tsan_cleanup", ClHandleCxxExceptions);
     while (IRBuilder<> *AtExit = EE.Next()) {
