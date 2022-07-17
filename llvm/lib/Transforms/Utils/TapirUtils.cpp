@@ -97,8 +97,11 @@ BasicBlock *llvm::getTaskFrameResumeDest(Value *TaskFrame) {
 /// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
 /// \p SyncRegion is specified, then additionally checks that the sync.unwind
 /// uses \p SyncRegion.
-bool llvm::isSyncUnwind(const Instruction *I, const Value *SyncRegion) {
-  return isTapirIntrinsic(Intrinsic::sync_unwind, I, SyncRegion);
+bool llvm::isSyncUnwind(const Instruction *I, const Value *SyncRegion,
+                        bool CheckForInvoke) {
+  if (isTapirIntrinsic(Intrinsic::sync_unwind, I, SyncRegion))
+    return !CheckForInvoke || isa<InvokeInst>(I);
+  return false;
 }
 
 /// Returns true if BasicBlock \p B is a placeholder successor, that is, it's
@@ -1986,7 +1989,11 @@ static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
          isTapirIntrinsic(Intrinsic::taskframe_end, CI, TaskFrame)))
       return nullptr;
 
+    // No need to transform calls that do not throw.
     if (CI->doesNotThrow())
+      continue;
+    // We cannot transform calls with musttail tag.
+    if (CI->isMustTailCall())
       continue;
 
     // We do not need to (and in fact, cannot) convert possibly throwing calls
