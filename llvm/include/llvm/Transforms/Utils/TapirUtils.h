@@ -61,7 +61,8 @@ BasicBlock *getTaskFrameResumeDest(Value *TaskFrame);
 /// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
 /// \p SyncRegion is specified, then additionally checks that the sync.unwind
 /// uses \p SyncRegion.
-bool isSyncUnwind(const Instruction *I, const Value *SyncRegion = nullptr);
+bool isSyncUnwind(const Instruction *I, const Value *SyncRegion = nullptr,
+                  bool CheckForInvoke = false);
 
 /// Returns true if BasicBlock \p B is a placeholder successor, that is, it's
 /// the immediate successor of only detached-rethrow and taskframe-resume
