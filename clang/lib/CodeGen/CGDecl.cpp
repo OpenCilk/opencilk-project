@@ -1836,7 +1836,7 @@ void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF, Address Addr,
   QualType Inner = Type.stripHyperobject();
   if (const RecordType *rtype = Inner->getAs<RecordType>()) {
     if (const CXXRecordDecl *record = dyn_cast<CXXRecordDecl>(rtype->getDecl()))
-      if (!record->getDestructor()->isTrivial())
+      if (record->hasNonTrivialDestructor())
         destroyCXXObject(CGF, Addr, Inner);
   }
 }
