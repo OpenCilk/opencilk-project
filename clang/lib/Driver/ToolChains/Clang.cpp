@@ -1344,6 +1344,9 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
   // OBJCPLUS_INCLUDE_PATH - system includes enabled when compiling ObjC++.
   addDirectoryList(Args, CmdArgs, "-objcxx-isystem", "OBJCPLUS_INCLUDE_PATH");
 
+  // If a custom OpenCilk resource directory is specified, add its include path.
+  getToolChain().AddOpenCilkIncludeDir(Args, CmdArgs);
+
   // While adding the include arguments, we also attempt to retrieve the
   // arguments of related offloading toolchains or arguments that are specific
   // of an offloading programming model.
