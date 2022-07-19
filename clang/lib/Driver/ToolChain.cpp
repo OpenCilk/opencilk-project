@@ -1278,8 +1278,7 @@ void ToolChain::AddOpenCilkIncludeDir(const ArgList &Args,
   P.assign(A->getValue());
   llvm::sys::path::append(P, "include");
   if (getVFS().exists(P)) {
-    CmdArgs.push_back("-internal-isystem");
-    CmdArgs.push_back(Args.MakeArgString(P.str()));
+    addSystemInclude(Args, CmdArgs, P);
   } else {
     D.Diag(diag::err_drv_opencilk_resource_dir_missing_include)
         << A->getAsString(Args);
