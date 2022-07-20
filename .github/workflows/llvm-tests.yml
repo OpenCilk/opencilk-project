@@ -26,7 +26,7 @@ concurrency:
 jobs:
   check_all:
     name: Test llvm,clang,libclc
-    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@dev/14.x
+    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@release/14.x
     with:
       build_target: check-all
       projects: clang;libclc
@@ -35,14 +35,14 @@ jobs:
   # space to build all these projects on Windows.
   build_lldb:
     name: Build lldb
-    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@dev/14.x
+    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@release/14.x
     with:
       build_target: ''
       projects: clang;lldb
 
   check_lld:
     name: Test lld
-    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@dev/14.x
+    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@release/14.x
     with:
       build_target: check-lld
       projects: lld

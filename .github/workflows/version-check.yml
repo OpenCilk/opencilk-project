@@ -10,6 +10,7 @@ on:
 jobs:
   version_check:
     runs-on: ubuntu-latest
+    if: github.repository == 'llvm/llvm-project'
     steps:
       - name: Fetch LLVM sources
         uses: actions/checkout@v2

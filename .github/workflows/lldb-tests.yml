@@ -28,7 +28,7 @@ concurrency:
 jobs:
   build_lldb:
     name: Build lldb
-    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@dev/14.x
+    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@release/14.x
     with:
       build_target: ''
       projects: clang;lldb
