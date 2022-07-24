@@ -28,3 +28,13 @@ int _Hyperobject(x) i; // expected-error{{use of undeclared identifier 'x'}}
 int _Hyperobject(0) j; // expected-error{{hyperobject must have 0 or 2 callbacks}}
 int _Hyperobject(0,0,0,0) k; // expected-error{{hyperobject must have 0 or 2 callbacks}}
 int _Hyperobject(0, 1) x; // expected-error{{incompatible integer to pointer conversion passing 'int' to parameter of type 'void (*)(void *, void *)'}}
+
+void function() {
+  int _Hyperobject(typo1, reduce) var1 = 0;
+  // expected-error@-1{{use of undeclared identifier 'typo1'}}
+  int _Hyperobject(typo2, typo3) var2 = 0;
+  // expected-error@-1{{use of undeclared identifier 'typo2'}}
+  // expected-error@-2{{use of undeclared identifier 'typo3'}}
+  int _Hyperobject(0, typo4) var3 = 0;
+  // expected-error@-1{{use of undeclared identifier 'typo4'}}
+}
