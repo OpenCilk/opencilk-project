@@ -6397,7 +6397,6 @@ class HyperobjectType final : public Type, public llvm::FoldingSetNode {
   QualType ElementType;
   Expr *Identity, *Reduce;
   const FunctionDecl *IdentityID, *ReduceID;
-  bool Bare;
 
   HyperobjectType(QualType Element, QualType CanonicalPtr,
                   Expr *i, const FunctionDecl *ifn,
@@ -6411,7 +6410,7 @@ public:
   Expr *getIdentity() const { return Identity; }
   Expr *getReduce() const { return Reduce; }
 
-  bool hasCallbacks() const { return !Bare; }
+  bool hasCallbacks() const;
 
   bool isSugared() const { return false; }
   QualType desugar() const { return QualType(this, 0); }
