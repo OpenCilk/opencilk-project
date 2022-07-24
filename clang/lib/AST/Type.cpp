@@ -3184,7 +3184,7 @@ QualType QualType::stripHyperobject() const {
   return *this;
 }
 
-/// Check if the expression is exactly nullptr or 0.
+/// Check if the expression is nullptr, 0, or contains an error.
 /// The more general isNullPointerConstant requires a non-const ASTContext.
 bool HyperobjectType::isNullish(Expr *E) {
   E = E->IgnoreParenCasts();
@@ -3193,8 +3193,10 @@ bool HyperobjectType::isNullish(Expr *E) {
     return true;
   case Expr::IntegerLiteralClass:
     return cast<IntegerLiteral>(E)->getValue().isNullValue();
+  case Expr::TypoExprClass:
+    return true;
   default:
-    return false;
+    return E->getType()->containsErrors();
   }
 }
 
@@ -3203,8 +3205,11 @@ HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
                                  Expr *r, const FunctionDecl *rfn)
   : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
     ElementType(Element), Identity(i), Reduce(r),
-    IdentityID(ifn), ReduceID(rfn),
-    Bare(isNullish(i) && isNullish(r)) {
+    IdentityID(ifn), ReduceID(rfn) {
+}
+
+bool HyperobjectType::hasCallbacks() const {
+  return Identity && Reduce && !isNullish(Identity) && !isNullish(Reduce);
 }
 
 void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID) const {
