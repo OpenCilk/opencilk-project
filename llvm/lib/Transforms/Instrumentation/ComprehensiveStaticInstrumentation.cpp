@@ -2461,6 +2461,8 @@ void CSIImpl::instrumentFunction(Function &F) {
     // Ignore Tapir placeholder basic blocks
     if (&F.getEntryBlock() != &BB && isTapirPlaceholderSuccessor(&BB))
       continue;
+    if (!DT->isReachableFromEntry(&BB))
+      continue;
     SmallVector<Instruction *, 8> BBLoadsAndStores;
     for (Instruction &I : BB) {
       if (isAtomic(&I))
@@ -2474,7 +2476,6 @@ void CSIImpl::instrumentFunction(Function &F) {
         Syncs.push_back(SI);
         if (isSyncUnwind(SI->getSuccessor(0)->getFirstNonPHIOrDbgOrLifetime(),
                          /*SyncRegion=*/nullptr, /*CheckForInvoke=*/true)) {
-          dbgs() << "Sync " << *SI << "has unwind\n" << F;
           SyncsWithUnwinds.insert(SI);
           BBsToIgnore.insert(SI->getSuccessor(0));
         }
