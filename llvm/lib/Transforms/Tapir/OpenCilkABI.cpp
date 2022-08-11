@@ -152,7 +152,8 @@ void OpenCilkABI::prepareModule() {
 
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
-    if (std::unique_ptr<Module> ExternalModule = parseIRFile(RuntimeBCPath, SMD, C)) {
+    if (std::unique_ptr<Module> ExternalModule =
+        parseIRFile(RuntimeBCPath, SMD, C)) {
       // Get the original DiagnosticHandler for this context.
       std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
           C.getDiagnosticHandler();
@@ -296,32 +297,36 @@ void OpenCilkABI::prepareModule() {
       // compiling with no optimizations.
       AlignVar->setLinkage(GlobalValue::PrivateLinkage);
     }
-  } else if (DebugABICalls) {
-    if (StackFrameTy->isOpaque()) {
-      // Create a dummy __cilkrts_stack_frame structure, for debugging purposes
-      // only.
-      StackFrameTy->setBody(Int64Ty);
-    }
-    // Create declarations of all CilkRTS functions, and add basic attributes to
-    // those declarations.
-    for (CilkRTSFnDesc FnDesc : CilkRTSFunctions) {
-      assert(!FnDesc.FnCallee && "Redefining Cilk function");
-      FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
-      assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
-             "Cilk function is not a function");
-      Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
-
-      // Mark all CilkRTS functions nounwind, except for __cilk_sync.
-      if ("__cilk_sync" == FnDesc.FnName)
-        Fn->removeFnAttr(Attribute::NoUnwind);
-      else
-        Fn->setDoesNotThrow();
-    }
-  } else {
+  } else if (!DebugABICalls) {
     // The OpenCilkABI target requires the use of a bitcode ABI file to generate
     // correct code.
     C.emitError(
         "OpenCilkABI: Bitcode ABI file required for correct code generation.");
+  }
+
+  // If no valid bitcode file was found fill in the missing pieces.
+  // An error should have been emitted already unless the user
+  // set DebugABICalls.
+
+  if (StackFrameTy->isOpaque()) {
+    // Create a dummy __cilkrts_stack_frame structure
+    StackFrameTy->setBody(Int64Ty);
+  }
+  // Create declarations of all CilkRTS functions, and add basic attributes to
+  // those declarations.
+  for (CilkRTSFnDesc FnDesc : CilkRTSFunctions) {
+    if (FnDesc.FnCallee)
+      continue;
+    FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
+    assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
+           "Cilk function is not a function");
+    Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
+
+    // Mark all CilkRTS functions nounwind, except for __cilk_sync.
+    if ("__cilk_sync" == FnDesc.FnName)
+      Fn->removeFnAttr(Attribute::NoUnwind);
+    else
+      Fn->setDoesNotThrow();
   }
 }
 
