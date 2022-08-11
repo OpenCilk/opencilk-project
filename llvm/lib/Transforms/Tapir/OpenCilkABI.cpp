@@ -152,53 +152,52 @@ void OpenCilkABI::prepareModule() {
 
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
-    std::unique_ptr<Module> ExternalModule = parseIRFile(RuntimeBCPath, SMD, C);
+    if (std::unique_ptr<Module> ExternalModule = parseIRFile(RuntimeBCPath, SMD, C)) {
+      // Get the original DiagnosticHandler for this context.
+      std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
+          C.getDiagnosticHandler();
 
-    if (!ExternalModule)
+      // Setup an OpenCilkABIDiagnosticHandler for this context, to handle
+      // diagnostics that arise from linking ExternalModule.
+      C.setDiagnosticHandler(std::make_unique<OpenCilkABIDiagnosticHandler>(
+          ExternalModule.get(), OrigDiagHandler.get()));
+
+      // Link the external module into the current module, copying over global
+      // values.
+      //
+      // TODO: Consider restructuring the import process to use
+      // Linker::Flags::LinkOnlyNeeded to copy over only the necessary contents
+      // from the external module.
+      bool Fail = Linker::linkModules(
+          M, std::move(ExternalModule), Linker::Flags::None,
+          [](Module &M, const StringSet<> &GVS) {
+            for (StringRef GVName : GVS.keys()) {
+              LLVM_DEBUG(dbgs() << "Linking global value " << GVName << "\n");
+              if (Function *Fn = M.getFunction(GVName)) {
+                if (!Fn->isDeclaration())
+                  // We set the function's linkage as available_externally, so
+                  // that subsequent optimizations can remove these definitions
+                  // from the module.  We don't want this module redefining any of
+                  // these symbols, even if they aren't inlined, because the
+                  // OpenCilk runtime library will provide those definitions
+                  // later.
+                  Fn->setLinkage(Function::AvailableExternallyLinkage);
+              } else if (GlobalVariable *G = M.getGlobalVariable(GVName)) {
+                if (!G->isDeclaration())
+                  G->setLinkage(GlobalValue::AvailableExternallyLinkage);
+              }
+            }
+          });
+      if (Fail)
+        C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
+                    Twine(RuntimeBCPath));
+
+      // Restore the original DiagnosticHandler for this context.
+      C.setDiagnosticHandler(std::move(OrigDiagHandler));
+    } else {
       C.emitError("OpenCilkABI: Failed to parse bitcode ABI file: " +
                   Twine(RuntimeBCPath));
-
-    // Get the original DiagnosticHandler for this context.
-    std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
-        C.getDiagnosticHandler();
-
-    // Setup an OpenCilkABIDiagnosticHandler for this context, to handle
-    // diagnostics that arise from linking ExternalModule.
-    C.setDiagnosticHandler(std::make_unique<OpenCilkABIDiagnosticHandler>(
-        ExternalModule.get(), OrigDiagHandler.get()));
-
-    // Link the external module into the current module, copying over global
-    // values.
-    //
-    // TODO: Consider restructuring the import process to use
-    // Linker::Flags::LinkOnlyNeeded to copy over only the necessary contents
-    // from the external module.
-    bool Fail = Linker::linkModules(
-        M, std::move(ExternalModule), Linker::Flags::None,
-        [](Module &M, const StringSet<> &GVS) {
-          for (StringRef GVName : GVS.keys()) {
-            LLVM_DEBUG(dbgs() << "Linking global value " << GVName << "\n");
-            if (Function *Fn = M.getFunction(GVName)) {
-              if (!Fn->isDeclaration())
-                // We set the function's linkage as available_externally, so
-                // that subsequent optimizations can remove these definitions
-                // from the module.  We don't want this module redefining any of
-                // these symbols, even if they aren't inlined, because the
-                // OpenCilk runtime library will provide those definitions
-                // later.
-                Fn->setLinkage(Function::AvailableExternallyLinkage);
-            } else if (GlobalVariable *G = M.getGlobalVariable(GVName)) {
-              if (!G->isDeclaration())
-                G->setLinkage(GlobalValue::AvailableExternallyLinkage);
-            }
-          }
-        });
-    if (Fail)
-      C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
-                  Twine(RuntimeBCPath));
-
-    // Restore the original DiagnosticHandler for this context.
-    C.setDiagnosticHandler(std::move(OrigDiagHandler));
+    }
   }
 
   // Get or create local definitions of Cilk RTS structure types.
