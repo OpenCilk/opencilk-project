@@ -8,7 +8,7 @@ on:
 jobs:
   auto-subscribe:
     runs-on: ubuntu-latest
-    if: github.repository == 'OpenCilk/opencilk-project'
+    if: github.repository == 'llvm/llvm-project'
     steps:
     - name: Setup Automation Script
       run:  |
