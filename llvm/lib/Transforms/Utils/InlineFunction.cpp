@@ -2504,13 +2504,16 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
           ? Caller->getPersonalityFn()->stripPointerCasts()
           : nullptr;
   if (CalledPersonality) {
+    Triple T(Caller->getParent()->getTargetTriple());
     if (!CallerPersonality)
       Caller->setPersonalityFn(CalledPersonality);
     // If the personality functions match, then we can perform the
     // inlining. Otherwise, we can't inline.
     // TODO: This isn't 100% true. Some personality functions are proper
     //       supersets of others and can be used in place of the other.
-    else if (CalledPersonality != CallerPersonality)
+    else if (CalledPersonality != CallerPersonality &&
+             classifyEHPersonality(CalledPersonality) !=
+                 getDefaultEHPersonality(T))
       return InlineResult::failure("incompatible personality");
   }
 
