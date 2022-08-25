@@ -1,6 +1,7 @@
 name: Clang Tests
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'release/**'
@@ -27,7 +28,7 @@ concurrency:
 jobs:
   check_clang:
     name: Test clang,lldb,libclc
-    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@release/14.x
+    uses: ./.github/workflows/llvm-project-tests.yml
     with:
       build_target: check-clang
       projects: clang;lldb;libclc

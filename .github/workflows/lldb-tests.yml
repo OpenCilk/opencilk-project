@@ -1,6 +1,7 @@
 name: lldb Tests
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'release/**'
@@ -28,7 +29,7 @@ concurrency:
 jobs:
   build_lldb:
     name: Build lldb
-    uses: OpenCilk/opencilk-project/.github/workflows/llvm-project-tests.yml@release/14.x
+    uses: ./.github/workflows/llvm-project-tests.yml
     with:
       build_target: ''
       projects: clang;lldb

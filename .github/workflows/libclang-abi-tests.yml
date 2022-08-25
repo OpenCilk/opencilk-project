@@ -3,16 +3,21 @@ name: libclang ABI Tests
 # TODO: Enable this test based on OpenCilk Clang changes.
 
 on:
+  workflow_dispatch:
   push:
+    ignore-forks: true
     branches:
-      - 'nobranch/**'
+      - 'release/**'
     paths:
       - 'clang/**'
       - '.github/workflows/libclang-abi-tests.yml'
-#   pull_request:
-#     paths:
-#       - 'clang/**'
-#       - '.github/workflows/libclang-abi-tests.yml'
+  pull_request:
+    ignore-forks: true
+    branches:
+      - 'release/**'
+    paths:
+      - 'clang/**'
+      - '.github/workflows/libclang-abi-tests.yml'
 
 concurrency:
   # Skip intermediate builds: always.
@@ -23,6 +28,7 @@ concurrency:
 
 jobs:
   abi-dump-setup:
+    if: github.repository_owner == 'llvm'
     runs-on: ubuntu-latest
     outputs:
       BASELINE_REF: ${{ steps.vars.outputs.BASELINE_REF }}
@@ -35,7 +41,7 @@ jobs:
       LLVM_VERSION_PATCH: ${{ steps.version.outputs.LLVM_VERSION_PATCH }}
     steps:
       - name: Checkout source
-        uses: actions/checkout@v1
+        uses: actions/checkout@v3
         with:
           fetch-depth: 250
 
@@ -76,6 +82,7 @@ jobs:
 
 
   abi-dump:
+    if: github.repository_owner == 'llvm'
     needs: abi-dump-setup
     runs-on: ubuntu-latest
     strategy:
@@ -119,12 +126,10 @@ jobs:
     - name: Dump ABI
       run: |
         parallel abi-dumper -lver ${{ matrix.ref }} -skip-cxx -public-headers ./install/include/${{ needs.abi-dump-setup.outputs.ABI_HEADERS }} -o {}-${{ matrix.ref }}.abi ./build/lib/{} ::: ${{ needs.abi-dump-setup.outputs.ABI_LIBS }}
-        # Remove symbol versioning from dumps, so we can compare across major
-        # versions.  We don't need to do this for libclang.so since its ABI
-        # is stable across major releases and the symbol versions don't change.
-        if [ -e libclang-cpp.so-${{ matrix.ref }}.abi ]; then
-          sed -i 's/LLVM_[0-9]\+/LLVM_NOVERSION/' libclang-cpp.so-${{ matrix.ref }}.abi
-        fi
+        for lib in ${{ needs.abi-dump-setup.outputs.ABI_LIBS }}; do
+          # Remove symbol versioning from dumps, so we can compare across major versions.
+          sed -i 's/LLVM_[0-9]\+/LLVM_NOVERSION/' $lib-${{ matrix.ref }}.abi
+        done
     - name: Upload ABI file
       uses: actions/upload-artifact@v2
       with:
@@ -132,6 +137,7 @@ jobs:
         path: "*${{ matrix.ref }}.abi"
 
   abi-compare:
+    if: github.repository_owner == 'llvm'
     runs-on: ubuntu-latest
     needs:
       - abi-dump-setup
