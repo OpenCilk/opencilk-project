@@ -3930,7 +3930,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     // Buffer is a void**.
     Address Buf = EmitPointerWithAlignment(E->getArg(0));
 
-    // Store the frame pointer to the setjmp buffer.
+    // Frame pointer, PC, stack pointer, base pointer
     Value *FrameAddr = Builder.CreateCall(
         CGM.getIntrinsic(Intrinsic::frameaddress, AllocaInt8PtrTy),
         ConstantInt::get(Int32Ty, 0));
@@ -3939,17 +3939,13 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     Builder.CreateStore(EmitScalarExpr(E->getArg(1)),
                         Builder.CreateConstInBoundsGEP(Buf, 1));
 
-    // Store the stack pointer to the setjmp buffer.
     Value *StackAddr =
         Builder.CreateCall(CGM.getIntrinsic(Intrinsic::stacksave));
-    Address StackSaveSlot = Builder.CreateConstInBoundsGEP(Buf, 2);
-    Builder.CreateStore(StackAddr, StackSaveSlot);
+    Builder.CreateStore(StackAddr, Builder.CreateConstInBoundsGEP(Buf, 2));
 
-    Builder.CreateStore(Constant::getNullValue(VoidPtrTy),
-                        Builder.CreateConstInBoundsGEP(Buf, 3));
-
-    // TODO: add an intrinsic call to reconstruct the third frame pointer
-    // is get_dynamic_area_offset useful?
+    Value *BaseAddr =
+        Builder.CreateCall(CGM.getIntrinsic(Intrinsic::localaddress));
+    Builder.CreateStore(BaseAddr, Builder.CreateConstInBoundsGEP(Buf, 3));
 
     return RValue::getIgnored();
   }
