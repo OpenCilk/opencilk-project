@@ -781,7 +781,7 @@ unsigned AArch64RegisterInfo::getLocalAddressRegister(
   const auto &MFI = MF.getFrameInfo();
   if (!MF.hasEHFunclets() && !MFI.hasVarSizedObjects())
     return AArch64::SP;
-  else if (hasStackRealignment(MF))
+  else if (hasBasePointer(MF))
     return getBaseRegister();
   return getFrameRegister(MF);
 }
