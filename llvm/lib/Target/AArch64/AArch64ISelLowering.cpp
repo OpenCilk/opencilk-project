@@ -6122,8 +6122,11 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
   bool TailCallOpt = MF.getTarget().Options.GuaranteedTailCallOpt;
   bool IsSibCall = false;
   bool GuardWithBTI = false;
+  bool NoRegs =
+      CLI.CB && CLI.CB->getAttributes().hasFnAttr("no_callee_saved_registers");
 
-  if (CLI.CB && CLI.CB->getAttributes().hasFnAttr(Attribute::ReturnsTwice) &&
+  if (CLI.CB &&
+      (NoRegs || CLI.CB->getAttributes().hasFnAttr(Attribute::ReturnsTwice)) &&
       !Subtarget->noBTIAtReturnTwice()) {
     GuardWithBTI = FuncInfo->branchTargetEnforcement();
   }
@@ -6523,6 +6526,9 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
     }
   } else
     Mask = TRI->getCallPreservedMask(MF, CallConv);
+
+  if (NoRegs)
+    Mask = TRI->getNoPreservedMask();
 
   if (Subtarget->hasCustomCallingConv())
     TRI->UpdateCustomCallPreservedMask(MF, &Mask);

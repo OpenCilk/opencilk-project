@@ -215,6 +215,8 @@ void OpenCilkABI::prepareModule() {
       FunctionType::get(VoidTy, {StackFramePtrTy}, false);
   FunctionType *CilkPrepareSpawnFnTy =
       FunctionType::get(Int32Ty, {StackFramePtrTy}, false);
+  FunctionType *CilkPrepareSpawn2FnTy =
+      FunctionType::get(VoidTy, {StackFramePtrTy, VoidPtrTy}, false);
   FunctionType *CilkRTSEnterLandingpadFnTy =
       FunctionType::get(VoidTy, {StackFramePtrTy, Int32Ty}, false);
   FunctionType *CilkRTSPauseFrameFnTy = FunctionType::get(
@@ -241,6 +243,7 @@ void OpenCilkABI::prepareModule() {
       {"__cilkrts_leave_frame", CilkRTSFnTy, CilkRTSLeaveFrame},
       {"__cilkrts_leave_frame_helper", CilkRTSFnTy, CilkRTSLeaveFrameHelper},
       {"__cilk_prepare_spawn", CilkPrepareSpawnFnTy, CilkPrepareSpawn},
+      {"__cilk_prepare_spawn2", CilkPrepareSpawn2FnTy, CilkPrepareSpawn2},
       {"__cilk_sync", CilkRTSFnTy, CilkSync},
       {"__cilk_sync_nothrow", CilkRTSFnTy, CilkSyncNoThrow},
       {"__cilk_parent_epilogue", CilkRTSFnTy, CilkParentEpilogue},
@@ -336,6 +339,7 @@ void OpenCilkABI::addHelperAttributes(Function &Helper) {
   // Inlining the helper function is not legal.
   Helper.removeFnAttr(Attribute::AlwaysInline);
   Helper.addFnAttr(Attribute::NoInline);
+  Helper.addFnAttr("no_callee_saved_registers");
   // If the helper uses an argument structure, then it is not a write-only
   // function.
   if (getArgStructMode() != ArgStructMode::None) {
@@ -750,6 +754,8 @@ void OpenCilkABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
 }
 
 void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
+  const bool worse = false;
+
   Instruction *ReplStart = TOI.ReplStart;
   Instruction *ReplCall = TOI.ReplCall;
 
@@ -766,10 +772,6 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   // detach replacement.
   Instruction *SpawnPt = DetBlock->getTerminator();
   IRBuilder<> B(SpawnPt);
-  CallBase *SpawnPrepCall = B.CreateCall(GetCilkPrepareSpawnFn(), {SF});
-
-  // Remember to inline this call later.
-  CallsToInline.insert(SpawnPrepCall);
 
   // Get the ordinary continuation of the detach.
   BasicBlock *CallCont;
@@ -778,11 +780,29 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   else // isa<CallInst>(CallSite)
     CallCont = CallBlock->getSingleSuccessor();
 
-  // Insert a conditional branch, based on the result of the
-  // __cilk_spawn_prepare, to either the detach replacement or the continuation.
-  Value *SpawnPrepRes = B.CreateICmpEQ(
-      SpawnPrepCall, ConstantInt::get(SpawnPrepCall->getType(), 0));
-  B.CreateCondBr(SpawnPrepRes, CallBlock, CallCont);
+  CallBase *SpawnPrepCall;
+  if (worse)
+    SpawnPrepCall = B.CreateCall(GetCilkPrepareSpawnFn(), {SF});
+  else
+    SpawnPrepCall =
+        B.CreateCall(GetCilkPrepareSpawn2Fn(),
+                     {SF, BlockAddress::get(CallCont)});
+
+  // XXX Wrong split in !worse case, branch goes to call
+  // and should go after call
+
+  // Remember to inline this call later.
+  CallsToInline.insert(SpawnPrepCall);
+
+  if (worse) {
+    // Insert a conditional branch, based on the result of the
+    // __cilk_spawn_prepare, to either the detach replacement or the continuation.
+    Value *SpawnPrepRes = B.CreateICmpEQ(
+        SpawnPrepCall, ConstantInt::get(SpawnPrepCall->getType(), 0));
+    B.CreateCondBr(SpawnPrepRes, CallBlock, CallCont);
+  } else {
+    B.CreateBr(CallBlock);
+  }
   for (PHINode &PN : CallCont->phis())
     PN.addIncoming(PN.getIncomingValueForBlock(CallBlock), DetBlock);
 
