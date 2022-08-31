@@ -334,12 +334,11 @@ void OpenCilkABI::prepareModule() {
 }
 
 void OpenCilkABI::addHelperAttributes(Function &Helper) {
-  // Use a fast calling convention for the helper.
-  Helper.setCallingConv(CallingConv::Fast);
+  // The helper might return via longjmp.
+  Helper.setCallingConv(CallingConv::PreserveNone);
   // Inlining the helper function is not legal.
   Helper.removeFnAttr(Attribute::AlwaysInline);
   Helper.addFnAttr(Attribute::NoInline);
-  Helper.addFnAttr("no_callee_saved_registers");
   // If the helper uses an argument structure, then it is not a write-only
   // function.
   if (getArgStructMode() != ArgStructMode::None) {

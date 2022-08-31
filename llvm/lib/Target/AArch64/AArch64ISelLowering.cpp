@@ -5347,6 +5347,7 @@ CCAssignFn *AArch64TargetLowering::CCAssignFnForCall(CallingConv::ID CC,
     return CC_AArch64_WebKit_JS;
   case CallingConv::GHC:
     return CC_AArch64_GHC;
+  case CallingConv::PreserveNone:
   case CallingConv::C:
   case CallingConv::Fast:
   case CallingConv::PreserveMost:
@@ -6122,12 +6123,11 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
   bool TailCallOpt = MF.getTarget().Options.GuaranteedTailCallOpt;
   bool IsSibCall = false;
   bool GuardWithBTI = false;
-  bool NoRegs =
-      CLI.CB && CLI.CB->getAttributes().hasFnAttr("no_callee_saved_registers");
+  bool MaybeBTI =
+      CallConv == CallingConv::PreserveNone ||
+      (CLI.CB && CLI.CB->getAttributes().hasFnAttr(Attribute::ReturnsTwice));
 
-  if (CLI.CB &&
-      (NoRegs || CLI.CB->getAttributes().hasFnAttr(Attribute::ReturnsTwice)) &&
-      !Subtarget->noBTIAtReturnTwice()) {
+  if (MaybeBTI && !Subtarget->noBTIAtReturnTwice()) {
     GuardWithBTI = FuncInfo->branchTargetEnforcement();
   }
 
@@ -6526,9 +6526,6 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
     }
   } else
     Mask = TRI->getCallPreservedMask(MF, CallConv);
-
-  if (NoRegs)
-    Mask = TRI->getNoPreservedMask();
 
   if (Subtarget->hasCustomCallingConv())
     TRI->UpdateCustomCallPreservedMask(MF, &Mask);
