@@ -3128,9 +3128,6 @@ bool AArch64FastISel::fastLowerCall(CallLoweringInfo &CLI) {
   if (!Callee && !Symbol)
     return false;
 
-  if (CLI.CB->hasFnAttr("no_callee_saved_registers"))
-    return false;
-
   // Allow SelectionDAG isel to handle calls to functions like setjmp that need
   // a bti instruction following the call.
   if (CLI.CB && CLI.CB->hasFnAttr(Attribute::ReturnsTwice) &&

@@ -221,6 +221,8 @@ AArch64RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
     return SCS ? CSR_AArch64_NoRegs_SCS_RegMask : CSR_AArch64_NoRegs_RegMask;
   if (CC == CallingConv::AnyReg)
     return SCS ? CSR_AArch64_AllRegs_SCS_RegMask : CSR_AArch64_AllRegs_RegMask;
+  if (CC == CallingConv::PreserveNone)
+    return SCS ? CSR_AArch64_FewRegs_SCS_RegMask : CSR_AArch64_FewRegs_RegMask;
 
   // All the following calling conventions are handled differently on Darwin.
   if (MF.getSubtarget<AArch64Subtarget>().isTargetDarwin()) {
