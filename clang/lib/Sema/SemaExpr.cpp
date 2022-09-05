@@ -2099,7 +2099,7 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   if (!HT)
     return E;
 
-  bool Difficult = InputType->isDependentType();
+  bool Difficult = CurContext->isDependentContext();
 
   // For now all hyperobjects use the same lookup function.
   IdentifierInfo *ID = PP.getIdentifierInfo("__hyper_lookup");
