@@ -426,7 +426,7 @@ def CSR_AArch64_AllRegs
 
 def CSR_AArch64_NoRegs : CalleeSavedRegs<(add)>;
 
-def CSR_AArch64_FewRegs : CalleeSavedRegs<(add LR, FP, X19)>;
+def CSR_AArch64_FewRegs : CalleeSavedRegs<(add X19, LR, FP)>;
 
 def CSR_AArch64_RT_MostRegs :  CalleeSavedRegs<(add CSR_AArch64_AAPCS,
                                                 (sequence "X%u", 9, 15))>;
