@@ -47,6 +47,10 @@ static cl::opt<std::string> ClOpenCilkRuntimeBCPath(
     "opencilk-runtime-bc-path", cl::init(""),
     cl::desc("Path to the bitcode file for the OpenCilk runtime ABI"),
     cl::Hidden);
+static cl::opt<bool> UsePrepareSpawn2(
+    "use-prepare-spawn2", cl::init(true),
+    cl::desc("Call __cilk_prepare_spawn2 instead of __cilk_prepare_spawn"),
+    cl::Hidden);
 
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
 
@@ -753,7 +757,7 @@ void OpenCilkABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
 }
 
 void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
-  const bool worse = false;
+  const bool old_spawn = !UsePrepareSpawn2;
 
   Instruction *ReplStart = TOI.ReplStart;
   Instruction *ReplCall = TOI.ReplCall;
@@ -780,7 +784,7 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
     CallCont = CallBlock->getSingleSuccessor();
 
   CallBase *SpawnPrepCall;
-  if (worse)
+  if (old_spawn)
     SpawnPrepCall = B.CreateCall(GetCilkPrepareSpawnFn(), {SF});
   else
     SpawnPrepCall =
@@ -793,7 +797,7 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   // Remember to inline this call later.
   CallsToInline.insert(SpawnPrepCall);
 
-  if (worse) {
+  if (old_spawn) {
     // Insert a conditional branch, based on the result of the
     // __cilk_spawn_prepare, to either the detach replacement or the continuation.
     Value *SpawnPrepRes = B.CreateICmpEQ(
