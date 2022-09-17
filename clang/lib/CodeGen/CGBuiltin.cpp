@@ -3949,6 +3949,43 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
 
     return RValue::getIgnored();
   }
+  case Builtin::BI__builtin_call_continuation: {
+    // TODO: Merge with above?
+    // Buffer is a void**.
+    Address Buf = EmitPointerWithAlignment(E->getArg(0));
+
+    // Frame pointer, PC, stack pointer, base pointer
+    Value *FrameAddr = Builder.CreateCall(
+        CGM.getIntrinsic(Intrinsic::frameaddress, AllocaInt8PtrTy),
+        ConstantInt::get(Int32Ty, 0));
+    Builder.CreateStore(FrameAddr, Buf);
+
+    BasicBlock *Continuation = createBasicBlock("cont", this->CurFn);
+    /*EmitBlock(Continuation);*/
+    Builder.CreateStore(BlockAddress::get(Continuation),
+                        Builder.CreateConstInBoundsGEP(Buf, 1));
+
+    Value *StackAddr =
+        Builder.CreateCall(CGM.getIntrinsic(Intrinsic::stacksave));
+    Builder.CreateStore(StackAddr, Builder.CreateConstInBoundsGEP(Buf, 2));
+
+    Value *BaseAddr =
+        Builder.CreateCall(CGM.getIntrinsic(Intrinsic::localaddress));
+    Builder.CreateStore(BaseAddr, Builder.CreateConstInBoundsGEP(Buf, 3));
+
+    SmallVector<llvm::Type *, 1> ArgTy{VoidPtrTy};
+    llvm::FunctionType *FTy = llvm::FunctionType::get(VoidTy, ArgTy, false);
+
+    Address FnAddr = EmitPointerWithAlignment(E->getArg(1));
+    Address FnArg = EmitPointerWithAlignment(E->getArg(2));
+    Builder.CreateCall(FTy, FnAddr.getPointer(), FnArg.getPointer());
+    Builder.CreateBr(Continuation);
+
+    // Not needed? EmitBlock(Continuation);
+    Builder.SetInsertPoint(Continuation);
+
+    return RValue::getIgnored();
+  }
   case Builtin::BI__builtin_setjmp: {
     // Buffer is a void**.
     Address Buf = EmitPointerWithAlignment(E->getArg(0));

@@ -585,7 +585,6 @@ BUILTIN(__builtin_return_address, "v*IUi", "n")
 BUILTIN(__builtin_extract_return_addr, "v*v*", "n")
 BUILTIN(__builtin_frame_address, "v*IUi", "n")
 BUILTIN(__builtin___clear_cache, "vc*c*", "n")
-BUILTIN(__builtin_continuation, "vv**v*", "n")
 BUILTIN(__builtin_setjmp, "iv**", "j")
 BUILTIN(__builtin_longjmp, "vv**i", "r")
 BUILTIN(__builtin_unwind_init, "v", "")
@@ -1693,6 +1692,10 @@ LANGBUILTIN(__arithmetic_fence, "v.", "t", ALL_LANGUAGES)
 // Tapir.  Rewriting of reducer references happens during sema
 // and needs a builtin to carry the information to codegen.
 BUILTIN(__hyper_lookup, "v*vC*", "nU")
+
+// Support for Tapir
+BUILTIN(__builtin_continuation, "vv**v*", "n")
+BUILTIN(__builtin_call_continuation, "vv**v*v*", "")
 
 #undef BUILTIN
 #undef LIBBUILTIN
