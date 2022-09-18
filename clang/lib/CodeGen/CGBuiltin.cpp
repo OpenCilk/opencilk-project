@@ -3978,7 +3978,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
 
     Address FnAddr = EmitPointerWithAlignment(E->getArg(1));
     Address FnArg = EmitPointerWithAlignment(E->getArg(2));
-    Builder.CreateCall(FTy, FnAddr.getPointer(), FnArg.getPointer());
+    CallBase *Call =
+      Builder.CreateCall(FTy, FnAddr.getPointer(), FnArg.getPointer());
+    Call->setCallingConv(llvm::CallingConv::PreserveNone);
+
     Builder.CreateBr(Continuation);
 
     // Not needed? EmitBlock(Continuation);
