@@ -214,7 +214,6 @@
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LCSSAPass on foo
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: LICMPass
-; CHECK-POSTLINK-O2-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: JumpThreadingPass
 ; CHECK-POSTLINK-O2-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-POSTLINK-O2-NEXT: Running pass: CorrelatedValuePropagationPass
@@ -229,7 +228,6 @@
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LCSSAPass on foo
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LoopSimplifyCFGPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: LICMPass
-; CHECK-POSTLINK-O3-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: JumpThreadingPass
 ; CHECK-POSTLINK-O3-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-POSTLINK-O3-NEXT: Running pass: CorrelatedValuePropagationPass
@@ -249,11 +247,11 @@
 ; CHECK-POSTLINK-O-NEXT: Running pass: LoopLoadEliminationPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: InstCombinePass
 ; CHECK-POSTLINK-O-NEXT: Running pass: SimplifyCFGPass
-; CHECK-POSTLINK-O-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O2-NEXT: Running pass: SLPVectorizerPass
 ; CHECK-POSTLINK-O3-NEXT: Running pass: SLPVectorizerPass
 ; CHECK-POSTLINK-Os-NEXT: Running pass: SLPVectorizerPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: VectorCombinePass
+; CHECK-POSTLINK-O-NEXT: Running pass: EarlyCSEPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: InstCombinePass
 ; CHECK-POSTLINK-O-NEXT: Running pass: LoopUnrollPass
 ; CHECK-POSTLINK-O-NEXT: Running pass: WarnMissedTransformationsPass
