@@ -1,4 +1,5 @@
 ; RUN: opt %s -passes="default<O2>" -S | FileCheck %s
+; REQUIRES: x86-registered-target
 
 ; ModuleID = 'test.c'
 source_filename = "test.c"
