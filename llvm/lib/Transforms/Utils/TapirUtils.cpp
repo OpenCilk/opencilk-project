@@ -2058,7 +2058,8 @@ static Instruction *GetTaskFrameInstructionInBlock(BasicBlock *BB,
 static void PromoteCallsInTasksHelper(
     BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
     BasicBlock *Unreachable, Value *CurrentTaskFrame,
-    SmallVectorImpl<BasicBlock *> *ParentWorklist) {
+    SmallVectorImpl<BasicBlock *> *ParentWorklist,
+    SmallPtrSetImpl<BasicBlock *> &Processed) {
   SmallVector<DetachInst *, 8> DetachesToReplace;
   SmallVector<BasicBlock *, 32> Worklist;
   // TODO: See if we need a global Visited set over all recursive calls, i.e.,
@@ -2078,6 +2079,7 @@ static void PromoteCallsInTasksHelper(
 
     Instruction *TFI = GetTaskFrameInstructionInBlock(BB, CurrentTaskFrame);
     if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI)) {
+      Processed.insert(BB);
       Instruction *TFCreate = TFI;
       if (TFCreate != CurrentTaskFrame) {
         // Split the block at the taskframe.create, if necessary.
@@ -2094,7 +2096,7 @@ static void PromoteCallsInTasksHelper(
 
         // Recursively check all blocks
         PromoteCallsInTasksHelper(NewBB, TaskFrameUnwindEdge, Unreachable,
-                                  TFCreate, &Worklist);
+                                  TFCreate, &Worklist, Processed);
 
         // Remove the unwind edge for the taskframe if it is not needed.
         if (pred_empty(TaskFrameUnwindEdge))
@@ -2131,6 +2133,7 @@ static void PromoteCallsInTasksHelper(
     // Process a detach instruction specially.  In particular, process th
     // spawned task recursively.
     if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      Processed.insert(BB);
       if (!DI->hasUnwindDest()) {
         // Create an unwind edge for the subtask, which is terminated with a
         // detached-rethrow.
@@ -2139,7 +2142,8 @@ static void PromoteCallsInTasksHelper(
             Unreachable, DI);
         // Recursively check all blocks in the detached task.
         PromoteCallsInTasksHelper(DI->getDetached(), SubTaskUnwindEdge,
-                                  Unreachable, CurrentTaskFrame, &Worklist);
+                                  Unreachable, CurrentTaskFrame, &Worklist,
+                                  Processed);
         // If the new unwind edge is not used, remove it.
         if (pred_empty(SubTaskUnwindEdge))
           SubTaskUnwindEdge->eraseFromParent();
@@ -2193,6 +2197,18 @@ static FunctionCallee getDefaultPersonalityFn(Module *M) {
 }
 
 void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
+  // Collect blocks to process, in order to handle unreachable blocks.
+  SmallVector<BasicBlock *, 8> ToProcess;
+  ToProcess.push_back(&F.getEntryBlock());
+  for (BasicBlock &BB : F) {
+    Instruction *TFI = GetTaskFrameInstructionInBlock(&BB, nullptr);
+    if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI))
+      ToProcess.push_back(&BB);
+
+    if (isa<DetachInst>(BB.getTerminator()))
+      ToProcess.push_back(&BB);
+  }
+
   // Create a cleanup block.
   LLVMContext &C = F.getContext();
   BasicBlock *CleanupBB = BasicBlock::Create(C, Name, &F);
@@ -2207,8 +2223,12 @@ void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
   BasicBlock *UnreachableBlk = BasicBlock::Create(C, Name+".unreachable", &F);
 
   // Recursively handle inlined tasks.
-  PromoteCallsInTasksHelper(&F.getEntryBlock(), CleanupBB, UnreachableBlk,
-                            nullptr, nullptr);
+  SmallPtrSet<BasicBlock *, 8> Processed;
+  for (BasicBlock *BB : ToProcess) {
+    if (!Processed.contains(BB))
+      PromoteCallsInTasksHelper(BB, CleanupBB, UnreachableBlk, nullptr, nullptr,
+                                Processed);
+  }
 
   // Either finish inserting the cleanup block (and associated data) or remove
   // it, depending on whether it is used.
