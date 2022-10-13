@@ -211,19 +211,18 @@ bool Spindle::succInSameTask(const Spindle *Succ) const {
     return (Succ->isSharedEH() && (getParentTask() == Succ->getParentTask()));
 
   // Otherwise we have an ordinary spindle.  If this spindle and Succ are both
-  // properly contained in ParentTask, return true;
+  // properly contained in ParentTask, return true.
   if (getParentTask()->contains(Succ))
     return true;
   else {
     // Otherwise, check if Succ is a shared EH spindle tracked by the parent of
     // ParentTask.
-    const Task *GrandParent = getParentTask()->getParentTask();
-    return (GrandParent && GrandParent->containsSharedEH(Succ));
+    return getParentTask()->isSharedEHExit(Succ);
   }
 }
 
-/// Return true if the successor spindle Succ is part of the same task as this
-/// spindle.
+/// Return true if the successor spindle Succ is in a subtask of the task
+/// containing this spindle.
 bool Spindle::succInSubTask(const Spindle *Succ) const {
   return (Succ->getParentTask()->getParentTask() == getParentTask());
 }
@@ -279,14 +278,27 @@ LLVM_DUMP_METHOD void Task::dumpVerbose() const {
 // SpindleVec.
 void Task::getSharedEHExits(SmallVectorImpl<Spindle *> &SpindleVec) const {
   if (isRootTask()) return;
-  if (!getParentTask()->tracksSharedEHSpindles()) return;
+
+  // NOTE: We assume that all shared-eh exit spindles are contained in ancestors
+  // of this task, which might not be true if the shared-eh exit spindles
+  // themselves detach.  It's not clear how this case could arise in practice,
+  // however.
+  SmallPtrSet<const Task *, 4> Ancestors;
+  bool tracksSharedEHSpindles = false;
+  const Task *Parent = this;
+  do {
+    Parent = Parent->getParentTask();
+    Ancestors.insert(Parent);
+    tracksSharedEHSpindles |= Parent->tracksSharedEHSpindles();
+  } while (!Parent->isRootTask());
+  if (!tracksSharedEHSpindles) return;
 
   // Scan the successors of the spindles in this task to find shared EH exits.
   SmallVector<Spindle *, 4> WorkList;
   SmallPtrSet<Spindle *, 4> Visited;
   for (Spindle *S : getSpindles())
     for (Spindle *Succ : successors(S))
-      if (getParentTask()->containsSharedEH(Succ))
+      if (Succ->isSharedEH() && Ancestors.contains(Succ->getParentTask()))
         WorkList.push_back(Succ);
 
   // Perform a DFS of the shared EH exits to push each one onto SpindleVec and
@@ -300,18 +312,33 @@ void Task::getSharedEHExits(SmallVectorImpl<Spindle *> &SpindleVec) const {
 
     // Scan the successors of EHExit for more shared EH exits.
     for (Spindle *Succ : successors(EHExit))
-      if (getParentTask()->containsSharedEH(Succ))
+      if (Succ->isSharedEH())
         WorkList.push_back(Succ);
   }
 }
 
-// Get the shared EH spindles that this task can exit to and append them to
-// SpindleVec.
+/// Returns true if SharedEH is a shared EH exit of this task.
 bool Task::isSharedEHExit(const Spindle *SharedEH) const {
   if (isRootTask()) return false;
-  // Quickly confirm that the given spindle is a shared EH spindle tracked by
-  // the parent.
-  if (!getParentTask()->containsSharedEH(SharedEH)) return false;
+  if (!SharedEH->isSharedEH()) return false;
+
+  // NOTE: We assume that all shared-eh exit spindles are contained in ancestors
+  // of this task, which might not be true if the shared-eh exit spindles
+  // themselves detach.  It's not clear how this case could arise in practice,
+  // however.
+  SmallPtrSet<const Task *, 4> Ancestors;
+  bool tracksSharedEHSpindles = false;
+  const Task *Parent = this;
+  do {
+    Parent = Parent->getParentTask();
+    Ancestors.insert(Parent);
+    tracksSharedEHSpindles |= Parent->tracksSharedEHSpindles();
+  } while (!Parent->isRootTask());
+  if (!tracksSharedEHSpindles) return false;
+
+  Task *SharedEHParent = SharedEH->getParentTask();
+  if (!Ancestors.contains(SharedEHParent))
+    return false;
 
   // Scan the successors of the spindles in this task to find shared EH exits.
   SmallVector<Spindle *, 4> WorkList;
@@ -320,7 +347,7 @@ bool Task::isSharedEHExit(const Spindle *SharedEH) const {
     for (Spindle *Succ : successors(S))
       if (SharedEH == Succ)
         return true;
-      else if (getParentTask()->containsSharedEH(Succ))
+      else if (Succ->isSharedEH() && Ancestors.contains(Succ->getParentTask()))
         WorkList.push_back(Succ);
 
   // Perform a DFS of the shared EH exits to push each one onto SpindleVec and
@@ -335,7 +362,7 @@ bool Task::isSharedEHExit(const Spindle *SharedEH) const {
 
     // Scan the successors of EHExit for more shared EH exits.
     for (Spindle *Succ : successors(EHExit))
-      if (getParentTask()->containsSharedEH(Succ))
+      if (Succ->isSharedEH())
         WorkList.push_back(Succ);
   }
 
