@@ -2507,6 +2507,10 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     Triple T(Caller->getParent()->getTargetTriple());
     if (!CallerPersonality)
       Caller->setPersonalityFn(CalledPersonality);
+    else if (CalledPersonality != CallerPersonality &&
+             classifyEHPersonality(CallerPersonality) ==
+             getDefaultEHPersonality(T))
+      Caller->setPersonalityFn(CalledPersonality);
     // If the personality functions match, then we can perform the
     // inlining. Otherwise, we can't inline.
     // TODO: This isn't 100% true. Some personality functions are proper
