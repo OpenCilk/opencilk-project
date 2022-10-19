@@ -2027,9 +2027,9 @@ static Instruction *GetTaskFrameInstructionInBlock(BasicBlock *BB,
 
     // Stop the search early if we encounter a taskframe.create or a
     // taskframe.end.
-    if (isTapirIntrinsic(Intrinsic::taskframe_create, CI) ||
-        (TaskFrame &&
-         isTapirIntrinsic(Intrinsic::taskframe_end, CI, TaskFrame)))
+    if (isTapirIntrinsic(Intrinsic::taskframe_create, CI) && CI != TaskFrame)
+      return I;
+    if (TaskFrame && isTapirIntrinsic(Intrinsic::taskframe_end, CI, TaskFrame))
       return I;
   }
   return nullptr;
@@ -2089,8 +2089,17 @@ static void PromoteCallsInTasksHelper(
       // If we find a taskframe.end in this block that ends the current
       // taskframe, add this block to the parent search.
       assert(ParentWorklist &&
-             "Unexpected taskframe.resume: no parent worklist");
-      ParentWorklist->push_back(BB);
+             "Unexpected taskframe.end: no parent worklist");
+      if (BB->getTerminator()->getPrevNode() != TFI) {
+        // This taskframe.end does not terminate the basic block.  To make sure
+        // the rest of the block is processed properly, split the block.
+        BasicBlock *NewBB = SplitBlock(BB, TFI->getNextNode());
+        ParentWorklist->push_back(NewBB);
+      } else {
+        // Add all successors of BB to the worklist.
+        for (BasicBlock *Successor : successors(BB))
+          ParentWorklist->push_back(Successor);
+      }
       continue;
     }
 
