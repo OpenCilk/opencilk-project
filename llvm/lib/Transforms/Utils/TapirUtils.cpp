@@ -2109,7 +2109,8 @@ static void PromoteCallsInTasksHelper(
       // taskframe, add this block to the parent search.
       assert(ParentWorklist &&
              "Unexpected taskframe.end: no parent worklist");
-      if (BB->getTerminator()->getPrevNode() != TFI) {
+      if (BB->getTerminator()->getPrevNode() != TFI ||
+          !isa<BranchInst>(BB->getTerminator())) {
         // This taskframe.end does not terminate the basic block.  To make sure
         // the rest of the block is processed properly, split the block.
         BasicBlock *NewBB = SplitBlock(BB, TFI->getNextNode());
