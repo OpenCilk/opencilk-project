@@ -85,7 +85,7 @@ void llvm::findDbgValues(SmallVectorImpl<DbgValueInst *> &DbgValues, Value *V) {
   // only add the owning DbgValueInst once; use this set to track ArgListUsers.
   // This behaviour can be removed when we can automatically remove duplicates.
   SmallPtrSet<DbgValueInst *, 4> EncounteredDbgValues;
-  if (auto *L = LocalAsMetadata::getIfExists(V)) {
+  if (auto *L = ValueAsMetadata::getIfExists(V)) {
     if (auto *MDV = MetadataAsValue::getIfExists(V->getContext(), L)) {
       for (User *U : MDV->users())
         if (DbgValueInst *DVI = dyn_cast<DbgValueInst>(U))
