@@ -3718,6 +3718,12 @@ FunctionCallee CilkSanitizerImpl::getOrInsertSynthesizedHook(StringRef Name,
   return NewHook;
 }
 
+// Check if we need to spill a value of this type onto the stack to pass it to a
+// hook.
+static bool NeedToSpillType(const Type *T) {
+  return T->isVectorTy() || T->isStructTy();
+}
+
 bool CilkSanitizerImpl::instrumentIntrinsicCall(
     Instruction *I, SmallVectorImpl<Value *> *MAAPVals) {
   assert(!callsPlaceholderFunction(*I) &&
@@ -3778,25 +3784,25 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
     Value *SavedStack = nullptr;
     const DataLayout &DL = M.getDataLayout();
     for (Value *Arg : CB->args()) {
-      if (!Arg->getType()->isVectorTy()) {
-        BeforeHookParamTys.push_back(Arg->getType());
+      Type *ArgTy = Arg->getType();
+      if (!NeedToSpillType(ArgTy)) {
+        // We can simply pass the argument directly to the hook.
+        BeforeHookParamTys.push_back(ArgTy);
         BeforeHookParamVals.push_back(Arg);
         continue;
       }
-      // We need to deal with a vector-type argument.  Spill the vector onto the
-      // stack.
+      // We need to spill the argument onto the stack.
 
       // Save the stack pointer, if we haven't already
       if (!SavedStack)
         SavedStack =
             IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
 
-      // Spill the vector argument onto the stack
-      VectorType *VecTy = cast<VectorType>(Arg->getType());
-      AllocaInst *ArgSpill = IRB.CreateAlloca(VecTy);
+      // Spill the argument onto the stack
+      AllocaInst *ArgSpill = IRB.CreateAlloca(ArgTy);
       IRB.CreateAlignedStore(Arg, ArgSpill, DL.getStackAlignment());
 
-      // Add the spilled vector argument
+      // Add the spilled argument
       BeforeHookParamTys.push_back(ArgSpill->getType());
       BeforeHookParamVals.push_back(ArgSpill);
     }
@@ -3835,48 +3841,48 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
   Value *SavedStack = nullptr;
   const DataLayout &DL = M.getDataLayout();
   if (!Called->getReturnType()->isVoidTy()) {
-    if (!Called->getReturnType()->isVectorTy()) {
-      AfterHookParamTys.push_back(Called->getReturnType());
+    Type *RetTy = Called->getReturnType();
+    if (!NeedToSpillType(RetTy)) {
+      // We can simply pass the return value directly to the hook.
+      AfterHookParamTys.push_back(RetTy);
       AfterHookParamVals.push_back(CB);
     } else {
-      // We need to deal with a vector-type return value.  Spill the vector onto
-      // the stack.
+      // We need to spill the return value onto the stack.
 
       // Save the stack pointer, if we haven't already
       if (!SavedStack)
         SavedStack =
             IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
 
-      // Spill the vector return value onto the stack
-      VectorType *VecTy = cast<VectorType>(Called->getReturnType());
-      AllocaInst *RetSpill = IRB.CreateAlloca(VecTy);
+      // Spill the return value onto the stack
+      AllocaInst *RetSpill = IRB.CreateAlloca(RetTy);
       IRB.CreateAlignedStore(CB, RetSpill, DL.getStackAlignment());
 
-      // Add the spilled vector return value
+      // Add the spilled return value
       AfterHookParamTys.push_back(RetSpill->getType());
       AfterHookParamVals.push_back(RetSpill);
     }
   }
   for (Value *Arg : CB->args()) {
-    if (!Arg->getType()->isVectorTy()) {
-      AfterHookParamTys.push_back(Arg->getType());
+    Type *ArgTy = Arg->getType();
+    if (!NeedToSpillType(ArgTy)) {
+      // We can simply pass the argument directly to the hook.
+      AfterHookParamTys.push_back(ArgTy);
       AfterHookParamVals.push_back(Arg);
       continue;
     }
-    // We need to deal with a vector-type argument.  Spill the vector onto the
-    // stack.
+    // We need to spill the argument onto the stack.
 
     // Save the stack pointer, if we haven't already
     if (!SavedStack)
       SavedStack =
           IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
 
-    // Spill the vector argument onto the stack
-    VectorType *VecTy = cast<VectorType>(Arg->getType());
-    AllocaInst *ArgSpill = IRB.CreateAlloca(VecTy);
+    // Spill the argument onto the stack
+    AllocaInst *ArgSpill = IRB.CreateAlloca(ArgTy);
     IRB.CreateAlignedStore(Arg, ArgSpill, DL.getStackAlignment());
 
-    // Add the spolled vector argument
+    // Add the spilled argument
     AfterHookParamTys.push_back(ArgSpill->getType());
     AfterHookParamVals.push_back(ArgSpill);
   }
