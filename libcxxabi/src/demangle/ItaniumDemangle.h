@@ -47,6 +47,7 @@
     X(PointerType) \
     X(ReferenceType) \
     X(PointerToMemberType) \
+    X(HyperobjectType) \
     X(ArrayType) \
     X(FunctionType) \
     X(NoexceptSpec) \
@@ -633,6 +634,36 @@ public:
         OB += ")";
       Pointee->printRight(OB);
     }
+  }
+};
+
+class HyperobjectType final : public Node {
+  const Node *View;
+
+public:
+  HyperobjectType(const Node *View_)
+      : Node(KHyperobjectType, View_->RHSComponentCache),
+        View(View_) {}
+
+  template<typename Fn> void match(Fn F) const { F(View); }
+
+  bool hasRHSComponentSlow(OutputBuffer &OB) const override {
+    return View->hasRHSComponent(OB);
+  }
+
+  void printLeft(OutputBuffer &OB) const override {
+    View->printLeft(OB);
+    if (View->hasArray(OB))
+      OB += " ";
+    if (View->hasArray(OB) || View->hasFunction(OB))
+      OB += "(";
+    OB += " _Hyperobject";
+  }
+
+  void printRight(OutputBuffer &OB) const override {
+    if (View->hasArray(OB) || View->hasFunction(OB))
+      OB += ")";
+    View->printRight(OB);
   }
 };
 
@@ -4036,6 +4067,14 @@ Node *AbstractManglingParser<Derived, Alloc>::parseType() {
     if (Ptr == nullptr)
       return nullptr;
     Result = make<PointerType>(Ptr);
+    break;
+  }
+  case 'H': {
+    ++First;
+    Node *Ptr = getDerived().parseType();
+    if (Ptr == nullptr)
+      return nullptr;
+    Result = make<HyperobjectType>(Ptr);
     break;
   }
   //             ::= R <type>        # l-value reference
