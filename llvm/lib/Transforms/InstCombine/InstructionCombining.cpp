@@ -4290,6 +4290,10 @@ bool InstCombinerImpl::run() {
         // Make sure these checks are done only once, naturally we do the checks
         // the first time we get the userparent, this will save compile time.
         if (NumUsers == 0) {
+          // Don't sink if the successor follows through a sync instruction.
+          if (isa<SyncInst>(BB->getTerminator()))
+            return None;
+
           // Try sinking to another block. If that block is unreachable, then do
           // not bother. SimplifyCFG should handle it.
           if (UserParent == BB || !DT.isReachableFromEntry(UserParent))
