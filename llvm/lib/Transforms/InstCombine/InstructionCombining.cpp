@@ -4047,6 +4047,10 @@ bool InstCombinerImpl::run() {
       if (UserParent == BB || !DT.isReachableFromEntry(UserParent))
         return None;
 
+      // Don't sink if the successor follows through a sync instruction.
+      if (isa<SyncInst>(BB->getTerminator()))
+        return None;
+
       auto *Term = UserParent->getTerminator();
       // See if the user is one of our successors that has only one
       // predecessor, so that we don't have to split the critical edge.
