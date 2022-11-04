@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the OpenCilk ABI to converts Tapir instructions to calls
+// This file implements the OpenCilk ABI to convert Tapir instructions to calls
 // into the OpenCilk runtime system.
 //
 //===----------------------------------------------------------------------===//
