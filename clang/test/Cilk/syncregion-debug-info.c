@@ -13,5 +13,5 @@ int fib(int n) {
   return x + y;
 }
 
-// CHECK-LABEL: define i32 @fib(
+// CHECK-LABEL: define {{.*}}i32 @fib(
 // CHECK: call token @llvm.syncregion.start(), !dbg
