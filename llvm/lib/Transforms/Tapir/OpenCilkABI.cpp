@@ -488,6 +488,19 @@ CallInst *OpenCilkABI::InsertStackFramePush(Function &F,
       }
       ++BI;
     }
+
+    // Next, try to find debug information earlier in this block.
+    if (!B.getCurrentDebugLocation()) {
+      BI = B.GetInsertPoint();
+      BasicBlock::const_iterator BB(B.GetInsertBlock()->begin());
+      while (BI != BB) {
+        --BI;
+        if (DebugLoc Loc = BI->getDebugLoc()) {
+          B.SetCurrentDebugLocation(Loc);
+          break;
+        }
+      }
+    }
   }
 
   Value *Args[1] = {SF};
