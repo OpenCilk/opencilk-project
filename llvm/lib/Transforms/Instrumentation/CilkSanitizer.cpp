@@ -368,10 +368,10 @@ struct CilkSanitizerImpl : public CSIImpl {
     BI = I->getIterator();
     BasicBlock::const_iterator BB(I->getParent()->begin());
     while (BI != BB) {
+      --BI;
       if (DebugLoc Loc = BI->getDebugLoc()) {
         return Loc;
       }
-      --BI;
     }
 
     return I->getDebugLoc();
