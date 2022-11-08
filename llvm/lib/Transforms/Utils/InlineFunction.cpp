@@ -2507,18 +2507,41 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     Triple T(Caller->getParent()->getTargetTriple());
     if (!CallerPersonality)
       Caller->setPersonalityFn(CalledPersonality);
-    else if (CalledPersonality != CallerPersonality &&
-             classifyEHPersonality(CallerPersonality) ==
-             getDefaultEHPersonality(T))
-      Caller->setPersonalityFn(CalledPersonality);
-    // If the personality functions match, then we can perform the
-    // inlining. Otherwise, we can't inline.
-    // TODO: This isn't 100% true. Some personality functions are proper
-    //       supersets of others and can be used in place of the other.
-    else if (CalledPersonality != CallerPersonality &&
-             classifyEHPersonality(CalledPersonality) !=
-                 getDefaultEHPersonality(T))
-      return InlineResult::failure("incompatible personality");
+    else if (CalledPersonality != CallerPersonality) {
+      // See if we want to replace CallerPersonality with the CalledPersonality,
+      // because CalledPersonality is a proper superset.
+      if (classifyEHPersonality(CallerPersonality) ==
+          getDefaultEHPersonality(T))
+        // The caller is using the default personality function.  We assume
+        // CalledPersonality is a superset.
+        Caller->setPersonalityFn(CalledPersonality);
+
+      else if (classifyEHPersonality(CalledPersonality) ==
+                   EHPersonality::Cilk_CXX &&
+               classifyEHPersonality(CallerPersonality) ==
+                   EHPersonality::GNU_CXX)
+        // The Cilk personality is a superset of the caller's.
+        Caller->setPersonalityFn(CalledPersonality);
+
+      // If the personality functions match, then we can perform the
+      // inlining. Otherwise, we can't inline.
+      // TODO: This isn't 100% true. Some personality functions are proper
+      //       supersets of others and can be used in place of the other.
+      else {
+        EHPersonality CalledEHPersonality =
+            classifyEHPersonality(CalledPersonality);
+        // We can inline if:
+        // - CalledPersonality is the default personality, or
+        // - CallerPersonality is the Cilk personality and CalledPersonality is
+        //   GNU_CXX.
+        // Otherwise, declare that we can't inline.
+        if (CalledEHPersonality != getDefaultEHPersonality(T) &&
+            (classifyEHPersonality(CallerPersonality) !=
+                 EHPersonality::Cilk_CXX ||
+             CalledEHPersonality != EHPersonality::GNU_CXX))
+          return InlineResult::failure("incompatible personality");
+      }
+    }
   }
 
   // We need to figure out which funclet the callsite was in so that we may
