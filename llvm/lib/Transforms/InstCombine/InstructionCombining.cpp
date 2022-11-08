@@ -3122,6 +3122,7 @@ static bool isCatchAll(EHPersonality Personality, Constant *TypeInfo) {
   case EHPersonality::CoreCLR:
   case EHPersonality::Wasm_CXX:
   case EHPersonality::XL_CXX:
+  case EHPersonality::Cilk_CXX:
     return TypeInfo->isNullValue();
   }
   llvm_unreachable("invalid enum");
