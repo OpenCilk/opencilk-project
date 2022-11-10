@@ -59,7 +59,7 @@ public:
 
 private:
   bool unifyReturns(Function &F);
-  void processFunction(Function &F, SmallVectorImpl<Function *> &NewHelpers);
+  bool processFunction(Function &F, SmallVectorImpl<Function *> &NewHelpers);
   TFOutlineMapTy outlineAllTasks(Function &F,
                                  SmallVectorImpl<Spindle *> &AllTaskFrames,
                                  DominatorTree &DT, AssumptionCache &AC,
@@ -390,7 +390,7 @@ static bool isSpawnedTaskFrame(const Spindle *TF) {
   return TF->getTaskFromTaskFrame();
 }
 
-void TapirToTargetImpl::processFunction(
+bool TapirToTargetImpl::processFunction(
     Function &F, SmallVectorImpl<Function *> &NewHelpers) {
   LLVM_DEBUG(dbgs() << "Tapir: Processing function " << F.getName() << "\n");
 
@@ -401,11 +401,12 @@ void TapirToTargetImpl::processFunction(
   TI.findTaskFrameTree();
   AssumptionCache &AC = GetAC(F);
 
+  bool ChangedCFG = false;
   {
   NamedRegionTimer NRT("TargetPreProcess", "Target preprocessing",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
-  Target->preProcessFunction(F, TI);
+  ChangedCFG = Target->preProcessFunction(F, TI);
   } // end timed region
 
   // If we don't need to do outlining, then just handle the simple ABI.
@@ -413,7 +414,7 @@ void TapirToTargetImpl::processFunction(
     // Process the Tapir instructions in F directly.
     if (!Target->processOrdinaryFunction(F, &F.getEntryBlock()))
       processSimpleABI(F, &F.getEntryBlock());
-    return;
+    return ChangedCFG;
   }
 
   // Traverse the tasks in this function in post order.
@@ -471,7 +472,7 @@ void TapirToTargetImpl::processFunction(
       }
   });
 
-  return;
+  return ChangedCFG || !NewHelpers.empty();
 }
 
 bool TapirToTargetImpl::run() {
@@ -511,8 +512,7 @@ bool TapirToTargetImpl::run() {
     Function *F = WorkList.pop_back_val();
     SmallVector<Function *, 4> NewHelpers;
 
-    processFunction(*F, NewHelpers);
-    Changed |= !NewHelpers.empty();
+    Changed |= processFunction(*F, NewHelpers);
 
     // Check the generated helper functions to see if any need to be processed,
     // that is, to see if any of them themselves detach a subtask.

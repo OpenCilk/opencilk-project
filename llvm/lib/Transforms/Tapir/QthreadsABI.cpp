@@ -300,11 +300,11 @@ void QthreadsABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   // function to manage the allocation of the argument structure.
 }
 
-void QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
+bool QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
                                      bool ProcessingTapirLoops) {
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
-    return;
+    return false;
 
   LLVMContext &C = M.getContext();
   for (Task *T : post_order(TI.getRootTask())) {
@@ -334,6 +334,7 @@ void QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
     std::vector<Value*> submitArgs = {sinc, null};
     footerB.CreateCall(QTHREAD_FUNC(qt_sinc_submit), submitArgs);
   }
+  return false;
 }
 
 void QthreadsABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {

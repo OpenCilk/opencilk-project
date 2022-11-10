@@ -32,18 +32,21 @@ void SerialABI::lowerSync(SyncInst &SI) {
   ReplaceInstWithInst(&SI, BranchInst::Create(SI.getSuccessor(0)));
 }
 
-void SerialABI::preProcessFunction(Function &F, TaskInfo &TI,
+bool SerialABI::preProcessFunction(Function &F, TaskInfo &TI,
                                    bool ProcessingTapirLoops) {
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
-    return;
+    return false;
 
+  bool Changed = false;
   for (Task *T : post_order(TI.getRootTask())) {
     if (T->isRootTask())
       continue;
     DetachInst *DI = T->getDetach();
     SerializeDetach(DI, T);
+    Changed = true;
   }
+  return Changed;
 }
 
 

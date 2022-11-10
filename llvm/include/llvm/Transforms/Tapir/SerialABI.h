@@ -29,7 +29,7 @@ public:
   bool shouldDoOutlining(const Function &F) const override final {
     return false;
   }
-  void preProcessFunction(Function &F, TaskInfo &TI,
+  bool preProcessFunction(Function &F, TaskInfo &TI,
                           bool ProcessingTapirLoops) override final;
   void postProcessFunction(Function &F,
                            bool ProcessingTapirLoops) override final {}
