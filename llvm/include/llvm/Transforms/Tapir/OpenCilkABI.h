@@ -168,7 +168,7 @@ public:
   void remapAfterOutlining(BasicBlock *TFEntry,
                            ValueToValueMapTy &VMap) override final;
 
-  void preProcessFunction(Function &F, TaskInfo &TI,
+  bool preProcessFunction(Function &F, TaskInfo &TI,
                           bool ProcessingTapirLoops) override final;
   void postProcessFunction(Function &F,
                            bool ProcessingTapirLoops) override final;

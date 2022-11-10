@@ -30,7 +30,7 @@ public:
   void lowerSync(SyncInst &SI) override final;
 
   void addHelperAttributes(Function &F) override final {}
-  void preProcessFunction(Function &F, TaskInfo &TI,
+  bool preProcessFunction(Function &F, TaskInfo &TI,
                           bool ProcessingTapirLoops) override final;
   void postProcessFunction(Function &F,
                            bool ProcessingTapirLoops) override final;
