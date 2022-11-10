@@ -43,8 +43,10 @@ void CudaABI::lowerSync(SyncInst &SI) {
   // currently a no-op...
 }
 
-void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                 bool ProcessingTapirLoops) {}
+bool CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
+                                 bool ProcessingTapirLoops) {
+  return false;
+}
 
 void CudaABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {}
 

@@ -1759,17 +1759,18 @@ static inline void inlineCilkFunctions(
   CallsToInline.clear();
 }
 
-void CilkABI::preProcessFunction(Function &F, TaskInfo &TI,
+bool CilkABI::preProcessFunction(Function &F, TaskInfo &TI,
                                  bool ProcessingTapirLoops) {
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
-    return;
+    return false;
 
   LLVM_DEBUG(dbgs() << "CilkABI processing function " << F.getName() << "\n");
   if (fastCilk && F.getName() == "main") {
     IRBuilder<> B(F.getEntryBlock().getTerminator());
     B.CreateCall(CILKRTS_FUNC(init));
   }
+  return false;
 }
 
 void CilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
