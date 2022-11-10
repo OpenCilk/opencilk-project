@@ -43,7 +43,7 @@ public:
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
 
-  void preProcessFunction(Function &F, TaskInfo &TI,
+  bool preProcessFunction(Function &F, TaskInfo &TI,
                           bool ProcessingTapirLoops) override final;
   void postProcessFunction(Function &F,
                            bool ProcessingTapirLoops) override final;

@@ -975,21 +975,22 @@ void OpenCilkABI::GetTapirRTCalls(Spindle *TaskFrame, bool IsRootTask,
   }
 }
 
-void OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
+bool OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
                                      bool ProcessingTapirLoops) {
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
-    return;
+    return false;
 
   // Find all Tapir-runtime calls in this function that may be translated to
   // enter_frame/leave_frame calls.
   GetTapirRTCalls(TI.getRootTask()->getEntrySpindle(), true, TI);
 
   if (!TI.isSerial() || TapirRTCalls[&F.getEntryBlock()].empty())
-    return;
+    return false;
 
   MarkSpawner(F);
   LowerTapirRTCalls(F, &F.getEntryBlock());
+  return false;
 }
 
 void OpenCilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
