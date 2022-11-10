@@ -255,8 +255,10 @@ public:
   virtual bool shouldDoOutlining(const Function &F) const { return true; }
 
   /// Process Function F before any function outlining is performed.  This
-  /// routine should not modify the CFG structure.
-  virtual void preProcessFunction(Function &F, TaskInfo &TI,
+  /// routine should not modify the CFG structure, unless it processes all Tapir
+  /// instructions in F itself.  Returns true if it modifies the CFG, false
+  /// otherwise.
+  virtual bool preProcessFunction(Function &F, TaskInfo &TI,
                                   bool ProcessingTapirLoops = false) = 0;
 
   /// Returns an ArgStructMode enum value describing how inputs to a task should
