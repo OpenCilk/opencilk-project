@@ -6153,11 +6153,14 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     /* JFC: Is it possible to confuse with with -fno-opencilk? */
     bool OpenCilk = Args.hasArgNoClaim(options::OPT_fopencilk);
     bool Cheetah = false;
+    bool CustomTarget = false;
 
     if (Arg *TapirRuntime = Args.getLastArgNoClaim(options::OPT_ftapir_EQ)) {
       Cheetah = TapirRuntime->getValue() == StringRef("cheetah");
       if (TapirRuntime->getValue() == StringRef("opencilk")) {
         OpenCilk = true;
+      } else {
+        CustomTarget = true;
       }
     }
 
@@ -6196,8 +6199,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       // Forward flags for enabling pedigrees.
       Args.AddLastArg(CmdArgs, options::OPT_fopencilk_enable_pedigrees);
 
-      // Add the OpenCilk ABI bitcode file.
-      getToolChain().AddOpenCilkABIBitcode(Args, CmdArgs);
+      if (!CustomTarget)
+        // Add the OpenCilk ABI bitcode file.
+        getToolChain().AddOpenCilkABIBitcode(Args, CmdArgs);
     }
   }
 
