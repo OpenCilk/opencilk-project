@@ -2001,7 +2001,7 @@ CallInst *CSIImpl::createRTUnitInitCall(IRBuilder<> &IRB) {
   // Insert call to __csirt_unit_init
   return IRB.CreateCall(
       RTUnitInit,
-      {IRB.CreateGlobalStringPtr(M.getName()),
+      {IRB.CreateGlobalStringPtr(M.getName(), "__csi_module_name"),
        ConstantExpr::getGetElementPtr(FEDGV->getValueType(), FEDGV, GepArgs),
        ConstantExpr::getGetElementPtr(SizeGV->getValueType(), SizeGV, GepArgs),
        InitCallsiteToFunction});
