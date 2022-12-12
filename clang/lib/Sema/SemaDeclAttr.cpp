@@ -4988,6 +4988,9 @@ static void handleCallConvAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   case ParsedAttr::AT_IntelOclBicc:
     D->addAttr(::new (S.Context) IntelOclBiccAttr(S.Context, AL));
     return;
+  case ParsedAttr::AT_PreserveNone:
+    D->addAttr(::new (S.Context) PreserveNoneAttr(S.Context, AL));
+    return;
   case ParsedAttr::AT_PreserveMost:
     D->addAttr(::new (S.Context) PreserveMostAttr(S.Context, AL));
     return;
@@ -5158,6 +5161,9 @@ bool Sema::CheckCallingConvAttr(const ParsedAttr &Attrs, CallingConv &CC,
   }
   case ParsedAttr::AT_IntelOclBicc:
     CC = CC_IntelOclBicc;
+    break;
+  case ParsedAttr::AT_PreserveNone:
+    CC = CC_PreserveNone;
     break;
   case ParsedAttr::AT_PreserveMost:
     CC = CC_PreserveMost;
@@ -8548,6 +8554,7 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
   case ParsedAttr::AT_SysVABI:
   case ParsedAttr::AT_Pcs:
   case ParsedAttr::AT_IntelOclBicc:
+  case ParsedAttr::AT_PreserveNone:
   case ParsedAttr::AT_PreserveMost:
   case ParsedAttr::AT_PreserveAll:
   case ParsedAttr::AT_AArch64VectorPcs:

@@ -4945,6 +4945,19 @@ general this requires the template to be declared at least twice. For example:
   }];
 }
 
+def PreserveNoneDocs : Documentation {
+  let Category = DocCatCallingConvs;
+  let Content = [{
+On X86-64 and AArch64 targets, this attribute changes the calling convention of
+a function. The function saves only frame-related registers.  This is used in
+conjunction with ``__builtin_save_continuation`` to call a function that might
+use ``__builtin_longjmp`` to return to its caller.  The function should return
+``void``.
+
+- On AArch64 this saves SP, FP, and X19.
+  }];
+}
+
 def PreserveMostDocs : Documentation {
   let Category = DocCatCallingConvs;
   let Content = [{

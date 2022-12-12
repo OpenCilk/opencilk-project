@@ -478,6 +478,12 @@ def AArch64call_bti      : SDNode<"AArch64ISD::CALL_BTI",
                                 [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                                  SDNPVariadic]>;
 
+def AArch64call_continuation
+                         : SDNode<"AArch64ISD::CALL_CONTINUATION",
+                                SDTypeProfile<0, -1, [SDTCisPtrTy<0>]>,
+                                [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
+                                 SDNPVariadic]>;
+
 def AArch64call_rvmarker: SDNode<"AArch64ISD::CALL_RVMARKER",
                              SDTypeProfile<0, -1, [SDTCisPtrTy<0>]>,
                              [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -2327,6 +2333,8 @@ let isCall = 1, Defs = [LR], Uses = [SP] in {
                      Sched<[WriteBrReg]>;
   def BLR_BTI : Pseudo<(outs), (ins variable_ops), []>,
                 Sched<[WriteBrReg]>;
+  def BLR_CONTINUATION : Pseudo<(outs), (ins variable_ops), []>,
+                Sched<[WriteBrReg]>;
 } // isCall
 
 def : Pat<(AArch64call GPR64:$Rn),
@@ -2342,6 +2350,10 @@ def : Pat<(AArch64call_rvmarker (i64 tglobaladdr:$rvfunc), GPR64:$Rn),
 
 def : Pat<(AArch64call_bti GPR64:$Rn),
           (BLR_BTI GPR64:$Rn)>,
+      Requires<[NoSLSBLRMitigation]>;
+
+def : Pat<(AArch64call_continuation GPR64:$Rn),
+          (BLR_CONTINUATION GPR64:$Rn)>,
       Requires<[NoSLSBLRMitigation]>;
 
 let isBranch = 1, isTerminator = 1, isBarrier = 1, isIndirectBranch = 1 in {

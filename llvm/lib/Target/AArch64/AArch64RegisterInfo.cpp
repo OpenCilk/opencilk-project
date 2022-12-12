@@ -79,6 +79,8 @@ AArch64RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     // GHC set of callee saved regs is empty as all those regs are
     // used for passing STG regs around
     return CSR_AArch64_NoRegs_SaveList;
+  if (MF->getFunction().getCallingConv() == CallingConv::PreserveNone)
+      return CSR_AArch64_FewRegs_SaveList;
   if (MF->getFunction().getCallingConv() == CallingConv::AnyReg)
     return CSR_AArch64_AllRegs_SaveList;
 
@@ -219,6 +221,8 @@ AArch64RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
     return SCS ? CSR_AArch64_NoRegs_SCS_RegMask : CSR_AArch64_NoRegs_RegMask;
   if (CC == CallingConv::AnyReg)
     return SCS ? CSR_AArch64_AllRegs_SCS_RegMask : CSR_AArch64_AllRegs_RegMask;
+  if (CC == CallingConv::PreserveNone)
+    return SCS ? CSR_AArch64_FewRegs_SCS_RegMask : CSR_AArch64_FewRegs_RegMask;
 
   // All the following calling conventions are handled differently on Darwin.
   if (MF.getSubtarget<AArch64Subtarget>().isTargetDarwin()) {
@@ -388,6 +392,9 @@ bool AArch64RegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   // during execution, the base pointer is the only reliable way to reference
   // local variables.
   if (MF.getFunction().hasFnAttribute(Attribute::Stealable))
+    return true;
+
+  if (MFI.hasReadBasePointer())
     return true;
 
   // In the presence of variable sized objects or funclets, if the fixed stack
@@ -781,7 +788,7 @@ unsigned AArch64RegisterInfo::getLocalAddressRegister(
   const auto &MFI = MF.getFrameInfo();
   if (!MF.hasEHFunclets() && !MFI.hasVarSizedObjects())
     return AArch64::SP;
-  else if (hasStackRealignment(MF))
+  else if (hasBasePointer(MF))
     return getBaseRegister();
   return getFrameRegister(MF);
 }

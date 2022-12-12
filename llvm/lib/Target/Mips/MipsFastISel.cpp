@@ -1508,6 +1508,9 @@ bool MipsFastISel::fastLowerCall(CallLoweringInfo &CLI) {
   if (IsVarArg)
     return false;
 
+  if (CC == CallingConv::PreserveNone)
+    return false;
+
   // FIXME: Only handle *simple* calls for now.
   MVT RetVT;
   if (CLI.RetTy->isVoidTy())

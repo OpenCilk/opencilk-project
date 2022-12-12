@@ -299,6 +299,8 @@ X86RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   case CallingConv::GHC:
   case CallingConv::HiPE:
     return CSR_NoRegs_SaveList;
+  case CallingConv::PreserveNone:
+    return CSR_FewRegs_64_SaveList;
   case CallingConv::AnyReg:
     if (HasAVX)
       return CSR_64_AllRegs_AVX_SaveList;
@@ -422,6 +424,8 @@ X86RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
   case CallingConv::GHC:
   case CallingConv::HiPE:
     return CSR_NoRegs_RegMask;
+  case CallingConv::PreserveNone:
+    return Is64Bit ? CSR_FewRegs_64_RegMask : CSR_FewRegs_32_RegMask;
   case CallingConv::AnyReg:
     if (HasAVX)
       return CSR_64_AllRegs_AVX_RegMask;
@@ -648,6 +652,9 @@ bool X86RegisterInfo::hasBasePointer(const MachineFunction &MF) const {
     return true;
 
   const MachineFrameInfo &MFI = MF.getFrameInfo();
+
+  if (MFI.hasReadBasePointer())
+    return true;
 
   if (!EnableBasePointer)
     return false;

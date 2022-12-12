@@ -223,6 +223,14 @@ let hasSideEffects = 1, isBarrier = 1, isCodeGenOnly = 1,
                             "#EH_SJLJ_LONGJMP64",
                             [(X86eh_sjlj_longjmp addr:$buf)]>,
                           Requires<[In64BitMode]>;
+  def EH_SjLj_Resume32 : I<0, Pseudo, (outs), (ins i32mem:$buf, GR32:$fn),
+                            "#EH_SJLJ_RESUME32",
+                            [(X86eh_sjlj_resume addr:$buf, GR32:$fn)]>,
+                          Requires<[Not64BitMode]>;
+  def EH_SjLj_Resume64 : I<0, Pseudo, (outs), (ins i64mem:$buf, GR64:$fn),
+                           "#EH_SJLJ_RESUME64",
+                           [(X86eh_sjlj_resume addr:$buf, GR64:$fn)]>,
+                          Requires<[In64BitMode]>;
   }
 }
 

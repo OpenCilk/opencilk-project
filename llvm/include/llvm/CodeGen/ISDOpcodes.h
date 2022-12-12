@@ -145,6 +145,8 @@ enum NodeType {
   /// It takes an input chain and a pointer to the jump buffer as inputs
   /// and returns an outchain.
   EH_SJLJ_LONGJMP,
+  /// As above but with one extra argument
+  EH_SJLJ_RESUME,
 
   /// OUTCHAIN = EH_SJLJ_SETUP_DISPATCH(INCHAIN)
   /// The target initializes the dispatch table here.

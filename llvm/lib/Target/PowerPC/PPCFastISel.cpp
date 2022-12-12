@@ -1559,6 +1559,9 @@ bool PPCFastISel::fastLowerCall(CallLoweringInfo &CLI) {
   if (IsTailCall)
     return false;
 
+  if (CC == CallingConv::PreserveNone)
+    return false;
+
   // Let SDISel handle vararg functions.
   if (IsVarArg)
     return false;

@@ -1125,6 +1125,10 @@ def CC_X86 : CallingConv<[
 
 def CSR_NoRegs : CalleeSavedRegs<(add)>;
 
+// Frame and base registers only
+def CSR_FewRegs_32 : CalleeSavedRegs<(add EBP, ESI)>;
+def CSR_FewRegs_64 : CalleeSavedRegs<(add RBP, RBX)>;
+
 def CSR_32 : CalleeSavedRegs<(add ESI, EDI, EBX, EBP)>;
 def CSR_64 : CalleeSavedRegs<(add RBX, R12, R13, R14, R15, RBP)>;
 

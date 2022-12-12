@@ -2098,6 +2098,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   unsigned CSSize = X86FI->getCalleeSavedFrameSize();
   unsigned TailCallArgReserveSize = -X86FI->getTCReturnAddrDelta();
   bool HasFP = hasFP(MF);
+  bool HasBP = TRI->hasBasePointer(MF);
   uint64_t NumBytes = 0;
 
   bool NeedsDwarfCFI = (!MF.getTarget().getTargetTriple().isOSDarwin() &&
@@ -2222,6 +2223,14 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
         .addReg(FramePtr);
       --MBBI;
     }
+  } else if (IsLP64 && HasFP && HasBP) {
+    if (NumBytes)
+      addRegOffset(BuildMI(MBB, MBBI, DL, TII.get(X86::LEA64r), StackPtr),
+                   TRI->getBaseRegister(), true, NumBytes);
+    else
+      BuildMI(MBB, MBBI, DL, TII.get(X86::MOV64rr), StackPtr)
+          .addReg(TRI->getBaseRegister());
+    --MBBI;
   } else if (NumBytes) {
     // Adjust stack pointer back: ESP += numbytes.
     emitSPUpdate(MBB, MBBI, DL, NumBytes, /*InEpilogue=*/true);

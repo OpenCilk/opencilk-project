@@ -55,6 +55,7 @@ enum NodeType : unsigned {
   // x29, x29` marker instruction.
   CALL_RVMARKER,
 
+  CALL_CONTINUATION, // Function call saving continuation
   CALL_BTI, // Function call followed by a BTI instruction.
 
   // Produces the full sequence of instructions for getting the thread pointer
@@ -420,6 +421,7 @@ enum NodeType : unsigned {
   // Builtin setjmp and longjmp
   EH_SJLJ_SETJMP,
   EH_SJLJ_LONGJMP,
+  EH_SJLJ_RESUME,
 
   // Strict (exception-raising) floating point comparison
   STRICT_FCMP = ISD::FIRST_TARGET_STRICTFP_OPCODE,
@@ -1025,6 +1027,7 @@ private:
                              EVT VT, SelectionDAG &DAG, const SDLoc &DL) const;
   SDValue LowerSetjmp(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerLongjmp(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerResume(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue LowerFixedLengthVectorIntDivideToSVE(SDValue Op,
                                                SelectionDAG &DAG) const;

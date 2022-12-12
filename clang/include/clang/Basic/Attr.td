@@ -2578,6 +2578,11 @@ def PreferredName : InheritableAttr {
   let TemplateDependent = 1;
 }
 
+def PreserveNone : DeclOrTypeAttr {
+  let Spellings = [GCC<"preserve_none">];
+  let Documentation = [PreserveNoneDocs];
+}
+
 def PreserveMost : DeclOrTypeAttr {
   let Spellings = [Clang<"preserve_most">];
   let Documentation = [PreserveMostDocs];

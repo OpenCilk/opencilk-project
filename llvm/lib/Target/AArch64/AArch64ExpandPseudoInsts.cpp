@@ -87,6 +87,8 @@ private:
   bool expandCALL_RVMARKER(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator MBBI);
   bool expandCALL_BTI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI);
+  bool expandCALL_CONTINUATION(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator MBBI);
   bool expandStoreSwiftAsyncContext(MachineBasicBlock &MBB,
                                     MachineBasicBlock::iterator MBBI);
 };
@@ -791,6 +793,69 @@ bool AArch64ExpandPseudo::expandCALL_BTI(MachineBasicBlock &MBB,
   return true;
 }
 
+bool AArch64ExpandPseudo::expandCALL_CONTINUATION(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI) {
+  // Expand CALL_CONTINUATION pseudo to:
+  // - a save of x19
+  // - a branch to the call target
+  // - a label
+  // - a nop or BTI instruction attached to the label
+  // Mark the last three as a bundle, to avoid passes moving other code in
+  // between.
+
+  MachineInstr &MI = *MBBI;
+
+  // This is not optimal.
+  unsigned LabelReg = AArch64::LR; // XXX LR is technically preserved?
+  MachineInstrBuilder MIB;
+  // Due to the fixed displacement (12) this must be bundled with
+  // the store, call, and BTI hint.
+  MIB = BuildMI(MBB, MBBI, MI.getDebugLoc(),
+                TII->get(AArch64::ADR), LabelReg).addImm(12);
+  MachineInstr *First = MIB.getInstr();
+
+  // The last argument holds the pointer to the void *[5] block.
+  // Finding the last argument is ugly.
+  unsigned PtrReg = 0; // any value <= X0
+  unsigned NumArgs = MI.getNumOperands();
+  for (unsigned I = 1; I < NumArgs; ++I) {
+    MachineOperand &Arg = MI.getOperand(I);
+    if (!Arg.isReg() || !Arg.isUse())
+      continue;
+    if (Arg.getReg() < AArch64::X0 || Arg.getReg() > AArch64::X7)
+      continue;
+    if (Arg.getReg() > PtrReg)
+      PtrReg = Arg.getReg();
+  }
+
+  // TODO: if PtrReg is X7 this might be wrong
+  MIB = BuildMI(MBB, MBBI, MI.getDebugLoc(), TII->get(AArch64::STRXui))
+            .addUse(LabelReg)
+            .addUse(PtrReg)
+            .addImm(2); // scaled by 8
+
+  MachineOperand &CallTarget = MI.getOperand(0);
+  assert((CallTarget.isGlobal() || CallTarget.isReg()) &&
+         "invalid operand for regular call");
+  unsigned Opc = CallTarget.isGlobal() ? AArch64::BL : AArch64::BLR;
+  MachineInstr *Call =
+      BuildMI(MBB, MBBI, MI.getDebugLoc(), TII->get(Opc)).getInstr();
+  Call->addOperand(CallTarget);
+
+  MachineInstr *BTI =
+      BuildMI(MBB, MBBI, MI.getDebugLoc(), TII->get(AArch64::HINT))
+          // BTI J so that setjmp can to BR to this.
+          .addImm(36)
+          .getInstr();
+
+  if (MI.shouldUpdateCallSiteInfo())
+    MBB.getParent()->moveCallSiteInfo(&MI, Call);
+
+  MI.eraseFromParent();
+  finalizeBundle(MBB, First->getIterator(), std::next(BTI->getIterator()));
+  return true;
+}
+
 bool AArch64ExpandPseudo::expandStoreSwiftAsyncContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI) {
   Register CtxReg = MBBI->getOperand(0).getReg();
@@ -1272,6 +1337,8 @@ bool AArch64ExpandPseudo::expandMI(MachineBasicBlock &MBB,
      return expandCALL_RVMARKER(MBB, MBBI);
    case AArch64::BLR_BTI:
      return expandCALL_BTI(MBB, MBBI);
+   case AArch64::BLR_CONTINUATION:
+     return expandCALL_CONTINUATION(MBB, MBBI);
    case AArch64::StoreSwiftAsyncContext:
      return expandStoreSwiftAsyncContext(MBB, MBBI);
   }

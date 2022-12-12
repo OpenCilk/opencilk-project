@@ -726,6 +726,7 @@ public:
     case CC_X86VectorCall:
     case CC_IntelOclBicc:
     case CC_Win64:
+    case CC_PreserveNone:
     case CC_PreserveMost:
     case CC_PreserveAll:
     case CC_X86RegCall:

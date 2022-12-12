@@ -35,6 +35,9 @@ define i32 @bar(i32 %i) local_unnamed_addr {
 ; X86_64:       ## %bb.0: ## %entry
 ; X86_64-NEXT:    pushq %rbp
 ; X86_64-NEXT:    .cfi_def_cfa_offset 16
+; X86_64-NEXT:    pushq %rbx
+; X86_64-NEXT:    .cfi_def_cfa_offset 24
+; X86_64-NEXT:    .cfi_offset %rbx, -24
 ; X86_64-NEXT:    .cfi_offset %rbp, -16
 ; X86_64-NEXT:    movq _buf@GOTPCREL(%rip), %rax
 ; X86_64-NEXT:    movq (%rax), %rax
@@ -63,12 +66,16 @@ define i32 @bar(i32 %i) local_unnamed_addr {
 ; X86_64-NEXT:    movq (%rax), %rbp
 ; X86_64-NEXT:    movq 8(%rax), %rcx
 ; X86_64-NEXT:    movq 16(%rax), %rsp
+; X86_64-NEXT:    movq 24(%rax), %rbx
 ; X86_64-NEXT:    jmpq *%rcx
 ;
 ; X86-LABEL: bar:
 ; X86:       ## %bb.0: ## %entry
 ; X86-NEXT:    pushl %ebp
 ; X86-NEXT:    .cfi_def_cfa_offset 8
+; X86-NEXT:    pushl %esi
+; X86-NEXT:    .cfi_def_cfa_offset 12
+; X86-NEXT:    .cfi_offset %esi, -12
 ; X86-NEXT:    .cfi_offset %ebp, -8
 ; X86-NEXT:    movl L_buf$non_lazy_ptr, %eax
 ; X86-NEXT:    movl (%eax), %eax
@@ -97,6 +104,7 @@ define i32 @bar(i32 %i) local_unnamed_addr {
 ; X86-NEXT:    movl (%eax), %ebp
 ; X86-NEXT:    movl 4(%eax), %ecx
 ; X86-NEXT:    movl 8(%eax), %esp
+; X86-NEXT:    movl 12(%eax), %esi
 ; X86-NEXT:    jmpl *%ecx
 entry:
   %0 = load i8*, i8** @buf, align 8

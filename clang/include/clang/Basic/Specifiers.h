@@ -277,6 +277,7 @@ namespace clang {
     CC_OpenCLKernel, // inferred for OpenCL kernels
     CC_Swift,        // __attribute__((swiftcall))
     CC_SwiftAsync,        // __attribute__((swiftasynccall))
+    CC_PreserveNone, // __attribute__((preserve_none))
     CC_PreserveMost, // __attribute__((preserve_most))
     CC_PreserveAll,  // __attribute__((preserve_all))
     CC_AArch64VectorCall, // __attribute__((aarch64_vector_pcs))
@@ -296,6 +297,7 @@ namespace clang {
     case CC_OpenCLKernel:
     case CC_Swift:
     case CC_SwiftAsync:
+    case CC_PreserveNone:
       return false;
     default:
       return true;

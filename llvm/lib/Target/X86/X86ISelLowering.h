@@ -306,6 +306,7 @@ namespace llvm {
 
     // SjLj exception handling longjmp.
     EH_SJLJ_LONGJMP,
+    EH_SJLJ_RESUME,
 
     // SjLj exception handling dispatch.
     EH_SJLJ_SETUP_DISPATCH,
@@ -1588,6 +1589,7 @@ namespace llvm {
     SDValue LowerEH_RETURN(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerEH_SJLJ_SETJMP(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerEH_SJLJ_LONGJMP(SDValue Op, SelectionDAG &DAG) const;
+    SDValue lowerEH_SJLJ_RESUME(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerEH_SJLJ_SETUP_DISPATCH(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerINIT_TRAMPOLINE(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFLT_ROUNDS_(SDValue Op, SelectionDAG &DAG) const;
@@ -1692,7 +1694,8 @@ namespace llvm {
                                   MachineBasicBlock *MBB) const;
 
     MachineBasicBlock *emitEHSjLjLongJmp(MachineInstr &MI,
-                                         MachineBasicBlock *MBB) const;
+                                         MachineBasicBlock *MBB,
+                                         unsigned Opcode) const;
 
     MachineBasicBlock *emitLongJmpShadowStackFix(MachineInstr &MI,
                                                  MachineBasicBlock *MBB) const;

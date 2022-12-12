@@ -68,6 +68,7 @@
 // C -> const
 // D -> volatile
 // R -> restrict
+// % -> function returning void with single argument of postfixed type
 
 // The third value provided to the macro specifies information about attributes
 // of the function.  These must be kept in sync with the predicates in the
@@ -1692,6 +1693,13 @@ LANGBUILTIN(__arithmetic_fence, "v.", "t", ALL_LANGUAGES)
 // Tapir.  Rewriting of reducer references happens during sema
 // and needs a builtin to carry the information to codegen.
 BUILTIN(__hyper_lookup, "v*vC*", "nU")
+
+// OpenCilk.  Create a jmp_buf suitable for resuming the current function
+// at the given address.
+BUILTIN(__builtin_continuation, "vv**v*", "n")
+// If the third argument is not null, simulate a call to it from
+// the target of the continuation.
+BUILTIN(__builtin_resume_continuation, "vv**v%", "r")
 
 #undef BUILTIN
 #undef LIBBUILTIN

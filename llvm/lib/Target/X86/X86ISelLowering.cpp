@@ -472,6 +472,7 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
   // LLVM/Clang supports zero-cost DWARF and SEH exception handling.
   setOperationAction(ISD::EH_SJLJ_SETJMP, MVT::i32, Custom);
   setOperationAction(ISD::EH_SJLJ_LONGJMP, MVT::Other, Custom);
+  setOperationAction(ISD::EH_SJLJ_RESUME, MVT::Other, Custom);
   setOperationAction(ISD::EH_SJLJ_SETUP_DISPATCH, MVT::Other, Custom);
   if (TM.Options.ExceptionModel == ExceptionHandling::SjLj)
     setLibcallName(RTLIB::UNWIND_RESUME, "_Unwind_SjLj_Resume");
@@ -26816,6 +26817,17 @@ SDValue X86TargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
     return recoverFramePointer(DAG, Fn, IncomingFPOp);
   }
 
+  case Intrinsic::basepointer: {
+    MachineFunction &MF = DAG.getMachineFunction();
+    bool Force = Op.getConstantOperandVal(1);
+    if (Force)
+      MF.getFrameInfo().setReadBasePointer(true);
+    const X86RegisterInfo *RegInfo = Subtarget.getRegisterInfo();
+    if (Force || RegInfo->hasBasePointer(MF))
+      return DAG.getCopyFromReg(DAG.getEntryNode(), dl,
+                                RegInfo->getBaseRegister(), VT);
+    return DAG.getIntPtrConstant(0, dl);
+  }
   case Intrinsic::localaddress: {
     // Returns one of the stack, base, or frame pointer registers, depending on
     // which is used to reference local variables.
@@ -27732,6 +27744,14 @@ SDValue X86TargetLowering::lowerEH_SJLJ_SETJMP(SDValue Op,
   return DAG.getNode(X86ISD::EH_SJLJ_SETJMP, DL,
                      DAG.getVTList(MVT::i32, MVT::Other),
                      Op.getOperand(0), Op.getOperand(1));
+}
+
+SDValue X86TargetLowering::lowerEH_SJLJ_RESUME(SDValue Op,
+                                               SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  return DAG.getNode(X86ISD::EH_SJLJ_RESUME, DL, MVT::Other,
+                     Op.getOperand(0), Op.getOperand(1),
+                     Op.getOperand(2));
 }
 
 SDValue X86TargetLowering::lowerEH_SJLJ_LONGJMP(SDValue Op,
@@ -31672,6 +31692,7 @@ SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::EH_RETURN:          return LowerEH_RETURN(Op, DAG);
   case ISD::EH_SJLJ_SETJMP:     return lowerEH_SJLJ_SETJMP(Op, DAG);
   case ISD::EH_SJLJ_LONGJMP:    return lowerEH_SJLJ_LONGJMP(Op, DAG);
+  case ISD::EH_SJLJ_RESUME:     return lowerEH_SJLJ_RESUME(Op, DAG);
   case ISD::EH_SJLJ_SETUP_DISPATCH:
     return lowerEH_SJLJ_SETUP_DISPATCH(Op, DAG);
   case ISD::INIT_TRAMPOLINE:    return LowerINIT_TRAMPOLINE(Op, DAG);
@@ -32808,6 +32829,7 @@ const char *X86TargetLowering::getTargetNodeName(unsigned Opcode) const {
   NODE_NAME_CASE(TLSCALL)
   NODE_NAME_CASE(EH_SJLJ_SETJMP)
   NODE_NAME_CASE(EH_SJLJ_LONGJMP)
+  NODE_NAME_CASE(EH_SJLJ_RESUME)
   NODE_NAME_CASE(EH_SJLJ_SETUP_DISPATCH)
   NODE_NAME_CASE(EH_RETURN)
   NODE_NAME_CASE(TC_RETURN)
@@ -35164,9 +35186,24 @@ X86TargetLowering::emitLongJmpShadowStackFix(MachineInstr &MI,
   return sinkMBB;
 }
 
+static void CopyAddress(MachineInstrBuilder &Out, MachineInstr &In,
+                        int64_t Offset) {
+  for (unsigned i = 0; i < X86::AddrNumOperands; ++i) {
+    const MachineOperand &MO = In.getOperand(i);
+    if (i == X86::AddrDisp && Offset)
+      Out.addDisp(MO, Offset);
+    else if (MO.isReg()) // Don't add the whole operand, we don't want to
+                         // preserve kill flags.
+      Out.addReg(MO.getReg());
+    else
+      Out.add(MO);
+  }
+}
+
 MachineBasicBlock *
 X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
-                                     MachineBasicBlock *MBB) const {
+                                     MachineBasicBlock *MBB,
+                                     unsigned Opcode) const {
   const DebugLoc &DL = MI.getDebugLoc();
   MachineFunction *MF = MBB->getParent();
   const TargetInstrInfo *TII = Subtarget.getInstrInfo();
@@ -35183,19 +35220,22 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
 
   const TargetRegisterClass *RC =
     (PVT == MVT::i64) ? &X86::GR64RegClass : &X86::GR32RegClass;
-  Register Tmp = MRI.createVirtualRegister(RC);
+  Register PC = MRI.createVirtualRegister(RC);
   // Since FP is only updated here but NOT referenced, it's treated as GPR.
   const X86RegisterInfo *RegInfo = Subtarget.getRegisterInfo();
   Register FP = (PVT == MVT::i64) ? X86::RBP : X86::EBP;
+  Register BP = (PVT == MVT::i64) ? X86::RBX : X86::ESI;
   Register SP = RegInfo->getStackRegister();
 
   MachineInstrBuilder MIB;
 
   const int64_t LabelOffset = 1 * PVT.getStoreSize();
   const int64_t SPOffset = 2 * PVT.getStoreSize();
+  const int64_t BPOffset = 3 * PVT.getStoreSize();
 
   unsigned PtrLoadOpc = (PVT == MVT::i64) ? X86::MOV64rm : X86::MOV32rm;
   unsigned IJmpOpc = (PVT == MVT::i64) ? X86::JMP64r : X86::JMP32r;
+  unsigned PushOpc = (PVT == MVT::i64) ? X86::PUSH64r : X86::PUSH32r;
 
   MachineBasicBlock *thisMBB = MBB;
 
@@ -35218,35 +35258,24 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
 
   // Reload FP
   MIB = BuildMI(*thisMBB, MI, DL, TII->get(PtrLoadOpc), FP);
-  for (unsigned i = 0; i < X86::AddrNumOperands; ++i) {
-    const MachineOperand &MO = MI.getOperand(i);
-    if (MO.isReg()) // Don't add the whole operand, we don't want to
-                    // preserve kill flags.
-      MIB.addReg(MO.getReg());
-    else
-      MIB.add(MO);
-  }
+  CopyAddress(MIB, MI, 0);
   MIB.setMemRefs(MMOs);
 
   // Reload IP
-  MIB = BuildMI(*thisMBB, MI, DL, TII->get(PtrLoadOpc), Tmp);
-  for (unsigned i = 0; i < X86::AddrNumOperands; ++i) {
-    const MachineOperand &MO = MI.getOperand(i);
-    if (i == X86::AddrDisp)
-      MIB.addDisp(MO, LabelOffset);
-    else if (MO.isReg()) // Don't add the whole operand, we don't want to
-                         // preserve kill flags.
-      MIB.addReg(MO.getReg());
-    else
-      MIB.add(MO);
-  }
+  MIB = BuildMI(*thisMBB, MI, DL, TII->get(PtrLoadOpc), PC);
+  CopyAddress(MIB, MI, LabelOffset);
   MIB.setMemRefs(MMOs);
 
   // Reload SP
   MIB = BuildMI(*thisMBB, MI, DL, TII->get(PtrLoadOpc), SP);
+  CopyAddress(MIB, MI, SPOffset);
+  MIB.setMemRefs(MMOs);
+
+  // Reload BP
+  MIB = BuildMI(*thisMBB, MI, DL, TII->get(PtrLoadOpc), BP);
   for (unsigned i = 0; i < X86::AddrNumOperands; ++i) {
     if (i == X86::AddrDisp)
-      MIB.addDisp(MI.getOperand(i), SPOffset);
+      MIB.addDisp(MI.getOperand(i), BPOffset);
     else
       MIB.add(MI.getOperand(i)); // We can preserve the kill flags here, it's
                                  // the last instruction of the expansion.
@@ -35254,7 +35283,24 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
   MIB.setMemRefs(MMOs);
 
   // Jump
-  BuildMI(*thisMBB, MI, DL, TII->get(IJmpOpc)).addReg(Tmp);
+  switch (Opcode) {
+  case X86::EH_SjLj_LongJmp32:
+  case X86::EH_SjLj_LongJmp64:
+    // Jump
+    BuildMI(*thisMBB, MI, DL, TII->get(IJmpOpc)).addReg(PC);
+    break;
+  case X86::EH_SjLj_Resume32:
+  case X86::EH_SjLj_Resume64:
+    // push return address on the stack just restored
+    // TODO: Does this require different shadow stack handling?
+    // TODO: This ought to allow a direct branch instead of an indirect
+    // branch, but every attempt to allow a direct branch caused a
+    // tablegen or compiler crash.  Need documentation.
+    MIB = BuildMI(*thisMBB, MI, DL, TII->get(PushOpc)).addReg(PC);
+    MIB = BuildMI(*thisMBB, MI, DL, TII->get(IJmpOpc))
+              .add(MI.getOperand(X86::AddrNumOperands));
+    break;
+  }
 
   MI.eraseFromParent();
   return thisMBB;
@@ -35718,7 +35764,9 @@ X86TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
 
   case X86::EH_SjLj_LongJmp32:
   case X86::EH_SjLj_LongJmp64:
-    return emitEHSjLjLongJmp(MI, BB);
+  case X86::EH_SjLj_Resume32:
+  case X86::EH_SjLj_Resume64:
+    return emitEHSjLjLongJmp(MI, BB, MI.getOpcode());
 
   case X86::Int_eh_sjlj_setup_dispatch:
     return EmitSjLjDispatchBlock(MI, BB);

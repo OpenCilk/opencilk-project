@@ -252,6 +252,9 @@ namespace CallingConv {
     /// M68k_INTR - Calling convention used for M68k interrupt routines.
     M68k_INTR = 101,
 
+    /// PreserveNone - Only frame-related registers preserved.
+    PreserveNone = 102,
+
     /// The highest possible calling convention ID. Must be some 2^k - 1.
     MaxID = 1023
   };

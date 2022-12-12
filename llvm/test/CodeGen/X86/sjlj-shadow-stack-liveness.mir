@@ -26,6 +26,8 @@ body:             |
     ; CHECK-NOT: MOV64rm killed %0
     ; CHECK-NEXT: MOV64rm %0
     ; CHECK-NOT: MOV64rm killed %0
+    ; CHECK-NEXT: MOV64rm %0
+    ; CHECK-NOT: MOV64rm killed %0
     ; CHECK-NEXT: MOV64rm killed %0
 
   ; FIXME: Dummy PHI to set the property NoPHIs to false. PR38439.

@@ -3135,6 +3135,9 @@ bool AArch64FastISel::fastLowerCall(CallLoweringInfo &CLI) {
       MF->getInfo<AArch64FunctionInfo>()->branchTargetEnforcement())
     return false;
 
+  if (CC == CallingConv::PreserveNone)
+    return false;
+
   // Allow SelectionDAG isel to handle tail calls.
   if (IsTailCall)
     return false;

@@ -1360,6 +1360,7 @@ llvm::DIType *CGDebugInfo::CreateType(const TypedefType *Ty,
 static unsigned getDwarfCC(CallingConv CC) {
   switch (CC) {
   case CC_C:
+  case CC_PreserveNone:
     // Avoid emitting DW_AT_calling_convention if the C convention was used.
     return 0;
 

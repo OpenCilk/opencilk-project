@@ -3209,6 +3209,7 @@ StringRef FunctionType::getNameForCallConv(CallingConv CC) {
   case CC_OpenCLKernel: return "opencl_kernel";
   case CC_Swift: return "swiftcall";
   case CC_SwiftAsync: return "swiftasynccall";
+  case CC_PreserveNone: return "preserve_none";
   case CC_PreserveMost: return "preserve_most";
   case CC_PreserveAll: return "preserve_all";
   }
@@ -3666,6 +3667,7 @@ bool AttributedType::isCallingConv() const {
   case attr::MSABI:
   case attr::SysVABI:
   case attr::IntelOclBicc:
+  case attr::PreserveNone:
   case attr::PreserveMost:
   case attr::PreserveAll:
     return true;

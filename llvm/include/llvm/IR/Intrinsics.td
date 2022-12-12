@@ -531,6 +531,11 @@ def int_read_volatile_register  : Intrinsic<[llvm_anyint_ty], [llvm_metadata_ty]
 // stack, frame, or base pointer depending on the type of prologue.
 def int_localaddress : DefaultAttrsIntrinsic<[llvm_ptr_ty], [], [IntrNoMem]>;
 
+// Gets the address of the base pointer.
+// If the argument is nonzero, force use of a base pointer.
+def int_basepointer : DefaultAttrsIntrinsic<[llvm_ptr_ty], [llvm_i1_ty],
+                                            [IntrNoMem,ImmArg<ArgIndex<0>>]>;
+
 // Escapes local variables to allow access from other functions.
 def int_localescape : DefaultAttrsIntrinsic<[], [llvm_vararg_ty]>;
 
@@ -1013,6 +1018,8 @@ def int_eh_sjlj_callsite         : Intrinsic<[], [llvm_i32_ty], [IntrNoMem]>;
 def int_eh_sjlj_functioncontext : Intrinsic<[], [llvm_ptr_ty]>;
 def int_eh_sjlj_setjmp          : Intrinsic<[llvm_i32_ty], [llvm_ptr_ty]>;
 def int_eh_sjlj_longjmp         : Intrinsic<[], [llvm_ptr_ty], [IntrNoReturn]>;
+def int_eh_sjlj_resume          : Intrinsic<[], [llvm_ptr_ty, llvm_ptr_ty],
+                                            [IntrNoReturn]>;
 def int_eh_sjlj_setup_dispatch  : Intrinsic<[], []>;
 
 //===---------------- Generic Variable Attribute Intrinsics----------------===//

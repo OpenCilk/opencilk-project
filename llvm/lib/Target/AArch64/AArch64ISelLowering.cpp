@@ -860,6 +860,7 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
 
   setOperationAction(ISD::EH_SJLJ_SETJMP, MVT::i32, Custom);
   setOperationAction(ISD::EH_SJLJ_LONGJMP, MVT::Other, Custom);
+  setOperationAction(ISD::EH_SJLJ_RESUME, MVT::Other, Custom);
 
   // Indexed loads and stores are supported.
   for (unsigned im = (unsigned)ISD::PRE_INC;
@@ -2282,8 +2283,10 @@ const char *AArch64TargetLowering::getTargetNodeName(unsigned Opcode) const {
     MAKE_CASE(AArch64ISD::MOPS_MEMCOPY)
     MAKE_CASE(AArch64ISD::MOPS_MEMMOVE)
     MAKE_CASE(AArch64ISD::CALL_BTI)
+    MAKE_CASE(AArch64ISD::CALL_CONTINUATION)
     MAKE_CASE(AArch64ISD::EH_SJLJ_SETJMP)
     MAKE_CASE(AArch64ISD::EH_SJLJ_LONGJMP)
+    MAKE_CASE(AArch64ISD::EH_SJLJ_RESUME)
   }
 #undef MAKE_CASE
   return nullptr;
@@ -4355,6 +4358,19 @@ SDValue AArch64TargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
     return DAG.getCopyFromReg(DAG.getEntryNode(), dl, Reg,
                               Op.getSimpleValueType());
   }
+  case Intrinsic::basepointer: {
+    // Force use of a base pointer, else X19 may be used without any
+    // explicit set and the def-use matcher will lose its tiny mind.
+    bool Force = Op.getConstantOperandVal(1);
+    if (Force)
+      DAG.getMachineFunction().getFrameInfo().setReadBasePointer(true);
+    const AArch64RegisterInfo *RegInfo = Subtarget->getRegisterInfo();
+    if (Force || RegInfo->hasBasePointer(DAG.getMachineFunction()))
+      return DAG.getCopyFromReg(DAG.getEntryNode(), dl,
+                                RegInfo->getBaseRegister(),
+                                Op.getSimpleValueType());
+    return DAG.getIntPtrConstant(0, dl);
+  }
 
   case Intrinsic::eh_recoverfp: {
     // FIXME: This needs to be implemented to correctly handle highly aligned
@@ -5280,6 +5296,7 @@ SDValue AArch64TargetLowering::LowerOperation(SDValue Op,
   case ISD::EH_SJLJ_SETJMP:
     return LowerSetjmp(Op, DAG);
   case ISD::EH_SJLJ_LONGJMP:
+  case ISD::EH_SJLJ_RESUME:
     return LowerLongjmp(Op, DAG);
   }
 }
@@ -5347,6 +5364,7 @@ CCAssignFn *AArch64TargetLowering::CCAssignFnForCall(CallingConv::ID CC,
     return CC_AArch64_WebKit_JS;
   case CallingConv::GHC:
     return CC_AArch64_GHC;
+  case CallingConv::PreserveNone:
   case CallingConv::C:
   case CallingConv::Fast:
   case CallingConv::PreserveMost:
@@ -6122,11 +6140,12 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
   bool TailCallOpt = MF.getTarget().Options.GuaranteedTailCallOpt;
   bool IsSibCall = false;
   bool GuardWithBTI = false;
+  bool MaybeBTI =
+      CallConv == CallingConv::PreserveNone ||
+      (CLI.CB && CLI.CB->getAttributes().hasFnAttr(Attribute::ReturnsTwice));
 
-  if (CLI.CB && CLI.CB->getAttributes().hasFnAttr(Attribute::ReturnsTwice) &&
-      !Subtarget->noBTIAtReturnTwice()) {
+  if (MaybeBTI && !Subtarget->noBTIAtReturnTwice())
     GuardWithBTI = FuncInfo->branchTargetEnforcement();
-  }
 
   // Check callee args/returns for SVE registers and set calling convention
   // accordingly.
@@ -20068,6 +20087,13 @@ SDValue AArch64TargetLowering::LowerLongjmp(SDValue Op,
                      Op.getOperand(0), Op.getOperand(1));
 }
 
+SDValue AArch64TargetLowering::LowerResume(SDValue Op,
+                                           SelectionDAG &DAG) const {
+  return DAG.getNode(AArch64ISD::EH_SJLJ_RESUME, SDLoc(Op), MVT::Other,
+                     Op.getOperand(0), Op.getOperand(1),
+                     Op.getOperand(2));
+}
+
 MachineBasicBlock *
 AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
                                   MachineBasicBlock *MBB) const {
@@ -20193,6 +20219,7 @@ AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
 MachineBasicBlock *
 AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
                                    MachineBasicBlock *MBB) const {
+  bool Interposed = false;
   MachineFunction *MF = MBB->getParent();
   MachineRegisterInfo &MRI = MF->getRegInfo();
   const TargetInstrInfo *TII = Subtarget->getInstrInfo();
@@ -20233,8 +20260,15 @@ AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
   MIB.addReg(StackReg);
   MIB.addImm(0); // immediate
   MIB.addImm(0); // shift count
+  if (Interposed) {
+    // Either ORRXrs or ADDXri
+    MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::ORRXrs), AArch64::LR);
+    MIB.addReg(AArch64::XZR);
+    MIB.addReg(PC);
+    MIB.addImm(0); // shift count
+  }
   MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::BR));
-  MIB.addReg(PC);
+  MIB.addReg(Interposed ? MI.getOperand(1).getReg() : PC);
   MI.eraseFromParent();
   return MBB;
 }
