@@ -8437,12 +8437,17 @@ def AArch64eh_sjlj_setjmp : SDNode<"AArch64ISD::EH_SJLJ_SETJMP",
 def AArch64eh_sjlj_longjmp : SDNode<"AArch64ISD::EH_SJLJ_LONGJMP",
                              SDTypeProfile<0, 1, [SDTCisPtrTy<0>]>,
                              [SDNPHasChain, SDNPSideEffect]>;
+def AArch64eh_sjlj_resume : SDNode<"AArch64ISD::EH_SJLJ_RESUME",
+                            SDTypeProfile<0, 2, [SDTCisPtrTy<0>]>,
+                            [SDNPHasChain, SDNPSideEffect]>;
 
 let isCodeGenOnly = 1, usesCustomInserter = 1, hasNoSchedulingInfo = 1 in {
   def AArch64_setjmp_instr : Pseudo<(outs GPR32:$dst), (ins GPR64:$buf),
                       [(set GPR32:$dst, (AArch64eh_sjlj_setjmp GPR64:$buf))]>;
   def AArch64_longjmp_instr : Pseudo<(outs), (ins GPR64:$buf),
                       [(AArch64eh_sjlj_longjmp GPR64:$buf)]>;
+  def AArch64_resume_instr : Pseudo<(outs), (ins GPR64:$buf, GPR64:$fn),
+                      [(AArch64eh_sjlj_resume GPR64:$buf, GPR64:$fn)]>;
 }
 
 // This instruction is needed to make the longjmp target block reachable.

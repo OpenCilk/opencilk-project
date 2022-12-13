@@ -1157,7 +1157,8 @@ private:
                                               LLT Ty2) const override;
   MachineBasicBlock *EmitSetjmp(MachineInstr &MI, MachineBasicBlock *MBB) const;
   MachineBasicBlock *EmitLongjmp(MachineInstr &MI,
-                                 MachineBasicBlock *MBB) const;
+                                 MachineBasicBlock *MBB,
+                                 bool Interposed) const;
 };
 
 namespace AArch64 {

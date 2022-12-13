@@ -2389,7 +2389,9 @@ MachineBasicBlock *AArch64TargetLowering::EmitInstrWithCustomInserter(
   case AArch64::AArch64_setjmp_instr:
     return EmitSetjmp(MI, BB);
   case AArch64::AArch64_longjmp_instr:
-    return EmitLongjmp(MI, BB);
+    return EmitLongjmp(MI, BB, false);
+  case AArch64::AArch64_resume_instr:
+    return EmitLongjmp(MI, BB, true);
   }
 }
 
@@ -5296,8 +5298,9 @@ SDValue AArch64TargetLowering::LowerOperation(SDValue Op,
   case ISD::EH_SJLJ_SETJMP:
     return LowerSetjmp(Op, DAG);
   case ISD::EH_SJLJ_LONGJMP:
-  case ISD::EH_SJLJ_RESUME:
     return LowerLongjmp(Op, DAG);
+  case ISD::EH_SJLJ_RESUME:
+    return LowerResume(Op, DAG);
   }
 }
 
@@ -20218,8 +20221,8 @@ AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
 
 MachineBasicBlock *
 AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
-                                   MachineBasicBlock *MBB) const {
-  bool Interposed = false;
+                                   MachineBasicBlock *MBB,
+                                   bool Interposed) const {
   MachineFunction *MF = MBB->getParent();
   MachineRegisterInfo &MRI = MF->getRegInfo();
   const TargetInstrInfo *TII = Subtarget->getInstrInfo();
@@ -20261,14 +20264,27 @@ AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
   MIB.addImm(0); // immediate
   MIB.addImm(0); // shift count
   if (Interposed) {
+    unsigned Function = MI.getOperand(1).getReg();
+    MachineBasicBlock *altMBB =
+        MF->CreateMachineBasicBlock(MBB->getBasicBlock());
+    MF->insert(++MBB->getIterator(), altMBB);
+    MBB->addSuccessor(altMBB);
+
+    MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::CBNZX))
+              .addReg(Function)
+              .addMBB(altMBB);
+
     // Either ORRXrs or ADDXri
-    MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::ORRXrs), AArch64::LR);
+    MIB = BuildMI(altMBB, DL, TII->get(AArch64::ORRXrs), AArch64::LR);
     MIB.addReg(AArch64::XZR);
     MIB.addReg(PC);
     MIB.addImm(0); // shift count
+    MIB = BuildMI(altMBB, DL, TII->get(AArch64::BR))
+              .addReg(Function)
+              .addReg(AArch64::LR, RegState::Implicit);
   }
   MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::BR));
-  MIB.addReg(Interposed ? MI.getOperand(1).getReg() : PC);
+  MIB.addReg(PC);
   MI.eraseFromParent();
   return MBB;
 }
