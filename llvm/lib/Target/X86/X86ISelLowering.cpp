@@ -35290,16 +35290,31 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
     BuildMI(*thisMBB, MI, DL, TII->get(IJmpOpc)).addReg(PC);
     break;
   case X86::EH_SjLj_Resume32:
-  case X86::EH_SjLj_Resume64:
+  case X86::EH_SjLj_Resume64: {
+    unsigned TestRROpc = (PVT == MVT::i64) ? X86::TEST64rr : X86::TEST32rr;
+    MachineBasicBlock *altMBB =
+        MF->CreateMachineBasicBlock(thisMBB->getBasicBlock());
+    MF->insert(++MBB->getIterator(), altMBB);
+    thisMBB->addSuccessor(altMBB);
+
+    MIB = BuildMI(*thisMBB, MI, DL, TII->get(TestRROpc))
+              .add(MI.getOperand(X86::AddrNumOperands))
+              .add(MI.getOperand(X86::AddrNumOperands));
+    MIB = BuildMI(*thisMBB, MI, DL, TII->get(X86::JCC_1))
+              .addMBB(altMBB)
+              .addImm(X86::COND_NE);
+    // Direct return
+    MIB = BuildMI(*thisMBB, MI, DL, TII->get(IJmpOpc)).addReg(PC);
     // push return address on the stack just restored
     // TODO: Does this require different shadow stack handling?
     // TODO: This ought to allow a direct branch instead of an indirect
     // branch, but every attempt to allow a direct branch caused a
     // tablegen or compiler crash.  Need documentation.
-    MIB = BuildMI(*thisMBB, MI, DL, TII->get(PushOpc)).addReg(PC);
-    MIB = BuildMI(*thisMBB, MI, DL, TII->get(IJmpOpc))
+    MIB = BuildMI(altMBB, DL, TII->get(PushOpc)).addReg(PC);
+    MIB = BuildMI(altMBB, DL, TII->get(IJmpOpc))
               .add(MI.getOperand(X86::AddrNumOperands));
     break;
+  }
   }
 
   MI.eraseFromParent();
