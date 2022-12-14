@@ -8446,6 +8446,7 @@ let isCodeGenOnly = 1, usesCustomInserter = 1, hasNoSchedulingInfo = 1 in {
                       [(set GPR32:$dst, (AArch64eh_sjlj_setjmp GPR64:$buf))]>;
   def AArch64_longjmp_instr : Pseudo<(outs), (ins GPR64:$buf),
                       [(AArch64eh_sjlj_longjmp GPR64:$buf)]>;
+  // Register class rtcGPR64 is needed with branch target enforcement?
   def AArch64_resume_instr : Pseudo<(outs), (ins GPR64:$buf, GPR64:$fn),
                       [(AArch64eh_sjlj_resume GPR64:$buf, GPR64:$fn)]>;
 }

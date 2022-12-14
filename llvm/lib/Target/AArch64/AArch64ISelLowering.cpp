@@ -20264,6 +20264,7 @@ AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
   MIB.addImm(0); // immediate
   MIB.addImm(0); // shift count
   if (Interposed) {
+    // TODO: With branch target enforcement this needs to be x16 or x17?
     unsigned Function = MI.getOperand(1).getReg();
     MachineBasicBlock *altMBB =
         MF->CreateMachineBasicBlock(MBB->getBasicBlock());
@@ -20281,10 +20282,12 @@ AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
     MIB.addImm(0); // shift count
     MIB = BuildMI(altMBB, DL, TII->get(AArch64::BR))
               .addReg(Function)
-              .addReg(AArch64::LR, RegState::Implicit);
+              .addReg(AArch64::LR, RegState::Implicit)
+              .addReg(AArch64::X19, RegState::Implicit);
   }
-  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::BR));
-  MIB.addReg(PC);
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::BR))
+            .addReg(PC)
+            .addReg(AArch64::X19, RegState::Implicit);
   MI.eraseFromParent();
   return MBB;
 }
