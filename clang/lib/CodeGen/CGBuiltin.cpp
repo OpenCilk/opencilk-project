@@ -5438,8 +5438,11 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     return RValue::get(Ptr);
   }
   case Builtin::BI__hyper_lookup: {
-    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup);
-    return RValue::get(Builder.CreateCall(F, {EmitScalarExpr(E->getArg(0))}));
+    llvm::Value *Size = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
+    return RValue::get(Builder.CreateCall(
+        F, {EmitScalarExpr(E->getArg(0)), Size, EmitScalarExpr(E->getArg(2)),
+            EmitScalarExpr(E->getArg(3))}));
   }
   }
   IsSpawnedScope SpawnedScp(this);

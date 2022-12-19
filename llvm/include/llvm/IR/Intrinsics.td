@@ -1386,9 +1386,11 @@ def int_task_frameaddress
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.
 def int_hyper_lookup
-    : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
-    [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
-     IntrStrandPure, IntrHyperView, IntrInjective]>;
+    : Intrinsic<[llvm_ptr_ty],
+                [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty], [
+                  IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+                  IntrStrandPure, IntrHyperView, IntrInjective
+                ]>;
 
 // TODO: Change tablegen to allow function pointer types in intrinsics.
 def int_reducer_register

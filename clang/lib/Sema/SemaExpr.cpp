@@ -2049,6 +2049,9 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
       InputType.getLocalFastQualifiers());
   QualType Ptr = Context.getPointerType(ResultType);
 
+  QualType SizeType = Context.getSizeType();
+  llvm::APInt Size(Context.getTypeSize(SizeType),
+                   Context.getTypeSizeInChars(ResultType).getQuantity());
   Expr *VarAddr;
   if (Pointer)
     VarAddr = E;
@@ -2075,8 +2078,11 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
                                     SourceLocation(), false,
                                     CurFPFeatureOverrides());
   }
-  ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(),
-				  { VarAddr }, E->getExprLoc(), nullptr);
+  Expr *CallArgs[] = {
+      VarAddr, IntegerLiteral::Create(Context, Size, SizeType, E->getExprLoc()),
+      HT->getIdentity(), HT->getReduce()};
+  ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(), CallArgs,
+                                  E->getExprLoc(), nullptr);
 
   // Template expansion normally strips out implicit casts,
   // so make this explicit in C++.
