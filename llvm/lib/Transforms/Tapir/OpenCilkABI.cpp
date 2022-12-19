@@ -223,7 +223,8 @@ void OpenCilkABI::prepareModule() {
   FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
   FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
   FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
-  FunctionType *PtrPtrTy = FunctionType::get(VoidPtrTy, {VoidPtrTy}, false);
+  FunctionType *LookupTy = FunctionType::get(
+      VoidPtrTy, {VoidPtrTy, Int64Ty, VoidPtrTy, VoidPtrTy}, false);
   FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
   FunctionType *Reg32Ty =
       FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
@@ -258,7 +259,7 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
-      {"__cilkrts_reducer_lookup", PtrPtrTy, CilkRTSReducerLookup},
+      {"__cilkrts_reducer_lookup", LookupTy, CilkRTSReducerLookup},
       {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
       {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
       {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
