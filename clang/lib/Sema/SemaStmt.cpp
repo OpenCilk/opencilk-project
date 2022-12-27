@@ -3770,7 +3770,8 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
     BuildBinOp(S, LoopVarLoc, StrideIsNegative ? BO_Sub : BO_Add, InitRef.get(),
                BuildBinOp(S, LoopVarLoc, BO_Mul,
                           BeginRef.get(), Stride).get());
-  AddInitializerToDecl(LoopVar, NewLoopVarInit.get(), /*DirectInit=*/false);
+  if (!NewLoopVarInit.isInvalid())
+    AddInitializerToDecl(LoopVar, NewLoopVarInit.get(), /*DirectInit=*/false);
 
   return new (Context) CilkForStmt(
       NewInit.get(), cast<DeclStmt>(LimitDecl.get()), InitCond.get(),
