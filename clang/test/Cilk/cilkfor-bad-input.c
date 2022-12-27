@@ -16,3 +16,12 @@ void f4() {
   int i;
   _Cilk_for(; i < 42; ++i); // expected-error{{missing control variable declaration and initialization in '_Cilk_for'}} expected-error{{expected control variable declaration in initializer in '_Cilk_for'}}
 }
+
+void f5(const long *begin, const long *end) { // expected-note{{previous}}
+  long end = 666; // expected-error{{redefinition of 'end' with a different type}}
+  _Cilk_for (const long *p = begin; p != end; ++p)
+    ;
+  // expected-error@-2{{invalid operands}}
+  // expected-warning@-3{{incompatible integer to pointer conversion}}
+  // expected-warning@-4{{Cilk for loop has empty body}}
+}
