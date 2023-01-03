@@ -1497,8 +1497,8 @@ static inline bool isPureSet(const TapirFnBehavior TFB) {
 }
 static inline bool isViewSet(const TapirFnBehavior TFB) {
   return (static_cast<uint8_t>(TFB) &
-          static_cast<uint8_t>(TapirFnBehavior::Pure)) ==
-         static_cast<uint8_t>(TapirFnBehavior::Pure);
+          static_cast<uint8_t>(TapirFnBehavior::View)) ==
+         static_cast<uint8_t>(TapirFnBehavior::View);
 }
 static inline bool isInjectiveOrPureOrViewSet(const TapirFnBehavior TFB) {
   return static_cast<uint8_t>(TFB) &
