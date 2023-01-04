@@ -1691,7 +1691,7 @@ LANGBUILTIN(__arithmetic_fence, "v.", "t", ALL_LANGUAGES)
 
 // Tapir.  Rewriting of reducer references happens during sema
 // and needs a builtin to carry the information to codegen.
-BUILTIN(__hyper_lookup, "v*vC*zvC*vC*", "nU")
+BUILTIN(__hyper_lookup, "v*vC*z.", "nU")
 
 #undef BUILTIN
 #undef LIBBUILTIN

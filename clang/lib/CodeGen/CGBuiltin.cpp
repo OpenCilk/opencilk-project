@@ -5440,9 +5440,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   case Builtin::BI__hyper_lookup: {
     llvm::Value *Size = EmitScalarExpr(E->getArg(1));
     Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
+    llvm::Value *Ptr = EmitScalarExpr(E->getArg(0));
+    llvm::Value *Identity = EmitScalarExpr(E->getArg(2));
+    llvm::Value *Reduce = EmitScalarExpr(E->getArg(3));
     return RValue::get(Builder.CreateCall(
-        F, {EmitScalarExpr(E->getArg(0)), Size, EmitScalarExpr(E->getArg(2)),
-            EmitScalarExpr(E->getArg(3))}));
+        F, {Ptr, Size, Builder.CreateBitCast(Identity, VoidPtrTy),
+            Builder.CreateBitCast(Reduce, VoidPtrTy)}));
   }
   }
   IsSpawnedScope SpawnedScp(this);
