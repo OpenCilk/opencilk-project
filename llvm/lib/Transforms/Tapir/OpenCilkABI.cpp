@@ -258,7 +258,8 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
-      {"__cilkrts_reducer_lookup", PtrPtrTy, CilkRTSReducerLookup},
+      {"__cilkrts_hyperobject_read", PtrPtrTy, CilkRTSHyperobjectRead},
+      {"__cilkrts_hyperobject_write", PtrPtrTy, CilkRTSHyperobjectWrite},
       {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
       {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
       {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
@@ -1071,8 +1072,11 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   switch (ID) {
   default:
     llvm_unreachable("unexpected reducer intrinsic");
-  case Intrinsic::hyper_lookup:
-    Fn = Get__cilkrts_reducer_lookup();
+  case Intrinsic::hyper_read:
+    Fn = Get__cilkrts_hyperobject_read();
+    break;
+  case Intrinsic::hyper_write:
+    Fn = Get__cilkrts_hyperobject_write();
     break;
   case Intrinsic::reducer_register: {
     const Type *SizeType = CI->getArgOperand(1)->getType();

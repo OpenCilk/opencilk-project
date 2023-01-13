@@ -1383,9 +1383,23 @@ def int_tapir_loop_grainsize
 def int_task_frameaddress
     : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty], [IntrWillReturn]>;
 
+// The split into read and write is experimental for support of splitters.
+// Note that int_hyper_write calls are more easily optimized.  All calls in
+// the same spindle return the same result given the same argument.
+// Calls to int_hyper_read will return a different result if there has
+// been an intervening call to int_hyper_write.
+
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.
-def int_hyper_lookup
+
+// Lookup a hyperobject only to read its value.
+def int_hyper_read
+    : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
+    [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+     IntrHyperView, IntrInjective]>;
+
+// Lookup a hyperobject with intent to write to it.
+def int_hyper_write
     : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
     [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
      IntrStrandPure, IntrHyperView, IntrInjective]>;

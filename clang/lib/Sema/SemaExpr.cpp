@@ -503,7 +503,8 @@ ExprResult Sema::DefaultFunctionArrayConversion(Expr *E, bool Diagnose) {
     E = result.get();
   }
 
-  E = BuildHyperobjectLookup(E);
+  // Hard to know if the array will be read or written.
+  E = BuildHyperobjectLookup(E, HyperWrite);
 
   QualType Ty = E->getType();
   assert(!Ty.isNull() && "DefaultFunctionArrayConversion - missing type");
@@ -668,7 +669,7 @@ ExprResult Sema::DefaultLvalueConversion(Expr *E) {
 
   CheckForNullPointerDereference(*this, E);
 
-  E = BuildHyperobjectLookup(E);
+  E = BuildHyperobjectLookup(E, HyperRead);
   T = E->getType();
 
   if (const ObjCIsaExpr *OISA = dyn_cast<ObjCIsaExpr>(E->IgnoreParenCasts())) {
@@ -2010,15 +2011,15 @@ NonOdrUseReason Sema::getNonOdrUseReasonInCurrentContext(ValueDecl *D) {
   return NOUR_None;
 }
 
-Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
-  if (!Pointer && !E->isLValue())
+Expr *Sema::BuildHyperobjectLookup(Expr *E, HyperType Type) {
+  if (Type != HyperPointer && !E->isLValue())
     return E;
 
   if (getLangOpts().getCilk() != LangOptions::Cilk_opencilk)
     return E;
 
   QualType InputType = E->getType();
-  if (Pointer) {
+  if (Type == HyperPointer) {
     const PointerType *PT = InputType->getAs<PointerType>();
     if (!PT)
       return E;
@@ -2032,7 +2033,8 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   bool Difficult = CurContext->isDependentContext();
 
   // For now all hyperobjects use the same lookup function.
-  IdentifierInfo *ID = PP.getIdentifierInfo("__hyper_lookup");
+  IdentifierInfo *ID =
+    PP.getIdentifierInfo(Type == HyperRead ? "__hyper_read": "__hyper_write");
   ValueDecl *Builtin =
       dyn_cast<ValueDecl>
       (LazilyCreateBuiltin(ID, ID->getBuiltinID(),
@@ -2050,7 +2052,7 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   QualType Ptr = Context.getPointerType(ResultType);
 
   Expr *VarAddr;
-  if (Pointer)
+  if (Type == HyperPointer)
     VarAddr = E;
   else if (Difficult) {
     IdentifierInfo *BAI = PP.getIdentifierInfo("__builtin_addressof");
@@ -2095,7 +2097,7 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
                                       Call.get(), nullptr, VK_PRValue,
                                       CurFPFeatureOverrides());
 
-  if (Pointer)
+  if (Type == HyperPointer)
     return Casted;
 
   auto *Deref =
@@ -14361,7 +14363,7 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
   CheckForIllegalSpawn(*this, LHS.get());
 
   if (BinaryOperator::isAssignmentOp(Opc))
-    LHS = BuildHyperobjectLookup(LHS.get());
+    LHS = BuildHyperobjectLookup(LHS.get(), HyperWrite);
 
   switch (Opc) {
   case BO_Assign:
@@ -14849,8 +14851,11 @@ ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
   std::tie(LHS, RHS) = CorrectDelayedTyposInBinOp(*this, Opc, LHSExpr, RHSExpr);
   if (!LHS.isUsable() || !RHS.isUsable())
     return ExprError();
-  LHSExpr = BuildHyperobjectLookup(LHS.get());
-  RHSExpr = BuildHyperobjectLookup(RHS.get());
+
+  HyperType LeftType =
+    BinaryOperator::isAssignmentOp(Opc) ? HyperWrite : HyperRead;
+  LHSExpr = BuildHyperobjectLookup(LHS.get(), LeftType);
+  RHSExpr = BuildHyperobjectLookup(RHS.get(), HyperRead);
 
   // We want to end up calling one of checkPseudoObjectAssignment
   // (if the LHS is a pseudo-object), BuildOverloadedBinOp (if
@@ -15028,7 +15033,7 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
   case UO_PreDec:
   case UO_PostInc:
   case UO_PostDec:
-    Input = BuildHyperobjectLookup(InputExpr);
+    Input = BuildHyperobjectLookup(InputExpr, HyperWrite);
     resultType = CheckIncrementDecrementOperand(*this, Input.get(), VK, OK,
                                                 OpLoc,
                                                 Opc == UO_PreInc ||
@@ -15039,7 +15044,8 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
     break;
   case UO_AddrOf:
     // Before CheckAddressOfOperand
-    Input = BuildHyperobjectLookup(InputExpr);
+    // Hard to know if the pointer will be read or written.
+    Input = BuildHyperobjectLookup(InputExpr, HyperWrite);
     resultType = CheckAddressOfOperand(Input, OpLoc);
     CheckAddressOfNoDeref(InputExpr);
     RecordModifiableNonNullParam(*this, InputExpr);
@@ -15173,7 +15179,7 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
     break;
   case UO_Real:
   case UO_Imag:
-    Input = BuildHyperobjectLookup(InputExpr);
+    Input = BuildHyperobjectLookup(InputExpr, HyperRead);
     resultType = CheckRealImagOperand(*this, Input, OpLoc, Opc == UO_Real);
     // _Real maps ordinary l-values into ordinary l-values. _Imag maps ordinary
     // complex l-values to ordinary l-values and all other values to r-values.

@@ -5437,8 +5437,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
                                                      Str.getPointer(), Zeros);
     return RValue::get(Ptr);
   }
-  case Builtin::BI__hyper_lookup: {
-    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup);
+  case Builtin::BI__hyper_read: {
+    Function *F = CGM.getIntrinsic(Intrinsic::hyper_read);
+    return RValue::get(Builder.CreateCall(F, {EmitScalarExpr(E->getArg(0))}));
+  }
+  case Builtin::BI__hyper_write: {
+    Function *F = CGM.getIntrinsic(Intrinsic::hyper_write);
     return RValue::get(Builder.CreateCall(F, {EmitScalarExpr(E->getArg(0))}));
   }
   }

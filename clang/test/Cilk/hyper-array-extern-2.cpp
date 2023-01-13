@@ -9,8 +9,8 @@ extern I10 _Hyperobject y;
 int read_hyper_array(unsigned i)
 {
   return y[i];
-  // CHECK: call i8* @llvm.hyper.lookup
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.
+  // CHECK-NOT: call i8* @llvm.hyper.
   // Make sure the array is not copied to the stack.
   // CHECK-NOT: call void @llvm.memcpy
   // CHECK: getelementptr

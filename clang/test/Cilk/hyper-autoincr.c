@@ -11,10 +11,10 @@ extern int _Hyperobject x, _Hyperobject y;
 // CHECK_LABEL: extern1
 void extern1()
 {
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
   // CHECK: load i32,
   // Only one call for a read-modify-write operation.
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: store i32
   // CHECK: ret void
   ++x;
@@ -23,10 +23,10 @@ void extern1()
 // CHECK_LABEL: extern2
 int extern2()
 {
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
   // CHECK: load i32,
   // Only one call for a read-modify-write operation.
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: store i32
   // CHECK: ret i32
   return 1 + --x;
@@ -36,7 +36,8 @@ int extern2()
 long ptr_with_direct_typedef(long_hp ptr)
 {
   // CHECK-NOT: ret i64
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
+  // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: ret i64
   return ++*ptr;
 }
@@ -45,7 +46,8 @@ long ptr_with_direct_typedef(long_hp ptr)
 long ptr_with_indirect_typedef_1(long_h *ptr)
 {
   // CHECK-NOT: ret i64
-  // CHECK: call i8* @llvm.hyper.lookup
+  // The next call is llvm.hyper.write in C and llvm.hyper.read in C++.
+  // CHECK: call i8* @llvm.hyper.
   // CHECK-NOT: store i64
   // CHECK: ret i64
   return *ptr++; // this increments the pointer, a dead store
@@ -55,7 +57,8 @@ long ptr_with_indirect_typedef_1(long_h *ptr)
 long ptr_with_indirect_typedef_2(long_h *ptr)
 {
   // CHECK-NOT: ret i64
-  // CHECK: call i8* @llvm.hyper.lookup
+  // The next call is llvm.hyper.write in C and llvm.hyper.read in C++.
+  // CHECK: call i8* @llvm.hyper.
   // CHECK-NOT: store i64
   // CHECK: ret i64
   return *++ptr; // again, the increment is dead
@@ -65,9 +68,9 @@ long ptr_with_indirect_typedef_2(long_h *ptr)
 long ptr_with_indirect_typedef_3(long_h *ptr)
 {
   // CHECK-NOT: ret i64
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
   // CHECK: load i64
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: store i64
   // CHECK: ret i64
   return ptr[0]++;
@@ -77,7 +80,7 @@ long ptr_with_indirect_typedef_3(long_h *ptr)
 long direct_typedef_1()
 {
   extern long_h z;
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
   // CHECK: load i64,
   // CHECK: store i64
   // CHECK: ret i64
@@ -91,12 +94,15 @@ double local_reducer_1()
   // CHECK: store double 0.0
   // CHECK: call void @llvm.reducer.register
   double _Hyperobject(identity, reduce) x = 0.0;
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
+  // CHECK-NOT: call i8* @llvm.hyper.read
   // CHECK: load double
   // CHECK: fadd double
   // CHECK: store double
   x += 1.0f;
-  // CHECK: call i8* @llvm.hyper.lookup
+  // The next call is llvm.hyper.write in C and llvm.hyper.read in C++,
+  // which is probably a bug in C.
+  // CHECK: call i8* @llvm.hyper.
   // CHECK: load double
   // CHECK: call void @llvm.reducer.unregister
   // CHECK: ret double
@@ -107,10 +113,10 @@ double local_reducer_1()
 long two_increments()
 {
   // It would also be correct for evaluation of operands of + to be interleaved.
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
   // CHECK: load i32
   // CHECK: store i32
-  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK: call i8* @llvm.hyper.write
   // CHECK: load i32
   // CHECK: store i32
   // CHECK: ret i64

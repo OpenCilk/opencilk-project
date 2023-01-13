@@ -1177,7 +1177,8 @@ bool TapirTarget::shouldProcessFunction(const Function &F) const {
   for (const Instruction &I : instructions(&F))
     if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
       switch (II->getIntrinsicID()) {
-      case Intrinsic::hyper_lookup:
+      case Intrinsic::hyper_read:
+      case Intrinsic::hyper_write:
       case Intrinsic::reducer_register:
       case Intrinsic::reducer_unregister:
       case Intrinsic::tapir_loop_grainsize:

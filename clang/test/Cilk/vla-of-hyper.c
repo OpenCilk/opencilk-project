@@ -11,7 +11,8 @@ int test_vla_hyper(unsigned long size)
   // expected-warning@-1{{array of reducer not implemented}}
 
   // CHECK: getelementptr
-  // CHECK: %[[RAW:.+]] = call i8* @llvm.hyper.lookup
+  // The C front end is not smart enough to call llvm.hyper.read 
+  // CHECK: %[[RAW:.+]] = call i8* @llvm.hyper.
   // CHECK-NEXT: %[[VIEW:.+]] = bitcast i8* %[[RAW]] to i32*
   // CHECK-NEXT: %[[RET:.+]] = load i32, i32* %[[VIEW]]
   // CHECK-NOT: getelementptr

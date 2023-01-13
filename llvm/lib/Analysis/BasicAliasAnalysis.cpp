@@ -1654,7 +1654,6 @@ intersectTapirFnBehavior(const TapirFnBehavior TFB1,
 // which means the return values MustAlias if the arguments are identical.
 // 3. View lookups return a value that does not alias anything that the
 // argument does not alias (for simplicity, this implies injective).
-// 4. Token lookups return a value that does not alias any alloca or global.
 static const Value *getRecognizedArgument(const Value *V, bool InSameSpindle,
                                           const Value *&Fn,
                                           TapirFnBehavior &Behavior) {

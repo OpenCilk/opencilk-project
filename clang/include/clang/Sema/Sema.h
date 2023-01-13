@@ -5284,7 +5284,8 @@ public:
                    SourceLocation TemplateKWLoc = SourceLocation(),
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
 
-  Expr *BuildHyperobjectLookup(Expr *, bool Pointer = false);
+  enum HyperType { HyperWrite = 0, HyperRead = 1, HyperPointer = 2 };
+  Expr *BuildHyperobjectLookup(Expr *, HyperType Type = HyperWrite);
   Expr *ValidateReducerCallback(Expr *E, unsigned NumArgs, SourceLocation Loc);
 
   ExprResult
