@@ -5937,6 +5937,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       case llvm::Triple::armeb:
       case llvm::Triple::aarch64:
       case llvm::Triple::aarch64_be:
+      case llvm::Triple::ppc64:
+      case llvm::Triple::ppc64le:
 	break;
       default:
 	D.Diag(diag::err_drv_cilk_unsupported);
