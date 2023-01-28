@@ -5,7 +5,7 @@ template<typename T> struct S { T member; };
 S<long> _Hyperobject S_long;
 
 // CHECK-LABEL: @_Z1fv
-// CHECK: %0 = call i8* @llvm.hyper.lookup(i8* bitcast (%struct.S* @S_long to i8*))
+// CHECK: %0 = call i8* @llvm.hyper.lookup.i64(i8* bitcast (%struct.S* @S_long to i8*), i64 8, i8* null, i8* null)
 // CHECK-NOT: call i8* @llvm.hyper.lookup
 // CHECK: getelementptr
 // CHECK: %[[RET:.+]] = load i64

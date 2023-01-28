@@ -1662,7 +1662,7 @@ static const Value *getRecognizedArgument(const Value *V, bool InSameSpindle,
   if (!C)
     return nullptr;
   unsigned NumOperands = C->getNumOperands();
-  if (NumOperands != 2)
+  if (NumOperands != 2 && NumOperands != 5)
     return nullptr;
   for (auto E : TapirFnAttrTable) {
     if (C->hasFnAttr(E.first))
