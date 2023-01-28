@@ -34,7 +34,7 @@ pfor.cond:                                        ; preds = %pfor.inc, %pfor.ph
 pfor.body:                                        ; preds = %pfor.cond
   %2 = load i64, i64* %add.ptr, align 8, !tbaa !4
   %3 = bitcast i64* %sum to i8*
-  %4 = call i8* @llvm.hyper.lookup(i8* nonnull %3)
+  %4 = call i8* @llvm.hyper.lookup(i8* nonnull %3, i64 8, i8* bitcast (void (i8*)* @zero to i8*), i8* bitcast (void (i8*, i8*)* @plus to i8*))
   %5 = bitcast i8* %4 to i64*
   %6 = load i64, i64* %5, align 8, !tbaa !4
   %add = add nsw i64 %6, %2
@@ -51,7 +51,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
 
 pfor.end:                                         ; preds = %entry, %pfor.cond.cleanup
   %7 = bitcast i64* %sum to i8*
-  %8 = call i8* @llvm.hyper.lookup(i8* nonnull %7)
+  %8 = call i8* @llvm.hyper.lookup(i8* nonnull %7, i64 8, i8* bitcast (void (i8*)* @zero to i8*), i8* bitcast (void (i8*, i8*)* @plus to i8*))
   %9 = bitcast i8* %8 to i64*
   %10 = load i64, i64* %9, align 8, !tbaa !4
   %11 = bitcast i64* %sum to i8*
@@ -91,7 +91,7 @@ declare void @llvm.reducer.register.i64(i8*, i64, i8*, i8*) #2
 declare token @llvm.syncregion.start() #3
 
 ; Function Attrs: hyper_view inaccessiblememonly injective mustprogress nofree nounwind readonly strand_pure willreturn
-declare i8* @llvm.hyper.lookup(i8*) #4
+declare i8* @llvm.hyper.lookup(i8*, i64, i8*, i8*) #4
 
 ; Function Attrs: argmemonly mustprogress nofree nosync nounwind willreturn
 declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #1
