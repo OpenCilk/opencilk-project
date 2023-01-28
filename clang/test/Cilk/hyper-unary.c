@@ -11,10 +11,10 @@ void function1()
 {
   // CHECK: store i32 1, i32* %[[Y:.+]],
   int _Hyperobject y = 1;
-  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i32* @x to i8*))
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i32* @x to i8*), i64 4, i8* null, i8* null)
   // CHECK: load i32
   // CHECK: %[[Y1:.+]] = bitcast i32* %[[Y]] to i8*
-  // CHECK: call i8* @llvm.hyper.lookup(i8* %[[Y1]])
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* %[[Y1]], i64 4, i8* null, i8* null)
   // CHECK: load i32
   (void)x; (void)y;
 }
@@ -24,10 +24,10 @@ void function2()
 {
   // CHECK: store i32 1, i32* %[[Y:.+]],
   int _Hyperobject y = 1;
-  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i32* @x to i8*))
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i32* @x to i8*), i64 4, i8* null, i8* null)
   // CHECK: load i32
   // CHECK: %[[Y2:.+]] = bitcast i32* %[[Y]] to i8*
-  // CHECK: call i8* @llvm.hyper.lookup(i8* %[[Y2]])
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* %[[Y2]], i64 4, i8* null, i8* null)
   // CHECK: load i32
   (void)!x; (void)!y;
 }
@@ -37,21 +37,21 @@ void function3()
 {
   // CHECK: store i32 1, i32* %[[Y:.+]],
   int _Hyperobject y = 1;
-  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i32* @x to i8*))
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i32* @x to i8*), i64 4, i8* null, i8* null)
   // CHECK: load i32
   // CHECK: %[[Y3:.+]] = bitcast i32* %[[Y]] to i8*
-  // CHECK: call i8* @llvm.hyper.lookup(i8* %[[Y3]])
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* %[[Y3]], i64 4, i8* null, i8* null)
   // CHECK: load i32
   (void)-x; (void)-y;
-  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i32* @x to i8*))
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i32* @x to i8*), i64 4, i8* null, i8* null)
   // CHECK: load i32
   // CHECK: %[[Y4:.+]] = bitcast i32* %[[Y]] to i8*
-  // CHECK: call i8* @llvm.hyper.lookup(i8* %[[Y4]])
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* %[[Y4]], i64 4, i8* null, i8* null)
   // CHECK: load i32
   (void)~x; (void)~y;
   // CHECK: %[[XP:.+]] = load i32*, i32** @xp
   // CHECK: %[[XP1:.+]] = bitcast i32* %[[XP]] to i8*
-  // CHECK: call i8* @llvm.hyper.lookup(i8* %[[XP1]])
+  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* %[[XP1]], i64 4, i8* null, i8* null)
   // CHECK: load i32
   (void)*xp;
 }
