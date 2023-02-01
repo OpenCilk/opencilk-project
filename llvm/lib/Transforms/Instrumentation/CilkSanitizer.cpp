@@ -902,6 +902,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   Type *LoopPropertyTy = CsiLoopProperty::getType(C);
   Type *AllocFnPropertyTy = CsiAllocFnProperty::getType(C);
   Type *FreePropertyTy = CsiFreeProperty::getType(C);
+  Type *DetachPropertyTy = CsiDetachProperty::getType(C);
   Type *DetContPropertyTy = CsiDetachContinueProperty::getType(C);
   Type *RetType = IRB.getVoidTy();
   Type *AddrType = IRB.getInt8PtrTy();
@@ -983,7 +984,8 @@ void CilkSanitizerImpl::initializeCsanHooks() {
     AttributeList FnAttrs = GeneralFnAttrs;
     CsanDetach = M.getOrInsertFunction("__csan_detach", FnAttrs, RetType,
                                        /* detach_id */ IDType,
-                                       /* sync_reg */ SyncRegType);
+                                       /* sync_reg */ SyncRegType,
+                                       DetachPropertyTy);
   }
   {
     AttributeList FnAttrs = GeneralFnAttrs;
@@ -4270,13 +4272,16 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
   ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), SyncRegNum);
   ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
+  CsiDetachProperty DetachProp;
+  DetachProp.setForTapirLoopBody(TapirLoopBody);
   // Instrument the detach instruction itself
   Value *DetachID;
   {
     IRBuilder<> IRB(DI);
     uint64_t LocalID = DetachFED.add(*DI);
     DetachID = DetachFED.localToGlobalId(LocalID, IDBuilder);
-    Instruction *Call = IRB.CreateCall(CsanDetach, {DetachID, SyncRegVal});
+    Instruction *Call = IRB.CreateCall(
+        CsanDetach, {DetachID, SyncRegVal, DetachProp.getValue(IRB)});
     IRB.SetInstDebugLocation(Call);
   }
   NumInstrumentedDetaches++;
@@ -4363,6 +4368,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
     uint64_t LocalID = DetachContinueFED.add(*ContinueBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
     CsiDetachContinueProperty ContProp;
+    ContProp.setForTapirLoopBody(TapirLoopBody);
     Instruction *Call =
         IRB.CreateCall(CsanDetachContinue, {ContinueID, DetachID, SyncRegVal,
                                             ContProp.getValue(IRB)});
@@ -4387,6 +4393,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
     CsiDetachContinueProperty ContProp;
     Value *DefaultPropVal = ContProp.getValueImpl(Ctx);
     ContProp.setIsUnwind();
+    ContProp.setForTapirLoopBody(TapirLoopBody);
     insertHookCallInSuccessorBB(
         UnwindBlock, PredBlock, CsanDetachContinue,
         {ContinueID, DetachID, SyncRegVal, ContProp.getValue(Ctx)},

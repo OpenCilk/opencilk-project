@@ -729,11 +729,13 @@ void CSIImpl::initializeTapirHooks() {
   Type *RetType = IRB.getVoidTy();
   Type *TaskPropertyTy = CsiTaskProperty::getType(C);
   Type *TaskExitPropertyTy = CsiTaskExitProperty::getType(C);
+  Type *DetachPropertyTy = CsiDetachProperty::getType(C);
   Type *DetContPropertyTy = CsiDetachContinueProperty::getType(C);
 
   CsiDetach = M.getOrInsertFunction("__csi_detach", RetType,
                                     /* detach_id */ IDType,
-                                    IntegerType::getInt32Ty(C)->getPointerTo());
+                                    IntegerType::getInt32Ty(C)->getPointerTo(),
+                                    DetachPropertyTy);
   CsiTaskEntry = M.getOrInsertFunction("__csi_task", RetType,
                                        /* task_id */ IDType,
                                        /* detach_id */ IDType,
@@ -1278,7 +1280,10 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     IRB.CreateStore(
         Constant::getIntegerValue(IntegerType::getInt32Ty(Ctx), APInt(32, 1)),
         TrackVar);
-    insertHookCall(DI, CsiDetach, {DetachID, TrackVar});
+    CsiDetachProperty DetachProp;
+    DetachProp.setForTapirLoopBody(TapirLoopBody);
+    insertHookCall(DI, CsiDetach,
+                   {DetachID, TrackVar, DetachProp.getValue(IRB)});
   }
 
   // Find the detached block, continuation, and associated reattaches.
@@ -1349,6 +1354,7 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     uint64_t LocalID = DetachContinueFED.add(*ContinueBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
     CsiDetachContinueProperty ContProp;
+    ContProp.setForTapirLoopBody(TapirLoopBody);
     Instruction *Call = IRB.CreateCall(
         CsiDetachContinue, {ContinueID, DetachID, ContProp.getValue(IRB)});
     setInstrumentationDebugLoc(*ContinueBlock, Call);
@@ -1372,6 +1378,7 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     CsiDetachContinueProperty ContProp;
     Value *DefaultPropVal = ContProp.getValueImpl(Ctx);
     ContProp.setIsUnwind();
+    ContProp.setForTapirLoopBody(TapirLoopBody);
     insertHookCallInSuccessorBB(UnwindBlock, PredBlock, CsiDetachContinue,
                                 {ContinueID, DetachID, ContProp.getValue(Ctx)},
                                 {DefaultID, DefaultID, DefaultPropVal});
