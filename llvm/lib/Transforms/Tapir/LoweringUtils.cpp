@@ -815,6 +815,22 @@ Function *llvm::createHelperForTaskFrame(
         SharedEHEntries.insert(S->getEntry());
     }
 
+    // Terminate landingpads might be shared between a taskframe and its parent.
+    // It's safe to clone these blocks, but we need to be careful about PHI
+    // nodes.
+    if (S != TF) {
+      for (Spindle *PredS : predecessors(S)) {
+        if (!TF->taskFrameContains(PredS)) {
+          LLVM_DEBUG(
+              dbgs()
+              << "Taskframe spindle has predecessor outside of taskframe: "
+              << *S << "\n");
+          SharedEHEntries.insert(S->getEntry());
+          break;
+        }
+      }
+    }
+
     for (BasicBlock *B : S->blocks()) {
       LLVM_DEBUG(dbgs() << "Adding taskframe block " << B->getName() << "\n");
       TaskBlocks.push_back(B);
@@ -829,6 +845,19 @@ Function *llvm::createHelperForTaskFrame(
         LLVM_DEBUG(dbgs() << "Recording taskframe.resume block " << B->getName()
                    << "\n");
         TFResumeBlocks.insert(B);
+      }
+
+      // Terminate landingpads might be shared between a taskframe and its
+      // parent.  It's safe to clone these blocks, but we need to be careful
+      // about PHI nodes.
+      if ((B != S->getEntry()) && B->isLandingPad()) {
+        for (BasicBlock *Pred : predecessors(B)) {
+          if (!S->contains(Pred)) {
+            LLVM_DEBUG(dbgs() << "Block within taskframe spindle has "
+                                 "predecessor outside of spindle.\n");
+            SharedEHEntries.insert(B);
+          }
+        }
       }
     }
   }
