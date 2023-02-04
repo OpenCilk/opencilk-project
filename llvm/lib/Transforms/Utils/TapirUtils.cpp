@@ -20,6 +20,7 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -190,7 +191,7 @@ bool llvm::removeDeadSyncUnwind(CallBase *SyncUnwind,
 /// does not actually match the detach instruction, but instead matches a
 /// sibling detach instruction with the same continuation.  This best-effort
 /// check is sufficient in some cases, such as during a traversal of a detached
-/// task..
+/// task.
 bool llvm::ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
                                  DominatorTree *DT) {
   // Check that the reattach instruction belonds to the same sync region as the
@@ -212,6 +213,19 @@ bool llvm::ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
   }
 
   return true;
+}
+
+/// Returns true of the given task itself contains a sync instruction.
+bool llvm::taskContainsSync(const Task *T) {
+  for (const Spindle *S :
+       depth_first<InTask<Spindle *>>(T->getEntrySpindle())) {
+    if (S == T->getEntrySpindle())
+      continue;
+    for (const BasicBlock *Pred : predecessors(S->getEntry()))
+      if (isa<SyncInst>(Pred->getTerminator()))
+        return true;
+  }
+  return false;
 }
 
 /// Return the result of AI->isStaticAlloca() if AI were moved to the entry
@@ -836,13 +850,15 @@ void llvm::InlineTaskFrameResumes(Value *TaskFrame, DominatorTree *DT) {
 
 static void startSerializingTaskFrame(Value *TaskFrame,
                                       SmallVectorImpl<Instruction *> &ToErase,
-                                      DominatorTree *DT) {
+                                      DominatorTree *DT,
+                                      bool PreserveTaskFrame) {
   for (User *U : TaskFrame->users())
     if (Instruction *UI = dyn_cast<Instruction>(U))
       if (isTapirIntrinsic(Intrinsic::taskframe_use, UI))
         ToErase.push_back(UI);
 
-  InlineTaskFrameResumes(TaskFrame, DT);
+  if (!PreserveTaskFrame)
+    InlineTaskFrameResumes(TaskFrame, DT);
 }
 
 void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
@@ -852,17 +868,20 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
                            SmallPtrSetImpl<BasicBlock *> *EHBlockPreds,
                            SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
                            SmallVectorImpl<Instruction *> *DetachedRethrows,
-                           DominatorTree *DT, LoopInfo *LI) {
+                           bool ReplaceWithTaskFrame, DominatorTree *DT,
+                           LoopInfo *LI) {
   BasicBlock *Spawner = DI->getParent();
   BasicBlock *TaskEntry = DI->getDetached();
   BasicBlock *Continue = DI->getContinue();
   BasicBlock *Unwind = DI->getUnwindDest();
   Value *SyncRegion = DI->getSyncRegion();
+  Module *M = Spawner->getModule();
 
   // If the spawned task has a taskframe, serialize the taskframe.
   SmallVector<Instruction *, 8> ToErase;
-  if (Value *TaskFrame = getTaskFrameUsed(TaskEntry))
-    startSerializingTaskFrame(TaskFrame, ToErase, DT);
+  Value *TaskFrame = getTaskFrameUsed(TaskEntry);
+  if (TaskFrame)
+    startSerializingTaskFrame(TaskFrame, ToErase, DT, ReplaceWithTaskFrame);
 
   // Clone any EH blocks that need cloning.
   if (EHBlocksToClone) {
@@ -887,7 +906,6 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   // If the cloned loop contained dynamic alloca instructions, wrap the inlined
   // code with llvm.stacksave/llvm.stackrestore intrinsics.
   if (ContainsDynamicAllocas) {
-    Module *M = Spawner->getParent()->getParent();
     // Get the two intrinsics we care about.
     Function *StackSave = Intrinsic::getDeclaration(M, Intrinsic::stacksave);
     Function *StackRestore =
@@ -903,12 +921,39 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
       IRBuilder<>(Exit).CreateCall(StackRestore, SavedPtr);
   }
 
+  // If we're replacing the detach with a taskframe and we don't have a
+  // taskframe already, create one.
+  if (ReplaceWithTaskFrame) {
+    if (!TaskFrame) {
+      // Create a new task frame.
+      Function *TFCreate =
+          Intrinsic::getDeclaration(M, Intrinsic::taskframe_create);
+      TaskFrame = IRBuilder<>(TaskEntry, TaskEntry->begin())
+                      .CreateCall(TFCreate, {}, "repltf");
+    }
+  }
+
   // Handle any detached-rethrows in the task.
   if (DI->hasUnwindDest()) {
     assert(InlinedLPads && "Missing set of landing pads in task.");
     assert(DetachedRethrows && "Missing set of detached rethrows in task.");
-    handleDetachedLandingPads(DI, EHContinue, LPadValInEHContinue,
-                              *InlinedLPads, *DetachedRethrows, DT);
+    if (ReplaceWithTaskFrame) {
+      // If we're replacing the detach with a taskframe, simply replace the
+      // detached.rethrow intrinsics with taskframe.resume intrinsics.
+      for (Instruction *I : *DetachedRethrows) {
+        InvokeInst *II = cast<InvokeInst>(I);
+        Value *LPad = II->getArgOperand(1);
+        Function *TFResume = Intrinsic::getDeclaration(
+            M, Intrinsic::taskframe_resume, {LPad->getType()});
+        IRBuilder<>(II).CreateInvoke(TFResume, II->getNormalDest(),
+                                     II->getUnwindDest(), {TaskFrame, LPad});
+        II->eraseFromParent();
+      }
+    } else {
+      // Otherwise, "inline" the detached landingpads.
+      handleDetachedLandingPads(DI, EHContinue, LPadValInEHContinue,
+                                *InlinedLPads, *DetachedRethrows, DT);
+    }
   }
 
   // Replace reattaches with unconditional branches to the continuation.
@@ -923,6 +968,13 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
       else
         ReattachDom = DT->findNearestCommonDominator(ReattachDom,
                                                      I->getParent());
+    }
+
+    // If we're replacing the detach with a taskframe, insert a taskframe.end
+    // immediately before the reattach.
+    if (ReplaceWithTaskFrame) {
+      Function *TFEnd = Intrinsic::getDeclaration(M, Intrinsic::taskframe_end);
+      IRBuilder<>(I).CreateCall(TFEnd, {TaskFrame});
     }
     ReplaceInstWithInst(I, BranchInst::Create(Continue));
   }
@@ -1006,7 +1058,8 @@ void llvm::AnalyzeTaskForSerialization(
 
 /// Serialize the detach DI that spawns task T.  If provided, the dominator tree
 /// DT will be updated to reflect the serialization.
-void llvm::SerializeDetach(DetachInst *DI, Task *T, DominatorTree *DT) {
+void llvm::SerializeDetach(DetachInst *DI, Task *T, bool ReplaceWithTaskFrame,
+                           DominatorTree *DT) {
   assert(DI && "SerializeDetach given nullptr for detach.");
   assert(DI == T->getDetach() && "Task and detach arguments do not match.");
   SmallVector<BasicBlock *, 4> EHBlocksToClone;
@@ -1025,82 +1078,7 @@ void llvm::SerializeDetach(DetachInst *DI, Task *T, DominatorTree *DT) {
   }
   SerializeDetach(DI, T->getParentTask()->getEntry(), EHContinue, LPadVal,
                   Reattaches, &EHBlocksToClone, &EHBlockPreds, &InlinedLPads,
-                  &DetachedRethrows, DT);
-}
-
-/// SerializeDetachedCFG - Serialize the sub-CFG detached by the specified
-/// detach instruction.  Removes the detach instruction and returns a pointer to
-/// the branch instruction that replaces it.
-///
-BranchInst *llvm::SerializeDetachedCFG(DetachInst *DI, DominatorTree *DT) {
-  // Get the parent of the detach instruction.
-  BasicBlock *Detacher = DI->getParent();
-  // Get the detached block and continuation of this detach.
-  BasicBlock *Detached = DI->getDetached();
-  BasicBlock *Continuation = DI->getContinue();
-  BasicBlock *Unwind = nullptr;
-  if (DI->hasUnwindDest())
-    Unwind = DI->getUnwindDest();
-
-  assert(Detached->getSinglePredecessor() &&
-         "Detached block has multiple predecessors.");
-
-  // Get the detach edge from DI.
-  BasicBlockEdge DetachEdge(Detacher, Detached);
-
-  // Collect the reattaches into the continuation.  If DT is available, verify
-  // that all reattaches are dominated by the detach edge from DI.
-  SmallVector<ReattachInst *, 8> Reattaches;
-  // If we only find a single reattach into the continuation, capture it so we
-  // can later update the dominator tree.
-  BasicBlock *SingleReattacher = nullptr;
-  int ReattachesFound = 0;
-  for (auto PI = pred_begin(Continuation), PE = pred_end(Continuation);
-       PI != PE; PI++) {
-    BasicBlock *Pred = *PI;
-    // Skip the detacher.
-    if (Detacher == Pred) continue;
-    // Record the reattaches found.
-    if (isa<ReattachInst>(Pred->getTerminator())) {
-      ReattachesFound++;
-      if (!SingleReattacher)
-        SingleReattacher = Pred;
-      if (DT) {
-        assert(DT->dominates(DetachEdge, Pred) &&
-               "Detach edge does not dominate a reattach "
-               "into its continuation.");
-      }
-      Reattaches.push_back(cast<ReattachInst>(Pred->getTerminator()));
-    }
-  }
-  // TODO: It's possible to detach a CFG that does not terminate with a
-  // reattach.  For example, optimizations can create detached CFG's that are
-  // terminated by unreachable terminators only.  Some of these special cases
-  // lead to problems with other passes, however, and this check will identify
-  // those special cases early while we sort out those issues.
-  assert(!Reattaches.empty() && "No reattach found for detach.");
-
-  // Replace each reattach with branches to the continuation.
-  for (ReattachInst *RI : Reattaches) {
-    BranchInst *ReplacementBr = BranchInst::Create(Continuation, RI);
-    ReplacementBr->setDebugLoc(RI->getDebugLoc());
-    RI->eraseFromParent();
-  }
-
-  // Replace the new detach with a branch to the detached CFG.
-  Continuation->removePredecessor(DI->getParent());
-  if (Unwind)
-    Unwind->removePredecessor(DI->getParent());
-  BranchInst *ReplacementBr = BranchInst::Create(Detached, DI);
-  ReplacementBr->setDebugLoc(DI->getDebugLoc());
-  DI->eraseFromParent();
-
-  // Update the dominator tree.
-  if (DT)
-    if (DT->dominates(Detacher, Continuation) && 1 == ReattachesFound)
-      DT->changeImmediateDominator(Continuation, SingleReattacher);
-
-  return ReplacementBr;
+                  &DetachedRethrows, ReplaceWithTaskFrame, DT);
 }
 
 static bool isCanonicalTaskFrameEnd(const Instruction *TFEnd) {
