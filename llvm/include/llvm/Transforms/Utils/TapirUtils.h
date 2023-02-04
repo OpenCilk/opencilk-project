@@ -88,6 +88,9 @@ bool removeDeadSyncUnwind(CallBase *SyncUnwind, DomTreeUpdater *DTU = nullptr);
 bool ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
                            DominatorTree *DT = nullptr);
 
+/// Returns true of the given task itself contains a sync instruction.
+bool taskContainsSync(const Task *T);
+
 /// Move static allocas in Block into Entry, which is assumed to dominate Block.
 /// Leave lifetime markers behind in Block and before each instruction in
 /// ExitPoints for those static allocas.  Returns true if Block still contains
@@ -124,6 +127,7 @@ void SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
                      SmallPtrSetImpl<BasicBlock *> *EHBlockPreds,
                      SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
                      SmallVectorImpl<Instruction *> *DetachedRethrows,
+                     bool ReplaceWithTaskFrame = false,
                      DominatorTree *DT = nullptr, LoopInfo *LI = nullptr);
 
 /// Analyze a task T for serialization.  Gets the reattaches, landing pads, and
@@ -137,12 +141,8 @@ void AnalyzeTaskForSerialization(
 
 /// Serialize the detach DI that spawns task T.  If \p DT is provided, then it
 /// will be updated to reflect the CFG changes.
-void SerializeDetach(DetachInst *DI, Task *T, DominatorTree *DT = nullptr);
-
-/// Serialize the sub-CFG detached by the specified detach
-/// instruction.  Removes the detach instruction and returns a pointer
-/// to the branch instruction that replaces it.
-BranchInst *SerializeDetachedCFG(DetachInst *DI, DominatorTree *DT = nullptr);
+void SerializeDetach(DetachInst *DI, Task *T, bool ReplaceWithTaskFrame = false,
+                     DominatorTree *DT = nullptr);
 
 /// Get the entry basic block to the detached context that contains
 /// the specified block.

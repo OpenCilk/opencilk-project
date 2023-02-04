@@ -1009,6 +1009,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // Analyze the original task for serialization.
   AnalyzeTaskForSerialization(T, Reattaches, EHBlocksToClone, EHBlockPreds,
                               InlinedLPads, DetachedRethrows);
+  bool NeedToInsertTaskFrame = taskContainsSync(T);
 
   // If this detach can throw, get the exceptional continuation of the detach
   // and its associated landingpad value.
@@ -1103,7 +1104,8 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     // Serialize the new task.
     SerializeDetach(ClonedDI, ParentEntry, EHCont, EHContLPadVal,
                     ClonedReattaches, &ClonedEHBlocks, &ClonedEHBlockPreds,
-                    &ClonedInlinedLPads, &ClonedDetachedRethrows, DT, LI);
+                    &ClonedInlinedLPads, &ClonedDetachedRethrows,
+                    NeedToInsertTaskFrame, DT, LI);
   }
 
   // Detach the stripmined loop.

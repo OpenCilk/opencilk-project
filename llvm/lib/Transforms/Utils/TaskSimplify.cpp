@@ -23,7 +23,9 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/InitializePasses.h"
@@ -41,6 +43,9 @@ using namespace llvm;
 STATISTIC(NumUniqueSyncRegs, "Number of unique sync regions found.");
 STATISTIC(NumDiscriminatingSyncs, "Number of discriminating syncs found.");
 STATISTIC(NumTaskFramesErased, "Number of taskframes erased");
+STATISTIC(
+    NumTaskFramesConverted,
+    "Number of taskframes converted to stacksave and stackrestore intrinsics");
 STATISTIC(NumSimpl, "Number of blocks simplified");
 
 static cl::opt<bool> SimplifyTaskFrames(
@@ -179,9 +184,8 @@ static bool removeRedundantSyncRegions(MaybeParallelTasks &MPTasks, Task *T) {
 bool llvm::simplifySyncs(Task *T, MaybeParallelTasks &MPTasks) {
   bool Changed = false;
 
-  LLVM_DEBUG(dbgs() <<
-             "Simplifying syncs in task @ " << T->getEntry()->getName() <<
-             "\n");
+  LLVM_DEBUG(dbgs() << "Simplifying syncs in task @ "
+                    << T->getEntry()->getName() << "\n");
 
   // Remove redundant syncs.  This optimization might not be necessary here,
   // because SimplifyCFG seems to do a good job removing syncs that cannot sync
@@ -192,7 +196,7 @@ bool llvm::simplifySyncs(Task *T, MaybeParallelTasks &MPTasks) {
   Changed |= removeRedundantSyncRegions(MPTasks, T);
 
   return Changed;
-}  
+}
 
 static bool taskCanThrow(const Task *T) {
   for (const Spindle *S : T->spindles())
@@ -226,11 +230,13 @@ bool llvm::simplifyTask(Task *T) {
   if (T->isRootTask())
     return false;
 
-  LLVM_DEBUG(dbgs() <<
-             "Simplifying task @ " << T->getEntry()->getName() << "\n");
+  LLVM_DEBUG(dbgs() << "Simplifying task @ " << T->getEntry()->getName()
+                    << "\n");
 
   bool Changed = false;
   DetachInst *DI = T->getDetach();
+
+  bool NestedSync = taskContainsSync(T);
 
   // If T's detach has an unwind dest and T cannot throw, remove the unwind
   // destination from T's detach.
@@ -248,17 +254,18 @@ bool llvm::simplifyTask(Task *T) {
     // This optimization assumes that if a task cannot reach its continuation
     // then we shouldn't bother spawning it.  The task might perform code that
     // can reach the unwind destination, however.
-    SerializeDetach(DI, T);
+    SerializeDetach(DI, T, NestedSync);
     Changed = true;
   } else if (detachImmediatelySyncs(DI)) {
-    SerializeDetach(DI, T);
+    SerializeDetach(DI, T, NestedSync);
     Changed = true;
   }
 
   return Changed;
 }
 
-static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks) {
+static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks,
+                               bool &TaskFrameContainsAlloca) {
   Value *TFCreate = TF->getTaskFrameCreate();
   if (!TFCreate)
     // Ignore implicit taskframes created from the start of a task that does not
@@ -290,6 +297,14 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks) {
     if (UserT && UserT->contains(S))
       continue;
 
+    // Skip spindles that are placeholders.
+    if (isPlaceholderSuccessor(S->getEntry()))
+      continue;
+
+    // Skip spindles in nested taskframes.
+    if (S != TF && S->getTaskFrameParent() != TF)
+      continue;
+
     // Filter the task list of S to exclude tasks in parallel with the entry.
     SmallPtrSet<const Task *, 4> LocalTaskList;
     for (const Task *MPTask : MPTasks.TaskList[S])
@@ -297,15 +312,16 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks) {
         LocalTaskList.insert(MPTask);
 
     for (const BasicBlock *BB : S->blocks()) {
-      // Skip spindles that are placeholders.
-      if (isPlaceholderSuccessor(S->getEntry()))
-        continue;
-
-      // We cannot remove taskframes that perform allocas.  Doing so would cause
-      // these allocas to affect the stack of the parent taskframe.
-      for (const Instruction &I : *BB)
-        if (isa<AllocaInst>(I))
-          return false;
+      // If the taskframe contains an alloca, then we can replace it with
+      // stacksave and stackrestore intrinsics if there is no associated task.
+      // Otherwise, we cannot remove the taskframe.
+      for (const Instruction &I : *BB) {
+        if (isa<AllocaInst>(I)) {
+          TaskFrameContainsAlloca = true;
+          if (UserT)
+            return false;
+        }
+      }
 
       // We cannot remove taskframes that contain discriminating syncs.  Doing
       // so would cause these syncs to sync tasks spawned in the parent
@@ -379,13 +395,19 @@ bool llvm::simplifyTaskFrames(TaskInfo &TI, DominatorTree &DT) {
 
   // Get the set of taskframes we can erase.
   SmallVector<Instruction *, 8> TaskFramesToErase;
+  SmallVector<Instruction *, 8> TaskFramesToConvert;
   SmallVector<Instruction *, 8> TaskFramesToOptimize;
   for (Spindle *TFRoot : TI.getRootTask()->taskframe_roots()) {
     for (Spindle *TF : post_order<TaskFrames<Spindle *>>(TFRoot)) {
-      if (canRemoveTaskFrame(TF, MPTasks))
-        TaskFramesToErase.push_back(
-            cast<Instruction>(TF->getTaskFrameCreate()));
-      else if (Value *TFCreate = TF->getTaskFrameCreate())
+      bool TaskFrameContainsAlloca = false;
+      if (canRemoveTaskFrame(TF, MPTasks, TaskFrameContainsAlloca)) {
+        if (TaskFrameContainsAlloca)
+          TaskFramesToConvert.push_back(
+              cast<Instruction>(TF->getTaskFrameCreate()));
+        else
+          TaskFramesToErase.push_back(
+              cast<Instruction>(TF->getTaskFrameCreate()));
+      } else if (Value *TFCreate = TF->getTaskFrameCreate())
         TaskFramesToOptimize.push_back(cast<Instruction>(TFCreate));
     }
   }
@@ -393,15 +415,38 @@ bool llvm::simplifyTaskFrames(TaskInfo &TI, DominatorTree &DT) {
   // First handle hoisting instructions out of a taskframe entry block, since
   // this transformation does not change the CFG.
   for (Instruction *TFCreate : TaskFramesToOptimize) {
-    LLVM_DEBUG(dbgs() <<
-               "Hoisting instructions out of taskframe " << *TFCreate << "\n");
+    LLVM_DEBUG(dbgs() << "Hoisting instructions out of taskframe " << *TFCreate
+                      << "\n");
     Changed |= hoistOutOfTaskFrame(TFCreate);
   }
 
   // Now delete any taskframes we don't need.
+  for (Instruction *TFCreate : TaskFramesToConvert) {
+    LLVM_DEBUG(dbgs() << "Converting taskframe " << *TFCreate << "\n");
+    Module *M = TFCreate->getModule();
+    Function *StackSave = Intrinsic::getDeclaration(M, Intrinsic::stacksave);
+    Function *StackRestore =
+        Intrinsic::getDeclaration(M, Intrinsic::stackrestore);
+
+    // Save the stack at the point of the taskframe.create.
+    CallInst *SavedPtr =
+        IRBuilder<>(TFCreate).CreateCall(StackSave, {}, "savedstack.ts");
+
+    for (User *U : TFCreate->users()) {
+      if (Instruction *UI = dyn_cast<Instruction>(U)) {
+        // Restore the stack at each end of the taskframe.
+        if (isTapirIntrinsic(Intrinsic::taskframe_end, UI) ||
+            isTapirIntrinsic(Intrinsic::taskframe_resume, UI))
+          IRBuilder<>(UI).CreateCall(StackRestore, SavedPtr);
+      }
+    }
+    // Remove the taskframe.
+    eraseTaskFrame(TFCreate, &DT);
+    ++NumTaskFramesConverted;
+    Changed = true;
+  }
   for (Instruction *TFCreate : TaskFramesToErase) {
-    LLVM_DEBUG(dbgs() <<
-               "Removing taskframe " << *TFCreate << "\n");
+    LLVM_DEBUG(dbgs() << "Removing taskframe " << *TFCreate << "\n");
     eraseTaskFrame(TFCreate, &DT);
     ++NumTaskFramesErased;
     Changed = true;
