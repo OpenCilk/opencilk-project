@@ -78,6 +78,8 @@ static bool trySerializeSmallLoop(
   if (!ConstTripCount || SMP.Count < ConstTripCount)
     return Changed;
 
+  // Serialize the loop's detach, since it appears to be too small to be worth
+  // parallelizing.
   ORE.emit([&]() {
              return OptimizationRemark("serialize-small-tasks",
                                        "SerializingSmallLoop",
@@ -85,7 +87,8 @@ static bool trySerializeSmallLoop(
                << "Serializing parallel loop that appears to be unprofitable "
                << "to parallelize.";
            });
-  SerializeDetach(cast<DetachInst>(L->getHeader()->getTerminator()), T, &DT);
+  SerializeDetach(cast<DetachInst>(L->getHeader()->getTerminator()), T,
+                  /* ReplaceWithTaskFrame = */ taskContainsSync(T), &DT);
   Hints.clearHintsMetadata();
   L->setDerivedFromTapirLoop();
   return true;
