@@ -843,6 +843,72 @@ getReturnBlocksToSync(BasicBlock *Entry, SyncInst *Sync,
   }
 }
 
+static bool hasPrecedingSync(SyncInst *SI) {
+  // TODO: Save the results from previous calls to hasPrecedingSync, in order to
+  // speed up multiple calls to this routine for different sync instructions.
+  SmallPtrSet<BasicBlock *, 32> Visited;
+  SmallVector<Instruction *, 32> Worklist;
+  Worklist.push_back(SI);
+  while (!Worklist.empty()) {
+    Instruction *I = Worklist.pop_back_val();
+    if (!Visited.insert(I->getParent()).second)
+      continue;
+
+    // Scan the basic block in reverse for a taskframe.end.  If found, skip the
+    // search to the corresponding taskframe.create().
+    BasicBlock::iterator Iter(I);
+    BasicBlock::const_iterator BBStart(I->getParent()->begin());
+    bool FoundPred = false;
+    while (Iter != BBStart) {
+      Instruction *I = &*Iter;
+      if (isTapirIntrinsic(Intrinsic::taskframe_end, I)) {
+        CallInst *TFEnd = cast<CallInst>(I);
+        Instruction *TaskFrame = cast<Instruction>(TFEnd->getArgOperand(0));
+        if (TaskFrame->getParent() == I->getParent()) {
+          Iter = TaskFrame->getIterator();
+          continue;
+        }
+        Worklist.push_back(TaskFrame);
+        FoundPred = true;
+        break;
+      }
+      Iter--;
+    }
+
+    // If this block contains a taskframe.end whose taskframe.create exists in
+    // another block, then we're done with this block.
+    if (FoundPred)
+      continue;
+
+    // Add predecessors of this block to the search, based on their terminators.
+    for (BasicBlock *Pred : predecessors(I->getParent())) {
+      Instruction *TI = Pred->getTerminator();
+      // If we find a sync, then the searchis done.
+      if (isa<SyncInst>(TI))
+        return true;
+
+      // Skip predecessors terminated by reattaches or detached.rethrows.  This
+      // block will also have a detach as its predecessor, where we'll continue
+      // the search.
+      if (isa<ReattachInst>(TI) || isDetachedRethrow(TI))
+        continue;
+
+      // If we find a taskframe.resume, jump the search to the corresponding
+      // taskframe.create.
+      if (isTaskFrameResume(TI)) {
+        CallBase *CB = dyn_cast<CallBase>(TI);
+        Instruction *TaskFrame = cast<Instruction>(CB->getArgOperand(0));
+        Worklist.push_back(TaskFrame);
+        continue;
+      }
+      // Otherwise, add the terminator to the worklist.
+      Worklist.push_back(TI);
+    }
+  }
+  // We finished the search and did not find a preceding sync.
+  return false;
+}
+
 bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
   Instruction *TI = BB.getTerminator();
 
@@ -935,6 +1001,11 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
                         << ": sync region does not start in entry block.");
       return false;
     }
+
+    // Check for preceding syncs, since TRE would cause those syncs to
+    // synchronize any computations that this sync currently syncs.
+    if (hasPrecedingSync(SI))
+      return false;
 
     // Get returns reachable from newly created loop.
     getReturnBlocksToSync(OldEntryBlock, SI, ReturnBlocksToSync[SyncRegion]);
