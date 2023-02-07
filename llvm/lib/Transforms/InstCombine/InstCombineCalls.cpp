@@ -2413,6 +2413,42 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     assert(isa<CallInst>(II));
     return eraseInstFromFunction(CI);
   }
+  case Intrinsic::tapir_runtime_end: {
+    Value *PrevRTStart = CI.getArgOperand(0);
+    // If there's a tapir.runtime.start in the same block after this
+    // tapir.runtime.end with no interesting instructions in between, eliminate
+    // both.
+    BasicBlock::iterator Iter(CI);
+    while (++Iter != CI.getParent()->end()) {
+      if (isTapirIntrinsic(Intrinsic::tapir_runtime_start, &*Iter)) {
+        // Replce the uses of the tapir.runtime.start with the argument to the
+        // tapir.runtime.end.
+        replaceInstUsesWith(*Iter, PrevRTStart);
+        eraseInstFromFunction(*Iter);
+        return eraseInstFromFunction(CI);
+      }
+      if (isa<CallBase>(&*Iter) && !isa<DbgInfoIntrinsic>(&*Iter))
+        // We found a nontrivial call.  Give up.
+        break;
+    }
+    break;
+  }
+  case Intrinsic::tapir_runtime_start: {
+    // If there's tapir.runtime.end in the same block after this
+    // tapir.runtime.start with no interesting instructions in between,
+    // eliminate both.
+    BasicBlock::iterator Iter(CI);
+    while (++Iter != CI.getParent()->end()) {
+      if (isTapirIntrinsic(Intrinsic::tapir_runtime_end, &*Iter, &CI)) {
+        eraseInstFromFunction(CI);
+        return eraseInstFromFunction(*Iter);
+      }
+      if (isa<CallBase>(&*Iter) && !isa<DbgInfoIntrinsic>(&*Iter))
+        // We found a nontrivial call.  Give up.
+        break;
+    }
+    break;
+  }
   case Intrinsic::assume: {
     Value *IIOperand = II->getArgOperand(0);
     SmallVector<OperandBundleDef, 4> OpBundles;
