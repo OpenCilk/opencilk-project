@@ -75,6 +75,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/InitializePasses.h"
@@ -956,16 +957,21 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
       return false;
 
     // Try to find a return instruction in the block following a sync.
-    ReturnInst *Ret =
-        dyn_cast<ReturnInst>(Succ->getFirstNonPHIOrDbgOrSyncUnwind(true));
+    Instruction *NextI = Succ->getFirstNonPHIOrDbgOrSyncUnwind(true);
+    Instruction *TapirRuntimeToRemove = nullptr;
+    if (isTapirIntrinsic(Intrinsic::tapir_runtime_end, NextI)) {
+      TapirRuntimeToRemove =
+          cast<Instruction>(cast<CallInst>(NextI)->getArgOperand(0));
+      NextI = &*(++NextI->getIterator());
+    }
+    ReturnInst *Ret = dyn_cast<ReturnInst>(NextI);
 
     BasicBlock *BrSucc = nullptr;
     if (!Ret) {
       // After the sync, there might be a block with a sync.unwind instruction
       // and an unconditional branch to a block containing just a return.  Check
       // for this structure.
-      if (BranchInst *BI = dyn_cast<BranchInst>(
-              Succ->getFirstNonPHIOrDbgOrSyncUnwind(true))) {
+      if (BranchInst *BI = dyn_cast<BranchInst>(NextI)) {
         if (BI->isConditional())
           return false;
 
@@ -1009,6 +1015,23 @@ bool TailRecursionEliminator::processBlock(BasicBlock &BB) {
 
     // Get returns reachable from newly created loop.
     getReturnBlocksToSync(OldEntryBlock, SI, ReturnBlocksToSync[SyncRegion]);
+
+    // If we found a tapir.runtime.end intrinsic between the sync and return,
+    // remove it.
+    if (TapirRuntimeToRemove) {
+      SmallVector<Instruction *, 8> ToErase;
+      for (User *U : TapirRuntimeToRemove->users()) {
+        if (Instruction *I = dyn_cast<Instruction>(U)) {
+          if (!isTapirIntrinsic(Intrinsic::tapir_runtime_end, I))
+            return false;
+          ToErase.push_back(I);
+        }
+      }
+      LLVM_DEBUG(dbgs() << "ERASING: " << *TapirRuntimeToRemove << "\n");
+      for (Instruction *I : ToErase)
+        I->eraseFromParent();
+      TapirRuntimeToRemove->eraseFromParent();
+    }
 
     // If we found a sync.unwind and unconditional branch between the sync and
     // return, first fold the return into this unconditional branch.
