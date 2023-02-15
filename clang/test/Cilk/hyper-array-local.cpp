@@ -15,7 +15,7 @@ long local_array_of_hyper(unsigned int x)
   // CHECK-NOT: call void @llvm.reducer.register
   rlong array[10]; // expected-warning{{array of reducer not implemented}}
   // CHECK: getelementptr inbounds [[JUNK:.+]] %[[ARRAY]]
-  // CHECK: call i8* @llvm.hyper.
+  // CHECK: call i8* @llvm.hyper.read
   // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: %[[VIEW:.+]] = bitcast
   // CHECK: %[[VAL:.+]] = load i64, i64* %[[VIEW]]
@@ -33,7 +33,7 @@ long local_hyper_of_array(unsigned int x)
   // CHECK-NOT: call void @llvm.reducer.register
   typedef long Array[10];
   Array _Hyperobject array;
-  // CHECK: call i8* @llvm.hyper.
+  // CHECK: call i8* @llvm.hyper.read
   // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: %[[VIEW:.+]] = bitcast
   // CHECK: %[[ELEMENT:.+]] = getelementptr inbounds [[JUNK:.+]] %[[VIEW]]

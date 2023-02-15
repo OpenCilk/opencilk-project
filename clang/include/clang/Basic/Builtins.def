@@ -1693,6 +1693,7 @@ LANGBUILTIN(__arithmetic_fence, "v.", "t", ALL_LANGUAGES)
 // and needs a builtin to carry the information to codegen.
 BUILTIN(__hyper_read, "v*vC*", "nU")
 BUILTIN(__hyper_write, "v*vC*", "n")
+BUILTIN(__hyper_lookup, "v*vC*", "n")
 
 #undef BUILTIN
 #undef LIBBUILTIN

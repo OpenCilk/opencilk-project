@@ -29,9 +29,7 @@ float get_imag()
 float get_abs()
 {
   // Only one call to llvm.hyper.read.
-  // The next call is llvm.hyper.write in C and llvm.hyper.read in C++,
-  // which is probably a bug in C.
-  // CHECK: @llvm.hyper.
+  // CHECK: @llvm.hyper.read
   // Should be @llvm.hyper.read(i8* bitcast ({ float, float }* @c to i8*))
   // CHECK-NOT: @llvm.hyper.
   // CHECK: call float @cabsf

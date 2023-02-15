@@ -1404,6 +1404,12 @@ def int_hyper_write
     [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
      IntrStrandPure, IntrHyperView, IntrInjective]>;
 
+// Lookup a hyperobject with unknown read or write behavior
+def int_hyper_lookup
+    : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
+    [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+     IntrHyperView, IntrInjective]>;
+
 // TODO: Change tablegen to allow function pointer types in intrinsics.
 def int_reducer_register
     : Intrinsic<[], [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty],

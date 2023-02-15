@@ -11,8 +11,7 @@ int read_array_hyper(unsigned i)
   return x[i];
   // CHECK: %[[ARRAYIDX:.+]] = getelementptr inbounds
   // CHECK: %[[KEY:.+]] = bitcast i32* %[[ARRAYIDX]] to i8*
-  // C++ calls llvm.hyper.read and C calls llvm.hyper.write
-  // CHECK: %[[VIEWRAW:.+]] = call i8* @llvm.hyper
+  // CHECK: %[[VIEWRAW:.+]] = call i8* @llvm.hyper.read
   // CHECK-NOT: call i8* @llvm.hyper.read
   // CHECK-NOT: call i8* @llvm.hyper.write
   // CHECK: %[[VIEW:.+]] = bitcast i8* %[[VIEWRAW]] to i32*

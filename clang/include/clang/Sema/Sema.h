@@ -5284,7 +5284,12 @@ public:
                    SourceLocation TemplateKWLoc = SourceLocation(),
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
 
-  enum HyperType { HyperWrite = 0, HyperRead = 1, HyperPointer = 2 };
+  enum HyperType {
+    HyperWrite = 0,   // Object is completely written
+    HyperUnknown = 1, // Unknown or read-modify-write
+    HyperRead = 2,    // Object is only read
+    HyperPointer = 3  // Pointer to view is captured
+  };
   Expr *BuildHyperobjectLookup(Expr *, HyperType Type = HyperWrite);
   Expr *ValidateReducerCallback(Expr *E, unsigned NumArgs, SourceLocation Loc);
 

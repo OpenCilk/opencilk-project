@@ -30,7 +30,7 @@ T mult_direct(T *x, T *y) {
   // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: getelementptr
   // CHECK-NEXT: load double,
-  // CHECK: call i8* @llvm.hyper.write
+  // CHECK: call i8* @llvm.hyper.lookup
   // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: load double
   // CHECK-NOT: call i8* @llvm.hyper.

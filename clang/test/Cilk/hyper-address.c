@@ -20,7 +20,7 @@ void assorted_addresses()
   // CHECK-NOT: llvm.hyper.write
   // CHECK: call void @[[FN1:.*consume_hyper]]
   consume_hyper(__builtin_addressof(sum));
-  // CHECK: call i8* @llvm.hyper.write
+  // CHECK: call i8* @llvm.hyper.lookup
   // CHECK-NOT: call i8* @llvm.hyper.read
   // CHECK: call void @[[FN2:.*consume_view]]
   consume_view(&sum);

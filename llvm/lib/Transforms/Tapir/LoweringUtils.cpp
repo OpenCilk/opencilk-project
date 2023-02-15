@@ -1179,6 +1179,7 @@ bool TapirTarget::shouldProcessFunction(const Function &F) const {
       switch (II->getIntrinsicID()) {
       case Intrinsic::hyper_read:
       case Intrinsic::hyper_write:
+      case Intrinsic::hyper_lookup:
       case Intrinsic::reducer_register:
       case Intrinsic::reducer_unregister:
       case Intrinsic::tapir_loop_grainsize:

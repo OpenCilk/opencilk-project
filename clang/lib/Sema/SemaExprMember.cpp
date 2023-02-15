@@ -1234,7 +1234,7 @@ Sema::PerformMemberExprBaseConversion(Expr *Base, bool IsArrow) {
     return Result;
   // Hard to know if the member will be read or written.
   return BuildHyperobjectLookup(Result.get(),
-                                IsArrow ? HyperPointer : HyperWrite);
+                                IsArrow ? HyperPointer : HyperUnknown);
 }
 
 /// Look up the given member of the given non-type-dependent

@@ -27,11 +27,11 @@ long simple_assign(long val)
 long subtract()
 {
   // The order is not fixed here.
-  // CHECK: call i8* @llvm.hyper.write(i8* bitcast (i64* @y to i8*))
+  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i64* @y to i8*))
   // CHECK: load i64
   // CHECK: add nsw i64 %[[Y:.+]], 1
   // CHECK: store i64
-  // CHECK: call i8* @llvm.hyper.write(i8* bitcast (i64* @x to i8*))
+  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (i64* @x to i8*))
   // CHECK: load i64
   // CHECK: sub nsw
   // CHECK: store i64

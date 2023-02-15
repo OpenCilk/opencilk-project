@@ -6,7 +6,7 @@ S<long> _Hyperobject S_long;
 
 // CHECK-LABEL: @_Z1fv
 // The front end isn't smart enough to generate llvm.hyper.read here.
-// CHECK: %0 = call i8* @llvm.hyper.write(i8* bitcast (%struct.S* @S_long to i8*))
+// CHECK: %0 = call i8* @llvm.hyper.lookup(i8* bitcast (%struct.S* @S_long to i8*))
 // CHECK-NOT: call i8* @llvm.hyper.
 // CHECK: getelementptr
 // CHECK: %[[RET:.+]] = load i64
@@ -15,7 +15,7 @@ long f() { return S_long.member; }
 
 // CHECK-LABEL: _Z1gPH1SIsE
 // The front end isn't smart enough to generate llvm.hyper.read here.
-// CHECK: call i8* @llvm.hyper.write
+// CHECK: call i8* @llvm.hyper.lookup
 // CHECK-NOT: call i8* @llvm.hyper.
 // CHECK: getelementptr
 // CHECK: load i16
