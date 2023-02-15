@@ -33,12 +33,33 @@ long local_hyper_of_array(unsigned int x)
   // CHECK-NOT: call void @llvm.reducer.register
   typedef long Array[10];
   Array _Hyperobject array;
-  // CHECK: call i8* @llvm.hyper.read
+  // This should be llvm.hyper.read.
+  // CHECK: call i8* @llvm.hyper.lookup
   // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: %[[VIEW:.+]] = bitcast
   // CHECK: %[[ELEMENT:.+]] = getelementptr inbounds [[JUNK:.+]] %[[VIEW]]
   // CHECK: %[[VAL:.+]] = load i64, i64* %[[ELEMENT]]
   return array[x];
+  // CHECK-NOT: call void @llvm.reducer.unregister
+  // CHECK ret i64 [[VAL]]
+}
+
+// CHECK_LABEL: local_hyper_of_array_incr
+long local_hyper_of_array_incr(unsigned int x)
+{
+  // CHECK: %x.addr = alloca
+  // CHECK: %[[ARRAY:.+]] = alloca [10 x i64]
+  // A hyperobject without reducer attribute should not be registered.
+  // CHECK-NOT: call void @llvm.reducer.register
+  typedef long Array[10];
+  Array _Hyperobject array;
+  // Unlike the previous test, this one does need to call @llym.hyper.lookup.
+  // CHECK: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call i8* @llvm.hyper.
+  // CHECK: %[[VIEW:.+]] = bitcast
+  // CHECK: %[[ELEMENT:.+]] = getelementptr inbounds [[JUNK:.+]] %[[VIEW]]
+  // CHECK: %[[VAL:.+]] = load i64, i64* %[[ELEMENT]]
+  return array[x]++;
   // CHECK-NOT: call void @llvm.reducer.unregister
   // CHECK ret i64 [[VAL]]
 }

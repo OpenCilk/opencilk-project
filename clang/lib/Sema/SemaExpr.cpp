@@ -504,7 +504,8 @@ ExprResult Sema::DefaultFunctionArrayConversion(Expr *E, bool Diagnose) {
   }
 
   // Hard to know if the array will be read or written.
-  E = BuildHyperobjectLookup(E, E->getType()->isArrayType() ?
+  E = BuildHyperobjectLookup(E,
+                             E->getType().stripHyperobject()->isArrayType() ?
                              HyperUnknown : HyperRead);
 
   QualType Ty = E->getType();
