@@ -1392,6 +1392,12 @@ def int_task_frameaddress
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.
 
+// Lookup a hyperobject with reducer semantics.
+def int_reducer_lookup
+    : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
+    [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+     IntrStrandPure, IntrHyperView, IntrInjective]>;
+
 // Lookup a hyperobject only to read its value.
 def int_hyper_read
     : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
@@ -1402,7 +1408,7 @@ def int_hyper_read
 def int_hyper_write
     : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
     [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
-     IntrStrandPure, IntrHyperView, IntrInjective]>;
+     IntrHyperView, IntrInjective]>;
 
 // Lookup a hyperobject with unknown read or write behavior
 def int_hyper_lookup

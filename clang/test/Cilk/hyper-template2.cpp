@@ -17,7 +17,7 @@ struct reducer
 reducer<short> r; // expected-note{{in instantiation}}
 
 // CHECK-LABEL: _Z1fv
-// CHECK: call i8* @llvm.hyper.read
+// CHECK: call i8* @llvm.reducer.lookup
 // CHECK-NOT: call i8* @llvm.hyper.
 // CHECK: load i16
 // CHECK: sext i16

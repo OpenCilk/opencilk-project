@@ -258,6 +258,7 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
+      {"__cilkrts_reducer_lookup", PtrPtrTy, CilkRTSReducerLookup},
       {"__cilkrts_hyperobject_read", PtrPtrTy, CilkRTSHyperobjectRead},
       {"__cilkrts_hyperobject_write", PtrPtrTy, CilkRTSHyperobjectWrite},
       {"__cilkrts_hyperobject_lookup", PtrPtrTy, CilkRTSHyperobjectLookup},

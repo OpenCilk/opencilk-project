@@ -2021,6 +2021,7 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, HyperType Type) {
     return E;
 
   QualType InputType = E->getType();
+
   if (Type == HyperPointer) {
     const PointerType *PT = InputType->getAs<PointerType>();
     if (!PT)
@@ -2032,22 +2033,32 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, HyperType Type) {
   if (!HT)
     return E;
 
+  QualType ResultType = HT->getElementType().withFastQualifiers(
+      InputType.getLocalFastQualifiers());
+
   bool Difficult = CurContext->isDependentContext();
 
   // For now the lookup function does not depend on the type of hyperobject.
-  StringRef HyperFn;
-  switch (Type) {
-  case HyperRead:
-    HyperFn = "__hyper_read";
-    break;
-  case HyperWrite:
-    HyperFn = "__hyper_write";
-    break;
-  case HyperUnknown:
-  case HyperPointer:
-    HyperFn = "__hyper_lookup";
-    break;
+  StringRef HyperFn("__reducer_lookup");
+  if (!HT->hasCallbacks()) { // If it is not a reducer
+    if (ResultType.isConstQualified()) {
+      HyperFn = "__hyper_read";
+    } else {
+      switch (Type) {
+      case HyperRead:
+        HyperFn = "__hyper_read";
+        break;
+      case HyperWrite:
+        HyperFn = "__hyper_write";
+        break;
+      case HyperUnknown:
+      case HyperPointer:
+        HyperFn = "__hyper_lookup";
+        break;
+      }
+    }
   }
+
   IdentifierInfo *ID = PP.getIdentifierInfo(HyperFn);
   ValueDecl *Builtin =
       dyn_cast<ValueDecl>
@@ -2061,8 +2072,6 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, HyperType Type) {
   DeclRefExpr *Lookup = BuildDeclRefExpr(Builtin, Builtin->getType(),
                                          VK_PRValue, SourceLocation(), nullptr);
 
-  QualType ResultType = HT->getElementType().withFastQualifiers(
-      InputType.getLocalFastQualifiers());
   QualType Ptr = Context.getPointerType(ResultType);
 
   Expr *VarAddr;

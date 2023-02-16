@@ -50,6 +50,7 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSReducerRegister32 = nullptr;
   FunctionCallee CilkRTSReducerRegister64 = nullptr;
   FunctionCallee CilkRTSReducerUnregister = nullptr;
+  FunctionCallee CilkRTSReducerLookup = nullptr;
   FunctionCallee CilkRTSHyperobjectRead = nullptr;
   FunctionCallee CilkRTSHyperobjectWrite = nullptr;
   FunctionCallee CilkRTSHyperobjectLookup = nullptr;
@@ -110,6 +111,9 @@ class OpenCilkABI final : public TapirTarget {
   }
   FunctionCallee Get__cilkrts_reducer_unregister() {
     return CilkRTSReducerUnregister;
+  }
+  FunctionCallee Get__cilkrts_reducer_lookup() {
+    return CilkRTSReducerLookup;
   }
   FunctionCallee Get__cilkrts_hyperobject_read() {
     return CilkRTSHyperobjectRead;

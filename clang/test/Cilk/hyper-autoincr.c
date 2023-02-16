@@ -92,13 +92,13 @@ double local_reducer_1()
   // CHECK: store double 0.0
   // CHECK: call void @llvm.reducer.register
   double _Hyperobject(identity, reduce) x = 0.0;
-  // CHECK: call i8* @llvm.hyper.lookup
-  // CHECK-NOT: call i8* @llvm.hyper.read
+  // CHECK: call i8* @llvm.reducer.lookup
+  // CHECK-NOT: call i8* @llvm.hyper.
   // CHECK: load double
   // CHECK: fadd double
   // CHECK: store double
   x += 1.0f;
-  // CHECK: call i8* @llvm.hyper.read
+  // CHECK: call i8* @llvm.reducer.lookup
   // CHECK: load double
   // CHECK: call void @llvm.reducer.unregister
   // CHECK: ret double
