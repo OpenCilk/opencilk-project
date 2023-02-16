@@ -500,16 +500,12 @@ void CallInst::init(FunctionType *FTy, Value *Func, ArrayRef<Value *> Args,
 #ifndef NDEBUG
   assert((Args.size() == FTy->getNumParams() ||
           (FTy->isVarArg() && Args.size() > FTy->getNumParams())) &&
-         "Calling a function with bad argument count!");
+         "Calling a function with bad signature!");
 
-  for (unsigned i = 0; i != Args.size(); ++i) {
-    if (i < FTy->getNumParams() &&
-            FTy->getParamType(i) != Args[i]->getType()) {
-      Func->dump();
-      Args[i]->dump();
-      llvm_unreachable("Calling a function with a bad signature!");
-    }
-  }
+  for (unsigned i = 0; i != Args.size(); ++i)
+    assert((i >= FTy->getNumParams() ||
+            FTy->getParamType(i) == Args[i]->getType()) &&
+           "Calling a function with a bad signature!");
 #endif
 
   // Set operands in order of their index to match use-list-order
@@ -529,8 +525,6 @@ void CallInst::init(FunctionType *FTy, Value *Func, const Twine &NameStr) {
   assert(getNumOperands() == 1 && "NumOperands not set up?");
   setCalledOperand(Func);
 
-  if (FTy->getNumParams() != 0)
-    Func->dump();
   assert(FTy->getNumParams() == 0 && "Calling a function with bad signature");
 
   setName(NameStr);
