@@ -1083,6 +1083,9 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   case Intrinsic::hyper_lookup:
     Fn = Get__cilkrts_hyperobject_lookup();
     break;
+  case Intrinsic::reducer_lookup:
+    Fn = Get__cilkrts_reducer_lookup();
+    break;
   case Intrinsic::reducer_register: {
     const Type *SizeType = CI->getArgOperand(1)->getType();
     assert(isa<IntegerType>(SizeType));
