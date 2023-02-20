@@ -1693,7 +1693,7 @@ LANGBUILTIN(__arithmetic_fence, "v.", "t", ALL_LANGUAGES)
 // and needs a builtin to carry the information to codegen.
 // These translate directly to LLVM IR intrinsics.
 BUILTIN(__reducer_lookup, "v*vC*", "nU")
-BUILTIN(__hyper_read, "v*vC*", "nU")
+BUILTIN(__hyper_read, "vC*vC*", "nU")
 BUILTIN(__hyper_write, "v*vC*", "n")
 BUILTIN(__hyper_lookup, "v*vC*", "n")
 
