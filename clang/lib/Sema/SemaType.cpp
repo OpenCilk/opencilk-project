@@ -2394,6 +2394,8 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
     E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
                                             E->getExprLoc());
     Cast = CK_NullToPointer;
+  } else if (Mismatch == IntToPointer) {
+    Cast = CK_IntegralToPointer;
   }
 
   return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, Cast, E,
@@ -2412,7 +2414,7 @@ QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
 
   Identity = ValidateReducerCallback(Identity, 1, Loc);
   Reduce = ValidateReducerCallback(Reduce, 2, Loc);
-  Destruct = ValidateReducerCallback(Destruct, 2, Loc);
+  Destruct = ValidateReducerCallback(Destruct, 1, Loc);
 
   // The result of this function must be HyperobjectType if it is called
   // from C++ template instantiation when rebuilding an existing hyperobject

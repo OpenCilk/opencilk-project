@@ -10407,15 +10407,11 @@ def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
 
 def reducer_callbacks_not_allowed: Warning<
-   "reducer callbacks not implemented for structure members">,
+   "hyperobject callbacks not implemented for structure members">,
     InGroup<CilkIgnored>;
 
-def err_invalid_reducer_callback : Error<
-  "reducer callback must be function with %0 pointer parameter%s0"
->;
-
 def note_protected_by_reducer : Note<
-  "jump bypasses initialization of variable with __attribute__((reducer))">;
+  "jump bypasses initialization of hyperobject variable">;
 
 def err_hyperobject_param : Error<"parameter is hyperobject">;
 
