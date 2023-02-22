@@ -13644,7 +13644,7 @@ void Sema::FinalizeDeclaration(Decl *ThisDecl) {
   if (VD->getType()->isArrayType()) {
     const ArrayType *A = VD->getType()->getAsArrayTypeUnsafe();
     const HyperobjectType *H = A->getElementType()->getAs<HyperobjectType>();
-    if (H && H->hasCallbacks())
+    if (H && H->Classify() != HyperobjectType::BARE)
       Diag(VD->getLocation(), diag::no_reducer_array);
   }
 
@@ -17527,7 +17527,7 @@ void Sema::ActOnFields(Scope *S, SourceLocation RecLoc, Decl *EnclosingDecl,
 
     if (!FDTy->isDependentType()) {
       if (const HyperobjectType *HT = FDTy->getAs<HyperobjectType>()) {
-        if (HT->hasCallbacks())
+        if (HT->Classify() != HyperobjectType::BARE)
           Diag(FD->getLocation(), diag::reducer_callbacks_not_allowed)
             << FD->getDeclName();
       }

@@ -1211,7 +1211,7 @@ public:
                                       SourceLocation Loc);
 
   QualType RebuildHyperobjectType(QualType ElementType, Expr *R,
-                                  Expr *I, SourceLocation Loc);
+                                  Expr *I, Expr *D, SourceLocation Loc);
 
   /// Build a new template name given a nested name specifier, a flag
   /// indicating whether the "template" keyword was provided, and the template
@@ -5009,8 +5009,9 @@ QualType TreeTransform<Derived>::TransformHyperobjectType
         SemaRef, Sema::ExpressionEvaluationContext::PotentiallyEvaluated);
     NewR = getDerived().TransformExpr(H->getReduce());
     NewI = getDerived().TransformExpr(H->getIdentity());
+    NewD = getDerived().TransformExpr(H->getDestruct());
   }
-  if (NewR.isInvalid() || NewI.isInvalid())
+  if (NewR.isInvalid() || NewI.isInvalid() || NewD.isInvalid())
     return QualType();
 
   QualType ElementType = getDerived().TransformType(TLB, TL.getPointeeLoc());
@@ -5019,7 +5020,8 @@ QualType TreeTransform<Derived>::TransformHyperobjectType
 
   QualType Result =
     getDerived().RebuildHyperobjectType(ElementType, NewI.get(),
-                                        NewR.get(), TL.getHyperLoc());
+                                        NewR.get(), NewD.get(),
+                                        TL.getHyperLoc());
 
   HyperobjectTypeLoc NewT = TLB.push<HyperobjectTypeLoc>(Result);
   NewT.setHyperLoc(TL.getHyperLoc());
@@ -14691,8 +14693,9 @@ QualType TreeTransform<Derived>::RebuildDependentBitIntType(
 template<typename Derived>
 QualType TreeTransform<Derived>::RebuildHyperobjectType(QualType ElementType,
                                                         Expr *I, Expr *R,
+                                                        Expr *D,
                                                         SourceLocation Loc) {
-  return SemaRef.BuildHyperobjectType(ElementType, I, R, Loc);
+  return SemaRef.BuildHyperobjectType(ElementType, I, R, D, Loc);
 }
 
 template<typename Derived>

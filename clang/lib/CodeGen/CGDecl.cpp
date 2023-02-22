@@ -1807,11 +1807,12 @@ void CodeGenFunction::emitZeroOrPatternForAutoVarInit(QualType type,
 
 bool CodeGenFunction::getReducer(const VarDecl *D, ReducerCallbacks &CB) {
   if (const HyperobjectType *H = D->getType()->getAs<HyperobjectType>()) {
-    if (H->hasCallbacks()) {
-      CB.Identity = H->getIdentity();
-      CB.Reduce = H->getReduce();
-      return true;
-    }
+    if (H->Classify() == HyperobjectType::BARE)
+      return false;
+    CB.Identity = H->getIdentity();
+    CB.Reduce = H->getReduce();
+    CB.Destruct = H->getDestruct();
+    return true;
   }
   return false;
 }
@@ -1869,7 +1870,7 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(*this, D.getLocation());
   QualType type = D.getType();
 
-  ReducerCallbacks RCB = {0, 0};
+  ReducerCallbacks RCB = {0, 0, 0};
   bool Reducer = false;
   if (const HyperobjectType *H = type->getAs<HyperobjectType>()) {
     type = H->getElementType();
@@ -2086,7 +2087,7 @@ void CodeGenFunction::emitAutoVarTypeCleanup(
 
   case QualType::DK_cxx_destructor:
     if (const HyperobjectType *H = type->getAs<HyperobjectType>())
-      IsReducer = H->hasCallbacks();
+      IsReducer = H->Classify() != HyperobjectType::BARE;
     // If there's an NRVO flag on the emission, we need a different
     // cleanup.
     if (emission.NRVOFlag) {

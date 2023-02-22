@@ -390,7 +390,10 @@ void TypePrinter::printHyperobjectBefore(const HyperobjectType *T,
   SaveAndRestore<bool> NonEmptyPH(HasEmptyPlaceHolder, false);
   printBefore(T->getElementType(), OS);
   OS << "_Hyperobject";
-  if (T->hasCallbacks()) {
+  switch (T->Classify()) {
+  case HyperobjectType::BARE:
+    break;
+  case HyperobjectType::REDUCER: {
     Expr *I = T->getIdentity();
     Expr *R = T->getReduce();
     OS << '(';
@@ -398,6 +401,21 @@ void TypePrinter::printHyperobjectBefore(const HyperobjectType *T,
     OS << ", ";
     R->printPretty(OS, nullptr, Policy);
     OS << ")";
+    break;
+  }
+  case HyperobjectType::SPLITTER: {
+    Expr *I = T->getIdentity();
+    Expr *R = T->getReduce();
+    Expr *D = T->getDestruct();
+    OS << '(';
+    I->printPretty(OS, nullptr, Policy);
+    OS << ", ";
+    R->printPretty(OS, nullptr, Policy);
+    OS << ", ";
+    D->printPretty(OS, nullptr, Policy);
+    OS << ")";
+    break;
+  }
   }
 }
 

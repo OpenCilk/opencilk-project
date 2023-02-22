@@ -3675,6 +3675,7 @@ public:
   struct ReducerCallbacks {
     Expr *Identity;
     Expr *Reduce;
+    Expr *Destruct;
   };
 
   bool getReducer(const VarDecl *D, ReducerCallbacks &CB);

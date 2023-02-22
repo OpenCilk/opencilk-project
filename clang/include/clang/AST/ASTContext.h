@@ -1321,9 +1321,11 @@ public:
     return CanQualType::CreateUnsafe(getComplexType((QualType) T));
   }
 
-  QualType getHyperobjectType(QualType T, Expr *R, Expr *I) const;
-  CanQualType getHyperobjectType(CanQualType T, Expr *R, Expr *I) const {
-    return CanQualType::CreateUnsafe(getHyperobjectType((QualType) T, R, I));
+  QualType getHyperobjectType(QualType T, Expr *I, Expr *R, Expr *D) const;
+  CanQualType getHyperobjectType(CanQualType T, Expr *I, Expr *R,
+                                 Expr *D) const {
+    return
+      CanQualType::CreateUnsafe(getHyperobjectType((QualType) T, I, R, D));
   }
 
   /// Return the uniqued reference to the type for a pointer to

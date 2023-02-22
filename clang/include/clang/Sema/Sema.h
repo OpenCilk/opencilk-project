@@ -1997,7 +1997,7 @@ public:
   QualType BuildMatrixType(QualType T, Expr *NumRows, Expr *NumColumns,
                            SourceLocation AttrLoc);
   QualType BuildHyperobjectType(QualType Element, Expr *Identity, Expr *Reduce,
-                                SourceLocation Loc);
+                                Expr *Destruct, SourceLocation Loc);
 
   QualType BuildAddressSpaceAttr(QualType &T, LangAS ASIdx, Expr *AddrSpace,
                                  SourceLocation AttrLoc);

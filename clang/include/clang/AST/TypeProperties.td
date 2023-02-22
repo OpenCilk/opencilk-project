@@ -27,9 +27,12 @@ let Class = HyperobjectType in {
   def : Property<"identity", ExprRef> {
     let Read = [{ node->getIdentity() }];
   }
+  def : Property<"destruct", ExprRef> {
+    let Read = [{ node->getDestruct() }];
+  }
 
   def : Creator<[{
-    return ctx.getHyperobjectType(elementType, reduce, identity);
+    return ctx.getHyperobjectType(elementType, reduce, identity, destruct);
   }]>;
 }
 

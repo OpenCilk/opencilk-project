@@ -3166,28 +3166,28 @@ bool HyperobjectType::isNullish(Expr *E) {
 
 HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
                                  Expr *i, const FunctionDecl *ifn,
-                                 Expr *r, const FunctionDecl *rfn)
+                                 Expr *r, const FunctionDecl *rfn,
+                                 Expr *d, const FunctionDecl *dfn)
   : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
-    ElementType(Element), Identity(i), Reduce(r),
+    ElementType(Element), Identity(i), Reduce(r), Destruct(d),
     IdentityID(ifn), ReduceID(rfn) {
 }
 
-bool HyperobjectType::hasCallbacks() const {
-  return Identity && Reduce && !isNullish(Identity) && !isNullish(Reduce);
-}
-
 void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID) const {
-  Profile(ID, getElementType(), IdentityID, ReduceID);
+  Profile(ID, getElementType(), IdentityID, ReduceID, DestructID);
 }
 
 void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
-                              const FunctionDecl *I, const FunctionDecl *R) {
+                              const FunctionDecl *I, const FunctionDecl *R,
+                              const FunctionDecl *D) {
   ID.AddPointer(Pointee.getAsOpaquePtr());
   // In normal use both I and R will be non-null or neither of them will be.
   if (I)
     ID.AddPointer(I);
   if (R)
     ID.AddPointer(R);
+  if (D)
+    ID.AddPointer(D);
 }
 
 StringRef FunctionType::getNameForCallConv(CallingConv CC) {
@@ -4468,7 +4468,7 @@ QualType::DestructionKind QualType::isDestructedTypeImpl(QualType type) {
     QualType::DestructionKind DK_Inner = isDestructedTypeImpl(Inner);
     if (DK_Inner != DK_none)
       return DK_Inner;
-    if (HT->hasCallbacks())
+    if (HT->Classify() != HyperobjectType::BARE)
       return DK_hyperobject;
     return DK_none;
   }

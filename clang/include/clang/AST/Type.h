@@ -6395,12 +6395,19 @@ class HyperobjectType final : public Type, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   QualType ElementType;
-  Expr *Identity, *Reduce;
-  const FunctionDecl *IdentityID, *ReduceID;
+  Expr *Identity, *Reduce, *Destruct;
+  const FunctionDecl *IdentityID, *ReduceID, *DestructID;
+
+  // Bare hyperobject
+  HyperobjectType(QualType Element, QualType CanonicalPtr)
+    : HyperobjectType(Element, CanonicalPtr, nullptr, nullptr,
+                      nullptr, nullptr, nullptr, nullptr)
+  { }
 
   HyperobjectType(QualType Element, QualType CanonicalPtr,
                   Expr *i, const FunctionDecl *ifn,
-                  Expr *r, const FunctionDecl *rfn);
+                  Expr *r, const FunctionDecl *rfn,
+                  Expr *d, const FunctionDecl *dfn);
 
 public:
   QualType getElementType() const { return ElementType; }
@@ -6409,8 +6416,17 @@ public:
 
   Expr *getIdentity() const { return Identity; }
   Expr *getReduce() const { return Reduce; }
+  Expr *getDestruct() const { return Destruct; }
 
-  bool hasCallbacks() const;
+  enum Kind { BARE, REDUCER, SPLITTER };
+
+  enum Kind Classify() const {
+    if (isNullish(Reduce) || isNullish(Identity))
+      return BARE;
+    if (isNullish(Destruct))
+      return REDUCER;
+    return SPLITTER;
+  }
 
   bool isSugared() const { return false; }
   QualType desugar() const { return QualType(this, 0); }
@@ -6418,8 +6434,8 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
-                      const FunctionDecl *I,
-                      const FunctionDecl *R);
+                      const FunctionDecl *I, const FunctionDecl *R,
+                      const FunctionDecl *D);
 
   static bool classof(const Type *T) {
     return T->getTypeClass() == Hyperobject;

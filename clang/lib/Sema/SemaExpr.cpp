@@ -2038,9 +2038,8 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, HyperType Type) {
 
   bool Difficult = CurContext->isDependentContext();
 
-  // For now the lookup function does not depend on the type of hyperobject.
   StringRef HyperFn("__reducer_lookup");
-  if (!HT->hasCallbacks()) { // If it is not a reducer
+  if (HT->Classify() != HyperobjectType::REDUCER) {
     if (InputType.isConstQualified() || ResultType.isConstQualified()) {
       HyperFn = "__hyper_read";
     } else {
