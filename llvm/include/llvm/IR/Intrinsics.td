@@ -1416,14 +1416,15 @@ def int_hyper_lookup
     [IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
      IntrHyperView, IntrInjective]>;
 
-// TODO: Change tablegen to allow function pointer types in intrinsics.
-def int_reducer_register
-    : Intrinsic<[], [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty],
+// Leftmost view, hyperobject type, view size, callbacks
+def int_hyperobject_register
+    : Intrinsic<[], [llvm_ptr_ty, llvm_anyint_ty, llvm_i32_ty,
+                     llvm_ptr_ty, llvm_ptr_ty, llvm_ptr_ty],
      [IntrWillReturn, IntrInaccessibleMemOnly, IntrReducerRegister]>;
 
-def int_reducer_unregister
-    : Intrinsic<[], [llvm_ptr_ty], [IntrWillReturn, IntrInaccessibleMemOnly,
-     IntrReducerUnregister]>;
+def int_hyperobject_unregister
+    : Intrinsic<[], [llvm_ptr_ty],
+     [IntrWillReturn, IntrInaccessibleMemOnly, IntrReducerUnregister]>;
 
 ///===-------------------------- Other Intrinsics --------------------------===//
 //

@@ -226,11 +226,11 @@ void OpenCilkABI::prepareModule() {
   FunctionType *PtrPtrTy = FunctionType::get(VoidPtrTy, {VoidPtrTy}, false);
   FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
   FunctionType *Reg32Ty =
-      FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
-              VoidPtrTy}, false);
+      FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, Int32Ty, VoidPtrTy,
+              VoidPtrTy, VoidPtrTy}, false);
   FunctionType *Reg64Ty =
-      FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty, VoidPtrTy,
-              VoidPtrTy}, false);
+      FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty, Int32Ty, VoidPtrTy,
+              VoidPtrTy, VoidPtrTy}, false);
 
   // Create an array of CilkRTS functions, with their associated types and
   // FunctionCallee member variables in the OpenCilkABI class.
@@ -262,9 +262,12 @@ void OpenCilkABI::prepareModule() {
       {"__cilkrts_hyperobject_read", PtrPtrTy, CilkRTSHyperobjectRead},
       {"__cilkrts_hyperobject_write", PtrPtrTy, CilkRTSHyperobjectWrite},
       {"__cilkrts_hyperobject_lookup", PtrPtrTy, CilkRTSHyperobjectLookup},
-      {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
-      {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
-      {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
+      {"__cilkrts_hyperobject_register_32", Reg32Ty,
+       CilkRTSHyperobjectRegister32},
+      {"__cilkrts_hyperobject_register_64", Reg64Ty,
+       CilkRTSHyperobjectRegister64},
+      {"__cilkrts_hyperobject_unregister", UnregTy,
+       CilkRTSHyperobjectUnregister},
   };
 
   if (UseOpenCilkRuntimeBC) {
@@ -1086,15 +1089,15 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   case Intrinsic::reducer_lookup:
     Fn = Get__cilkrts_reducer_lookup();
     break;
-  case Intrinsic::reducer_register: {
+  case Intrinsic::hyperobject_register: {
     const Type *SizeType = CI->getArgOperand(1)->getType();
     assert(isa<IntegerType>(SizeType));
-    Fn = Get__cilkrts_reducer_register(SizeType->getIntegerBitWidth());
+    Fn = Get__cilkrts_hyperobject_register(SizeType->getIntegerBitWidth());
     assert(Fn);
     break;
   }
-  case Intrinsic::reducer_unregister:
-    Fn = Get__cilkrts_reducer_unregister();
+  case Intrinsic::hyperobject_unregister:
+    Fn = Get__cilkrts_hyperobject_unregister();
     break;
   }
   CI->setCalledFunction(Fn);

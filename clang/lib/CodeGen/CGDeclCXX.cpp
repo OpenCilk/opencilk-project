@@ -821,7 +821,7 @@ void CodeGenFunction::GenerateCXXGlobalVarDeclInitFunc(llvm::Function *Fn,
     EmitCXXGlobalVarDeclInit(*D, Addr, PerformInit);
   }
 
-  ReducerCallbacks RCB = {0, 0, 0};
+  ReducerCallbacks RCB = {0, 0, 0, 0};
   if (getReducer(D, RCB)) {
     llvm::Value *Addr =
       Builder.CreateBitCast(CGM.GetAddrOfGlobalVar(D, nullptr), CGM.VoidPtrTy);
@@ -967,7 +967,7 @@ llvm::Function *CodeGenFunction::generateDestroyHelper(
 
   if (IsReducer) {
     llvm::Function *Unregister =
-      CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
+      CGM.getIntrinsic(llvm::Intrinsic::hyperobject_unregister);
     llvm::Value *AddrVoid =
 	Builder.CreateBitCast(addr.getPointer(), CGM.VoidPtrTy);
     Builder.CreateCall(Unregister, {AddrVoid});

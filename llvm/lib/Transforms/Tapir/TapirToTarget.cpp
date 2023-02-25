@@ -254,8 +254,8 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
           isTapirIntrinsic(Intrinsic::hyper_write, &I, nullptr) ||
           isTapirIntrinsic(Intrinsic::hyper_lookup, &I, nullptr) ||
           isTapirIntrinsic(Intrinsic::reducer_lookup, &I, nullptr) ||
-          isTapirIntrinsic(Intrinsic::reducer_register, &I, nullptr) ||
-          isTapirIntrinsic(Intrinsic::reducer_unregister, &I, nullptr))
+          isTapirIntrinsic(Intrinsic::hyperobject_register, &I, nullptr) ||
+          isTapirIntrinsic(Intrinsic::hyperobject_unregister, &I, nullptr))
         ReducerOperations.push_back(cast<CallInst>(&I));
     }
   }

@@ -3673,6 +3673,7 @@ public:
   void emitAutoVarTypeCleanup(const AutoVarEmission &emission,
                               QualType::DestructionKind dtorKind);
   struct ReducerCallbacks {
+    int Kind;
     Expr *Identity;
     Expr *Reduce;
     Expr *Destruct;

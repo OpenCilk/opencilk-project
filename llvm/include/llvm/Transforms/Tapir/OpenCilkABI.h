@@ -47,13 +47,13 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSEnterLandingpad = nullptr;
   FunctionCallee CilkRTSPauseFrame = nullptr;
 
-  FunctionCallee CilkRTSReducerRegister32 = nullptr;
-  FunctionCallee CilkRTSReducerRegister64 = nullptr;
-  FunctionCallee CilkRTSReducerUnregister = nullptr;
   FunctionCallee CilkRTSReducerLookup = nullptr;
+  FunctionCallee CilkRTSHyperobjectRegister32 = nullptr;
+  FunctionCallee CilkRTSHyperobjectRegister64 = nullptr;
   FunctionCallee CilkRTSHyperobjectRead = nullptr;
   FunctionCallee CilkRTSHyperobjectWrite = nullptr;
   FunctionCallee CilkRTSHyperobjectLookup = nullptr;
+  FunctionCallee CilkRTSHyperobjectUnregister = nullptr;
 
   // Accessors for opaque Cilk RTS functions
   FunctionCallee CilkHelperEpilogueExn = nullptr;
@@ -102,18 +102,15 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee Get__cilkrts_cilk_for_grainsize_64() {
     return CilkRTSCilkForGrainsize64;
   }
-  FunctionCallee Get__cilkrts_reducer_register(unsigned Bits) {
-    if (Bits == 32)
-      return CilkRTSReducerRegister32;
-    if (Bits == 64)
-      return CilkRTSReducerRegister64;
-    return 0;
-  }
-  FunctionCallee Get__cilkrts_reducer_unregister() {
-    return CilkRTSReducerUnregister;
-  }
   FunctionCallee Get__cilkrts_reducer_lookup() {
     return CilkRTSReducerLookup;
+  }
+  FunctionCallee Get__cilkrts_hyperobject_register(unsigned Bits) {
+    if (Bits == 32)
+      return CilkRTSHyperobjectRegister32;
+    if (Bits == 64)
+      return CilkRTSHyperobjectRegister64;
+    return 0;
   }
   FunctionCallee Get__cilkrts_hyperobject_read() {
     return CilkRTSHyperobjectRead;
@@ -123,6 +120,9 @@ class OpenCilkABI final : public TapirTarget {
   }
   FunctionCallee Get__cilkrts_hyperobject_lookup() {
     return CilkRTSHyperobjectLookup;
+  }
+  FunctionCallee Get__cilkrts_hyperobject_unregister() {
+    return CilkRTSHyperobjectUnregister;
   }
 
   // Helper functions for implementing the Cilk ABI protocol

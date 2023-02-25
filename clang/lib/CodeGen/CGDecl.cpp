@@ -1807,8 +1807,10 @@ void CodeGenFunction::emitZeroOrPatternForAutoVarInit(QualType type,
 
 bool CodeGenFunction::getReducer(const VarDecl *D, ReducerCallbacks &CB) {
   if (const HyperobjectType *H = D->getType()->getAs<HyperobjectType>()) {
-    if (H->Classify() == HyperobjectType::BARE)
+    HyperobjectType::Kind Kind = H->Classify();
+    if (Kind == HyperobjectType::BARE)
       return false;
+    CB.Kind = Kind;
     CB.Identity = H->getIdentity();
     CB.Reduce = H->getReduce();
     CB.Destruct = H->getDestruct();
@@ -1819,7 +1821,8 @@ bool CodeGenFunction::getReducer(const VarDecl *D, ReducerCallbacks &CB) {
 
 void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF, Address Addr,
                                          QualType Type) {
-  llvm::Function *F = CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
+  llvm::Function *F =
+    CGF.CGM.getIntrinsic(llvm::Intrinsic::hyperobject_unregister);
   llvm::Value *Arg =
       CGF.Builder.CreateBitCast(Addr.getPointer(), CGF.CGM.VoidPtrTy);
   CGF.Builder.CreateCall(F, {Arg});
@@ -1836,28 +1839,31 @@ void CodeGenFunction::EmitReducerInit(const VarDecl *D,
                                       llvm::Value *Addr) {
   RValue Identity = EmitAnyExpr(C.Identity);
   RValue Reduce = EmitAnyExpr(C.Reduce);
+  RValue Destruct = EmitAnyExpr(C.Destruct);
 
+  llvm::Type *IntType = ConvertType(getContext().IntTy);
   llvm::Type *SizeType = ConvertType(getContext().getSizeType());
-  unsigned SizeBits = SizeType->getIntegerBitWidth();
   llvm::Value *Size = nullptr;
   QualType Type = D->getType();
-  if (uint64_t Bits = getContext().getTypeSize(Type)) {
-    Size = llvm::Constant::getIntegerValue(SizeType,
-                                           llvm::APInt(SizeBits, Bits / 8));
-  } else {
-    auto V = getVLASize(Type);
-    llvm::Value *Size1 = llvm::Constant::getIntegerValue(
-        SizeType, llvm::APInt(64, getContext().getTypeSize(V.Type) / 8));
+  if (const VariableArrayType *VLA =
+      getContext().getAsVariableArrayType(Type)) {
+    auto V = getVLASize(VLA);
+    llvm::Value *Size1 = CGM.getSize(getContext().getTypeSizeInChars(V.Type));
     Size = Builder.CreateNUWMul(V.NumElts, Size1);
+  } else {
+    Size = CGM.getSize(getContext().getTypeSizeInChars(Type));
   }
+  llvm::Value *KindV =
+    llvm::Constant::getIntegerValue(IntType, llvm::APInt(32, C.Kind));
   // TODO: mark this call as registering a local
   // TODO: add better handling of attribute arguments that evaluate to null
   SmallVector<llvm::Type *, 1> Types = {SizeType};
   llvm::Function *F =
-    CGM.getIntrinsic(llvm::Intrinsic::reducer_register, Types);
+    CGM.getIntrinsic(llvm::Intrinsic::hyperobject_register, Types);
   llvm::Value *IdentityV = Identity.getScalarVal();
   llvm::Value *ReduceV = Reduce.getScalarVal();
-  Builder.CreateCall(F, {Addr, Size, IdentityV, ReduceV});
+  llvm::Value *DestructV = Destruct.getScalarVal();
+  Builder.CreateCall(F, {Addr, Size, KindV, IdentityV, ReduceV, DestructV});
 }
 
 void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
@@ -1870,7 +1876,7 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   auto DL = ApplyDebugLocation::CreateDefaultArtificial(*this, D.getLocation());
   QualType type = D.getType();
 
-  ReducerCallbacks RCB = {0, 0, 0};
+  ReducerCallbacks RCB = {0, 0, 0, 0};
   bool Reducer = false;
   if (const HyperobjectType *H = type->getAs<HyperobjectType>()) {
     type = H->getElementType();
