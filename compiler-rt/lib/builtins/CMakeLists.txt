@@ -686,8 +686,6 @@ else ()
     append_list_if(COMPILER_RT_ENABLE_CET -fcf-protection=full BUILTIN_CFLAGS)
   endif()
 
-  append_list_if(COMPILER_RT_HAS_FLOAT16 -DCOMPILER_RT_HAS_FLOAT16 BUILTIN_CFLAGS)
-
   append_list_if(COMPILER_RT_HAS_STD_C11_FLAG -std=c11 BUILTIN_CFLAGS)
 
   # These flags would normally be added to CMAKE_C_FLAGS by the llvm
@@ -758,6 +756,10 @@ else ()
         )
 
         set(deps_aarch64 lse_builtin_symlinks)
+      endif()
+
+      if(NOT (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD" AND ${arch} STREQUAL "i386"))
+        append_list_if(COMPILER_RT_HAS_FLOAT16 -DCOMPILER_RT_HAS_FLOAT16 BUILTIN_CFLAGS_${arch})
       endif()
 
       add_compiler_rt_runtime(clang_rt.builtins
