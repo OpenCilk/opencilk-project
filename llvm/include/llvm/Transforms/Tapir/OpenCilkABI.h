@@ -39,7 +39,7 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSDetach = nullptr;
   FunctionCallee CilkRTSLeaveFrame = nullptr;
   FunctionCallee CilkRTSLeaveFrameHelper = nullptr;
-  FunctionCallee CilkPrepareSpawn = nullptr;
+  FunctionCallee CilkPrepareSpawn2 = nullptr;
   FunctionCallee CilkSync = nullptr;
   FunctionCallee CilkSyncNoThrow = nullptr;
   FunctionCallee CilkParentEpilogue = nullptr;
@@ -114,8 +114,8 @@ class OpenCilkABI final : public TapirTarget {
   }
 
   // Helper functions for implementing the Cilk ABI protocol
-  FunctionCallee GetCilkPrepareSpawnFn() {
-    return CilkPrepareSpawn;
+  FunctionCallee GetCilkPrepareSpawn2Fn() {
+    return CilkPrepareSpawn2;
   }
   FunctionCallee GetCilkSyncFn() {
     return CilkSync;
