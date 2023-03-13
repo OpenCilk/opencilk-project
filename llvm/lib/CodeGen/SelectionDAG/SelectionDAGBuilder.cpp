@@ -6268,6 +6268,11 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     DAG.setRoot(DAG.getNode(ISD::EH_SJLJ_LONGJMP, sdl, MVT::Other,
                             getRoot(), getValue(I.getArgOperand(0))));
     return;
+  case Intrinsic::eh_sjlj_resume:
+    DAG.setRoot(DAG.getNode(ISD::EH_SJLJ_RESUME, sdl, MVT::Other,
+                            getRoot(), getValue(I.getArgOperand(0)),
+                            getValue(I.getArgOperand(1))));
+    return;
   case Intrinsic::eh_sjlj_setup_dispatch:
     DAG.setRoot(DAG.getNode(ISD::EH_SJLJ_SETUP_DISPATCH, sdl, MVT::Other,
                             getRoot()));

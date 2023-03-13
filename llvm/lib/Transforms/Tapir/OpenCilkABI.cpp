@@ -213,8 +213,8 @@ void OpenCilkABI::prepareModule() {
   // Define the types of the CilkRTS functions.
   FunctionType *CilkRTSFnTy =
       FunctionType::get(VoidTy, {StackFramePtrTy}, false);
-  FunctionType *CilkPrepareSpawnFnTy =
-      FunctionType::get(Int32Ty, {StackFramePtrTy}, false);
+  FunctionType *CilkPrepareSpawn2FnTy =
+      FunctionType::get(VoidTy, {StackFramePtrTy}, false);
   FunctionType *CilkRTSEnterLandingpadFnTy =
       FunctionType::get(VoidTy, {StackFramePtrTy, Int32Ty}, false);
   FunctionType *CilkRTSPauseFrameFnTy = FunctionType::get(
@@ -240,7 +240,7 @@ void OpenCilkABI::prepareModule() {
       {"__cilkrts_detach", CilkRTSFnTy, CilkRTSDetach},
       {"__cilkrts_leave_frame", CilkRTSFnTy, CilkRTSLeaveFrame},
       {"__cilkrts_leave_frame_helper", CilkRTSFnTy, CilkRTSLeaveFrameHelper},
-      {"__cilk_prepare_spawn", CilkPrepareSpawnFnTy, CilkPrepareSpawn},
+      {"__cilk_prepare_spawn2", CilkPrepareSpawn2FnTy, CilkPrepareSpawn2},
       {"__cilk_sync", CilkRTSFnTy, CilkSync},
       {"__cilk_sync_nothrow", CilkRTSFnTy, CilkSyncNoThrow},
       {"__cilk_parent_epilogue", CilkRTSFnTy, CilkParentEpilogue},
@@ -331,7 +331,7 @@ void OpenCilkABI::prepareModule() {
 }
 
 void OpenCilkABI::addHelperAttributes(Function &Helper) {
-  // Use a fast calling convention for the helper.
+  // XXX Helper.setCallingConv(CallingConv::PreserveNone);
   Helper.setCallingConv(CallingConv::Fast);
   // Inlining the helper function is not legal.
   Helper.removeFnAttr(Attribute::AlwaysInline);
@@ -770,36 +770,13 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Value *SF = DetachCtxToStackFrame[&F];
   assert(SF && "No frame found for spawning task");
 
-  // Split the basic block containing the detach replacement just before the
-  // start of the detach-replacement instructions.
-  BasicBlock *DetBlock = ReplStart->getParent();
-  BasicBlock *CallBlock = SplitBlock(DetBlock, ReplStart, &DT);
+  IRBuilder<> B(ReplStart);
 
-  // Emit a __cilk_spawn_prepare at the end of the block preceding the split-off
-  // detach replacement.
-  Instruction *SpawnPt = DetBlock->getTerminator();
-  IRBuilder<> B(SpawnPt);
-  CallBase *SpawnPrepCall = B.CreateCall(GetCilkPrepareSpawnFn(), {SF});
+  CallBase *SpawnPrepCall;
+  SpawnPrepCall = B.CreateCall(GetCilkPrepareSpawn2Fn(), {SF});
 
   // Remember to inline this call later.
   CallsToInline.insert(SpawnPrepCall);
-
-  // Get the ordinary continuation of the detach.
-  BasicBlock *CallCont;
-  if (InvokeInst *II = dyn_cast<InvokeInst>(ReplCall))
-    CallCont = II->getNormalDest();
-  else // isa<CallInst>(CallSite)
-    CallCont = CallBlock->getSingleSuccessor();
-
-  // Insert a conditional branch, based on the result of the
-  // __cilk_spawn_prepare, to either the detach replacement or the continuation.
-  Value *SpawnPrepRes = B.CreateICmpEQ(
-      SpawnPrepCall, ConstantInt::get(SpawnPrepCall->getType(), 0));
-  B.CreateCondBr(SpawnPrepRes, CallBlock, CallCont);
-  for (PHINode &PN : CallCont->phis())
-    PN.addIncoming(PN.getIncomingValueForBlock(CallBlock), DetBlock);
-
-  SpawnPt->eraseFromParent();
 }
 
 // Helper function to inline calls to compiler-generated Cilk Plus runtime

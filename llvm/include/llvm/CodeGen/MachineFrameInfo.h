@@ -229,6 +229,10 @@ private:
   bool ReturnAddressTaken = false;
 
   /// This boolean keeps track of whether there is a call
+  /// to builtin \@llvm.basepointer.
+  bool ReadBasePointer = false;
+
+  /// This boolean keeps track of whether there is a call
   /// to builtin \@llvm.experimental.stackmap.
   bool HasStackMap = false;
 
@@ -373,6 +377,12 @@ public:
   /// \@llvm.returnaddress in this function.
   bool isReturnAddressTaken() const { return ReturnAddressTaken; }
   void setReturnAddressIsTaken(bool s) { ReturnAddressTaken = s; }
+
+  /// This method may be called any time after
+  /// instruction selection is complete to determine if there is a call to
+  /// \@llvm.basepointer in this function.
+  bool hasReadBasePointer() const { return ReadBasePointer; }
+  void setReadBasePointer(bool s) { ReadBasePointer = s; }
 
   /// This method may be called any time after instruction
   /// selection is complete to determine if there is a call to builtin

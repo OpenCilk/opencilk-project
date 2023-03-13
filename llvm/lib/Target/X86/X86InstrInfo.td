@@ -243,6 +243,10 @@ def X86eh_sjlj_setjmp  : SDNode<"X86ISD::EH_SJLJ_SETJMP",
 def X86eh_sjlj_longjmp : SDNode<"X86ISD::EH_SJLJ_LONGJMP",
                                 SDTypeProfile<0, 1, [SDTCisPtrTy<0>]>,
                                 [SDNPHasChain, SDNPSideEffect]>;
+def X86eh_sjlj_resume : SDNode<"X86ISD::EH_SJLJ_RESUME",
+                                SDTypeProfile<0, 2, [SDTCisPtrTy<0>,
+                                                     SDTCisPtrTy<1>]>,
+                                [SDNPHasChain, SDNPSideEffect]>;
 def X86eh_sjlj_setup_dispatch : SDNode<"X86ISD::EH_SJLJ_SETUP_DISPATCH",
                                        SDTypeProfile<0, 0, []>,
                                        [SDNPHasChain, SDNPSideEffect]>;

@@ -1078,6 +1078,7 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
   case ISD::EH_DWARF_CFA:
   case ISD::EH_SJLJ_SETJMP:
   case ISD::EH_SJLJ_LONGJMP:
+  case ISD::EH_SJLJ_RESUME:
   case ISD::EH_SJLJ_SETUP_DISPATCH:
     // These operations lie about being legal: when they claim to be legal,
     // they should actually be expanded.
@@ -2737,6 +2738,7 @@ bool SelectionDAGLegalize::ExpandNode(SDNode *Node) {
   case ISD::PREFETCH:
   case ISD::VAEND:
   case ISD::EH_SJLJ_LONGJMP:
+  case ISD::EH_SJLJ_RESUME:
     // If the target didn't expand these, there's nothing to do, so just
     // preserve the chain and be done.
     Results.push_back(Node->getOperand(0));

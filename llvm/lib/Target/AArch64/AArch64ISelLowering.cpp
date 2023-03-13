@@ -860,6 +860,7 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
 
   setOperationAction(ISD::EH_SJLJ_SETJMP, MVT::i32, Custom);
   setOperationAction(ISD::EH_SJLJ_LONGJMP, MVT::Other, Custom);
+  setOperationAction(ISD::EH_SJLJ_RESUME, MVT::Other, Custom);
 
   // Indexed loads and stores are supported.
   for (unsigned im = (unsigned)ISD::PRE_INC;
@@ -2284,6 +2285,7 @@ const char *AArch64TargetLowering::getTargetNodeName(unsigned Opcode) const {
     MAKE_CASE(AArch64ISD::CALL_BTI)
     MAKE_CASE(AArch64ISD::EH_SJLJ_SETJMP)
     MAKE_CASE(AArch64ISD::EH_SJLJ_LONGJMP)
+    MAKE_CASE(AArch64ISD::EH_SJLJ_RESUME)
   }
 #undef MAKE_CASE
   return nullptr;
@@ -2386,7 +2388,9 @@ MachineBasicBlock *AArch64TargetLowering::EmitInstrWithCustomInserter(
   case AArch64::AArch64_setjmp_instr:
     return EmitSetjmp(MI, BB);
   case AArch64::AArch64_longjmp_instr:
-    return EmitLongjmp(MI, BB);
+    return EmitLongjmp(MI, BB, false);
+  case AArch64::AArch64_resume_instr:
+    return EmitLongjmp(MI, BB, true);
   }
 }
 
@@ -4355,6 +4359,19 @@ SDValue AArch64TargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
     return DAG.getCopyFromReg(DAG.getEntryNode(), dl, Reg,
                               Op.getSimpleValueType());
   }
+  case Intrinsic::basepointer: {
+    // Force use of a base pointer, else X19 may be used without any
+    // explicit set and the def-use matcher will lose its tiny mind.
+    bool Force = Op.getConstantOperandVal(1);
+    if (Force)
+      DAG.getMachineFunction().getFrameInfo().setReadBasePointer(true);
+    const AArch64RegisterInfo *RegInfo = Subtarget->getRegisterInfo();
+    if (Force || RegInfo->hasBasePointer(DAG.getMachineFunction()))
+      return DAG.getCopyFromReg(DAG.getEntryNode(), dl,
+                                RegInfo->getBaseRegister(),
+                                Op.getSimpleValueType());
+    return DAG.getIntPtrConstant(0, dl);
+  }
 
   case Intrinsic::eh_recoverfp: {
     // FIXME: This needs to be implemented to correctly handle highly aligned
@@ -5281,6 +5298,8 @@ SDValue AArch64TargetLowering::LowerOperation(SDValue Op,
     return LowerSetjmp(Op, DAG);
   case ISD::EH_SJLJ_LONGJMP:
     return LowerLongjmp(Op, DAG);
+  case ISD::EH_SJLJ_RESUME:
+    return LowerResume(Op, DAG);
   }
 }
 
@@ -20068,6 +20087,13 @@ SDValue AArch64TargetLowering::LowerLongjmp(SDValue Op,
                      Op.getOperand(0), Op.getOperand(1));
 }
 
+SDValue AArch64TargetLowering::LowerResume(SDValue Op,
+                                           SelectionDAG &DAG) const {
+  return DAG.getNode(AArch64ISD::EH_SJLJ_RESUME, SDLoc(Op), MVT::Other,
+                     Op.getOperand(0), Op.getOperand(1),
+                     Op.getOperand(2));
+}
+
 MachineBasicBlock *
 AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
                                   MachineBasicBlock *MBB) const {
@@ -20192,7 +20218,8 @@ AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
 
 MachineBasicBlock *
 AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
-                                   MachineBasicBlock *MBB) const {
+                                   MachineBasicBlock *MBB,
+                                   bool Interposed) const {
   MachineFunction *MF = MBB->getParent();
   MachineRegisterInfo &MRI = MF->getRegInfo();
   const TargetInstrInfo *TII = Subtarget->getInstrInfo();
@@ -20233,8 +20260,31 @@ AArch64TargetLowering::EmitLongjmp(MachineInstr &MI,
   MIB.addReg(StackReg);
   MIB.addImm(0); // immediate
   MIB.addImm(0); // shift count
-  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::BR));
-  MIB.addReg(PC);
+  if (Interposed) {
+    // TODO: With branch target enforcement this needs to be x16 or x17?
+    unsigned Function = MI.getOperand(1).getReg();
+    MachineBasicBlock *altMBB =
+        MF->CreateMachineBasicBlock(MBB->getBasicBlock());
+    MF->insert(++MBB->getIterator(), altMBB);
+    MBB->addSuccessor(altMBB);
+
+    MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::CBNZX))
+              .addReg(Function)
+              .addMBB(altMBB);
+
+    // Either ORRXrs or ADDXri
+    MIB = BuildMI(altMBB, DL, TII->get(AArch64::ORRXrs), AArch64::LR);
+    MIB.addReg(AArch64::XZR);
+    MIB.addReg(PC);
+    MIB.addImm(0); // shift count
+    MIB = BuildMI(altMBB, DL, TII->get(AArch64::BR))
+              .addReg(Function)
+              .addReg(AArch64::LR, RegState::Implicit)
+              .addReg(AArch64::X19, RegState::Implicit);
+  }
+  MIB = BuildMI(*MBB, MI, DL, TII->get(AArch64::BR))
+            .addReg(PC)
+            .addReg(AArch64::X19, RegState::Implicit);
   MI.eraseFromParent();
   return MBB;
 }

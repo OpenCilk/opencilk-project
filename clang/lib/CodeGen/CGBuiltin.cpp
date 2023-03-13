@@ -3926,6 +3926,41 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     else
       return RValue::get(Builder.CreateZExt(Result, Int64Ty, "extend.zext"));
   }
+  case Builtin::BI__builtin_continuation: {
+    Address Buf = EmitPointerWithAlignment(E->getArg(0));
+
+    // Emit some instructions before breaking the basic block.
+    // If no non-frame related instructions precede the label
+    // it will float up before the function prologue, causing
+    // an invalid unwind state to be saved.  The ordering here
+    // allows stp instructions to be used on 64 bit ARM and
+    // probably does not hurt any other targets.
+
+    Value *StackAddr =
+        Builder.CreateCall(CGM.getIntrinsic(Intrinsic::stacksave));
+    Builder.CreateStore(StackAddr, Builder.CreateConstInBoundsGEP(Buf, 2));
+
+    Value *BaseAddr =
+      Builder.CreateCall(CGM.getIntrinsic(Intrinsic::basepointer),
+                         Builder.getFalse());
+    Builder.CreateStore(BaseAddr, Builder.CreateConstInBoundsGEP(Buf, 3));
+
+    llvm::BasicBlock *Here = createBasicBlock("continuation.anchor");
+    EmitBlock(Here);
+    // Frame pointer, PC, stack pointer, base pointer or null
+    Value *FrameAddr = Builder.CreateCall(
+        CGM.getIntrinsic(Intrinsic::frameaddress, AllocaInt8PtrTy),
+        ConstantInt::get(Int32Ty, 0));
+    Builder.CreateStore(FrameAddr, Buf);
+    Value *BlockAddr = BlockAddress::get(CurFn, Here);
+    Builder.CreateStore(BlockAddr, Builder.CreateConstInBoundsGEP(Buf, 1));
+
+    // eh_unwind_init does nothing but force saving of caller-saved registers.
+    Function *UI = CGM.getIntrinsic(Intrinsic::eh_unwind_init);
+    return RValue::get(Builder.CreateCall(UI));
+
+    return RValue::getIgnored();
+  }
   case Builtin::BI__builtin_setjmp: {
     // Buffer is a void**.
     Address Buf = EmitPointerWithAlignment(E->getArg(0));
@@ -3942,6 +3977,11 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     Address StackSaveSlot = Builder.CreateConstInBoundsGEP(Buf, 2);
     Builder.CreateStore(StackAddr, StackSaveSlot);
 
+    Value *BaseAddr =
+      Builder.CreateCall(CGM.getIntrinsic(Intrinsic::basepointer),
+                         Builder.getFalse());
+    Builder.CreateStore(BaseAddr, Builder.CreateConstInBoundsGEP(Buf, 3));
+
     // Call LLVM's EH setjmp, which is lightweight.
     Function *F = CGM.getIntrinsic(Intrinsic::eh_sjlj_setjmp);
     Buf = Builder.CreateBitCast(Buf, Int8PtrTy);
@@ -3953,6 +3993,25 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
 
     // Call LLVM's EH longjmp, which is lightweight.
     Builder.CreateCall(CGM.getIntrinsic(Intrinsic::eh_sjlj_longjmp), Buf);
+
+    // longjmp doesn't return; mark this as unreachable.
+    Builder.CreateUnreachable();
+
+    // We do need to preserve an insertion point.
+    EmitBlock(createBasicBlock("longjmp.cont"));
+
+    return RValue::get(nullptr);
+  }
+  case Builtin::BI__builtin_resume_continuation: {
+    llvm::Function *Resume = CGM.getIntrinsic(Intrinsic::eh_sjlj_resume);
+    Value *Buf = EmitScalarExpr(E->getArg(0));
+    Buf = Builder.CreateBitCast(Buf, Int8PtrTy);
+    Address FnA = EmitPointerWithAlignment(E->getArg(1));
+    Value *Fn = Builder.CreateBitCast(FnA.getPointer(), Int8PtrTy);
+
+    SmallVector<llvm::Value *, 2> Args = { Buf, Fn };
+
+    Builder.CreateCall(Resume, Args);
 
     // longjmp doesn't return; mark this as unreachable.
     Builder.CreateUnreachable();

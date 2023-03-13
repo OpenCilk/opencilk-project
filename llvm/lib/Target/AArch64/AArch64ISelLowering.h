@@ -420,6 +420,7 @@ enum NodeType : unsigned {
   // Builtin setjmp and longjmp
   EH_SJLJ_SETJMP,
   EH_SJLJ_LONGJMP,
+  EH_SJLJ_RESUME,
 
   // Strict (exception-raising) floating point comparison
   STRICT_FCMP = ISD::FIRST_TARGET_STRICTFP_OPCODE,
@@ -1025,6 +1026,7 @@ private:
                              EVT VT, SelectionDAG &DAG, const SDLoc &DL) const;
   SDValue LowerSetjmp(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerLongjmp(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerResume(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue LowerFixedLengthVectorIntDivideToSVE(SDValue Op,
                                                SelectionDAG &DAG) const;
@@ -1154,7 +1156,8 @@ private:
                                               LLT Ty2) const override;
   MachineBasicBlock *EmitSetjmp(MachineInstr &MI, MachineBasicBlock *MBB) const;
   MachineBasicBlock *EmitLongjmp(MachineInstr &MI,
-                                 MachineBasicBlock *MBB) const;
+                                 MachineBasicBlock *MBB,
+                                 bool Interposed) const;
 };
 
 namespace AArch64 {

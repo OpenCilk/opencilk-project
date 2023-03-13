@@ -390,6 +390,9 @@ bool AArch64RegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   if (MF.getFunction().hasFnAttribute(Attribute::Stealable))
     return true;
 
+  if (MFI.hasReadBasePointer())
+    return true;
+
   // In the presence of variable sized objects or funclets, if the fixed stack
   // size is large enough that referencing from the FP won't result in things
   // being in range relatively often, we can use a base pointer to allow access
@@ -781,7 +784,7 @@ unsigned AArch64RegisterInfo::getLocalAddressRegister(
   const auto &MFI = MF.getFrameInfo();
   if (!MF.hasEHFunclets() && !MFI.hasVarSizedObjects())
     return AArch64::SP;
-  else if (hasStackRealignment(MF))
+  else if (hasBasePointer(MF))
     return getBaseRegister();
   return getFrameRegister(MF);
 }

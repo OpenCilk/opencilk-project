@@ -11242,6 +11242,16 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
     case 'R':
       Type = Type.withRestrict();
       break;
+    case '%':
+      if (Type == Context.VoidTy)
+        Type = Context.getPointerType
+          (Context.getFunctionType(Context.VoidTy, { },
+                                   FunctionProtoType::ExtProtoInfo()));
+        else
+          Type = Context.getPointerType
+            (Context.getFunctionType(Context.VoidTy, { Type },
+                                     FunctionProtoType::ExtProtoInfo()));
+      break;
     }
   }
 

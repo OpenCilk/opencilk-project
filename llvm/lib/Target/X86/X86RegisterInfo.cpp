@@ -649,6 +649,9 @@ bool X86RegisterInfo::hasBasePointer(const MachineFunction &MF) const {
 
   const MachineFrameInfo &MFI = MF.getFrameInfo();
 
+  if (MFI.hasReadBasePointer())
+    return true;
+
   if (!EnableBasePointer)
     return false;
 
