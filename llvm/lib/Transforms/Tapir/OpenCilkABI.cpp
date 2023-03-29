@@ -462,7 +462,7 @@ void OpenCilkABI::InsertDetach(Function &F, Instruction *DetachPt) {
 
   // Call __cilkrts_detach
   IRBuilder<> IRB(DetachPt);
-  IRB.CreateCall(CILKRTS_FUNC(detach), Args);
+  CallsToInline.insert(IRB.CreateCall(CILKRTS_FUNC(detach), Args));
 }
 
 // Insert a call in Function F to __cilkrts_enter_frame{_helper} to initialize
