@@ -1,5 +1,6 @@
 ; Check that loops with reducers can be vectorized (OpenCilk issue 157).
-; RUN: opt -S < %s -passes='loop-mssa(tapir-indvars),loop-stripmine,loop-mssa(loop-simplifycfg,licm),loop-vectorize' -o - | FileCheck %s
+; RUN: opt -S < %s -passes='loop-mssa(tapir-indvars),loop-stripmine,loop-mssa(loop-simplifycfg,licm),loop-vectorize' | FileCheck %s
+; REQUIRES: x86-registered-target
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-freebsd13.1"
 
