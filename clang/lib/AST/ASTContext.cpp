@@ -10931,6 +10931,25 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
   #ifndef NDEBUG
   bool IsSpecial = false;
   #endif
+
+  if (*Str == '(') {
+    ++Str;
+    bool Dummy = false;
+    SmallVector<QualType, 4> Args;
+    QualType Return = DecodeTypeFromStr(Str, Context, Error, Dummy, true);
+    while (*Str != ')') {
+      assert(*Str && "Unterminated argument list");
+      QualType Arg = DecodeTypeFromStr(Str, Context, Error, Dummy, true);
+      if (Arg->isArrayType())
+        Arg = Context.getArrayDecayedType(Arg);
+      Args.push_back(Arg);
+    };
+    ++Str;
+    QualType Fn =
+      Context.getFunctionType(Return, Args, FunctionProtoType::ExtProtoInfo());
+    return Context.getPointerType(Fn);
+  }
+
   while (!Done) {
     switch (*Str++) {
     default: Done = true; --Str; break;

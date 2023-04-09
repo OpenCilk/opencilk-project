@@ -102,6 +102,9 @@
 //  C<N,M_0,...,M_k> -> callback behavior: argument N is called with argument
 //                      M_0, ..., M_k as payload
 //  FIXME: gcc has nonnull
+//
+// A list of types surrounded by (..) is converted to a pointer to a function
+// returning the first type with the remaining types as arguments.
 
 #if defined(BUILTIN) && !defined(LIBBUILTIN)
 #  define LIBBUILTIN(ID, TYPE, ATTRS, HEADER, BUILTIN_LANG) BUILTIN(ID, TYPE, ATTRS)
@@ -1691,7 +1694,7 @@ LANGBUILTIN(__arithmetic_fence, "v.", "t", ALL_LANGUAGES)
 
 // Tapir.  Rewriting of reducer references happens during sema
 // and needs a builtin to carry the information to codegen.
-BUILTIN(__hyper_lookup, "v*vC*z.", "nU")
+BUILTIN(__hyper_lookup, "v*vC*z(vv*)(vv*v*)", "nU")
 
 #undef BUILTIN
 #undef LIBBUILTIN

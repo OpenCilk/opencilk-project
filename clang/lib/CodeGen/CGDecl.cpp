@@ -1852,8 +1852,10 @@ void CodeGenFunction::EmitReducerInit(const VarDecl *D,
   SmallVector<llvm::Type *, 1> Types = {SizeType};
   llvm::Function *F =
     CGM.getIntrinsic(llvm::Intrinsic::reducer_register, Types);
-  llvm::Value *IdentityV = Identity.getScalarVal();
-  llvm::Value *ReduceV = Reduce.getScalarVal();
+  llvm::Value *IdentityV =
+    Builder.CreateBitCast(Identity.getScalarVal(), CGM.VoidPtrTy);
+  llvm::Value *ReduceV =
+    Builder.CreateBitCast(Reduce.getScalarVal(), CGM.VoidPtrTy);
   Builder.CreateCall(F, {Addr, Size, IdentityV, ReduceV});
 }
 

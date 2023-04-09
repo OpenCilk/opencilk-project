@@ -7287,6 +7287,10 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
   case Intrinsic::tapir_runtime_end:
     // Discard any tapir.runtime.ends.
     return;
+  case Intrinsic::hyper_lookup:
+    // Return the first argument
+    setValue(&I, getValue(I.getArgOperand(0)));
+    return;
   }
 }
 
