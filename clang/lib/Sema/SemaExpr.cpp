@@ -2084,6 +2084,9 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(), CallArgs,
                                   E->getExprLoc(), nullptr);
 
+  if (Call.isInvalid())
+    Call = E; // diagnostic emitted
+
   // Template expansion normally strips out implicit casts, so make this
   // explicit in C++.
   CastExpr *Casted = nullptr;
