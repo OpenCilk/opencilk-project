@@ -2345,15 +2345,12 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
     T = E->getType(); // Context.getDecayedType(T);
   }
 
-  CastKind Cast = CK_BitCast;
-
   if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(E)) {
     if (L->getValue().isNullValue())
       return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
                                       CK_NullToPointer, E,
                                       nullptr, VK_PRValue,
                                       FPOptionsOverride());
-    Cast = CK_IntegralToPointer;
   }
 
   // TODO: The compiler should allow
@@ -2390,16 +2387,14 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
     CheckAssignmentConstraints(E->getExprLoc(), FnTy, T);
 
   if (DiagnoseAssignmentResult(Mismatch, E->getExprLoc(), FnTy, T, E,
-                               AA_Passing)) {
-    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
-                                            E->getExprLoc());
-    Cast = CK_NullToPointer;
-  } else if (Mismatch == IntToPointer) {
-    Cast = CK_IntegralToPointer;
-  }
-
-  return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, Cast, E,
-                                  nullptr, VK_PRValue, FPOptionsOverride());
+                               AA_Passing))
+    return new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
+                                               E->getExprLoc());
+  if (Mismatch == IntToPointer)
+    return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
+                                    CK_IntegralToPointer, E, nullptr,
+                                    VK_PRValue, FPOptionsOverride());
+  return E;
 }
 
 QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
