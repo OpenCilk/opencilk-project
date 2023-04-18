@@ -556,7 +556,7 @@ bool llvm::sinkRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
 
   // Verify inputs.
   assert(N != nullptr && AA != nullptr && LI != nullptr && DT != nullptr &&
-         CurLoop != nullptr && SafetyInfo != nullptr && TI != nullptr
+         CurLoop != nullptr && SafetyInfo != nullptr && TI != nullptr &&
          "Unexpected input to sinkRegion.");
 
   // We want to visit children before parents. We will enqueue all the parents

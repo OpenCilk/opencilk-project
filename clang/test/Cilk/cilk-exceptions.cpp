@@ -80,7 +80,7 @@ void parallelfor_noexcept(int n) {
 // CHECK-LABEL: @_Z18parallelfor_excepti(
 // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
 // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]] unwind label %[[DUNWIND:.+]]
-// CHECK: call {{.*}}i8* @_Znwm(i64 noundef 1)
+// CHECK: call {{.*}}ptr @_Znwm(i64 noundef 1)
 // CHECK: invoke void @_ZN3FooC1Ev(
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[TASKLPAD:.+]]
 // CHECK: [[INVOKECONT2]]:
@@ -116,18 +116,18 @@ void parallelfor_tryblock(int n) {
       // CHECK-NEXT: to label %{{.+}} unwind label %[[CATCH:.+]]
       // CHECK: [[CATCH]]:
       // CHECK: landingpad [[LPADTYPE]]
-      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-      // CHECK-NEXT: catch i8* null
+      // CHECK-NEXT: catch ptr @_ZTIi
+      // CHECK-NEXT: catch ptr null
 
       // CHECK: detach within %[[SYNCREG2]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[CATCH]]
       // CHECK: [[DETACHED]]:
-      // CHECK: %[[OBJ:.+]] = invoke {{.*}}i8* @_Znwm(i64 noundef 1)
+      // CHECK: %[[OBJ:.+]] = invoke {{.*}}ptr @_Znwm(i64 noundef 1)
       // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
       // CHECK: [[INVOKECONT1]]
-      // CHECK: invoke void @_ZN3FooC1Ev(%class.Foo*
+      // CHECK: invoke void @_ZN3FooC1Ev(ptr
       // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[TASKLPAD2:.+]]
       // CHECK: [[INVOKECONT2]]
-      // CHECK: invoke {{.*}}i32 @_Z3barP3Foo(%class.Foo*
+      // CHECK: invoke {{.*}}i32 @_Z3barP3Foo(ptr
       // CHECK-NEXT: to label %[[INVOKECONT3:.+]] unwind label %[[TASKLPAD:.+]]
       // CHECK: [[INVOKECONT3]]
       // CHECK: reattach within %[[SYNCREG2]]
@@ -139,7 +139,7 @@ void parallelfor_tryblock(int n) {
       // CHECK: [[TASKLPAD2]]:
       // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
       // CHECK-NEXT: cleanup
-      // CHECK: call void @_ZdlPv(i8* noundef %[[OBJ]])
+      // CHECK: call void @_ZdlPv(ptr noundef %[[OBJ]])
       // CHECK: br label %[[TASKRESUME]]
       // CHECK: [[TASKRESUME]]:
       // CHECK: invoke void @llvm.detached.rethrow
@@ -165,14 +165,14 @@ void parallelfor_tryblock_inline(int n) {
     {
       // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
       // CHECK: [[DETACHED]]:
-      // CHECK: invoke {{.*}}i8* @_Znwm(
+      // CHECK: invoke {{.*}}ptr @_Znwm(
       // CHECK: invoke void @_ZN3FooC1Ev(
       // CHECK: invoke {{.*}}i32 @_Z3barP3Foo(
       // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
       // CHECK: [[TASKLPAD]]:
       // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
       // CHECK-NEXT: cleanup
-      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+      // CHECK-NEXT: catch ptr @_ZTIi
       // CHECK: br i1 {{.+}}, label {{.+}}, label %[[CATCHRESUME:.+]]
       // CHECK: [[CATCHRESUME]]:
       // CHECK: invoke void @llvm.detached.rethrow
@@ -180,8 +180,8 @@ void parallelfor_tryblock_inline(int n) {
       // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
       // CHECK: [[DUNWIND]]:
       // CHECK: landingpad [[LPADTYPE]]
-      // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-      // CHECK-NEXT: catch i8* null
+      // CHECK-NEXT: catch ptr @_ZTIi
+      // CHECK-NEXT: catch ptr null
       _Cilk_for (int i = 0; i < n; ++i)
         foo(new Foo());
     }
@@ -211,9 +211,9 @@ void spawn_noexcept(int n) {
 void spawn_tf_except(int n) {
   // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
   // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
-  // CHECK: %[[EXN:.+]] = alloca i8*
+  // CHECK: %[[EXN:.+]] = alloca ptr
   // CHECK: %[[EHSELECTOR:.+]] = alloca i32
-  // CHECK: invoke void @_ZN3FooC1Ev(%class.Foo*
+  // CHECK: invoke void @_ZN3FooC1Ev(ptr
   // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[TASKLPAD:.+]]
   // CHECK: [[INVOKECONT]]
   // CHECK-NEXT: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}}
@@ -224,18 +224,18 @@ void spawn_tf_except(int n) {
   // CHECK: [[TASKLPAD]]:
   // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
   // CHECK-NEXT: cleanup
-  // CHECK: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
+  // CHECK: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
   // CHECK: invoke void @llvm.taskframe.resume
   // CHECK: (token %[[TASKFRAME]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[TFUNWIND:.+]]
   // CHECK: [[TFUNWIND]]:
   // CHECK-NEXT: landingpad [[LPADTYPE]]
   // CHECK-NEXT: cleanup
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: load i8*, i8** %[[EXN]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTOR]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: load ptr, ptr %[[EXN]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
   // CHECK: resume [[LPADTYPE]]
   _Cilk_spawn bar(new Foo());
   quuz(n);
@@ -246,51 +246,51 @@ void spawn_stmt_destructor(int n) {
   // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
   // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
   // CHECK: %[[REFTMP:.+]] = alloca %class.Foo
-  // CHECK: %[[EXNTF:.+]] = alloca i8*
+  // CHECK: %[[EXNTF:.+]] = alloca ptr
   // CHECK: %[[EHSELECTORTF:.+]] = alloca i32
-  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
+  // CHECK: call void @_ZN3FooC1Ev(ptr {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
   // CHECK: [[DETACHED]]:
-  // CHECK-NEXT: %[[EXN:.+]] = alloca i8*
+  // CHECK-NEXT: %[[EXN:.+]] = alloca ptr
   // CHECK-NEXT: %[[EHSELECTOR:.+]] = alloca i32
   // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME]])
   // CHECK-NEXT: invoke {{.*}}i32 @_Z3bazRK3Foo(
   // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[TASKLPAD:.+]]
   // CHECK: [[INVOKECONT]]:
-  // CHECK-NEXT: call void @_ZN3FooD1Ev(%class.Foo* {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
+  // CHECK-NEXT: call void @_ZN3FooD1Ev(ptr {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
   // CHECK-NEXT: reattach within %[[SYNCREG]]
   // CHECK: [[TASKLPAD]]:
   // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
   // CHECK-NEXT: cleanup
-  // CHECK: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK: call void @_ZN3FooD1Ev(%class.Foo* {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
+  // CHECK: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK: call void @_ZN3FooD1Ev(ptr {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
   // CHECK: invoke void @llvm.detached.rethrow
   // CHECK: (token %[[SYNCREG]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
   // CHECK: [[DUNWIND]]:
   // CHECK-NEXT: landingpad [[LPADTYPE]]
   // CHECK-NEXT: cleanup
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: load i8*, i8** %[[EXN]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTOR]],
-  // CHECK: store i8* %{{.+}}, i8** %[[EXNTF]],
-  // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTORTF]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: load ptr, ptr %[[EXN]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
+  // CHECK: store ptr %{{.+}}, ptr %[[EXNTF]],
+  // CHECK: store i32 %{{.+}}, ptr %[[EHSELECTORTF]],
   // CHECK: invoke void @llvm.taskframe.resume
   // CHECK: (token %[[TASKFRAME]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[TFUNWIND:.+]]
   // CHECK: [[TFUNWIND]]:
   // CHECK-NEXT: landingpad [[LPADTYPE]]
   // CHECK-NEXT: cleanup
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: load i8*, i8** %[[EXN]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXNTF]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTORTF]],
-  // CHECK-NOT: load i8*, i8** %[[EXNTF]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTORTF]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: load ptr, ptr %[[EXN]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXNTF]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTORTF]],
+  // CHECK-NOT: load ptr, ptr %[[EXNTF]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTORTF]],
   // CHECK: resume [[LPADTYPE]]
   _Cilk_spawn baz(Foo());
   quuz(n);
@@ -301,52 +301,52 @@ void spawn_decl_destructor(int n) {
   // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
   // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
   // CHECK: %[[REFTMP:.+]] = alloca %class.Foo
-  // CHECK: %[[EXNTF:.+]] = alloca i8*
+  // CHECK: %[[EXNTF:.+]] = alloca ptr
   // CHECK: %[[EHSELECTORTF:.+]] = alloca i32
-  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
+  // CHECK: call void @_ZN3FooC1Ev(ptr {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
   // CHECK: [[DETACHED]]:
-  // CHECK-NEXT: %[[EXN:.+]] = alloca i8*
+  // CHECK-NEXT: %[[EXN:.+]] = alloca ptr
   // CHECK-NEXT: %[[EHSELECTOR:.+]] = alloca i32
   // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME]])
   // CHECK: %[[CALL:.+]] = invoke {{.*}}i32 @_Z3bazRK3Foo(
   // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[TASKLPAD:.+]]
   // CHECK: [[INVOKECONT]]:
-  // CHECK-NEXT: call void @_ZN3FooD1Ev(%class.Foo* {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
+  // CHECK-NEXT: call void @_ZN3FooD1Ev(ptr {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
   // CHECK-NEXT: store i32 %[[CALL]]
   // CHECK-NEXT: reattach within %[[SYNCREG]]
   // CHECK: [[TASKLPAD]]:
   // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
   // CHECK-NEXT: cleanup
-  // CHECK: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK: call void @_ZN3FooD1Ev(%class.Foo* {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
+  // CHECK: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK: call void @_ZN3FooD1Ev(ptr {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP]])
   // CHECK: invoke void @llvm.detached.rethrow
   // CHECK: (token %[[SYNCREG]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
   // CHECK: [[DUNWIND]]:
   // CHECK-NEXT: landingpad [[LPADTYPE]]
   // CHECK-NEXT: cleanup
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: load i8*, i8** %[[EXN]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTOR]],
-  // CHECK: store i8* %{{.+}}, i8** %[[EXNTF]],
-  // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTORTF]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: load ptr, ptr %[[EXN]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
+  // CHECK: store ptr %{{.+}}, ptr %[[EXNTF]],
+  // CHECK: store i32 %{{.+}}, ptr %[[EHSELECTORTF]],
   // CHECK: invoke void @llvm.taskframe.resume
   // CHECK: (token %[[TASKFRAME]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[TFUNWIND:.+]]
   // CHECK: [[TFUNWIND]]:
   // CHECK-NEXT: landingpad [[LPADTYPE]]
   // CHECK-NEXT: cleanup
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: load i8*, i8** %[[EXN]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXNTF]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTORTF]],
-  // CHECK-NOT: load i8*, i8** %[[EXNTF]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTORTF]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: load ptr, ptr %[[EXN]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXNTF]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTORTF]],
+  // CHECK-NOT: load ptr, ptr %[[EXNTF]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTORTF]],
   // CHECK: resume [[LPADTYPE]]
   int result = _Cilk_spawn baz(Foo());
   quuz(n);
@@ -363,13 +363,13 @@ void spawn_decl_destructor(int n) {
 // CHECK-LABEL: @_Z22spawn_block_destructori(
 void spawn_block_destructor(int n) {
   // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
-  // CHECK: call void @_ZN3FooC1Ev(%class.Foo* {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP:.+]])
+  // CHECK: call void @_ZN3FooC1Ev(ptr {{.*}}nonnull {{.*}}dereferenceable(1) %[[REFTMP:.+]])
   // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
-  // CHECK-NEXT: %[[EXNTF:.+]] = alloca i8*
+  // CHECK-NEXT: %[[EXNTF:.+]] = alloca ptr
   // CHECK-NEXT: %[[EHSELECTORTF:.+]] = alloca i32
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %[[DETCONT:.+]] unwind label %[[DUNWIND:.+]]
   // CHECK: [[DETACHED]]:
-  // CHECK-NEXT: %[[EXN:.+]] = alloca i8*
+  // CHECK-NEXT: %[[EXN:.+]] = alloca ptr
   // CHECK-NEXT: %[[EHSELECTOR:.+]] = alloca i32
   // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME]])
   // CHECK: %[[CALL:.+]] = invoke {{.*}}i32 @_Z3bazRK3Foo(
@@ -383,34 +383,34 @@ void spawn_block_destructor(int n) {
   // CHECK: [[TASKLPAD]]:
   // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
   // CHECK-NEXT: cleanup
-  // CHECK: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
+  // CHECK: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
   // CHECK: invoke void @llvm.detached.rethrow
   // CHECK: (token %[[SYNCREG]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[DUNWIND]]
   // CHECK: [[DUNWIND]]:
   // CHECK: landingpad [[LPADTYPE]]
   // CHECK-NEXT: cleanup
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: load i8*, i8** %[[EXN]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTOR]],
-  // CHECK: store i8* %{{.+}}, i8** %[[EXNTF]],
-  // CHECK: store i32 %{{.+}}, i32* %[[EHSELECTORTF]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: load ptr, ptr %[[EXN]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
+  // CHECK: store ptr %{{.+}}, ptr %[[EXNTF]],
+  // CHECK: store i32 %{{.+}}, ptr %[[EHSELECTORTF]],
   // CHECK: invoke void @llvm.taskframe.resume
   // CHECK: (token %[[TASKFRAME]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label %[[TFUNWIND:.+]]
   // CHECK: [[TFUNWIND]]:
   // CHECK-NEXT: landingpad [[LPADTYPE]]
   // CHECK-NEXT: cleanup
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXN]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: load i8*, i8** %[[EXN]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTOR]],
-  // CHECK-NOT: store i8* %{{.+}}, i8** %[[EXNTF]],
-  // CHECK-NOT: store i32 %{{.+}}, i32* %[[EHSELECTORTF]],
-  // CHECK-NOT: load i8*, i8** %[[EXNTF]],
-  // CHECK-NOT: load i32, i32* %[[EHSELECTORTF]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXN]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: load ptr, ptr %[[EXN]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
+  // CHECK-NOT: store ptr %{{.+}}, ptr %[[EXNTF]],
+  // CHECK-NOT: store i32 %{{.+}}, ptr %[[EHSELECTORTF]],
+  // CHECK-NOT: load ptr, ptr %[[EXNTF]],
+  // CHECK-NOT: load i32, ptr %[[EHSELECTORTF]],
   // CHECK: resume [[LPADTYPE]]
   {
     auto f = Foo();
@@ -423,7 +423,7 @@ void spawn_block_destructor(int n) {
 void spawn_throw_inline(int n) {
   // CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
   // CHECK: %[[TASKFRAME:.+]] = call token @llvm.taskframe.create()
-  // CHECK: call {{.*}}i8* @_Znwm(
+  // CHECK: call {{.*}}ptr @_Znwm(
   // CHECK: invoke void @_ZN3FooC1Ev(
   // CHECK: detach within %[[SYNCREG]], label %[[DETACHED:.+]], label %{{.+}} unwind label %[[DUNWIND:.+]]
   // CHECK: [[DETACHED]]:
@@ -432,7 +432,7 @@ void spawn_throw_inline(int n) {
   // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
   // CHECK: [[TASKLPAD]]:
   // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
-  // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+  // CHECK-NEXT: catch ptr @_ZTIi
   // CHECK: br i1 {{.+}}, label {{.+}}, label %[[CATCHRESUME:.+]]
   // CHECK: [[CATCHRESUME]]:
   // CHECK: invoke void @llvm.detached.rethrow
@@ -499,8 +499,8 @@ void spawn_tryblock(int n) {
   // CHECK-NEXT: to label {{.+}} unwind label %[[CONT3UNWIND]]
   // CHECK: [[CONT3UNWIND]]:
   // CHECK: landingpad [[LPADTYPE]]
-  // CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-  // CHECK-NEXT: catch i8* null
+  // CHECK-NEXT: catch ptr @_ZTIi
+  // CHECK-NEXT: catch ptr null
   catch (int e)
     {
       handle_exn(e);

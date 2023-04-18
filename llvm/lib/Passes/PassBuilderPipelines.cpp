@@ -1190,7 +1190,7 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
                                   .needCanonicalLoops(false)
                                   .hoistCommonInsts(true)
                                   .sinkCommonInsts(true)));
-
+ 
   if (IsFullLTO) {
     FPM.addPass(SCCPPass());
     FPM.addPass(InstCombinePass());
@@ -2214,8 +2214,9 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
   return MPM;
 }
 
-void PassBuilder::addPostCilkInstrumentationPipeline(ModulePassManager &MPM,
-                                                     OptimizationLevel Level) {
+ModulePassManager
+PassBuilder::buildPostCilkInstrumentationPipeline(OptimizationLevel Level) {
+  ModulePassManager MPM;
   if (Level != OptimizationLevel::O0) {
     FunctionPassManager FPM;
     FPM.addPass(SROAPass());
@@ -2230,7 +2231,8 @@ void PassBuilder::addPostCilkInstrumentationPipeline(ModulePassManager &MPM,
     // inner loops with implications on the outer loop.
     LPM.addPass(LoopInstSimplifyPass());
     LPM.addPass(LoopSimplifyCFGPass());
-    LPM.addPass(LICMPass());
+    LPM.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
+                         /*AllowSpeculation=*/true));
     LPM.addPass(SimpleLoopUnswitchPass(/* NonTrivial */ Level ==
                                            OptimizationLevel::O3 &&
                                        EnableO3NonTrivialUnswitching));
@@ -2267,7 +2269,8 @@ void PassBuilder::addPostCilkInstrumentationPipeline(ModulePassManager &MPM,
       // or on inner loops with implications on the outer loop.
       LPM.addPass(LoopInstSimplifyPass());
       LPM.addPass(LoopSimplifyCFGPass());
-      LPM.addPass(LICMPass());
+      LPM.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
+                           /*AllowSpeculation=*/true));
       FPM.addPass(
           RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
       FPM.addPass(
@@ -2286,6 +2289,8 @@ void PassBuilder::addPostCilkInstrumentationPipeline(ModulePassManager &MPM,
   }
   MPM.addPass(EliminateAvailableExternallyPass());
   MPM.addPass(GlobalDCEPass());
+
+  return MPM;
 }
 
 AAManager PassBuilder::buildDefaultAAPipeline() {

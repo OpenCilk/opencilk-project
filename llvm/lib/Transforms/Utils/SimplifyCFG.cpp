@@ -2662,8 +2662,13 @@ static bool MergeCompatibleInvokes(BasicBlock *BB, DomTreeUpdater *DTU) {
   // Record all the predecessors of this `landingpad`. As per verifier,
   // the only allowed predecessor is the unwind edge of an `invoke`.
   // We want to group "compatible" `invokes` into the same set to be merged.
-  for (BasicBlock *PredBB : predecessors(BB))
+  for (BasicBlock *PredBB : predecessors(BB)) {
+    // Tapir allows a detach to be a predecessor of a landingpad.  If we find a
+    // detach predecessor, quit early.
+    if (isa<DetachInst>(PredBB->getTerminator()))
+      return Changed;
     Grouper.insert(cast<InvokeInst>(PredBB->getTerminator()));
+  }
 
   // And now, merge `invoke`s that were grouped togeter.
   for (ArrayRef<InvokeInst *> Invokes : Grouper.Sets) {

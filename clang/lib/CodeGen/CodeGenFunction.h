@@ -1381,11 +1381,13 @@ public:
       // Recreate the landingpad's return value for the rethrow invoke.  Tapir
       // lowering will replace this rethrow with a resume.
       llvm::Value *Exn = CGF.Builder.CreateLoad(
-          Address(CGF.ExceptionSlot, CGF.getPointerAlign()), "exn");
+          Address(CGF.ExceptionSlot, CGF.Int8PtrTy, CGF.getPointerAlign()),
+          "exn");
       llvm::Value *Sel = CGF.Builder.CreateLoad(
-          Address(CGF.EHSelectorSlot, CharUnits::fromQuantity(4)), "sel");
-      llvm::Type *LPadType = llvm::StructType::get(Exn->getType(),
-                                                   Sel->getType());
+          Address(CGF.EHSelectorSlot, CGF.Int32Ty, CharUnits::fromQuantity(4)),
+          "sel");
+      llvm::Type *LPadType =
+          llvm::StructType::get(Exn->getType(), Sel->getType());
       llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
       LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
       LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");
@@ -1416,11 +1418,13 @@ public:
       // Recreate the landingpad's return value for the rethrow invoke.  Tapir
       // lowering will replace this rethrow with a resume.
       llvm::Value *Exn = CGF.Builder.CreateLoad(
-          Address(CGF.ExceptionSlot, CGF.getPointerAlign()), "exn");
+          Address(CGF.ExceptionSlot, CGF.Int8PtrTy, CGF.getPointerAlign()),
+          "exn");
       llvm::Value *Sel = CGF.Builder.CreateLoad(
-          Address(CGF.EHSelectorSlot, CharUnits::fromQuantity(4)), "sel");
-      llvm::Type *LPadType = llvm::StructType::get(Exn->getType(),
-                                                   Sel->getType());
+          Address(CGF.EHSelectorSlot, CGF.Int32Ty, CharUnits::fromQuantity(4)),
+          "sel");
+      llvm::Type *LPadType =
+          llvm::StructType::get(Exn->getType(), Sel->getType());
       llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
       LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
       LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");
@@ -1664,11 +1668,13 @@ public:
       // Recreate the landingpad's return value for the rethrow invoke.  Tapir
       // lowering will replace this rethrow with a resume.
       llvm::Value *Exn = CGF.Builder.CreateLoad(
-          Address(CGF.ExceptionSlot, CGF.getPointerAlign()), "exn");
+          Address(CGF.ExceptionSlot, CGF.Int8PtrTy, CGF.getPointerAlign()),
+          "exn");
       llvm::Value *Sel = CGF.Builder.CreateLoad(
-          Address(CGF.EHSelectorSlot, CharUnits::fromQuantity(4)), "sel");
-      llvm::Type *LPadType = llvm::StructType::get(Exn->getType(),
-                                                   Sel->getType());
+          Address(CGF.EHSelectorSlot, CGF.Int32Ty, CharUnits::fromQuantity(4)),
+          "sel");
+      llvm::Type *LPadType =
+          llvm::StructType::get(Exn->getType(), Sel->getType());
       llvm::Value *LPadVal = llvm::UndefValue::get(LPadType);
       LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Exn, 0, "lpad.val");
       LPadVal = CGF.Builder.CreateInsertValue(LPadVal, Sel, 1, "lpad.val");

@@ -2954,7 +2954,7 @@ void Verifier::verifyTask(const DetachInst *DI) {
       continue;
 
     if (const DetachInst *SDI = dyn_cast<DetachInst>(BB->getTerminator())) {
-      Assert(DI != SDI, "Detached task reaches its own detach", DI);
+      Check(DI != SDI, "Detached task reaches its own detach", DI);
       if (DetachesVisited.insert(SDI).second)
         // Recursively verify the detached task.
         verifyTask(SDI);
@@ -2967,10 +2967,10 @@ void Verifier::verifyTask(const DetachInst *DI) {
     }
 
     if (const ReattachInst *RI = dyn_cast<ReattachInst>(BB->getTerminator())) {
-      Assert(DI->getSyncRegion() == RI->getSyncRegion(),
-             "Mismatched sync regions between detach and reattach", DI, RI);
-      Assert(RI->getDetachContinue() == DI->getContinue(),
-             "Mismatched continuations between detach and reattach", DI, RI);
+      Check(DI->getSyncRegion() == RI->getSyncRegion(),
+            "Mismatched sync regions between detach and reattach", DI, RI);
+      Check(RI->getDetachContinue() == DI->getContinue(),
+            "Mismatched continuations between detach and reattach", DI, RI);
       // Don't add the successor of the reattach, since that's outside of the
       // task.
       continue;
@@ -2978,32 +2978,32 @@ void Verifier::verifyTask(const DetachInst *DI) {
 
     if (const InvokeInst *II = dyn_cast<InvokeInst>(BB->getTerminator())) {
       if (isDetachedRethrow(II)) {
-        Assert(DI->getSyncRegion() == II->getArgOperand(0),
-               "Mismatched sync regions between detach and detached.rethrow",
-               DI, II);
-        Assert(isa<UnreachableInst>(II->getNormalDest()->getTerminator()),
-               "detached.rethrow intrinsic has an "
-               "unexpected normal destination.",
-               DI, II);
-        Assert(DI->hasUnwindDest(),
-               "Task contains a detached.rethrow terminator, but detach has no "
-               "unwind destination",
-               DI, II);
-        Assert(DI->getUnwindDest() == II->getUnwindDest(),
-               "Mismatched unwind destinations between detach and "
-               "detached.rethrow",
-               DI, II);
+        Check(DI->getSyncRegion() == II->getArgOperand(0),
+              "Mismatched sync regions between detach and detached.rethrow", DI,
+              II);
+        Check(isa<UnreachableInst>(II->getNormalDest()->getTerminator()),
+              "detached.rethrow intrinsic has an "
+              "unexpected normal destination.",
+              DI, II);
+        Check(DI->hasUnwindDest(),
+              "Task contains a detached.rethrow terminator, but detach has no "
+              "unwind destination",
+              DI, II);
+        Check(DI->getUnwindDest() == II->getUnwindDest(),
+              "Mismatched unwind destinations between detach and "
+              "detached.rethrow",
+              DI, II);
         // Don't add the successors of the detached.rethrow, since they're
         // outside of the task.
         continue;
       }
     }
 
-    // Assert that do not encounter a return or resume in the middle of the
+    // Check that do not encounter a return or resume in the middle of the
     // task.
-    Assert(!isa<ReturnInst>(BB->getTerminator()) &&
-           !isa<ResumeInst>(BB->getTerminator()),
-           "Unexpected return or resume in task", BB->getTerminator());
+    Check(!isa<ReturnInst>(BB->getTerminator()) &&
+              !isa<ResumeInst>(BB->getTerminator()),
+          "Unexpected return or resume in task", BB->getTerminator());
 
     // Add the successors of this basic block.
     for (const BasicBlock *Successor : successors(BB))
@@ -4186,10 +4186,11 @@ void Verifier::visitEHPadPredecessors(Instruction &I) {
     // invoke.
     for (BasicBlock *PredBB : predecessors(BB)) {
       if (const auto *DI = dyn_cast<DetachInst>(PredBB->getTerminator())) {
-        Assert(DI && DI->getUnwindDest() == BB && DI->getDetached() != BB &&
-               DI->getContinue() != BB,
-               "A detach can only jump to a block containing a LandingPadInst "
-               "as the unwind destination.", LPI);
+        Check(DI && DI->getUnwindDest() == BB && DI->getDetached() != BB &&
+                  DI->getContinue() != BB,
+              "A detach can only jump to a block containing a LandingPadInst "
+              "as the unwind destination.",
+              LPI);
         continue;
       }
       const auto *II = dyn_cast<InvokeInst>(PredBB->getTerminator());
@@ -5913,9 +5914,8 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
     for (const DetachInst *DI1 : DetachUsers)
       for (const DetachInst *DI2 : DetachUsers)
         if (DI1 != DI2)
-          Assert(!DT.dominates(DI1->getDetached(), DI2->getParent()),
-                 "One detach user of a sync region dominates another",
-                 DI1, DI2);
+          Check(!DT.dominates(DI1->getDetached(), DI2->getParent()),
+                "One detach user of a sync region dominates another", DI1, DI2);
     break;
   }
   };

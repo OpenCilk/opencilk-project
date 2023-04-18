@@ -80,6 +80,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "tailcallelim"

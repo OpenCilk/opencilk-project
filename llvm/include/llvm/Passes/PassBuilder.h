@@ -398,8 +398,8 @@ public:
 
   /// Add optimizations to run immediately after an
   /// instrumentation pass, such as CilkSanitizer or CSI.
-  static void addPostCilkInstrumentationPipeline(ModulePassManager &MPM,
-                                                 OptimizationLevel Level);
+  ModulePassManager
+  buildPostCilkInstrumentationPipeline(OptimizationLevel Level);
 
   /// Register a callback for a default optimizer pipeline extension
   /// point

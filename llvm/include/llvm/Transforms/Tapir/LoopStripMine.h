@@ -12,6 +12,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Support/InstructionCost.h"
 
 namespace llvm {
 
@@ -37,7 +38,7 @@ TargetTransformInfo::StripMiningPreferences gatherStripMiningPreferences(
     Optional<unsigned> UserCount);
 
 bool computeStripMineCount(Loop *L, const TargetTransformInfo &TTI,
-                           int64_t LoopCost,
+                           InstructionCost LoopCost,
                            TargetTransformInfo::StripMiningPreferences &UP);
 
 Loop *StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,

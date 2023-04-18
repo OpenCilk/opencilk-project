@@ -8,6 +8,6 @@ extern const int size;
 void g(double _Hyperobject *sum) { // hyperobject-aware function
     // CHECK-LABEL: pfor.body
     _Cilk_for (int i = 0; i < size; ++i)
-        // CHECK: call i8* @llvm.hyper.lookup
+        // CHECK: call ptr @llvm.hyper.lookup
         *sum += array[i];
 }

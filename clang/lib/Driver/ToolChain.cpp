@@ -1389,10 +1389,13 @@ void ToolChain::AddOpenCilkIncludeDir(const ArgList &Args,
 
 ToolChain::path_list
 ToolChain::getOpenCilkRuntimePaths(const ArgList &Args) const {
-  if (!Args.hasArg(options::OPT_opencilk_resource_dir_EQ))
-    return getRuntimePaths();
-
   path_list Paths;
+
+  if (!Args.hasArg(options::OPT_opencilk_resource_dir_EQ)) {
+    Paths = getRuntimePaths();
+    Paths.push_back(getCompilerRTPath());
+    return Paths;
+  }
 
   // If -opencilk-resource-dir= is specified, try to use that directory, and
   // raise an error if that fails.

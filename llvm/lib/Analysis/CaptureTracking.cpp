@@ -298,7 +298,7 @@ UseCaptureKind llvm::DetermineUseCaptureKind(
     function_ref<bool(Value *, const DataLayout &)> IsDereferenceableOrNull) {
   Instruction *I = cast<Instruction>(U.getUser());
 
-  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U->getUser())) {
+  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(I)) {
     switch (CE->getOpcode()) {
     case Instruction::BitCast:
     case Instruction::GetElementPtr:

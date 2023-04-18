@@ -1,3 +1,6 @@
+; Check that SROA works on allocas inside entry blocks of detached
+; tasks, not just allocas in the entry block of the function.
+;
 ; RUN: opt < %s -sroa -S | FileCheck %s
 
 %"class.std::basic_ostream" = type { i32 (...)**, %"class.std::basic_ios" }
@@ -116,6 +119,11 @@ if.then:                                          ; preds = %pfor.body20
 ; CHECK-NOT: %t.i = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 0
 ; CHECK-NOT: store %struct.tri* %arrayidx22, %struct.tri** %t.i, align 8
 ; CHECK-NOT: %boundary.i = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 2
+; CHECK: %t.sroa.11.8.insert.mask = and i40 undef, -4294967296
+; CHECK: %t.sroa.11.8.insert.insert = or i40 %t.sroa.11.8.insert.mask, 0
+; CHECK: %t.sroa.11.12.insert.mask = and i40 %t.sroa.11.8.insert.insert, 4294967295
+; CHECK: %t.sroa.11.12.insert.insert = or i40 %t.sroa.11.12.insert.mask, 0
+
 
 for.cond:                                         ; preds = %invoke.cont100, %if.then
   %j25.0 = phi i32 [ 0, %if.then ], [ %inc104, %invoke.cont100 ]
@@ -124,8 +132,7 @@ for.cond:                                         ; preds = %invoke.cont100, %if
 
 ; CHECK: for.cond:
 ; CHECK: %t.sroa.0.0 = phi %struct.tri* [ %arrayidx22, %if.then ], [ %52, %invoke.cont100 ]
-; CHECK: %t.sroa.11.sroa.0.0 = phi i32 [ 0, %if.then ], [ %t.sroa.11.sroa.0.0.extract.trunc, %invoke.cont100 ]
-; CHECK: %t.sroa.11.sroa.9.0 = phi i8 [ 0, %if.then ], [ %t.sroa.11.sroa.9.0.extract.trunc, %invoke.cont100 ]
+; CHECK: %t.sroa.11.0 = phi i40 [ %t.sroa.11.12.insert.insert, %if.then ], [ %ref.tmp98.sroa.5.0.extract.trunc, %invoke.cont100 ]
 
 for.cond.cleanup:                                 ; preds = %for.cond
   call void @llvm.lifetime.end.p0i8(i64 16, i8* %6) #3
@@ -155,7 +162,8 @@ for.body:                                         ; preds = %for.cond
 ; CHECK-NOT: %idxprom.i = sext i32 %9 to i64
 ; CHECK-NOT: %arrayidx.i = getelementptr inbounds %struct.tri, %struct.tri* %8, i64 0, i32 0, i64 %idxprom.i
 ; CHECK-NOT: %10 = load %struct.tri*, %struct.tri** %arrayidx.i, align 8, !tbaa !21
-; CHECK: %idxprom.i = sext i32 %t.sroa.11.sroa.0.0 to i64
+; CHECK: %t.sroa.11.8.extract.trunc = trunc i40 %t.sroa.11.0 to i32
+; CHECK: %idxprom.i = sext i32 %t.sroa.11.8.extract.trunc to i64
 ; CHECK: %arrayidx.i = getelementptr inbounds %struct.tri, %struct.tri* %t.sroa.0.0, i64 0, i32 0, i64 %idxprom.i
 ; CHECK: %6 = load %struct.tri*, %struct.tri** %arrayidx.i, align 8
 
@@ -204,7 +212,7 @@ if.else.i:                                        ; preds = %for.body
 
 ; CHECK: if.else.i:
 ; CHECK-NOT: %retval.sroa.3.8.insert.ext13.i = zext i32 %9 to i64
-; CHECK: %retval.sroa.3.8.insert.ext13.i = zext i32 %t.sroa.11.sroa.0.0 to i64
+; CHECK: %retval.sroa.3.8.insert.ext13.i = zext i32 %t.sroa.11.8.extract.trunc to i64
 
 _ZN7simplex6acrossEv.exit:                        ; preds = %if.then.i, %for.inc.i.i, %for.inc.1.i.i, %if.else.i
   %retval.sroa.3.0.i = phi i64 [ %retval.sroa.3.12.insert.insert.i, %if.else.i ], [ 0, %if.then.i ], [ 1, %for.inc.i.i ], [ 2, %for.inc.1.i.i ]
@@ -269,7 +277,7 @@ invoke.cont35:                                    ; preds = %if.then33
 ; CHECK-NOT: %29 = load i8, i8* %boundary.i227, align 4
 ; CHECK: %ref.tmp.sroa.5.8.extract.trunc = trunc i64 %13 to i32
 ; CHECK: %idxprom.i219 = sext i32 %ref.tmp.sroa.5.8.extract.trunc to i64
-; CHECK: %tobool.i228 = icmp eq i8 %t.sroa.11.sroa.9.0, 0
+; CHECK: %tobool.i228 = icmp eq i8 %t.sroa.11.12.extract.trunc, 0
 
 lor.lhs.false.i:                                  ; preds = %invoke.cont35
   %t.i229 = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 0
@@ -319,8 +327,9 @@ if.end.i237:                                      ; preds = %lor.lhs.false.i
 ; CHECK: if.end.i237:
 ; CHECK-NOT: %o.i231 = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 1
 ; CHECK-NOT: %31 = load i32, i32* %o.i231, align 8
-; CHECK: %cmp.i.i232 = icmp sgt i32 %t.sroa.11.sroa.0.0, 0
-; CHECK: %cond.i.i234 = add i32 %cond.i.v.i233, %t.sroa.11.sroa.0.0
+; CHECK: %t.sroa.11.8.extract.trunc19 = trunc i40 %t.sroa.11.0 to i32
+; CHECK: %cmp.i.i232 = icmp sgt i32 %t.sroa.11.8.extract.trunc19, 0
+; CHECK: %cond.i.i234 = add i32 %cond.i.v.i233, %t.sroa.11.8.extract.trunc19
 
 _ZN7simplex7outsideEP6vertex.exit:                ; preds = %invoke.cont35, %lor.lhs.false.i, %if.end.i237
   %retval.0.i238 = phi i1 [ %cmp.i17.i, %if.end.i237 ], [ false, %invoke.cont35 ], [ false, %lor.lhs.false.i ]
@@ -375,8 +384,9 @@ if.then42:                                        ; preds = %invoke.cont40
 ; CHECK: if.then42:
 ; CHECK-NOT: %o = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 1
 ; CHECK-NOT: %35 = load i32, i32* %o, align 8
-; CHECK: %add44 = add nsw i32 %t.sroa.11.sroa.0.0, 2
-; CHECK: %idxprom53 = sext i32 %t.sroa.11.sroa.0.0 to i64
+; CHECK: %t.sroa.11.8.extract.trunc21 = trunc i40 %t.sroa.11.0 to i32
+; CHECK: %add44 = add nsw i32 %t.sroa.11.8.extract.trunc21, 2
+; CHECK: %idxprom53 = sext i32 %t.sroa.11.8.extract.trunc21 to i64
 
 invoke.cont57:                                    ; preds = %if.then42
   %cmp59 = fcmp fast olt double %div.i, -1.000000e-10
@@ -437,7 +447,8 @@ if.end63:                                         ; preds = %_ZN5utils8writeMinI
 ; CHECK: if.end63:
 ; CHECK-NOT: %boundary.i253 = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 2
 ; CHECK-NOT: %55 = load i8, i8* %boundary.i253, align 4
-; CHECK: %tobool.i254 = icmp eq i8 %t.sroa.11.sroa.9.0, 0
+; CHECK: %t.sroa.11.12.extract.trunc26 = trunc i40 %t.sroa.11.12.extract.shift25 to i8
+; CHECK: %tobool.i254 = icmp eq i8 %t.sroa.11.12.extract.trunc26, 0
 
 lor.lhs.false.i257:                               ; preds = %if.end63
   %t.i255 = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 0
@@ -629,8 +640,9 @@ if.end97:                                         ; preds = %_ZN5utils8writeMinI
 ; CHECK: if.end97:
 ; CHECK-NOT: %o.i287 = getelementptr inbounds %struct.simplex, %struct.simplex* %t, i64 0, i32 1
 ; CHECK-NOT: %75 = load i32, i32* %o.i287, align 8
-; CHECK: %cmp.i.i288 = icmp sgt i32 %t.sroa.11.sroa.0.0, 1
-; CHECK: %cond.i.i290 = add i32 %cond.i.v.i289, %t.sroa.11.sroa.0.0
+; CHECK: %t.sroa.11.8.extract.trunc23 = trunc i40 %t.sroa.11.0 to i32
+; CHECK: %cmp.i.i288 = icmp sgt i32 %t.sroa.11.8.extract.trunc23, 1
+; CHECK: %cond.i.i290 = add i32 %cond.i.v.i289, %t.sroa.11.8.extract.trunc23
 
 invoke.cont100:                                   ; preds = %if.end97
   %76 = extractvalue { %struct.tri*, i64 } %.fca.1.insert.i293, 0

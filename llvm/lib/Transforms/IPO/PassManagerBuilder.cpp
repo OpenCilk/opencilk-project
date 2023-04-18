@@ -353,8 +353,7 @@ void PassManagerBuilder::populateModulePassManager(
 
   do {
     RerunAfterTapirLowering =
-      !TapirHasBeenLowered && (TapirTargetID::None != TapirTarget) &&
-      !PrepareForThinLTO;
+      !TapirHasBeenLowered && (TapirTargetID::None != TapirTarget);
 
   // Infer attributes about declarations if possible.
   MPM.add(createInferFunctionAttrsLegacyPass());
@@ -521,8 +520,6 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createCFGSimplificationPass(
         SimplifyCFGOptions().convertSwitchRangeToICmp(true)));
     MPM.add(createPostOrderFunctionAttrsLegacyPass());
-    if (OptLevel > 2)
-      MPM.add(createArgumentPromotionPass()); // Scalarize uninlined fn args
     addFunctionSimplificationPasses(MPM);
     MPM.add(createReversePostOrderFunctionAttrsPass());
     if (MergeFunctions)
@@ -538,8 +535,6 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createCFGSimplificationPass(
         SimplifyCFGOptions().convertSwitchRangeToICmp(true)));
     MPM.add(createPostOrderFunctionAttrsLegacyPass());
-    if (OptLevel > 2)
-      MPM.add(createArgumentPromotionPass()); // Scalarize uninlined fn args
     addFunctionSimplificationPasses(MPM);
     MPM.add(createReversePostOrderFunctionAttrsPass());
 
@@ -568,8 +563,6 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createAlwaysInlinerLegacyPass());
 
     MPM.add(createPostOrderFunctionAttrsLegacyPass());
-    if (OptLevel > 2)
-      MPM.add(createArgumentPromotionPass()); // Scalarize uninlined fn args
 
     addFunctionSimplificationPasses(MPM);
 

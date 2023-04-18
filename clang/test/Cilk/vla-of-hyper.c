@@ -11,9 +11,8 @@ int test_vla_hyper(unsigned long size)
   // expected-warning@-1{{array of reducer not implemented}}
 
   // CHECK: getelementptr
-  // CHECK: %[[RAW:.+]] = call i8* @llvm.hyper.lookup
-  // CHECK-NEXT: %[[VIEW:.+]] = bitcast i8* %[[RAW]] to i32*
-  // CHECK-NEXT: %[[RET:.+]] = load i32, i32* %[[VIEW]]
+  // CHECK: %[[RAW:.+]] = call ptr @llvm.hyper.lookup
+  // CHECK-NEXT: %[[RET:.+]] = load i32, ptr %[[RAW]]
   // CHECK-NOT: getelementptr
   // CHECK: ret i32 %[[RET]]
   return array[2];

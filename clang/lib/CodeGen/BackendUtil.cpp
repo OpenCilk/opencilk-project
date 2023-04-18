@@ -268,7 +268,7 @@ static bool asanUseGlobalsGC(const Triple &T, const CodeGenOptions &CGOpts) {
   return false;
 }
 
-static CSIOptions getCSIOptionsForCilkscale() {
+static CSIOptions getCSIOptionsForCilkscale(bool InstrumentBasicBlocks) {
   CSIOptions Options;
   // Disable CSI hooks that Cilkscale doesn't need.
   Options.InstrumentBasicBlocks = InstrumentBasicBlocks;
@@ -1027,10 +1027,10 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     // Register the Cilksan pass.
     if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
       PB.registerTapirLateEPCallback(
-          [](ModulePassManager &MPM, OptimizationLevel Level) {
+          [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
             MPM.addPass(CSISetupPass());
             MPM.addPass(CilkSanitizerPass());
-            PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+            MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
           });
     // Register CSI instrumentation for Cilkscale
     if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
@@ -1039,29 +1039,29 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale:
         PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass(getCSIOptionsForCilkscale(false)));
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(false)));
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
         PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass(getCSIOptionsForCilkscale(true)));
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(true)));
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
           PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass(getCSIOptionsForCilkscaleBenchmark()));
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscaleBenchmark()));
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
       }
@@ -1072,34 +1072,34 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
       case LangOptions::CSI_EarlyAsPossible:
       case LangOptions::CSI_ModuleOptimizerEarly:
         PB.registerPipelineStartEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
       case LangOptions::CSI_TapirLate:
         PB.registerTapirLateEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
       case LangOptions::CSI_TapirLoopEnd:
         PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
       case LangOptions::CSI_OptimizerLast:
         PB.registerOptimizerLastEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
       case LangOptions::CSI_None:

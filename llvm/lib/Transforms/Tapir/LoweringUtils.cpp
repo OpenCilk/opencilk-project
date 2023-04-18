@@ -422,8 +422,7 @@ llvm::createTaskArgsStruct(const ValueSet &Inputs, Task *T,
   IRBuilder<> B2(LoadPt);
   for (unsigned i = 0; i < StructInputs.size(); ++i) {
     auto STGEP = cast<Instruction>(B2.CreateConstGEP2_32(ST, Closure, 0, i));
-    auto STLoad = B2.CreateLoad(
-        STGEP->getType()->getScalarType()->getPointerElementType(), STGEP);
+    auto STLoad = B2.CreateLoad(StructIT[i], STGEP);
     InputsMap[StructInputs[i]] = STLoad;
 
     // Update all uses of the struct inputs in the loop body.

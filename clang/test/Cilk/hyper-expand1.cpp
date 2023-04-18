@@ -24,20 +24,20 @@ T mult_direct(T *x, T *y) {
 
   reducer_opadd<T> result_reducer = 0;
   // CHECK: call void @llvm.reducer.register
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: getelementptr
   // CHECK-NEXT: load double,
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: getelementptr
   // CHECK-NEXT: load double,
-  // CHECK: call i8* @llvm.hyper.lookup
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: call ptr @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: load double
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: store double
   result_reducer += x[0]*y[0];
-  // CHECK: call i8* @llvm.hyper.lookup
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: call ptr @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: ret double
   return result_reducer;
 }
