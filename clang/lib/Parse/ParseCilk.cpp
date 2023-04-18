@@ -204,7 +204,7 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
     return StmtError();
   }
 
-  ParsedAttributesWithRange attrs(AttrFactory);
+  ParsedAttributes attrs(AttrFactory);
   MaybeParseCXX11Attributes(attrs);
 
   SourceLocation EmptyInitStmtSemiLoc;
@@ -233,9 +233,9 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
               ? FixItHint::CreateInsertion(Loc, "auto &&")
               : FixItHint());
 
-    ForRangeInfo.LoopVar = Actions.ActOnCXXForRangeIdentifier(
-        getCurScope(), Loc, Name, attrs, attrs.Range.getEnd());
-  } else if (isForInitDeclaration()) {  // _Cilk_for (int X = 4;
+    ForRangeInfo.LoopVar =
+        Actions.ActOnCXXForRangeIdentifier(getCurScope(), Loc, Name, attrs);
+  } else if (isForInitDeclaration()) { // _Cilk_for (int X = 4;
     ParenBraceBracketBalancer BalancerRAIIObj(*this);
 
     // Parse declaration, which eats the ';'.
@@ -252,8 +252,9 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
       ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
 
       SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
+      ParsedAttributes DeclSpecAttrs(AttrFactory);
       DeclGroupPtrTy DG = ParseSimpleDeclaration(
-          DeclaratorContext::ForInit, DeclEnd, attrs, false,
+          DeclaratorContext::ForInit, DeclEnd, attrs, DeclSpecAttrs, false,
           MightBeForRangeStmt ? &ForRangeInfo : nullptr);
       FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
       if (ForRangeInfo.ParsedForRangeDecl()) {

@@ -20,7 +20,7 @@ extern void g(double *);
 // the reducer attribute is directly on the variable declaration
 // or inherited from a typedef.
 
-// CHECK_LABEL: f1
+// CHECK-LABEL: f1
 double f1(double x)
 {
   // CHECK: call void @llvm.reducer.register
@@ -32,7 +32,7 @@ double f1(double x)
   return y;
 }
 
-// CHECK_LABEL: f2
+// CHECK-LABEL: f2
 double f2(double x)
 {
   // CHECK: store double

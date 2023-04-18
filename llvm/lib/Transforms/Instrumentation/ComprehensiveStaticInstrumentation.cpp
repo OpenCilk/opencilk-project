@@ -1513,8 +1513,8 @@ bool CSIImpl::getAllocFnArgs(const Instruction *I,
 
   // Return the old pointer argument for realloc-like functions or nullptr for
   // other allocation functions.
-  if (isReallocLikeFn(CB, &TLI))
-    AllocFnArgs.push_back(CB->getArgOperand(0));
+  if (Value *Reallocated = getReallocatedOperand(CB, &TLI))
+    AllocFnArgs.push_back(Reallocated);
   else
     AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
 
@@ -2350,14 +2350,13 @@ void CSIImpl::computeLoadAndStoreProperties(
            E = BBLoadsAndStores.rend();
        It != E; ++It) {
     Instruction *I = *It;
-    unsigned Alignment;
     if (StoreInst *Store = dyn_cast<StoreInst>(I)) {
       Value *Addr = Store->getPointerOperand();
       WriteTargets.insert(Addr);
       CsiLoadStoreProperty Prop;
       // Update alignment property data
-      Alignment = Store->getAlignment();
-      Prop.setAlignment(Alignment);
+      const Align Alignment = Store->getAlign();
+      Prop.setAlignment(Alignment.value());
       // Set vtable-access property
       Prop.setIsVtableAccess(isVtableAccess(Store));
       // Set constant-data-access property
@@ -2376,8 +2375,8 @@ void CSIImpl::computeLoadAndStoreProperties(
       Value *Addr = Load->getPointerOperand();
       CsiLoadStoreProperty Prop;
       // Update alignment property data
-      Alignment = Load->getAlignment();
-      Prop.setAlignment(Alignment);
+      const Align Alignment = Load->getAlign();
+      Prop.setAlignment(Alignment.value());
       // Set vtable-access property
       Prop.setIsVtableAccess(isVtableAccess(Load));
       // Set constant-data-access-property
@@ -2486,13 +2485,13 @@ void CSIImpl::instrumentFunction(Function &F) {
           SyncsWithUnwinds.insert(SI);
           BBsToIgnore.insert(SI->getSuccessor(0));
         }
-      } else if (isa<CallBase>(I)) {
+      } else if (CallBase *CB = dyn_cast<CallBase>(&I)) {
         // Record this function call as either an allocation function, a call to
         // free (or delete), a memory intrinsic, or an ordinary real function
         // call.
         if (isAllocationFn(&I, TLI))
           AllocationFnCalls.push_back(&I);
-        else if (getFreedOperand(&I, TLI))
+        else if (getFreedOperand(CB, TLI))
           FreeCalls.push_back(&I);
         else if (isa<MemIntrinsic>(I))
           MemIntrinsics.push_back(&I);

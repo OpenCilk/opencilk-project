@@ -6,7 +6,7 @@ void identity_long(void *v);
 void reduce_long(void *l, void *r);
 
 // CHECK-LABEL: cxx_global_var_init
-// CHECK: store i64 1, i64* @global
+// CHECK: store i64 1, ptr @global
 // CHECK: call void @llvm.reducer.register.i64
 long _Hyperobject(identity_long, reduce_long) global = 1;
 

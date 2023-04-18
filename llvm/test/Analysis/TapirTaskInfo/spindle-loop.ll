@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -analyze -tasks -verify-task-info 2>&1 | FileCheck %s
 ; RUN: opt < %s -passes='print<tasks>' -verify-task-info 2>&1 | FileCheck %s
 
 %"class.std::ios_base::Init" = type { i8 }

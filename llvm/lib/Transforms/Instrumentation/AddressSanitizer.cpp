@@ -646,7 +646,7 @@ namespace {
 
 /// AddressSanitizer: instrument the code in module to find memory bugs.
 struct AddressSanitizer {
-  AddressSanitizer(Module &M, const StackSafetyGlobalInfo *SSGI, TaskInfo &TI,
+  AddressSanitizer(Module &M, const StackSafetyGlobalInfo *SSGI, TaskInfo *TI,
                    int InstrumentationWithCallsThreshold,
                    uint32_t MaxInlinePoisoningSize, bool CompileKernel = false,
                    bool Recover = false, bool UseAfterScope = false,

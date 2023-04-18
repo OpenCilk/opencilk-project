@@ -6,20 +6,19 @@ extern long _Hyperobject x, _Hyperobject y;
 
 long chain_assign()
 {
-  // CHECK: %[[Y1RAW:.+]] = call i8* @llvm.hyper.lookup.i64(i8* bitcast (i64* @y to i8*), i64 8, i8* null, i8* null)
-  // CHECK: %[[Y1PTR:.+]] = bitcast i8* %[[Y1RAW]] to i64*
-  // CHECK: %[[Y1VAL:.+]] = load i64, i64* %[[Y1PTR]]
-  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i64* @x to i8*), i64 8, i8* null, i8* null)
+  // CHECK: %[[Y1RAW:.+]] = call ptr @llvm.hyper.lookup.i64(ptr @y, i64 8, ptr null, ptr null)
+  // CHECK: %[[Y1VAL:.+]] = load i64, ptr %[[Y1RAW]]
+  // CHECK: call ptr @llvm.hyper.lookup.i64(ptr @x, i64 8, ptr null, ptr null)
   // CHECK: store i64 %[[Y1VAL]]
-  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i64* @y to i8*), i64 8, i8* null, i8* null)
-  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i64* @x to i8*), i64 8, i8* null, i8* null)
+  // CHECK: call ptr @llvm.hyper.lookup.i64(ptr @y, i64 8, ptr null, ptr null)
+  // CHECK: call ptr @llvm.hyper.lookup.i64(ptr @x, i64 8, ptr null, ptr null)
   return x = y = x = y;
 }
 
 long simple_assign(long val)
 {
-  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i64* @x to i8*), i64 8, i8* null, i8* null)
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: call ptr @llvm.hyper.lookup.i64(ptr @x, i64 8, ptr null, ptr null)
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: store i64
   return x = val;
 }
@@ -27,11 +26,11 @@ long simple_assign(long val)
 long subtract()
 {
   // The order is not fixed here.
-  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i64* @y to i8*), i64 8, i8* null, i8* null)
+  // CHECK: call ptr @llvm.hyper.lookup.i64(ptr @y, i64 8, ptr null, ptr null)
   // CHECK: load i64
   // CHECK: add nsw i64 %[[Y:.+]], 1
   // CHECK: store i64
-  // CHECK: call i8* @llvm.hyper.lookup.i64(i8* bitcast (i64* @x to i8*), i64 8, i8* null, i8* null)
+  // CHECK: call ptr @llvm.hyper.lookup.i64(ptr @x, i64 8, ptr null, ptr null)
   // CHECK: load i64
   // CHECK: sub nsw
   // CHECK: store i64

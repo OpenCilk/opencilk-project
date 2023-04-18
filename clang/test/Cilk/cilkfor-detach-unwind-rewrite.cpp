@@ -29,8 +29,8 @@ int main() {
 // CHECK: call void @__ubsan_handle_add_overflow
 
 // Check contents of the detach block
-// CHECK: load i64, i64* %[[INIT:.+]]
-// CHECK: load i64, i64* %[[BEGIN:.+]]
+// CHECK: load i64, ptr %[[INIT:.+]]
+// CHECK: load i64, ptr %[[BEGIN:.+]]
 // CHECK: call { i64, i1 } @llvm.smul.with.overflow.i64(
 // CHECK: br i1 %{{.*}}, label %[[CONT5:.+]], label %[[HANDLE_MUL_OVERFLOW:[a-z0-9._]+]],
 

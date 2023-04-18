@@ -35,7 +35,7 @@ long foo() {
 // CHECK: [[DETBLK]]:
 // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME]])
 // CHECK-NEXT: %[[RETVAL:.+]] = call noundef i32 @_Z3fibIiET_S0_
-// CHECK-NEXT: store i32 %[[RETVAL]], i32*
+// CHECK-NEXT: store i32 %[[RETVAL]], ptr
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTBLK]]
 
 // CHECK: [[CONTBLK]]:
@@ -55,7 +55,7 @@ long foo() {
 // CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[DETLPAD:.+]]
 
 // CHECK: [[INVOKECONT]]:
-// CHECK-NEXT: store i32 %[[RETVAL]], i32*
+// CHECK-NEXT: store i32 %[[RETVAL]], ptr
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTBLK]]
 
 // CHECK: [[CONTBLK]]:
@@ -67,11 +67,11 @@ long foo() {
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
 // CHECK: [[DETLPAD]]:
-// CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+// CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]],
 // CHECK-NEXT: to label %[[UNREACHABLE:.+]] unwind label %[[TFLPAD]]
 
 // CHECK: [[TFLPAD]]:
-// CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
+// CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]],
 // CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %[[OUTERLPAD]]
 
 // CHECK: [[UNREACHABLE]]:

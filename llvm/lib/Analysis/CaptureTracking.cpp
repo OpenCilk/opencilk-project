@@ -283,7 +283,7 @@ UseCaptureKind llvm::DetermineUseCaptureKind(
   if (!I)
     return UseCaptureKind::MAY_CAPTURE;
 
-  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U->getUser())) {
+  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(I)) {
     switch (CE->getOpcode()) {
     case Instruction::BitCast:
     case Instruction::GetElementPtr:
