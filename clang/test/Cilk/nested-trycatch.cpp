@@ -37,14 +37,14 @@ void foo() {
 // CHECK: [[NESTEDLPAD]]:
 // CHECK-NEXT: landingpad
 // CHECK-NEXT: cleanup
-// CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+// CHECK-NEXT: catch ptr @_ZTIi
 // CHECK: br i1 {{.+}}, label {{.+}}, label %[[EHCLEANUP:.+]]
 
 // CHECK: call void @llvm.taskframe.end(token %[[TF]])
 // CHECK: sync within %[[SYNCREG1]]
 
 // CHECK: [[EHCLEANUP]]:
-// CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TF]],
+// CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TF]],
 
 int main(int argc, char *argv[])
 {

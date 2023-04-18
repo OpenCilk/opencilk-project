@@ -90,7 +90,7 @@ class CilkABI : public TapirTarget {
   Function *GetCilkSyncNothrowFn(bool instrument = false);
   Function *GetCilkCatchExceptionFn(Type *ExnTy);
   Function *GetCilkParentEpilogueFn(bool instrument = false);
-  static void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
+  void EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF);
   AllocaInst *CreateStackFrame(Function &F);
   Value *GetOrInitCilkStackFrame(Function &F, bool Helper,
                                  bool instrumet = false);

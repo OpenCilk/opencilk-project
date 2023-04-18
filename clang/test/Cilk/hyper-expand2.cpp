@@ -10,16 +10,16 @@ template<typename T>
 // CHECK-LABEL: mult_indirect
 void mult_indirect(Box<T> _Hyperobject *H, T *x, T *y) {
   // CHECK-NOT: call void @llvm.reducer.register
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: getelementptr
   // CHECK-NEXT: load double,
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: getelementptr
   // CHECK-NEXT: load double,
-  // CHECK: call i8* @llvm.hyper.lookup
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: call ptr @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: load double
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: store double
   H->value += x[0]*y[0];
   // CHECK: ret void

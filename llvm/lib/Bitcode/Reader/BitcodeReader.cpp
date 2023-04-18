@@ -5767,8 +5767,9 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
           return error("Invalid record");
       }
 
-      Value *SyncRegion =
-        getValue(Record, SREntry, NextValueNo, Type::getTokenTy(Context));
+      Type *TokenTy = Type::getTokenTy(Context);
+      Value *SyncRegion = getValue(Record, SREntry, NextValueNo, TokenTy,
+                                   getVirtualTypeID(TokenTy), CurBB);
       if (!SyncRegion)
         return error("Invalid record");
 
@@ -5779,7 +5780,7 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       InstructionList.push_back(I);
       break;
     }
-      case bitc::FUNC_CODE_INST_REATTACH: { // REATTACH: [bb#, val]
+    case bitc::FUNC_CODE_INST_REATTACH: { // REATTACH: [bb#, val]
       if (Record.size() != 2)
         return error("Invalid record");
 
@@ -5787,8 +5788,9 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       if (!DetachContinue)
         return error("Invalid record");
 
-      Value *SyncRegion =
-        getValue(Record, 1, NextValueNo, Type::getTokenTy(Context));
+      Type *TokenTy = Type::getTokenTy(Context);
+      Value *SyncRegion = getValue(Record, 1, NextValueNo, TokenTy,
+                                   getVirtualTypeID(TokenTy), CurBB);
       if (!SyncRegion)
         return error("Invalid record");
 
@@ -5803,8 +5805,9 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       if (!Continue)
         return error("Invalid record");
 
-      Value *SyncRegion =
-        getValue(Record, 1, NextValueNo, Type::getTokenTy(Context));
+      Type *TokenTy = Type::getTokenTy(Context);
+      Value *SyncRegion = getValue(Record, 1, NextValueNo, TokenTy,
+                                   getVirtualTypeID(TokenTy), CurBB);
       if (!SyncRegion)
         return error("Invalid record");
 

@@ -11,7 +11,7 @@ void identity(void * value);
 void reduce(void* left, void* right);
 extern void consume_view(long *);
 extern void consume_hyper(long _Hyperobject *);
-// CHECK_LABEL: assorted_addresses
+// CHECK-LABEL: assorted_addresses
 void assorted_addresses()
 {
   // CHECK: call void @llvm.reducer.register
@@ -19,8 +19,8 @@ void assorted_addresses()
   // CHECK-NOT: llvm.hyper.lookup
   // CHECK: call void @[[FN1:.*consume_hyper]]
   consume_hyper(__builtin_addressof(sum));
-  // CHECK: call i8* @llvm.hyper.lookup
-  // CHECK-NOT: call i8* @llvm.hyper.lookup
+  // CHECK: call ptr @llvm.hyper.lookup
+  // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: call void @[[FN2:.*consume_view]]
   consume_view(&sum);
   // CHECK: call void @llvm.reducer.unregister

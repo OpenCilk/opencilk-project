@@ -342,6 +342,7 @@ struct CilkSanitizerImpl : public CSIImpl {
   static Constant *objTableToUnitObjTable(Module &M,
                                           StructType *UnitObjTableType,
                                           ObjectTable &ObjTable);
+  static bool isFreeFn(const Instruction *I, const TargetLibraryInfo *TLI);
   static bool isAllocFn(const Instruction *I, const TargetLibraryInfo *TLI);
   static bool isLibCall(const Instruction &I, const TargetLibraryInfo *TLI);
   static bool simpleCallCannotRace(const Instruction &I);
@@ -1485,7 +1486,7 @@ bool CilkSanitizerImpl::isFreeFn(const Instruction *I,
     return false;
 
   const Function *Callee = dyn_cast<CallBase>(I)->getCalledFunction();
-  if (!Called)
+  if (!Callee)
     return false;
 
   LibFunc TLIFn;
@@ -3125,7 +3126,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(
   // are needed.
   CsiLoadStoreProperty Prop;
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
-    Prop.setAlignment(LI->getAlignment());
+    Prop.setAlignment(LI->getAlign().value());
     Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
     // Instrument the load
     Value *CsiId = LoadFED.localToGlobalId(LocalId, IRB);
@@ -3133,7 +3134,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStoreHoisted(
     Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
     IRB.SetInstDebugLocation(Call);
   } else if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-    Prop.setAlignment(SI->getAlignment());
+    Prop.setAlignment(SI->getAlign().value());
     Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
     // Instrument the store
     Value *CsiId = StoreFED.localToGlobalId(LocalId, IRB);
@@ -3603,11 +3604,11 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
   if (!(InstrumentationSet & SHADOWMEMORY))
     return true;
 
-  const unsigned Alignment = IsWrite
-      ? cast<StoreInst>(I)->getAlignment()
-      : cast<LoadInst>(I)->getAlignment();
+  const Align Alignment = IsWrite
+      ? cast<StoreInst>(I)->getAlign()
+      : cast<LoadInst>(I)->getAlign();
   CsiLoadStoreProperty Prop;
-  Prop.setAlignment(Alignment);
+  Prop.setAlignment(Alignment.value());
   Prop.setIsAtomic(I->isAtomic());
   Prop.setIsThreadLocal(isThreadLocalObject(lookupUnderlyingObject(Addr)));
   if (IsWrite) {
@@ -4631,8 +4632,8 @@ bool CilkSanitizerImpl::getAllocFnArgs(
 
   // Return the old pointer argument for realloc-like functions or nullptr for
   // other allocation functions.
-  if (isReallocLikeFn(CB, &TLI))
-    AllocFnArgs.push_back(CB->getArgOperand(0));
+  if (Value *Reallocated = getReallocatedOperand(CB, &TLI))
+    AllocFnArgs.push_back(Reallocated);
   else
     AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
 

@@ -126,7 +126,7 @@ void llvm::simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
     for (BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E;) {
       Instruction *Inst = &*I++;
 
-      if (Value *V = SimplifyInstruction(Inst, {DL, nullptr, DT, AC}))
+      if (Value *V = simplifyInstruction(Inst, {DL, nullptr, DT, AC}))
         if (LI->replacementPreservesLCSSAForm(Inst, V))
           Inst->replaceAllUsesWith(V);
       if (isInstructionTriviallyDead(Inst))
@@ -177,7 +177,7 @@ static unsigned StripMineCountPragmaValue(const Loop *L) {
 // Returns true if stripmine count was set explicitly.
 // Calculates stripmine count and writes it to SMP.Count.
 bool llvm::computeStripMineCount(
-    Loop *L, const TargetTransformInfo &TTI, int64_t LoopCost,
+    Loop *L, const TargetTransformInfo &TTI, InstructionCost LoopCost,
     TargetTransformInfo::StripMiningPreferences &SMP) {
   // Check for explicit Count.
   // 1st priority is stripmine count set by "stripmine-count" option.

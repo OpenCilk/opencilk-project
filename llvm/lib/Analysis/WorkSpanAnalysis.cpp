@@ -59,8 +59,8 @@ static void estimateLoopCostHelper(const Loop *L, CodeMetrics &Metrics,
     WSCost SubLoopCost;
     estimateLoopCostHelper(SubL, Metrics, SubLoopCost, LI, SE);
     // Quit early if the size of this subloop is already too big.
-    if (std::numeric_limits<int64_t>::max() == SubLoopCost.Work)
-      LoopCost.Work = std::numeric_limits<int64_t>::max();
+    if (InstructionCost::getMax() == SubLoopCost.Work)
+      LoopCost.Work = InstructionCost::getMax();
 
     // Find a constant trip count if available
     int64_t ConstTripCount = SE ? getConstTripCount(SubL, *SE) : 0;
@@ -74,13 +74,13 @@ static void estimateLoopCostHelper(const Loop *L, CodeMetrics &Metrics,
     }
 
     // Check if the total size of this subloop is huge.
-    if (std::numeric_limits<int64_t>::max() / ConstTripCount > SubLoopCost.Work)
-      LoopCost.Work = std::numeric_limits<int64_t>::max();
+    if (InstructionCost::getMax() / ConstTripCount > SubLoopCost.Work)
+      LoopCost.Work = InstructionCost::getMax();
 
     // Check if this subloop suffices to make loop L huge.
-    if (std::numeric_limits<int64_t>::max() - LoopCost.Work <
+    if (InstructionCost::getMax() - LoopCost.Work <
         (SubLoopCost.Work * ConstTripCount))
-      LoopCost.Work = std::numeric_limits<int64_t>::max();
+      LoopCost.Work = InstructionCost::getMax();
 
     // Add in the size of this subloop.
     LoopCost.Work += (SubLoopCost.Work * ConstTripCount);
@@ -88,15 +88,14 @@ static void estimateLoopCostHelper(const Loop *L, CodeMetrics &Metrics,
 
   // After looking at all subloops, if we've concluded we have a huge loop size,
   // return early.
-  if (std::numeric_limits<int64_t>::max() == LoopCost.Work)
+  if (InstructionCost::getMax() == LoopCost.Work)
     return;
 
   for (BasicBlock *BB : L->blocks())
     if (LI->getLoopFor(BB) == L) {
       // Check if this BB suffices to make loop L huge.
-      if (std::numeric_limits<int64_t>::max() - LoopCost.Work <
-          Metrics.NumBBInsts[BB]) {
-        LoopCost.Work = std::numeric_limits<int64_t>::max();
+      if (InstructionCost::getMax() - LoopCost.Work < Metrics.NumBBInsts[BB]) {
+        LoopCost.Work = InstructionCost::getMax();
         return;
       }
       LoopCost.Work += Metrics.NumBBInsts[BB];

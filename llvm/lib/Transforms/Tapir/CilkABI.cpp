@@ -268,12 +268,8 @@ FunctionCallee CilkABI::Get__cilkrts_bind_thread_1() {
 }
 
 /// Helper methods for storing to and loading from struct fields.
-static Value *GEP(IRBuilder<> &B, Value *Base, int Field) {
-  // return B.CreateStructGEP(cast<PointerType>(Base->getType()),
-  //                          Base, field);
-  return B.CreateConstInBoundsGEP2_32(
-      Base->getType()->getScalarType()->getPointerElementType(), Base, 0,
-      Field);
+static Value *GEP(IRBuilder<> &B, Value *Base, Type *Ty, int Field) {
+  return B.CreateConstInBoundsGEP2_32(Ty, Base, 0, Field);
 }
 
 static Align GetAlignment(const DataLayout &DL, StructType *STy, int Field) {
@@ -284,7 +280,7 @@ static void StoreSTyField(IRBuilder<> &B, const DataLayout &DL, StructType *STy,
                           Value *Val, Value *Dst, int Field,
                           bool isVolatile = false,
                           AtomicOrdering Ordering = AtomicOrdering::NotAtomic) {
-  StoreInst *S = B.CreateAlignedStore(Val, GEP(B, Dst, Field),
+  StoreInst *S = B.CreateAlignedStore(Val, GEP(B, Dst, STy, Field),
                                       GetAlignment(DL, STy, Field), isVolatile);
   S->setOrdering(Ordering);
 }
@@ -293,15 +289,15 @@ static Value *LoadSTyField(
     IRBuilder<> &B, const DataLayout &DL, StructType *STy, Value *Src,
     int Field, bool isVolatile = false,
     AtomicOrdering Ordering = AtomicOrdering::NotAtomic) {
-  Value *GetElPtr = GEP(B, Src, Field);
+  Value *GetElPtr = GEP(B, Src, STy, Field);
   LoadInst *L =
-      B.CreateAlignedLoad(GetElPtr->getType()->getPointerElementType(),
+      B.CreateAlignedLoad(STy->getElementType(Field),
                           GetElPtr, GetAlignment(DL, STy, Field), isVolatile);
   L->setOrdering(Ordering);
   return L;
 }
 
-/// Emit inline assembly code to save the floating point state, for x86 Only.
+/// Emit inline assembly code to save the floating point state, for x86 only.
 void CilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
   LLVMContext &C = B.getContext();
   FunctionType *FTy =
@@ -317,8 +313,8 @@ void CilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
                                   /*sideeffects*/ true);
 
   Value *Args[2] = {
-    GEP(B, SF, StackFrameFields::mxcsr),
-    GEP(B, SF, StackFrameFields::fpcsr)
+    GEP(B, SF, StackFrameTy, StackFrameFields::mxcsr),
+    GEP(B, SF, StackFrameTy, StackFrameFields::fpcsr)
   };
 
   CallInst *CI = B.CreateCall(Asm, Args);
@@ -359,21 +355,23 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
 
   // Get the buffer to store program state
   // Buffer is a void**.
-  Value *Buf = GEP(B, SF, StackFrameFields::ctx);
+  Value *Buf = GEP(B, SF, StackFrameTy, StackFrameFields::ctx);
+  Type *BufTy = StackFrameTy->getElementType(StackFrameFields::ctx);
+                    // ->getArrayElementType();
 
   // Store the frame pointer in the 0th slot
   Value *FrameAddr = B.CreateCall(
       Intrinsic::getDeclaration(&M, Intrinsic::frameaddress, Int8PtrTy),
       ConstantInt::get(Int32Ty, 0));
 
-  Value *FrameSaveSlot = GEP(B, Buf, 0);
+  Value *FrameSaveSlot = GEP(B, Buf, BufTy, 0);
   B.CreateStore(FrameAddr, FrameSaveSlot, /*isVolatile=*/true);
 
   // Store stack pointer in the 2nd slot
   Value *StackAddr = B.CreateCall(
       Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
 
-  Value *StackSaveSlot = GEP(B, Buf, 2);
+  Value *StackSaveSlot = GEP(B, Buf, BufTy, 2);
   B.CreateStore(StackAddr, StackSaveSlot, /*isVolatile=*/true);
 
   Buf = B.CreateBitCast(Buf, Int8PtrTy);
@@ -521,23 +519,25 @@ Function *CilkABI::Get__cilkrts_detach() {
     StructType *STy = PedigreeTy;
     Type *Ty = STy->getElementType(PedigreeFields::rank);
     StoreSTyField(B, DL, STy, ConstantInt::get(Ty, 0),
-                  GEP(B, W, WorkerFields::pedigree), PedigreeFields::rank,
+                  GEP(B, W, WorkerTy, WorkerFields::pedigree),
+                  PedigreeFields::rank,
                   /*isVolatile=*/false, AtomicOrdering::Release);
   }
 
   // w->pedigree.next = &sf->spawn_helper_pedigree;
-  StoreSTyField(B, DL, PedigreeTy,
-                GEP(B, GEP(B, SF, StackFrameFields::parent_pedigree), 0),
-                GEP(B, W, WorkerFields::pedigree), PedigreeFields::next,
-                /*isVolatile=*/false, AtomicOrdering::Release);
+  StoreSTyField(
+      B, DL, PedigreeTy,
+      GEP(B, GEP(B, SF, StackFrameTy, StackFrameFields::parent_pedigree),
+          StackFrameTy->getElementType(StackFrameFields::parent_pedigree), 0),
+      GEP(B, W, WorkerTy, WorkerFields::pedigree), PedigreeFields::next,
+      /*isVolatile=*/false, AtomicOrdering::Release);
 
   // StoreStore_fence();
   B.CreateFence(AtomicOrdering::Release);
 
   // *tail++ = parent;
   B.CreateStore(Parent, Tail, /*isVolatile=*/true);
-  Tail = B.CreateConstGEP1_32(
-      Tail->getType()->getScalarType()->getPointerElementType(), Tail, 1);
+  Tail = B.CreateConstGEP1_32(StackFramePtrTy, Tail, 1);
 
   // w->tail = tail;
   StoreSTyField(B, DL, WorkerTy, Tail, W, WorkerFields::tail,
@@ -698,9 +698,9 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
                                  StackFrameFields::worker,
                                  /*isVolatile=*/false,
                                  AtomicOrdering::Acquire);
-    Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
-    Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
-    Type *RankTy = Rank->getType()->getPointerElementType();
+    Value *Pedigree = GEP(B, Worker, WorkerTy, WorkerFields::pedigree);
+    Value *Rank = GEP(B, Pedigree, PedigreeTy, PedigreeFields::rank);
+    Type *RankTy = PedigreeTy->getElementType(PedigreeFields::rank);
     Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
     B.CreateAlignedStore(
         B.CreateAdd(B.CreateAlignedLoad(RankTy, Rank, RankAlignment),
@@ -823,9 +823,9 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
                                  StackFrameFields::worker,
                                  /*isVolatile=*/false,
                                  AtomicOrdering::Acquire);
-    Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
-    Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
-    Type *RankTy = Rank->getType()->getPointerElementType();
+    Value *Pedigree = GEP(B, Worker, WorkerTy, WorkerFields::pedigree);
+    Value *Rank = GEP(B, Pedigree, PedigreeTy, PedigreeFields::rank);
+    Type *RankTy = PedigreeTy->getElementType(PedigreeFields::rank);
     Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
     B.CreateAlignedStore(
         B.CreateAdd(B.CreateAlignedLoad(RankTy, Rank, RankAlignment),
@@ -981,9 +981,9 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
                                  StackFrameFields::worker,
                                  /*isVolatile=*/false,
                                  AtomicOrdering::Acquire);
-    Value *Pedigree = GEP(B, Worker, WorkerFields::pedigree);
-    Value *Rank = GEP(B, Pedigree, PedigreeFields::rank);
-    Type *RankTy = Rank->getType()->getPointerElementType();
+    Value *Pedigree = GEP(B, Worker, WorkerTy, WorkerFields::pedigree);
+    Value *Rank = GEP(B, Pedigree, PedigreeTy, PedigreeFields::rank);
+    Type *RankTy = PedigreeTy->getElementType(PedigreeFields::rank);
     Align RankAlignment = GetAlignment(DL, PedigreeTy, PedigreeFields::rank);
     B.CreateAlignedStore(
         B.CreateAdd(B.CreateAlignedLoad(RankTy, Rank, RankAlignment),
