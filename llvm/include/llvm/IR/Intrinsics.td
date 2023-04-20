@@ -1383,6 +1383,9 @@ def int_tapir_loop_grainsize
 def int_task_frameaddress
     : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty], [IntrWillReturn]>;
 
+def int_tapir_magic
+    : Intrinsic<[llvm_ptr_ty], [], [IntrWillReturn,IntrReadMem]>;
+
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.
 def int_hyper_lookup

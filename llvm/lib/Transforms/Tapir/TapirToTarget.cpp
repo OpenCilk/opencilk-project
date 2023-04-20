@@ -223,37 +223,45 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
   SmallVector<SyncInst *, 8> Syncs;
   SmallVector<CallInst *, 8> GrainsizeCalls;
   SmallVector<CallInst *, 8> TaskFrameAddrCalls;
+  SmallVector<CallInst *, 8> TapirMagicCalls;
   SmallVector<CallInst *, 8> TapirRTCalls;
   SmallVector<CallBase *, 8> ReducerOperations;
   for (BasicBlock &BB : F) {
     for (Instruction &I : BB) {
-      // Record calls to get Tapir-loop grainsizes.
-      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
-        if (Intrinsic::tapir_loop_grainsize == II->getIntrinsicID())
-          GrainsizeCalls.push_back(II);
-
-      // Record calls to task_frameaddr intrinsics.
-      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
-        if (Intrinsic::task_frameaddress == II->getIntrinsicID())
-          TaskFrameAddrCalls.push_back(II);
-
-      // Record calls to tapir_runtime_start intrinsics.  We rely on analyzing
-      // uses of these intrinsic calls to find calls to tapir_runtime_end.
-      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
-        if (Intrinsic::tapir_runtime_start == II->getIntrinsicID())
-          TapirRTCalls.push_back(II);
-
       // Record sync instructions in this function.
       if (SyncInst *SI = dyn_cast<SyncInst>(&I))
         Syncs.push_back(SI);
 
-      if (!dyn_cast<CallBase>(&I))
-        continue;
+      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
+        switch (II->getIntrinsicID()) {
+        case Intrinsic::tapir_loop_grainsize:
+          // Record calls to get Tapir-loop grainsizes.
+          GrainsizeCalls.push_back(II);
+          break;
 
-      if (isTapirIntrinsic(Intrinsic::hyper_lookup, &I, nullptr) ||
-          isTapirIntrinsic(Intrinsic::reducer_register, &I, nullptr) ||
-          isTapirIntrinsic(Intrinsic::reducer_unregister, &I, nullptr))
-        ReducerOperations.push_back(cast<CallInst>(&I));
+        case Intrinsic::task_frameaddress:
+          // Record calls to task_frameaddr intrinsics.
+          TaskFrameAddrCalls.push_back(II);
+          break;
+
+        case Intrinsic::tapir_runtime_start:
+          // Record calls to tapir_runtime_start intrinsics.  We rely on
+          // analyzing uses of these intrinsic calls to find calls to
+          // tapir_runtime_end.
+          TapirRTCalls.push_back(II);
+          break;
+
+        case Intrinsic::tapir_magic:
+          TapirMagicCalls.push_back(II);
+          break;
+
+        case Intrinsic::hyper_lookup:
+        case Intrinsic::reducer_register:
+        case Intrinsic::reducer_unregister:
+          ReducerOperations.push_back(cast<CallInst>(&I));
+          break;
+        }
+      }
     }
   }
 
@@ -277,6 +285,13 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
     Target->lowerTaskFrameAddrCall(TaskFrameAddrCall);
     Changed = true;
   }
+
+  while (!TapirMagicCalls.empty()) {
+    CallInst *CI = TapirMagicCalls.pop_back_val();
+    Target->lowerMagicCall(CI);
+    Changed = true;
+  }
+
   Target->lowerTapirRTCalls(TapirRTCalls, F, TFEntry);
 
   // Process the set of syncs.

@@ -1064,6 +1064,16 @@ LoopOutlineProcessor *OpenCilkABI::getLoopOutlineProcessor(
   return nullptr;
 }
 
+void OpenCilkABI::lowerMagicCall(CallBase *MagicCall) {
+  Function *F = MagicCall->getFunction();
+  if (!DetachCtxToStackFrame.count(F))
+    return; // will be replaced by null later
+  // TODO: The cast will not be required with opaque pointers.
+  IRBuilder<> B(MagicCall->getParent());
+  Value *SF = DetachCtxToStackFrame[F];
+  MagicCall->replaceAllUsesWith(B.CreateBitCast(SF, MagicCall->getType()));
+}
+
 void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   FunctionCallee Fn = nullptr;
   const Function *Called = CI->getCalledFunction();

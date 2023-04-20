@@ -236,6 +236,10 @@ void IntrinsicLowering::LowerIntrinsicCall(CallInst *CI) {
     report_fatal_error("Code generator does not support intrinsic function '"+
                       Callee->getName()+"'!");
 
+  case Intrinsic::tapir_magic:
+    CI->replaceAllUsesWith(Constant::getNullValue(CI->getType()));
+    break;
+
   case Intrinsic::hyper_lookup:
     // hyper_lookup, if not replaced by now, returns its first argument
   case Intrinsic::expect: {

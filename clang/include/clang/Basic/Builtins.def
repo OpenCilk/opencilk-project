@@ -1696,6 +1696,8 @@ LANGBUILTIN(__arithmetic_fence, "v.", "t", ALL_LANGUAGES)
 // and needs a builtin to carry the information to codegen.
 BUILTIN(__hyper_lookup, "v*vC*z(vv*)(vv*v*)", "nU")
 
+BUILTIN(__tapir_magic, "v*", "n")
+
 #undef BUILTIN
 #undef LIBBUILTIN
 #undef LANGBUILTIN

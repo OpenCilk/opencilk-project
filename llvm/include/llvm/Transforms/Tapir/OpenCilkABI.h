@@ -158,6 +158,7 @@ public:
   void prepareModule() override final;
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
+  void lowerMagicCall(CallBase *CI) override;
   void lowerReducerOperation(CallBase *CI) override;
 
   ArgStructMode getArgStructMode() const override final {

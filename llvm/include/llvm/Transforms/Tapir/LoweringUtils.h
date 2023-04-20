@@ -236,6 +236,9 @@ public:
   /// Lower a Tapir sync instruction SI.
   virtual void lowerSync(SyncInst &SI) = 0;
 
+  virtual void lowerMagicCall(CallBase *MagicCall) {
+  }
+
   virtual void lowerReducerOperation(CallBase *Call) {
   }
 

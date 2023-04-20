@@ -1211,6 +1211,7 @@ bool TapirTarget::shouldProcessFunction(const Function &F) const {
       case Intrinsic::reducer_unregister:
       case Intrinsic::tapir_loop_grainsize:
       case Intrinsic::task_frameaddress:
+      case Intrinsic::tapir_magic:
       case Intrinsic::tapir_runtime_start:
       case Intrinsic::tapir_runtime_end:
         return true;

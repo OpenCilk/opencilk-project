@@ -7291,6 +7291,10 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     // Return the first argument
     setValue(&I, getValue(I.getArgOperand(0)));
     return;
+  case Intrinsic::tapir_magic:
+    setValue(&I,
+             DAG.getConstant(0, sdl, TLI.getPointerTy(DAG.getDataLayout())));
+    return;
   }
 }
 
