@@ -1069,9 +1069,10 @@ void OpenCilkABI::lowerMagicCall(CallBase *MagicCall) {
   if (!DetachCtxToStackFrame.count(F))
     return; // will be replaced by null later
   // TODO: The cast will not be required with opaque pointers.
-  IRBuilder<> B(MagicCall->getParent());
+  IRBuilder<> B(MagicCall);
   Value *SF = DetachCtxToStackFrame[F];
   MagicCall->replaceAllUsesWith(B.CreateBitCast(SF, MagicCall->getType()));
+  MagicCall->eraseFromParent();
 }
 
 void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
