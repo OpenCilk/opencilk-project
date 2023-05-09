@@ -1390,7 +1390,8 @@ def int_tapir_magic
 // but that does not work, so rely on the front end to insert bitcasts.
 def int_hyper_lookup
     : Intrinsic<[llvm_ptr_ty],
-                [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty], [
+                [llvm_ptr_ty, llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty,
+                 llvm_ptr_ty], [
                   IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
                   IntrStrandPure, IntrHyperView, IntrInjective
                 ]>;

@@ -5442,13 +5442,15 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     return RValue::get(Builder.CreateCall(F, {}));
   }
   case Builtin::BI__hyper_lookup: {
+    Function *FM = CGM.getIntrinsic(Intrinsic::tapir_magic);
+    llvm::Value *Magic = Builder.CreateCall(FM, { });
     llvm::Value *Size = EmitScalarExpr(E->getArg(1));
-    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
+    Function *FL = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
     llvm::Value *Ptr = EmitScalarExpr(E->getArg(0));
     llvm::Value *Identity = EmitScalarExpr(E->getArg(2));
     llvm::Value *Reduce = EmitScalarExpr(E->getArg(3));
     return RValue::get(Builder.CreateCall(
-        F, {Ptr, Size, Builder.CreateBitCast(Identity, VoidPtrTy),
+        FL, {Magic, Ptr, Size, Builder.CreateBitCast(Identity, VoidPtrTy),
             Builder.CreateBitCast(Reduce, VoidPtrTy)}));
   }
   }

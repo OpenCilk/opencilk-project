@@ -224,7 +224,7 @@ void OpenCilkABI::prepareModule() {
   FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
   FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
   FunctionType *LookupTy = FunctionType::get(
-      VoidPtrTy, {VoidPtrTy, Int64Ty, VoidPtrTy, VoidPtrTy}, false);
+      VoidPtrTy, {VoidPtrTy, VoidPtrTy, Int64Ty, VoidPtrTy, VoidPtrTy}, false);
   FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
   FunctionType *Reg32Ty =
       FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
