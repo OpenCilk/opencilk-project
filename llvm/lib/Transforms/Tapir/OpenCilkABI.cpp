@@ -28,6 +28,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -635,6 +636,35 @@ Value *OpenCilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   return Grainsize;
 }
 
+BasicBlock *OpenCilkABI::GetDefaultSyncLandingpad(Function &F, Value *SF,
+                                                  DebugLoc Loc) {
+  // Return an existing default sync landingpad, if there is one.
+  if (DefaultSyncLandingpad.count(&F))
+    return cast<BasicBlock>(DefaultSyncLandingpad[&F]);
+
+  // Create a default cleanup landingpad block.
+  LLVMContext &C = F.getContext();
+  const Twine Name = "default_sync_lpad";
+  BasicBlock *CleanupBB = BasicBlock::Create(C, Name, &F);
+  Type *ExnTy = StructType::get(Type::getInt8PtrTy(C), Type::getInt32Ty(C));
+
+  IRBuilder<> Builder(CleanupBB);
+  Builder.SetCurrentDebugLocation(Loc);
+  LandingPadInst *LPad = Builder.CreateLandingPad(ExnTy, 1, Name + ".lpad");
+  LPad->setCleanup(true);
+  // Insert a call to __cilkrts_enter_landingpad.
+  Value *Sel = Builder.CreateExtractValue(LPad, {1}, "sel");
+  Value *CilkLPadArgs[] = {SF, Sel};
+  CallInst *CI =
+      Builder.CreateCall(CILKRTS_FUNC(enter_landingpad), CilkLPadArgs, "");
+  // Insert a resume.
+  Builder.CreateResume(LPad);
+
+  DefaultSyncLandingpad[&F] = CleanupBB;
+
+  return CleanupBB;
+}
+
 // Lower a sync instruction SI.
 void OpenCilkABI::lowerSync(SyncInst &SI) {
   Function &Fn = *SI.getFunction();
@@ -658,17 +688,39 @@ void OpenCilkABI::lowerSync(SyncInst &SI) {
       SyncCont = II->getNormalDest();
       SyncUnwindDest = II->getUnwindDest();
     }
+  } else if (CallBase *CB = dyn_cast<CallBase>(
+                 SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
+    if (isSyncUnwind(CB))
+      SyncUnwind = CB;
   }
 
   CallBase *CB;
   if (!SyncUnwindDest) {
-    if (Fn.doesNotThrow())
+    if (Fn.doesNotThrow()) {
+      // This function doesn't throw any exceptions, so use the no-throw version
+      // of cilk_sync.
       CB = CallInst::Create(GetCilkSyncNoThrowFn(), Args, "",
                             /*insert before*/ &SI);
-    else
-      CB = CallInst::Create(GetCilkSyncFn(), Args, "", /*insert before*/ &SI);
+      BranchInst::Create(SyncCont, CB->getParent());
+    } else if (SyncUnwind) {
+      // The presence of the sync.unwind indicates that the sync might rethrow
+      // an exception, but there isn't a landingpad associated with the sync.
 
-    BranchInst::Create(SyncCont, CB->getParent());
+      // Get the default sync-landingpad block to use instead, creating it if
+      // necessary.
+      BasicBlock *DefaultSyncLandingpad =
+          GetDefaultSyncLandingpad(Fn, SF, SI.getDebugLoc());
+
+      // Invoke __cilk_sync, using DefaultSyncLandingpad as the unwind
+      // destination.
+      CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, DefaultSyncLandingpad,
+                              Args, "",
+                              /*insert before*/ &SI);
+    } else {
+      // TODO: This case shouldn't be reachable.  Check whether it is reachable.
+      CB = CallInst::Create(GetCilkSyncFn(), Args, "", /*insert before*/ &SI);
+      BranchInst::Create(SyncCont, CB->getParent());
+    }
   } else {
     CB = InvokeInst::Create(GetCilkSyncFn(), SyncCont, SyncUnwindDest, Args, "",
                             /*insert before*/ &SI);
