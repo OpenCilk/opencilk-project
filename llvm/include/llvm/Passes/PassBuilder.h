@@ -666,6 +666,10 @@ public:
                                       OptimizationLevel Level);
   void invokePipelineEarlySimplificationEPCallbacks(ModulePassManager &MPM,
                                                     OptimizationLevel Level);
+  void invokeTapirLateEPCallbacks(ModulePassManager &MPM,
+                                  OptimizationLevel Level);
+  void invokeTapirLoopEndEPCallbacks(ModulePassManager &MPM,
+                                     OptimizationLevel Level);
 
 private:
   // O1 pass pipeline

@@ -379,6 +379,16 @@ void PassBuilder::invokePipelineEarlySimplificationEPCallbacks(
   for (auto &C : PipelineEarlySimplificationEPCallbacks)
     C(MPM, Level);
 }
+void PassBuilder::invokeTapirLateEPCallbacks(ModulePassManager &MPM,
+                                             OptimizationLevel Level) {
+  for (auto &C : TapirLateEPCallbacks)
+    C(MPM, Level);
+}
+void PassBuilder::invokeTapirLoopEndEPCallbacks(ModulePassManager &MPM,
+                                                OptimizationLevel Level) {
+  for (auto &C : TapirLoopEndEPCallbacks)
+    C(MPM, Level);
+}
 
 // Helper to add AnnotationRemarksPass.
 static void addAnnotationRemarksPass(ModulePassManager &MPM) {
@@ -1587,8 +1597,7 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
           buildFunctionSimplificationPipeline(Level, Phase)));
 
   // Add passes to run just after Tapir loops are processed.
-  for (auto &C : TapirLoopEndEPCallbacks)
-    C(MPM, Level);
+  invokeTapirLoopEndEPCallbacks(MPM, Level);
 
   // Canonicalize the representation of tasks.
   MPM.addPass(createModuleToFunctionPassAdaptor(TaskCanonicalizePass()));
@@ -1726,8 +1735,7 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
     addRequiredLTOPreLinkPasses(MPM);
 
   // Add passes to run just before Tapir lowering.
-  for (auto &C : TapirLateEPCallbacks)
-    C(MPM, Level);
+  invokeTapirLateEPCallbacks(MPM, Level);
 
   // Lower Tapir if necessary
   if (LowerTapir)
@@ -1735,8 +1743,7 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
         Level, LTOPreLink ? ThinOrFullLTOPhase::FullLTOPreLink
                           : ThinOrFullLTOPhase::None));
   else
-    for (auto &C : TapirLoopEndEPCallbacks)
-      C(MPM, Level);
+    invokeTapirLoopEndEPCallbacks(MPM, Level);
 
   return MPM;
 }
@@ -1868,16 +1875,14 @@ ModulePassManager PassBuilder::buildThinLTODefaultPipeline(
       Level, ThinOrFullLTOPhase::ThinLTOPostLink));
 
   // Add passes to run just before Tapir lowering.
-  for (auto &C : TapirLateEPCallbacks)
-    C(MPM, Level);
+  invokeTapirLateEPCallbacks(MPM, Level);
 
   // Lower Tapir if necessary
   if (LowerTapir)
     MPM.addPass(
         buildTapirLoweringPipeline(Level, ThinOrFullLTOPhase::ThinLTOPostLink));
   else
-    for (auto &C : TapirLoopEndEPCallbacks)
-      C(MPM, Level);
+    invokeTapirLoopEndEPCallbacks(MPM, Level);
 
   // Emit annotation remarks.
   addAnnotationRemarksPass(MPM);
@@ -2206,16 +2211,14 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
   invokeFullLinkTimeOptimizationLastEPCallbacks(MPM, Level);
 
   // Add passes to run just before Tapir lowering.
-  for (auto &C : TapirLateEPCallbacks)
-    C(MPM, Level);
+  invokeTapirLateEPCallbacks(MPM, Level);
 
   // Lower Tapir if necessary
   if (LowerTapir)
     MPM.addPass(
         buildTapirLoweringPipeline(Level, ThinOrFullLTOPhase::FullLTOPostLink));
   else
-    for (auto &C : TapirLoopEndEPCallbacks)
-      C(MPM, Level);
+    invokeTapirLoopEndEPCallbacks(MPM, Level);
 
   // Emit annotation remarks.
   addAnnotationRemarksPass(MPM);
@@ -2252,16 +2255,6 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
     MPM.addPass(createModuleToFunctionPassAdaptor(AddDiscriminatorsPass()));
 
   invokePipelineEarlySimplificationEPCallbacks(MPM, Level);
-
-  // Add passes to run just before Tapir lowering.
-  for (auto &C : TapirLateEPCallbacks)
-    C(MPM, Level);
-  for (auto &C : TapirLoopEndEPCallbacks)
-    C(MPM, Level);
-
-  // At -O0, outline Tapir constructs early.
-  if (LowerTapir)
-    MPM.addPass(TapirToTargetPass());
 
   // Build a minimal pipeline based on the semantics required by LLVM,
   // which is just that always inlining occurs. Further, disable generating
@@ -2323,6 +2316,17 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
   CoroPM.addPass(CoroCleanupPass());
   CoroPM.addPass(GlobalDCEPass());
   MPM.addPass(CoroConditionalWrapper(std::move(CoroPM)));
+
+  // Add passes to run just before Tapir lowering.
+  invokeTapirLateEPCallbacks(MPM, Level);
+  invokeTapirLoopEndEPCallbacks(MPM, Level);
+
+  // At -O0, outline Tapir constructs early.
+  if (LowerTapir) {
+    MPM.addPass(TapirToTargetPass());
+    MPM.addPass(AlwaysInlinerPass(
+        /*InsertLifetimeIntrinsics=*/false));
+  }
 
   invokeOptimizerLastEPCallbacks(MPM, Level);
 
