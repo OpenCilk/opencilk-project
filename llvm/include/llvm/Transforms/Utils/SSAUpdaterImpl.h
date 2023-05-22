@@ -405,16 +405,18 @@ public:
       if (!PHI)
         continue;
 
-      // TODO: Change this so we do not assume that a block has at
-      // most one Detach and Reattach predecessor.
-      BBInfo *DetachPredInfo = nullptr;
-      BBInfo *ReattachPredInfo = nullptr;
+      // Resolve detach and reattach predecessor information.  A reattach
+      // predecessor should use the same available value as its corresponding
+      // detach.  If a reattach predecessor does not have the same available
+      // value as its corresponding detach predecessor, note the use of a
+      // detached value.
+      SmallVector<BBInfo *, 8> DetachPredInfo, ReattachPredInfo;
       // Iterate through the block's predecessors.
       for (unsigned p = 0; p != Info->NumPreds; ++p) {
         BBInfo *PredInfo = Info->Preds[p];
         BlkT *Pred = PredInfo->BB;
         if (Traits::BlockReattaches(Pred, Updater)) {
-          ReattachPredInfo = PredInfo;
+          ReattachPredInfo.push_back(PredInfo);
           continue;
         }
         // Skip to the nearest preceding definition.
@@ -422,17 +424,28 @@ public:
           PredInfo = PredInfo->DefBB;
         Traits::AddPHIOperand(PHI, PredInfo->AvailableVal, Pred);
         if (Traits::BlockDetaches(Pred, Updater))
-          DetachPredInfo = PredInfo;
+          DetachPredInfo.push_back(PredInfo);
       }
-      if (ReattachPredInfo) {
-        assert(DetachPredInfo &&
-               "Reattach predecessor found with no corresponding Detach predecessor.");
-        // Available value from predecessor through a reattach is the
-        // same as that for the corresponding detach.
-        Traits::AddPHIOperand(PHI, DetachPredInfo->AvailableVal,
-                              ReattachPredInfo->BB);
-        if (DetachPredInfo->AvailableVal != ReattachPredInfo->AvailableVal)
-          DetachedValBlocks.push_back(Info);
+      if (!ReattachPredInfo.empty()) {
+        assert(!DetachPredInfo.empty() && "Reattach predecessor found with no "
+                                          "corresponding Detach predecessor.");
+        for (BBInfo *RPInfo : ReattachPredInfo) {
+          bool FoundMatchingDetach = false;
+          for (BBInfo *DPInfo : DetachPredInfo) {
+            if (RPInfo->DefBB->BB == DPInfo->DefBB->BB) {
+              // Available value from predecessor through a reattach is the
+              // same as that for the corresponding detach.
+              Traits::AddPHIOperand(PHI, DPInfo->AvailableVal, RPInfo->BB);
+              FoundMatchingDetach = true;
+              break;
+            }
+          }
+          if (!FoundMatchingDetach) {
+            DetachedValBlocks.push_back(Info);
+            Traits::AddPHIOperand(PHI, Traits::GetUndefVal(RPInfo->BB, Updater),
+                                  RPInfo->BB);
+          }
+        }
       }
 
       LLVM_DEBUG(dbgs() << "  Inserted PHI: " << *PHI << "\n");
