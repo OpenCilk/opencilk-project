@@ -646,35 +646,34 @@ static void HandleInlinedTasksHelper(
     if (!BlocksToProcess.count(BB))
       continue;
 
-    if (Instruction *TFCreate = FindTaskFrameCreateInBlock(BB)) {
-      if (TFCreate != CurrentTaskFrame) {
-        // Split the block at the taskframe.create, if necessary.
-        BasicBlock *NewBB;
-        if (TFCreate != &BB->front()) {
-          NewBB = SplitBlock(BB, TFCreate);
-          BlocksToProcess.insert(NewBB);
-        } else
-          NewBB = BB;
+    if (Instruction *TFCreate =
+            FindTaskFrameCreateInBlock(BB, CurrentTaskFrame)) {
+      // Split the block at the taskframe.create, if necessary.
+      BasicBlock *NewBB;
+      if (TFCreate != &BB->front()) {
+        NewBB = SplitBlock(BB, TFCreate);
+        BlocksToProcess.insert(NewBB);
+      } else
+        NewBB = BB;
 
-        // Split any blocks containing taskframe.end intrinsics that use
-        // TFCreate.
-        splitTaskFrameEnds(TFCreate);
+      // Split any blocks containing taskframe.end intrinsics that use
+      // TFCreate.
+      splitTaskFrameEnds(TFCreate);
 
-        // Create an unwind edge for the taskframe.
-        BasicBlock *TaskFrameUnwindEdge = CreateSubTaskUnwindEdge(
-            Intrinsic::taskframe_resume, TFCreate, UnwindEdge,
-            Unreachable, TFCreate);
+      // Create an unwind edge for the taskframe.
+      BasicBlock *TaskFrameUnwindEdge =
+          CreateSubTaskUnwindEdge(Intrinsic::taskframe_resume, TFCreate,
+                                  UnwindEdge, Unreachable, TFCreate);
 
-        // Recursively check all blocks
-        HandleInlinedTasksHelper(BlocksToProcess, NewBB, TaskFrameUnwindEdge,
-                                 Unreachable, TFCreate, &Worklist, Invoke,
-                                 InlinedLPads);
+      // Recursively check all blocks
+      HandleInlinedTasksHelper(BlocksToProcess, NewBB, TaskFrameUnwindEdge,
+                               Unreachable, TFCreate, &Worklist, Invoke,
+                               InlinedLPads);
 
-        // Remove the unwind edge for the taskframe if it is not needed.
-        if (pred_empty(TaskFrameUnwindEdge))
-          TaskFrameUnwindEdge->eraseFromParent();
-        continue;
-      }
+      // Remove the unwind edge for the taskframe if it is not needed.
+      if (pred_empty(TaskFrameUnwindEdge))
+        TaskFrameUnwindEdge->eraseFromParent();
+      continue;
     }
 
     // Promote any calls in the block to invokes.

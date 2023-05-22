@@ -2126,16 +2126,6 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
   for (auto &C : PipelineEarlySimplificationEPCallbacks)
     C(MPM, Level);
 
-  // Add passes to run just before Tapir lowering.
-  for (auto &C : TapirLateEPCallbacks)
-    C(MPM, Level);
-  for (auto &C : TapirLoopEndEPCallbacks)
-    C(MPM, Level);
-
-  // At -O0, outline Tapir constructs early.
-  if (LowerTapir)
-    MPM.addPass(TapirToTargetPass());
-
   // Build a minimal pipeline based on the semantics required by LLVM,
   // which is just that always inlining occurs. Further, disable generating
   // lifetime intrinsics to avoid enabling further optimizations during
@@ -2202,6 +2192,19 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
   CoroPM.addPass(CoroCleanupPass());
   CoroPM.addPass(GlobalDCEPass());
   MPM.addPass(CoroConditionalWrapper(std::move(CoroPM)));
+
+  // Add passes to run just before Tapir lowering.
+  for (auto &C : TapirLateEPCallbacks)
+    C(MPM, Level);
+  for (auto &C : TapirLoopEndEPCallbacks)
+    C(MPM, Level);
+
+  // At -O0, outline Tapir constructs early.
+  if (LowerTapir) {
+    MPM.addPass(TapirToTargetPass());
+    MPM.addPass(AlwaysInlinerPass(
+        /*InsertLifetimeIntrinsics=*/false));
+  }
 
   for (auto &C : OptimizerLastEPCallbacks)
     C(MPM, Level);
