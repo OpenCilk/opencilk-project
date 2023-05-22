@@ -215,8 +215,10 @@ void fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
                                 const DominatorTree &DT);
 
 /// FindTaskFrameCreateInBlock - Return the taskframe.create intrinsic in \p BB,
-/// or nullptr if no taskframe.create intrinsic exists in \p BB.
-Instruction *FindTaskFrameCreateInBlock(BasicBlock *BB);
+/// or nullptr if no taskframe.create intrinsic exists in \p BB.  If specified,
+/// ignores TFToIgnore when scanning for a taskframe.create.
+Instruction *FindTaskFrameCreateInBlock(BasicBlock *BB,
+                                        const Value *TFToIgnore = nullptr);
 
 /// CreateSubTaskUnwindEdge - Create a landingpad for the exit of a taskframe or
 /// task.
