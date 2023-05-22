@@ -559,6 +559,7 @@ private:
 
   void verifyTask(const DetachInst *DI);
   void visitDetachInst(DetachInst &DI);
+  void visitReattachInst(ReattachInst &RI);
 
   void verifySwiftErrorCall(CallBase &Call, const Value *SwiftErrorVal);
   void verifySwiftErrorValue(const Value *SwiftErrorVal);
@@ -3010,6 +3011,24 @@ void Verifier::verifyTask(const DetachInst *DI) {
       Worklist.push_back(Successor);
 
   } while (!Worklist.empty());
+}
+
+void Verifier::visitReattachInst(ReattachInst &RI) {
+  if (DT.isReachableFromEntry(RI.getParent())) {
+    // Check that the continuation of the reattach has a detach predecessor.
+    const BasicBlock *Continue = RI.getDetachContinue();
+    bool FoundDetachPred = false;
+    for (const BasicBlock *Pred : predecessors(Continue)) {
+      if (isa<DetachInst>(Pred->getTerminator()) &&
+          DT.dominates(Pred, RI.getParent())) {
+        FoundDetachPred = true;
+        break;
+      }
+    }
+    Check(FoundDetachPred,
+          "No detach predecessor found for successor of reattach.", &RI);
+  }
+  visitTerminator(RI);
 }
 
 void Verifier::visitDetachInst(DetachInst &DI) {
