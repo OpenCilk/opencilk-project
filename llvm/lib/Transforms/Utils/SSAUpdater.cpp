@@ -115,7 +115,7 @@ Value *SSAUpdater::GetValueInMiddleOfBlock(BasicBlock *BB) {
   // predecessor.
   SmallVector<std::pair<BasicBlock *, Value *>, 8> PredValues;
   Value *SingularValue = nullptr;
-  BasicBlock *DetachPred = nullptr, *ReattachPred = nullptr;
+  SmallVector<BasicBlock *, 8> DetachPreds, ReattachPreds;
 
   // We can get our predecessor info by walking the pred_iterator list, but it
   // is relatively slow.  If we already have PHI nodes in this block, walk one
@@ -125,11 +125,11 @@ Value *SSAUpdater::GetValueInMiddleOfBlock(BasicBlock *BB) {
       BasicBlock *PredBB = SomePhi->getIncomingBlock(i);
       Value *PredVal = GetValueAtEndOfBlock(PredBB);
       if (isa<ReattachInst>(PredBB->getTerminator())) {
-        ReattachPred = PredBB;
+        ReattachPreds.push_back(PredBB);
         continue;
       }
       if (isa<DetachInst>(PredBB->getTerminator()))
-        DetachPred = PredBB;
+        DetachPreds.push_back(PredBB);
       PredValues.push_back(std::make_pair(PredBB, PredVal));
 
       // Compute SingularValue.
@@ -143,11 +143,11 @@ Value *SSAUpdater::GetValueInMiddleOfBlock(BasicBlock *BB) {
     for (BasicBlock *PredBB : predecessors(BB)) {
       Value *PredVal = GetValueAtEndOfBlock(PredBB);
       if (isa<ReattachInst>(PredBB->getTerminator())) {
-        ReattachPred = PredBB;
+        ReattachPreds.push_back(PredBB);
         continue;
       }
       if (isa<DetachInst>(PredBB->getTerminator()))
-        DetachPred = PredBB;
+        DetachPreds.push_back(PredBB);
       PredValues.push_back(std::make_pair(PredBB, PredVal));
 
       // Compute SingularValue.
@@ -159,15 +159,30 @@ Value *SSAUpdater::GetValueInMiddleOfBlock(BasicBlock *BB) {
     }
   }
   // Record any values we discover whose definitions occur in detached blocks.
-  if (ReattachPred) {
-    assert(DetachPred &&
-           "Reattached predecessor of a block with no detached predecessor.");
-    Value *DetachVal = GetValueAtEndOfBlock(DetachPred);
-    PredValues.push_back(std::make_pair(ReattachPred, DetachVal));
-    Value *ReattachVal = GetValueAtEndOfBlock(ReattachPred);
-    if (ReattachVal != DetachVal) {
-      SingularValue = nullptr;
-      getValIsDetached(VID)[BB] = true;
+  if (!ReattachPreds.empty()) {
+    assert(!DetachPreds.empty() &&
+           "Block has reattach predecessor but no detached predecessor.");
+    SmallVector<std::pair<BasicBlock *, Value *>, 8> DetachPredValues;
+    for (BasicBlock *DetachPred : DetachPreds) {
+      Value *DetachVal = GetValueAtEndOfBlock(DetachPred);
+      DetachPredValues.push_back(std::make_pair(DetachPred, DetachVal));
+    }
+    for (BasicBlock *ReattachPred : ReattachPreds) {
+      Value *ReattachVal = GetValueAtEndOfBlock(ReattachPred);
+      bool FoundMatchingDetach = false;
+      for (std::pair<BasicBlock *, Value *> DetachPredVal : DetachPredValues) {
+        if (DetachPredVal.second == ReattachVal) {
+          FoundMatchingDetach = true;
+          PredValues.push_back(std::make_pair(ReattachPred, ReattachVal));
+          break;
+        }
+      }
+      if (!FoundMatchingDetach) {
+        SingularValue = nullptr;
+        getValIsDetached(VID)[BB] = true;
+        PredValues.push_back(std::make_pair(
+            ReattachPred, UndefValue::get(ReattachVal->getType())));
+      }
     }
   }
 
