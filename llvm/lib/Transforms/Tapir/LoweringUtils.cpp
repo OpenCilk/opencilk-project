@@ -84,8 +84,8 @@ findTaskInputsOutputs(const Task *T, ValueSet &Inputs, ValueSet &Outputs,
   }
 
   for (Spindle *S : depth_first<InTask<Spindle *>>(T->getEntrySpindle())) {
-    LLVM_DEBUG(dbgs() <<
-               "Examining spindle for inputs/outputs: " << *S << "\n");
+    LLVM_DEBUG(dbgs() << "Examining spindle for inputs/outputs: " << *S
+                      << "\n");
     for (BasicBlock *BB : S->blocks()) {
       // Skip basic blocks that are successors of detached rethrows.  They're
       // dead anyway.
@@ -110,8 +110,8 @@ findTaskInputsOutputs(const Task *T, ValueSet &Inputs, ValueSet &Outputs,
           // nodes for blocks not in this task.
           if (S->isSharedEH() && S->isEntry(BB))
             if (PHINode *PN = dyn_cast<PHINode>(&II)) {
-              LLVM_DEBUG(dbgs() <<
-                         "\tPHI node in shared-EH spindle: " << *PN << "\n");
+              LLVM_DEBUG(dbgs()
+                         << "\tPHI node in shared-EH spindle: " << *PN << "\n");
               if (!T->simplyEncloses(PN->getIncomingBlock(*OI))) {
                 LLVM_DEBUG(dbgs() << "skipping\n");
                 continue;
@@ -155,12 +155,12 @@ TaskValueSetMap llvm::findAllTaskInputs(Function &F, const DominatorTree &DT,
     if (T->isRootTask()) break;
 
     LLVM_DEBUG(dbgs() << "Finding inputs/outputs for task@"
-          << T->getEntry()->getName() << "\n");
+                      << T->getEntry()->getName() << "\n");
     ValueSet Inputs, Outputs;
     // Check all inputs of subtasks to determine if they're inputs to this task.
     for (Task *SubT : T->subtasks()) {
-      LLVM_DEBUG(dbgs() <<
-                 "\tsubtask @ " << SubT->getEntry()->getName() << "\n");
+      LLVM_DEBUG(dbgs() << "\tsubtask @ " << SubT->getEntry()->getName()
+                        << "\n");
 
       if (TaskInputs.count(SubT))
         for (Value *V : TaskInputs[SubT])
@@ -169,13 +169,13 @@ TaskValueSetMap llvm::findAllTaskInputs(Function &F, const DominatorTree &DT,
     }
 
     LLVM_DEBUG({
-        dbgs() << "Subtask Inputs:\n";
-        for (Value *V : Inputs)
-          dbgs() << "\t" << *V << "\n";
-        dbgs() << "Subtask Outputs:\n";
-        for (Value *V : Outputs)
-          dbgs() << "\t" << *V << "\n";
-      });
+      dbgs() << "Subtask Inputs:\n";
+      for (Value *V : Inputs)
+        dbgs() << "\t" << *V << "\n";
+      dbgs() << "Subtask Outputs:\n";
+      for (Value *V : Outputs)
+        dbgs() << "\t" << *V << "\n";
+    });
     assert(Outputs.empty() && "Task should have no outputs.");
 
     // Find additional inputs and outputs of task T by examining blocks in T and
@@ -183,13 +183,13 @@ TaskValueSetMap llvm::findAllTaskInputs(Function &F, const DominatorTree &DT,
     findTaskInputsOutputs(T, Inputs, Outputs, DT);
 
     LLVM_DEBUG({
-        dbgs() << "Inputs:\n";
-        for (Value *V : Inputs)
-          dbgs() << "\t" << *V << "\n";
-        dbgs() << "Outputs:\n";
-        for (Value *V : Outputs)
-          dbgs() << "\t" << *V << "\n";
-      });
+      dbgs() << "Inputs:\n";
+      for (Value *V : Inputs)
+        dbgs() << "\t" << *V << "\n";
+      dbgs() << "Outputs:\n";
+      for (Value *V : Outputs)
+        dbgs() << "\t" << *V << "\n";
+    });
     assert(Outputs.empty() && "Task should have no outputs.");
 
     // Map the computed inputs to this task.
@@ -228,10 +228,10 @@ void llvm::getTaskFrameInputsOutputs(TFValueSetMap &TFInputs,
   const Task *T = TF.getTaskFromTaskFrame();
   if (T)
     LLVM_DEBUG(dbgs() << "getTaskFrameInputsOutputs: task@"
-               << T->getEntry()->getName() << "\n");
+                      << T->getEntry()->getName() << "\n");
   else
     LLVM_DEBUG(dbgs() << "getTaskFrameInputsOutputs: taskframe spindle@"
-               << TF.getEntry()->getName() << "\n");
+                      << TF.getEntry()->getName() << "\n");
 
   // Check the taskframe spindles for definitions of inputs to T.
   if (TaskInputs)
@@ -341,13 +341,13 @@ void llvm::findAllTaskFrameInputs(
                               T ? &TaskInputs[T] : nullptr, TI, DT);
 
     LLVM_DEBUG({
-        dbgs() << "TFInputs:\n";
-        for (Value *V : TFInputs[TF])
-          dbgs() << "\t" << *V << "\n";
-        dbgs() << "TFOutputs:\n";
-        for (Value *V : TFOutputs[TF])
-          dbgs() << "\t" << *V << "\n";
-      });
+      dbgs() << "TFInputs:\n";
+      for (Value *V : TFInputs[TF])
+        dbgs() << "\t" << *V << "\n";
+      dbgs() << "TFOutputs:\n";
+      for (Value *V : TFOutputs[TF])
+        dbgs() << "\t" << *V << "\n";
+    });
   }
 }
 
@@ -474,10 +474,10 @@ void llvm::fixupInputSet(Function &F, const ValueSet &Inputs, ValueSet &Fixed) {
     if (V != SRetInput)
       InputsToSort.push_back(V);
   LLVM_DEBUG({
-      dbgs() << "After sorting:\n";
-      for (Value *V : InputsToSort)
-        dbgs() << "\t" << *V << "\n";
-    });
+    dbgs() << "After sorting:\n";
+    for (Value *V : InputsToSort)
+      dbgs() << "\t" << *V << "\n";
+  });
   const DataLayout &DL = F.getParent()->getDataLayout();
   std::sort(InputsToSort.begin(), InputsToSort.end(),
             [&DL](const Value *A, const Value *B) {
@@ -837,12 +837,12 @@ Function *llvm::createHelperForTaskFrame(
       // Record any blocks that end the taskframe.
       if (endsTaskFrame(B)) {
         LLVM_DEBUG(dbgs() << "Recording taskframe.end block " << B->getName()
-                   << "\n");
+                          << "\n");
         TFEndBlocks.insert(B);
       }
       if (isTaskFrameResume(B->getTerminator())) {
         LLVM_DEBUG(dbgs() << "Recording taskframe.resume block " << B->getName()
-                   << "\n");
+                          << "\n");
         TFResumeBlocks.insert(B);
       }
 
@@ -1150,10 +1150,10 @@ Instruction *llvm::replaceLoopWithCallToOutline(
   unlinkTaskEHFromParent(TL->getTask());
 
   LLVM_DEBUG({
-      dbgs() << "Creating call with arguments:\n";
-      for (Value *V : OutlineInputs)
-        dbgs() << "\t" << *V << "\n";
-    });
+    dbgs() << "Creating call with arguments:\n";
+    for (Value *V : OutlineInputs)
+      dbgs() << "\t" << *V << "\n";
+  });
 
   Loop *L = TL->getLoop();
   // Add call to new helper function in original function.
