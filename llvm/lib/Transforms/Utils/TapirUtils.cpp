@@ -1903,9 +1903,14 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
 }
 
 // Helper method to find a taskframe.create intrinsic in the given basic block.
-Instruction *llvm::FindTaskFrameCreateInBlock(BasicBlock *BB) {
-  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
+Instruction *llvm::FindTaskFrameCreateInBlock(BasicBlock *BB,
+                                              const Value *TFToIgnore) {
+  for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E;) {
     Instruction *I = &*BBI++;
+
+    // Ignore TFToIgnore
+    if (TFToIgnore == I)
+      continue;
 
     // Check if this instruction is a call to taskframe_create.
     if (CallInst *CI = dyn_cast<CallInst>(I))
