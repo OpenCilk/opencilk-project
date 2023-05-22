@@ -302,11 +302,11 @@ Function *llvm::CreateHelper(
   }
 
   LLVM_DEBUG({
-      dbgs() << "Function type: " << *RetTy << " f(";
-      for (Type *i : paramTy)
-	dbgs() << *i << ", ";
-      dbgs() << ")\n";
-    });
+    dbgs() << "Function type: " << *RetTy << " f(";
+    for (Type *i : paramTy)
+      dbgs() << *i << ", ";
+    dbgs() << ")\n";
+  });
 
   FunctionType *FTy = FunctionType::get(RetTy, paramTy, false);
 
