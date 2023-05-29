@@ -181,6 +181,11 @@ static cl::opt<unsigned> MaxSwitchCasesPerResult(
     "max-switch-cases-per-result", cl::Hidden, cl::init(16),
     cl::desc("Limit cases to analyze when converting a switch to select"));
 
+static cl::opt<bool> PreserveAllSpawns(
+    "simplifycfg-preserve-all-spawns", cl::Hidden, cl::init(false),
+    cl::desc("Temporary development switch to ensure SimplifyCFG does not "
+             "eliminate spawns that immediately sync."));
+
 STATISTIC(NumBitMaps, "Number of switch instructions turned into bitmaps");
 STATISTIC(NumLinearMaps,
           "Number of switch instructions turned into linear mapping");
@@ -7645,7 +7650,8 @@ bool SimplifyCFGOpt::simplifyOnce(BasicBlock *BB) {
 
   // Check for and remove trivial detached blocks.
   Changed |= serializeTrivialDetachedBlock(BB, DTU);
-  Changed |= serializeDetachToImmediateSync(BB, DTU);
+  if (!PreserveAllSpawns)
+    Changed |= serializeDetachToImmediateSync(BB, DTU);
   Changed |= serializeDetachOfUnreachable(BB, DTU);
 
   // Check for and remove sync instructions in empty sync regions.
