@@ -18,9 +18,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Tapir/CilkABI.h"
-#include "llvm/Transforms/Tapir/CudaABI.h"
+#include "llvm/Transforms/Tapir/LambdaABI.h"
+#include "llvm/Transforms/Tapir/OMPTaskABI.h"
 #include "llvm/Transforms/Tapir/OpenCilkABI.h"
-#include "llvm/Transforms/Tapir/OpenMPABI.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Tapir/QthreadsABI.h"
 #include "llvm/Transforms/Tapir/SerialABI.h"
@@ -44,13 +44,13 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return new SerialABI(M);
   case TapirTargetID::Cilk:
     return new CilkABI(M);
-  case TapirTargetID::Cuda:
-    return new CudaABI(M);
   case TapirTargetID::Cheetah:
   case TapirTargetID::OpenCilk:
     return new OpenCilkABI(M);
-  case TapirTargetID::OpenMP:
-    return new OpenMPABI(M);
+  case TapirTargetID::Lambda:
+    return new LambdaABI(M);
+  case TapirTargetID::OMPTask:
+    return new OMPTaskABI(M);
   case TapirTargetID::Qthreads:
     return new QthreadsABI(M);
   default:
@@ -363,10 +363,27 @@ llvm::createTaskArgsStruct(const ValueSet &Inputs, Task *T,
                            bool staticStruct, ValueToValueMapTy &InputsMap,
                            Loop *TapirL) {
   assert(T && T->getParentTask() && "Expected spawned task.");
+  SmallPtrSet<BasicBlock *, 4> TaskFrameBlocks;
+  if (Spindle *TFCreateSpindle = T->getTaskFrameCreateSpindle()) {
+    // Collect taskframe blocks
+    for (Spindle *S : TFCreateSpindle->taskframe_spindles()) {
+      // Skip spindles contained in the task.
+      if (T->contains(S))
+        continue;
+      // Skip placeholder spindles.
+      if (isPlaceholderSuccessor(S->getEntry()))
+        continue;
+
+      for (BasicBlock *B : S->blocks())
+        TaskFrameBlocks.insert(B);
+    }
+  }
   assert((T->encloses(LoadPt->getParent()) ||
+          TaskFrameBlocks.contains(LoadPt->getParent()) ||
           (TapirL && LoadPt->getParent() == TapirL->getHeader())) &&
          "Loads of struct arguments must be inside task.");
   assert(!T->encloses(StorePt->getParent()) &&
+         !TaskFrameBlocks.contains(StorePt->getParent()) &&
          "Store of struct arguments must be outside task.");
   assert(T->getParentTask()->encloses(StorePt->getParent()) &&
          "Store of struct arguments expected to be in parent task.");
@@ -399,8 +416,13 @@ llvm::createTaskArgsStruct(const ValueSet &Inputs, Task *T,
   StructType *ST = StructType::get(T->getEntry()->getContext(), StructIT);
   LLVM_DEBUG(dbgs() << "Closure struct type " << *ST << "\n");
   if (staticStruct) {
-    BasicBlock *AllocaInsertBlk = T->getParentTask()->getEntry();
-    IRBuilder<> Builder(&*AllocaInsertBlk->getFirstInsertionPt());
+    Spindle *ParentTF = T->getEntrySpindle()->getTaskFrameParent();
+    BasicBlock *AllocaInsertBlk =
+        ParentTF ? ParentTF->getEntry() : T->getParentTask()->getEntry();
+    Value *TFCreate = ParentTF ? ParentTF->getTaskFrameCreate() : nullptr;
+    IRBuilder<> Builder(TFCreate
+                            ? &*++cast<Instruction>(TFCreate)->getIterator()
+                            : &*AllocaInsertBlk->getFirstInsertionPt());
     Closure = Builder.CreateAlloca(ST);
     // Store arguments into the structure
     if (!StructInputs.empty())
@@ -434,6 +456,7 @@ llvm::createTaskArgsStruct(const ValueSet &Inputs, Task *T,
       if (!Usr)
         continue;
       if ((!T->encloses(Usr->getParent()) &&
+           !TaskFrameBlocks.contains(Usr->getParent()) &&
            (!TapirL || (Usr->getParent() != TapirL->getHeader() &&
                         Usr->getParent() != TapirL->getLoopLatch()))))
         continue;
@@ -1048,7 +1071,7 @@ TaskOutlineInfo llvm::outlineTask(
   Instruction *StorePt = DI;
   BasicBlock *Unwind = DI->getUnwindDest();
   if (Spindle *TaskFrameCreate = T->getTaskFrameCreateSpindle()) {
-    LoadPt = &TaskFrameCreate->getEntry()->front();
+    LoadPt = &*++TaskFrameCreate->getEntry()->begin();
     StorePt =
         TaskFrameCreate->getEntry()->getSinglePredecessor()->getTerminator();
     if (Unwind)
