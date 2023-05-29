@@ -56,6 +56,11 @@ static cl::opt<bool> PostCleanupCFG(
     "post-cleanup-cfg", cl::init(true), cl::Hidden,
     cl::desc("Cleanup the CFG after task simplification."));
 
+static cl::opt<bool> PreserveAllSpawns(
+    "tasksimplify-preserve-all-spawns", cl::init(false), cl::Hidden,
+    cl::desc("Temporary development switch to ensure TaskSimplify does not "
+             "eliminate spawns that immediately sync."));
+
 static bool syncMatchesReachingTask(const Value *SyncSR,
                                     SmallPtrSetImpl<const Task *> &MPTasks) {
   if (MPTasks.empty())
@@ -256,7 +261,7 @@ bool llvm::simplifyTask(Task *T) {
     // can reach the unwind destination, however.
     SerializeDetach(DI, T, NestedSync);
     Changed = true;
-  } else if (detachImmediatelySyncs(DI)) {
+  } else if (!PreserveAllSpawns && detachImmediatelySyncs(DI)) {
     SerializeDetach(DI, T, NestedSync);
     Changed = true;
   }
