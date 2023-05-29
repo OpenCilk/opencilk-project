@@ -754,7 +754,7 @@ void DACSpawning::implementDACIterSpawnOnHelper(
       // Create call instruction.
       RecurCall = Builder.CreateCall(Helper, RecurCallInputs);
       // Use a fast calling convention for the outline.
-      RecurCall->setCallingConv(CallingConv::Fast);
+      RecurCall->setCallingConv(Helper->getCallingConv());
       RecurCall->setDebugLoc(TLDebugLoc);
       if (Helper->doesNotThrow())
         RecurCall->setDoesNotThrow();
@@ -767,7 +767,7 @@ void DACSpawning::implementDACIterSpawnOnHelper(
       RecurCall = InvokeInst::Create(Helper, CallDest, CallUnwind,
                                      RecurCallInputs);
       // Use a fast calling convention for the outline.
-      RecurCall->setCallingConv(CallingConv::Fast);
+      RecurCall->setCallingConv(Helper->getCallingConv());
       RecurCall->setDebugLoc(TLDebugLoc);
       ReplaceInstWithInst(RecurDet->getTerminator(), RecurCall);
       RecurCallDest = CallDest;

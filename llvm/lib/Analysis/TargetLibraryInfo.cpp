@@ -15,6 +15,7 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 using namespace llvm;
 
 static cl::opt<TargetLibraryInfoImpl::VectorLibrary> ClVectorLibrary(
@@ -46,12 +47,14 @@ static cl::opt<TapirTargetID> ClTapirTarget(
                           "serial", "Serial code"),
                clEnumValN(TapirTargetID::Cilk,
                           "cilk", "Cilk Plus"),
-               clEnumValN(TapirTargetID::OpenMP,
-                          "openmp", "OpenMP"),
                clEnumValN(TapirTargetID::Cheetah,
                           "cheetah", "Cheetah"),
                clEnumValN(TapirTargetID::OpenCilk,
-                          "opencilk", "OpenCilk")));
+                          "opencilk", "OpenCilk"),
+               clEnumValN(TapirTargetID::Lambda,
+                          "lambda", "Lambda"),
+               clEnumValN(TapirTargetID::OMPTask,
+                          "omptask", "OMPTask")));
 
 StringLiteral const TargetLibraryInfoImpl::StandardNames[LibFunc::NumLibFuncs] =
     {
@@ -1295,8 +1298,8 @@ void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
   case TapirTargetID::None:
   case TapirTargetID::Serial:
   case TapirTargetID::Cheetah:
-  case TapirTargetID::Cuda:
-  case TapirTargetID::OpenMP:
+  case TapirTargetID::Lambda:
+  case TapirTargetID::OMPTask:
   case TapirTargetID::Qthreads:
   case TapirTargetID::Last_TapirTargetID:
     break;
