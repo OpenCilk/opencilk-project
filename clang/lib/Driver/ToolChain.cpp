@@ -1836,9 +1836,6 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
   case TapirTargetID::Cilk:
     CmdArgs.push_back("-lcilkrts");
     break;
-  case TapirTargetID::OpenMP:
-    CmdArgs.push_back("-lomp");
-    break;
   case TapirTargetID::Qthreads:
     CmdArgs.push_back("-lqthread");
     break;
