@@ -304,8 +304,9 @@
 
 using namespace llvm;
 
-static const Regex DefaultAliasRegex(
-    "^(default|thinlto-pre-link|thinlto|lto-pre-link|lto)<(O[0123sz])>$");
+static const Regex
+    DefaultAliasRegex("^(default|thinlto-pre-link|thinlto|lto-pre-link|lto|"
+                      "tapir-lowering|tapir-lowering-loops)<(O[0123sz])>$");
 
 namespace llvm {
 cl::opt<bool> PrintPipelinePasses(
@@ -1153,7 +1154,7 @@ Expected<GlobalMergeOptions> parseGlobalMergeOptions(StringRef Params) {
 /// alias.
 static bool startsWithDefaultPipelineAliasPrefix(StringRef Name) {
   return Name.starts_with("default") || Name.starts_with("thinlto") ||
-         Name.starts_with("lto");
+         Name.starts_with("lto") || Name.starts_with("tapir-lowering");
 }
 
 /// Tests whether registered callbacks will accept a given pass name.
@@ -1467,6 +1468,10 @@ Error PassBuilder::parseModulePass(ModulePassManager &MPM,
         MPM.addPass(buildThinLTOPreLinkDefaultPipeline(L));
       else
         MPM.addPass(buildLTOPreLinkDefaultPipeline(L));
+    } else if (Matches[1] == "tapir-lowering-loops") {
+      MPM.addPass(buildTapirLoopLoweringPipeline(L, ThinOrFullLTOPhase::None));
+    } else if (Matches[1] == "tapir-lowering") {
+      MPM.addPass(buildTapirLoweringPipeline(L, ThinOrFullLTOPhase::None));
     } else {
       assert(Matches[1] == "lto" && "Not one of the matched options!");
       MPM.addPass(buildLTODefaultPipeline(L, nullptr));
