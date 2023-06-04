@@ -1507,11 +1507,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
 }
 
 ModulePassManager
-PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
-                                        ThinOrFullLTOPhase Phase) {
+PassBuilder::buildTapirLoopLoweringPipeline(OptimizationLevel Level,
+                                            ThinOrFullLTOPhase Phase) {
   ModulePassManager MPM;
 
   LoopPassManager LPM1, LPM2;
+
+  if (Level == OptimizationLevel::O0)
+    // Form SSA out of local memory accesses.
+    MPM.addPass(createModuleToFunctionPassAdaptor(SROAPass()));
 
   // Rotate Loop - disable header duplication at -Oz
   LPM1.addPass(LoopRotatePass(Level != OptimizationLevel::Oz));
@@ -1540,9 +1544,40 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
   // The LoopSpawning pass may leave cruft around.  Clean it up using the
   // function simplification pipeline.
-  MPM.addPass(
-      createModuleToFunctionPassAdaptor(
-          buildFunctionSimplificationPipeline(Level, Phase)));
+  if (Level != OptimizationLevel::O0)
+    MPM.addPass(
+        createModuleToFunctionPassAdaptor(
+            buildFunctionSimplificationPipeline(Level, Phase)));
+
+  return MPM;
+}
+
+ModulePassManager
+PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
+                                        ThinOrFullLTOPhase Phase) {
+  ModulePassManager MPM;
+
+  if (Level == OptimizationLevel::O0) {
+    // At -O0, simply translate the Tapir constructs and run always-inline.  In
+    // particular, don't run loop-spawning.
+
+    // Add passes to run just after Tapir loops are (or would be) processed.
+    for (auto &C : TapirLoopEndEPCallbacks)
+      C(MPM, Level);
+
+    // Lower Tapir constructs to target runtime calls.
+    MPM.addPass(TapirToTargetPass());
+    if (VerifyTapirLowering)
+      MPM.addPass(VerifierPass());
+
+    MPM.addPass(AlwaysInlinerPass(
+        /*InsertLifetimeIntrinsics=*/false));
+
+    return MPM;
+  }
+
+  // Lower Tapir loops
+  MPM.addPass(buildTapirLoopLoweringPipeline(Level, Phase));
 
   // Add passes to run just after Tapir loops are processed.
   invokeTapirLoopEndEPCallbacks(MPM, Level);
@@ -1645,9 +1680,9 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
 
 ModulePassManager
 PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
-                                           bool LTOPreLink) {
+                                           bool LTOPreLink, bool LowerTapir) {
   if (Level == OptimizationLevel::O0)
-    return buildO0DefaultPipeline(Level, LTOPreLink);
+    return buildO0DefaultPipeline(Level, LTOPreLink, LowerTapir);
 
   ModulePassManager MPM;
 
@@ -2254,14 +2289,13 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
 
   // Add passes to run just before Tapir lowering.
   invokeTapirLateEPCallbacks(MPM, Level);
-  invokeTapirLoopEndEPCallbacks(MPM, Level);
 
-  // At -O0, outline Tapir constructs early.
-  if (LowerTapir) {
-    MPM.addPass(TapirToTargetPass());
-    MPM.addPass(AlwaysInlinerPass(
-        /*InsertLifetimeIntrinsics=*/false));
-  }
+  if (LowerTapir)
+    MPM.addPass(buildTapirLoweringPipeline(
+        Level, LTOPreLink ? ThinOrFullLTOPhase::FullLTOPreLink
+                          : ThinOrFullLTOPhase::None));
+  else
+    invokeTapirLoopEndEPCallbacks(MPM, Level);
 
   invokeOptimizerLastEPCallbacks(MPM, Level);
 
