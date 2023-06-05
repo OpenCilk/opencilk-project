@@ -4249,6 +4249,11 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
                .get();
     break;
 
+  case ICK_Hyperobject_To_View:
+    FromType = FromType.stripHyperobject();
+    From = BuildHyperobjectLookup(From, false);
+    break;
+
   default:
     llvm_unreachable("Improper first standard conversion");
   }
@@ -4568,6 +4573,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
   case ICK_Array_To_Pointer:
   case ICK_Function_To_Pointer:
   case ICK_Function_Conversion:
+  case ICK_Hyperobject_To_View:
   case ICK_Qualification:
   case ICK_Num_Conversion_Kinds:
   case ICK_C_Only_Conversion:

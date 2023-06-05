@@ -923,7 +923,10 @@ public:
     SK_OCLSamplerInit,
 
     /// Initialize an opaque OpenCL type (event_t, queue_t, etc.) with zero
-    SK_OCLZeroOpaqueType
+    SK_OCLZeroOpaqueType,
+
+    /// OpenCilk
+    SK_ViewLookup
   };
 
   /// A single step in the initialization sequence.
@@ -1318,6 +1321,8 @@ public:
 
   /// Add a zero-initialization step.
   void AddZeroInitializationStep(QualType T);
+
+  void AddViewLookup(QualType T);
 
   /// Add a C assignment step.
   //
