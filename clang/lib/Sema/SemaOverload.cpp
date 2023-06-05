@@ -128,6 +128,7 @@ ImplicitConversionRank clang::GetConversionRank(ImplicitConversionKind Kind) {
     ICR_Exact_Match,
     ICR_Exact_Match,
     ICR_Exact_Match,
+    ICR_Exact_Match,
     ICR_Promotion,
     ICR_Promotion,
     ICR_Promotion,
@@ -4854,6 +4855,14 @@ TryReferenceInit(Sema &S, Expr *Init, QualType DeclType,
       T2 = Fn->getType();
   }
 
+  // OpenCilk: If the right hand side is a hyperobject, see if the
+  // left hand side wants the hyperobject or a view.
+  bool LookupView = false;
+  if (T2->isHyperobjectType() && !T1->isHyperobjectType()) {
+    LookupView = true;
+    T2 = T2.stripHyperobject();
+  }
+
   // Compute some basic properties of the types and the initializer.
   bool isRValRef = DeclType->isRValueReferenceType();
   Expr::Classification InitCategory = Init->Classify(S.Context);
@@ -4914,6 +4923,8 @@ TryReferenceInit(Sema &S, Expr *Init, QualType DeclType,
       //   in which case the implicit conversion sequence is a
       //   derived-to-base Conversion (13.3.3.1).
       SetAsReferenceBinding(/*BindsDirectly=*/true);
+      if (LookupView)
+        ICS.Standard.First = ICK_Hyperobject_To_View;
 
       // Nothing more to do: the inaccessibility/ambiguity check for
       // derived-to-base conversions is suppressed when we're
@@ -5762,6 +5773,7 @@ static bool CheckConvertedConstantConversions(Sema &S,
   case ICK_Lvalue_To_Rvalue:
   case ICK_Array_To_Pointer:
   case ICK_Function_To_Pointer:
+  case ICK_Hyperobject_To_View:
     llvm_unreachable("found a first conversion kind in Second");
 
   case ICK_Function_Conversion:

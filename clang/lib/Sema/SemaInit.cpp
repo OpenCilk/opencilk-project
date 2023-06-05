@@ -3541,6 +3541,7 @@ void InitializationSequence::Step::Destroy() {
   case SK_OCLSamplerInit:
   case SK_OCLZeroOpaqueType:
   case SK_ParenthesizedListInit:
+  case SK_ViewLookup:
     break;
 
   case SK_ConversionSequence:
@@ -3656,6 +3657,13 @@ void InitializationSequence::AddReferenceBindingStep(QualType T,
 void InitializationSequence::AddFinalCopy(QualType T) {
   Step S;
   S.Kind = SK_FinalCopy;
+  S.Type = T;
+  Steps.push_back(S);
+}
+
+void InitializationSequence::AddViewLookup(QualType T) {
+  Step S;
+  S.Kind = SK_ViewLookup;
   S.Type = T;
   Steps.push_back(S);
 }
@@ -4844,6 +4852,14 @@ static void TryReferenceInitializationCore(Sema &S,
                                            InitializationSequence &Sequence) {
   QualType DestType = Entity.getType();
   SourceLocation DeclLoc = Initializer->getBeginLoc();
+
+  // OpenCilk: If the right hand side is a hyperobject, see if the
+  // left hand side wants the hyperobject or a view.
+  if (T2->isHyperobjectType() && !T1->isHyperobjectType()) {
+    Sequence.AddViewLookup(T1);
+    T2 = T2.stripHyperobject();
+    cv2T2 = cv2T2.stripHyperobject();
+  }
 
   // Compute some basic properties of the types and the initializer.
   bool isLValueRef = DestType->isLValueReferenceType();
@@ -8539,6 +8555,7 @@ ExprResult InitializationSequence::Perform(Sema &S,
   case SK_QualificationConversionPRValue:
   case SK_FunctionReferenceConversion:
   case SK_AtomicConversion:
+  case SK_ViewLookup:
   case SK_ConversionSequence:
   case SK_ConversionSequenceNoNarrowing:
   case SK_ListInitialization:
@@ -8716,6 +8733,10 @@ ExprResult InitializationSequence::Perform(Sema &S,
     case SK_ExtraneousCopyToTemporary:
       CurInit = CopyObject(S, Step->Type, Entity, CurInit,
                            /*IsExtraneousCopy=*/true);
+      break;
+
+    case SK_ViewLookup:
+      CurInit = S.BuildHyperobjectLookup(CurInit.get());
       break;
 
     case SK_UserConversion: {
@@ -10072,6 +10093,10 @@ void InitializationSequence::dump(raw_ostream &OS) const {
     switch (S->Kind) {
     case SK_ResolveAddressOfOverloadedFunction:
       OS << "resolve address of overloaded function";
+      break;
+
+    case SK_ViewLookup:
+      OS << "lookup hyperobject view";
       break;
 
     case SK_CastDerivedToBasePRValue:
