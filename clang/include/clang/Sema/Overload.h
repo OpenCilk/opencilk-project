@@ -101,6 +101,8 @@ class Sema;
   /// convert an argument to a parameter's type. The enumerator values
   /// match with the table titled 'Conversions' in [over.ics.scs] and are listed
   /// such that better conversion kinds have smaller values.
+  /// Changes to the next two enumerations require corresponding changes
+  /// to clang::GetConversionRank.
   enum ImplicitConversionKind {
     /// Identity conversion (no conversion)
     ICK_Identity = 0,
@@ -113,6 +115,9 @@ class Sema;
 
     /// Function-to-pointer (C++ [conv.array])
     ICK_Function_To_Pointer,
+
+    /// OpenCilk extension
+    ICK_Hyperobject_To_View,
 
     /// Function pointer conversion (C++17 [conv.fctptr])
     ICK_Function_Conversion,
