@@ -13578,6 +13578,9 @@ Sema::CreateOverloadedUnaryOp(SourceLocation OpLoc, UnaryOperatorKind Opc,
   if (checkPlaceholderForOverload(*this, Input))
     return ExprError();
 
+  if (Input->getType()->isHyperobjectType())
+    Input = BuildHyperobjectLookup(Input, false);
+
   Expr *Args[2] = { Input, nullptr };
   unsigned NumArgs = 1;
 

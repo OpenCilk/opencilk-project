@@ -16246,16 +16246,20 @@ ExprResult Sema::BuildUnaryOp(Scope *S, SourceLocation OpLoc,
     Input = Result.get();
   }
 
-  if (getLangOpts().CPlusPlus && Input->getType()->isOverloadableType() &&
-      UnaryOperator::getOverloadedOperator(Opc) != OO_None &&
-      !(Opc == UO_AddrOf && isQualifiedMemberAccess(Input))) {
-    // Find all of the overloaded operators visible from this point.
-    UnresolvedSet<16> Functions;
-    OverloadedOperatorKind OverOp = UnaryOperator::getOverloadedOperator(Opc);
-    if (S && OverOp != OO_None)
-      LookupOverloadedOperatorName(OverOp, S, Functions);
+  if (getLangOpts().CPlusPlus) {
+    // A hyperobject may need to be converted to a view.
+    QualType Real = Input->getType().stripHyperobject();
+    if (Real->isOverloadableType() &&
+        UnaryOperator::getOverloadedOperator(Opc) != OO_None &&
+        !(Opc == UO_AddrOf && isQualifiedMemberAccess(Input))) {
+      // Find all of the overloaded operators visible from this point.
+      UnresolvedSet<16> Functions;
+      OverloadedOperatorKind OverOp = UnaryOperator::getOverloadedOperator(Opc);
+      if (S && OverOp != OO_None)
+        LookupOverloadedOperatorName(OverOp, S, Functions);
 
-    return CreateOverloadedUnaryOp(OpLoc, Opc, Functions, Input);
+      return CreateOverloadedUnaryOp(OpLoc, Opc, Functions, Input);
+    }
   }
 
   return CreateBuiltinUnaryOp(OpLoc, Opc, Input, IsAfterAmp);
