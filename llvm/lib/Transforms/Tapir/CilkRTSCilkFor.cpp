@@ -254,8 +254,8 @@ void RuntimeCilkFor::processOutlinedLoopCall(TapirLoopInfo &TL,
   SpawnHelper->setCallingConv(CallingConv::Fast);
   // Note that the address of the helper is unimportant.
   SpawnHelper->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-  // The helper is private to this module.
-  SpawnHelper->setLinkage(GlobalValue::PrivateLinkage);
+  // The helper is internal to this module.
+  SpawnHelper->setLinkage(GlobalValue::InternalLinkage);
 
   // Add alignment assumptions to arguments of helper, based on alignment of
   // values in old function.

@@ -616,7 +616,7 @@ declare void @llvm.assume(i1) #6
 ; Function Attrs: nounwind readnone speculatable
 declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 
-; CHECK-LABEL: define private fastcc void @_Z15parfor_trycatchi.outline_pfor.cond48.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z15parfor_trycatchi.outline_pfor.cond48.ls1(
 ; CHECK: %[[SYNCREG:.+]] = tail call token @llvm.syncregion.start()
 ; CHECK: %[[DACSYNCREG:.+]] = tail call token @llvm.syncregion.start()
 
@@ -660,7 +660,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: unreachable
 
 
-; CHECK-LABEL: define private fastcc void @_Z15parfor_trycatchi.outline_pfor.cond.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z15parfor_trycatchi.outline_pfor.cond.ls1(
 ; CHECK: %[[SYNCREG:.+]] = tail call token @llvm.syncregion.start()
 ; CHECK: %[[DACSYNCREG:.+]] = tail call token @llvm.syncregion.start()
 
@@ -704,7 +704,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: unreachable
 
 
-; CHECK-LABEL: define private fastcc void @_Z27parfor_trycatch_destructorsi.outline_pfor.cond70.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z27parfor_trycatch_destructorsi.outline_pfor.cond70.ls1(
 ; CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
 ; CHECK: %[[DACSYNCREG:.+]] = {{.*}}call token @llvm.syncregion.start()
 
@@ -783,7 +783,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: to label %[[UNREACHABLE2:.+]] unwind label %[[DACDU]]
 
 
-; CHECK-LABEL: define private fastcc void @_Z27parfor_trycatch_destructorsi.outline_pfor.cond.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z27parfor_trycatch_destructorsi.outline_pfor.cond.ls1(
 ; CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
 ; CHECK: %[[DACSYNCREG:.+]] = {{.*}}call token @llvm.syncregion.start()
 

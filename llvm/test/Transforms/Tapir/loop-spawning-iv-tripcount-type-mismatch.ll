@@ -207,7 +207,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
   unreachable
 }
 
-; CHECK-LABEL: define private fastcc void @_ZL9conj_gradPiS_PdS0_S0_S0_S0_S0_S0_S0_.outline_pfor.cond.ls1(i64 %indvars.iv376.start.ls1,
+; CHECK-LABEL: define internal fastcc void @_ZL9conj_gradPiS_PdS0_S0_S0_S0_S0_S0_S0_.outline_pfor.cond.ls1(i64 %indvars.iv376.start.ls1,
 ; CHECK: i32 %[[END:.+]], i32 %[[GRAINSIZE:.+]],
 
 ; CHECK: _Z10initializePdS_S_S_S_mm.exit.ls1:

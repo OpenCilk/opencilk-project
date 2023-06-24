@@ -70,7 +70,7 @@ exit:                                             ; preds = %L27
   ret void
 }
 
-; LS: define private fastcc void @julia_mynorm.outline_L12.ls1(i64 %indvar.start.ls1, i64 %end.ls1, i64 %grainsize.ls1)
+; LS: define internal fastcc void @julia_mynorm.outline_L12.ls1(i64 %indvar.start.ls1, i64 %end.ls1, i64 %grainsize.ls1)
 
 declare %jl_value_t*** @julia.ptls_states()
 

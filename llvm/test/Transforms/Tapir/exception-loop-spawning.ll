@@ -446,7 +446,7 @@ unreachable:                                      ; preds = %lpad.body
   unreachable
 }
 
-; CHECK-LABEL: define private fastcc void @_Z19parallelfor_nocatchi.outline_pfor.cond.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z19parallelfor_nocatchi.outline_pfor.cond.ls1(
 ; CHECK: %[[SYNCREG:.+]] = tail call token @llvm.syncregion.start()
 ; CHECK: detach within %[[SYNCREG]], label %[[RECURDET:.+]], label %[[RECURCONT:.+]]
 
@@ -466,7 +466,7 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK-NOT: detached.rethrow
 
 
-; CHECK-LABEL: define private fastcc void @_Z20parallelfor_tryblocki.outline_pfor.cond17.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z20parallelfor_tryblocki.outline_pfor.cond17.ls1(
 ; CHECK: %[[SYNCREG:.+]] = tail call token @llvm.syncregion.start()
 ; CHECK: detach within %[[SYNCREG]], label %[[RECURDET:.+]], label %[[RECURCONT:.+]] unwind label %[[RECURUW:.+]]
 
@@ -502,13 +502,13 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK-NEXT: to label %{{.+}} unwind label %[[RECURUW]]
 
 
-; CHECK-LABEL: define private fastcc void @_Z20parallelfor_tryblocki.outline_pfor.cond.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z20parallelfor_tryblocki.outline_pfor.cond.ls1(
 ; CHECK-NOT: invoke
 ; CHECK-NOT: resume
 ; CHECK-NOT: detached.rethrow
 
 
-; CHECK-LABEL: define private fastcc void @_Z27parallelfor_tryblock_inlinei.outline_pfor.cond.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z27parallelfor_tryblock_inlinei.outline_pfor.cond.ls1(
 ; CHECK: %[[SYNCREG:.+]] = tail call token @llvm.syncregion.start()
 ; CHECK: detach within %[[SYNCREG]], label %[[RECURDET:.+]], label %[[RECURCONT:.+]] unwind label %[[RECURUW:.+]]
 
