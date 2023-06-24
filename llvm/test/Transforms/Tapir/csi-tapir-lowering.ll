@@ -3326,7 +3326,7 @@ if.then146.us.4:                                  ; preds = %if.end141.us.4
 ; CHECK: define void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs(
 ; CHECK: csi.cleanup:
 
-; CHECK-LABEL: define private fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach236.ls3(
+; CHECK-LABEL: define internal fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach236.ls3(
 ; CHECK: unnamed_addr #[[ATTRIBUTE:[0-9]+]]
 ; CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 ; CHECK: [[DETACHED]]:
@@ -3335,7 +3335,7 @@ if.then146.us.4:                                  ; preds = %if.end141.us.4
 ; CHECK: call void @__csi_task_exit(
 ; CHECK: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
-; CHECK-LABEL: define private fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach216.ls2(
+; CHECK-LABEL: define internal fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach216.ls2(
 ; CHECK: unnamed_addr #[[ATTRIBUTE]]
 ; CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 ; CHECK: [[DETACHED]]:
@@ -3344,7 +3344,7 @@ if.then146.us.4:                                  ; preds = %if.end141.us.4
 ; CHECK: call void @__csi_task_exit(
 ; CHECK: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
-; CHECK-LABEL: define private fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach64.ls2(
+; CHECK-LABEL: define internal fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach64.ls2(
 ; CHECK: unnamed_addr #[[ATTRIBUTE]]
 ; CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 ; CHECK: [[DETACHED]]:
@@ -3353,7 +3353,7 @@ if.then146.us.4:                                  ; preds = %if.end141.us.4
 ; CHECK: call void @__csi_task_exit(
 ; CHECK: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 
-; CHECK-LABEL: define private fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach.us.ls2(
+; CHECK-LABEL: define internal fastcc void @_ZN3tfk6Render23render_stack_with_patchEPNS_5StackESt4pairIN2cv6Point_IfEES6_ENS_10ResolutionESs.outline_pfor.detach.us.ls2(
 ; CHECK: unnamed_addr #[[ATTRIBUTE2:[0-9]+]]
 ; CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 ; CHECK: [[DETACHED]]:

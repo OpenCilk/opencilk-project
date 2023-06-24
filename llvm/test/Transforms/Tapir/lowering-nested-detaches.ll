@@ -107,7 +107,7 @@ synced22:                                         ; preds = %loop_exit
 ; Function Attrs: argmemonly nounwind
 declare token @llvm.syncregion.start() #1
 
-; CHECK-LABEL: define private fastcc void @kernel_anon.outline_det.achd18.otd4(
+; CHECK-LABEL: define internal fastcc void @kernel_anon.outline_det.achd18.otd4(
 ; CHECK: getelementptr
 ; CHECK-NEXT: load
 ; CHECK-NEXT: fmul
@@ -116,7 +116,7 @@ declare token @llvm.syncregion.start() #1
 ; CHECK-NEXT: store
 ; CHECK: ret void
 
-; CHECK-LABEL: define private fastcc void @kernel_anon.outline_det.achd12.otd3(
+; CHECK-LABEL: define internal fastcc void @kernel_anon.outline_det.achd12.otd3(
 ; CHECK: loop_body14.otd3.split:
 ; CHECK-NEXT: call fastcc void @kernel_anon.outline_det.achd18.otd4(
 ; CHECK-DAG: ptr %A.otd3
@@ -128,7 +128,7 @@ declare token @llvm.syncregion.start() #1
 ; CHECK-DAG: ptr %.otd3
 ; CHECK-NEXT: {{br label %loop_latch15.otd3|loop_body14.otd3.split.split}}
 
-; CHECK-LABEL: define private fastcc void @kernel_anon.outline_block_exit.otd2(
+; CHECK-LABEL: define internal fastcc void @kernel_anon.outline_block_exit.otd2(
 ; CHECK-LABEL: loop_body8.otd2.split: ; preds = %loop_body8.otd2
 ; CHECK-NEXT: call fastcc void @kernel_anon.outline_det.achd12.otd3(
 ; CHECK-DAG: ptr %A.otd2
@@ -139,7 +139,7 @@ declare token @llvm.syncregion.start() #1
 ; CHECK-DAG: ptr nonnull %0
 ; CHECK-NEXT: {{br label %loop_latch9.otd2|br label %loop_body8.otd2.split.split}}
 
-; CHECK-LABEL: define private fastcc void @kernel_anon.outline_det.achd.otd1(
+; CHECK-LABEL: define internal fastcc void @kernel_anon.outline_det.achd.otd1(
 ; CHECK-LABEL: loop_body2.otd1.split: ; preds = %loop_body2.otd1
 ; CHECK-NEXT: call fastcc void @kernel_anon.outline_block_exit.otd2(
 ; CHECK-DAG: ptr %O1.otd1

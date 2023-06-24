@@ -420,7 +420,7 @@ cleanup:                                          ; preds = %pfor.cond.cleanup, 
   ret i64 %sum.0.load21
 }
 
-; CHECK-LABEL: define private fastcc void @_Z11accum_wrongPKll.outline_pfor.cond.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z11accum_wrongPKll.outline_pfor.cond.ls1(
 
 ; CHECK: call void @__csan_detach(
 ; CHECK: call void @__csan_task(
@@ -637,7 +637,7 @@ csi.cleanup:                                      ; preds = %entry
   resume { i8*, i32 } %csi.cleanup.lpad
 }
 
-; CHECK-LABEL: define private fastcc void @_Z13accum_reducerPKll.outline_pfor.cond.ls1(
+; CHECK-LABEL: define internal fastcc void @_Z13accum_reducerPKll.outline_pfor.cond.ls1(
 
 ; CHECK: call void @__csan_detach(
 ; CHECK: call void @__csan_task(
