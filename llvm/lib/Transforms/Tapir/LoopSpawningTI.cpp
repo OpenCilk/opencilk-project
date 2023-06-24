@@ -170,8 +170,8 @@ void LoopOutlineProcessor::postProcessOutline(TapirLoopInfo &TL,
   Helper->setCallingConv(CallingConv::Fast);
   // Note that the address of the helper is unimportant.
   Helper->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-  // The helper is private to this module.
-  Helper->setLinkage(GlobalValue::PrivateLinkage);
+  // The helper is internal to this module.
+  Helper->setLinkage(GlobalValue::InternalLinkage);
 }
 
 void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,

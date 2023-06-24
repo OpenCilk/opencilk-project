@@ -107,8 +107,8 @@ void CilkABI::addHelperAttributes(Function &Helper) {
   }
   // Note that the address of the helper is unimportant.
   Helper.setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-  // The helper is private to this module.
-  Helper.setLinkage(GlobalValue::PrivateLinkage);
+  // The helper is internal to this module.
+  Helper.setLinkage(GlobalValue::InternalLinkage);
 }
 
 CilkABI::CilkABI(Module &M) : TapirTarget(M) {}
@@ -839,7 +839,7 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
     B.CreateRetVoid();
   }
 
-  Fn->setLinkage(Function::PrivateLinkage);
+  Fn->setLinkage(Function::InternalLinkage);
   Fn->setDoesNotThrow();
   if (!DebugABICalls)
     Fn->addFnAttr(Attribute::AlwaysInline);
@@ -994,7 +994,7 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
     B.CreateRet(ExnPN);
   }
 
-  Fn->setLinkage(Function::PrivateLinkage);
+  Fn->setLinkage(Function::InternalLinkage);
   if (!DebugABICalls)
     Fn->addFnAttr(Attribute::AlwaysInline);
   Fn->addFnAttr(Attribute::ReturnsTwice);
@@ -1699,8 +1699,8 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   }
   // Note that the address of the helper is unimportant.
   SpawnHelper->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-  // The helper is private to this module.
-  SpawnHelper->setLinkage(GlobalValue::PrivateLinkage);
+  // The helper is internal to this module.
+  SpawnHelper->setLinkage(GlobalValue::InternalLinkage);
 
   // Add alignment assumptions to arguments of helper, based on alignment of
   // values in old function.
