@@ -18854,6 +18854,10 @@ static void DoMarkVarDeclReferenced(
       }
     }
   }
+  else if (Var->mightBeUsableInConstantExpressions(SemaRef.Context)) {
+    if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(E))
+      DRE->setDecl(DRE->getDecl());
+  }
 
   // C++2a [basic.def.odr]p4:
   //   A variable x whose name appears as a potentially-evaluated expression e

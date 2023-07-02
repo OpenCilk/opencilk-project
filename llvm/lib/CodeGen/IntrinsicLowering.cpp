@@ -236,7 +236,9 @@ void IntrinsicLowering::LowerIntrinsicCall(CallInst *CI) {
     report_fatal_error("Code generator does not support intrinsic function '"+
                       Callee->getName()+"'!");
 
-  case Intrinsic::tapir_magic:
+  case Intrinsic::tapir_frame:
+  case Intrinsic::tapir_worker:
+  case Intrinsic::tapir_fiber:
     CI->replaceAllUsesWith(Constant::getNullValue(CI->getType()));
     break;
 
@@ -274,6 +276,7 @@ void IntrinsicLowering::LowerIntrinsicCall(CallInst *CI) {
   }
 
   case Intrinsic::stacksave:
+  case Intrinsic::stacksave_and_not:
   case Intrinsic::stackrestore: {
     if (!Warned)
       errs() << "WARNING: this target does not support the llvm.stack"

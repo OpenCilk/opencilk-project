@@ -223,7 +223,9 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
   SmallVector<SyncInst *, 8> Syncs;
   SmallVector<CallInst *, 8> GrainsizeCalls;
   SmallVector<CallInst *, 8> TaskFrameAddrCalls;
-  SmallVector<CallInst *, 8> TapirMagicCalls;
+  SmallVector<CallInst *, 8> TapirFrameCalls;
+  SmallVector<CallInst *, 8> TapirWorkerCalls;
+  SmallVector<CallInst *, 8> TapirFiberCalls;
   SmallVector<CallInst *, 8> TapirRTCalls;
   SmallVector<CallBase *, 8> ReducerOperations;
   for (BasicBlock &BB : F) {
@@ -251,8 +253,16 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
           TapirRTCalls.push_back(II);
           break;
 
-        case Intrinsic::tapir_magic:
-          TapirMagicCalls.push_back(II);
+        case Intrinsic::tapir_frame:
+          TapirFrameCalls.push_back(II);
+          break;
+
+        case Intrinsic::tapir_worker:
+          TapirWorkerCalls.push_back(II);
+          break;
+
+        case Intrinsic::tapir_fiber:
+          TapirFiberCalls.push_back(II);
           break;
 
         case Intrinsic::hyper_lookup:
@@ -286,9 +296,21 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
     Changed = true;
   }
 
-  while (!TapirMagicCalls.empty()) {
-    CallInst *CI = TapirMagicCalls.pop_back_val();
-    Target->lowerMagicCall(CI);
+  while (!TapirFrameCalls.empty()) {
+    CallInst *CI = TapirFrameCalls.pop_back_val();
+    Target->lowerFrameCall(CI);
+    Changed = true;
+  }
+
+  while (!TapirFiberCalls.empty()) {
+    CallInst *CI = TapirFiberCalls.pop_back_val();
+    Target->lowerFiberCall(CI);
+    Changed = true;
+  }
+
+  while (!TapirWorkerCalls.empty()) {
+    CallInst *CI = TapirWorkerCalls.pop_back_val();
+    Target->lowerWorkerCall(CI);
     Changed = true;
   }
 

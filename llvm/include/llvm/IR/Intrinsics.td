@@ -1383,8 +1383,27 @@ def int_tapir_loop_grainsize
 def int_task_frameaddress
     : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty], [IntrWillReturn]>;
 
-def int_tapir_magic
-    : Intrinsic<[llvm_ptr_ty], [], [IntrWillReturn,IntrReadMem]>;
+// Return the stack_frame in an OpenCilk function, otherwise null.
+def int_tapir_frame
+    : Intrinsic<[llvm_ptr_ty], [],
+      [IntrWillReturn,IntrReadMem]>;
+
+// Given a possibly null stack frame, return a pointer to the
+// OpenCilk worker.
+def int_tapir_worker
+    : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
+      [IntrWillReturn,IntrReadMem,IntrInaccessibleMemOrArgMemOnly]>;
+
+def int_tapir_fiber
+    : Intrinsic<[llvm_ptr_ty], [],
+      [IntrWillReturn,IntrReadMem,IntrHyperView]>;
+
+// Return some bit of the stack pointer.  This can be moved across alloca
+// so the result is approximate.  It does not return the stack pointer
+// directly to prevent optimizations from making a physical register live
+// across basic blocks.
+def int_stacksave_and_not
+    : Intrinsic<[llvm_ptr_ty], [llvm_anyint_ty], [IntrWillReturn,IntrReadMem]>;
 
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.

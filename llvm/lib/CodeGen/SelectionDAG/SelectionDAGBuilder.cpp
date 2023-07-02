@@ -6623,6 +6623,18 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     setValue(&I, DAG.getNode(ISD::ABS, sdl, Op1.getValueType(), Op1));
     return;
   }
+  case Intrinsic::stacksave_and_not: {
+    SDValue Op = getRoot();
+    EVT VT = TLI.getValueType(DAG.getDataLayout(), I.getType());
+    // TOOD: negate argument
+    SDValue Stack =
+        DAG.getNode(ISD::STACKSAVE, sdl, DAG.getVTList(VT, MVT::Other), Op);
+    Res = DAG.getNode(ISD::AND, sdl, VT, Stack.getValue(0),
+                      DAG.getNOT(sdl, getValue(I.getArgOperand(0)), VT));
+    setValue(&I, Res);
+    DAG.setRoot(Stack.getValue(1));
+    return;
+  }
   case Intrinsic::stacksave: {
     SDValue Op = getRoot();
     EVT VT = TLI.getValueType(DAG.getDataLayout(), I.getType());
@@ -7291,7 +7303,9 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     // Return the first argument
     setValue(&I, getValue(I.getArgOperand(0)));
     return;
-  case Intrinsic::tapir_magic:
+  case Intrinsic::tapir_frame:
+  case Intrinsic::tapir_worker:
+  case Intrinsic::tapir_fiber:
     setValue(&I,
              DAG.getConstant(0, sdl, TLI.getPointerTy(DAG.getDataLayout())));
     return;

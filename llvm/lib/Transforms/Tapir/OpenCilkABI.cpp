@@ -232,6 +232,8 @@ void OpenCilkABI::prepareModule() {
   FunctionType *Reg64Ty =
       FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty, VoidPtrTy,
               VoidPtrTy}, false);
+  FunctionType *WorkerTy = FunctionType::get(VoidPtrTy, {VoidPtrTy}, false);
+  FunctionType *FiberTy = FunctionType::get(VoidPtrTy, {}, false);
 
   // Create an array of CilkRTS functions, with their associated types and
   // FunctionCallee member variables in the OpenCilkABI class.
@@ -263,6 +265,8 @@ void OpenCilkABI::prepareModule() {
       {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
       {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
       {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
+      {"__cilkrts_fiber", FiberTy, CilkRTSFiber},
+      {"__cilkrts_worker", WorkerTy, CilkRTSWorker},
   };
 
   if (UseOpenCilkRuntimeBC) {
@@ -1064,15 +1068,34 @@ LoopOutlineProcessor *OpenCilkABI::getLoopOutlineProcessor(
   return nullptr;
 }
 
-void OpenCilkABI::lowerMagicCall(CallBase *MagicCall) {
-  Function *F = MagicCall->getFunction();
+void OpenCilkABI::lowerFrameCall(CallBase *FrameCall) {
+  Function *F = FrameCall->getFunction();
   if (!DetachCtxToStackFrame.count(F))
     return; // will be replaced by null later
+  assert(FrameCall->data_operands_size() == 0);
   // TODO: The cast will not be required with opaque pointers.
-  IRBuilder<> B(MagicCall);
+  IRBuilder<> B(FrameCall);
   Value *SF = DetachCtxToStackFrame[F];
-  MagicCall->replaceAllUsesWith(B.CreateBitCast(SF, MagicCall->getType()));
-  MagicCall->eraseFromParent();
+  FrameCall->replaceAllUsesWith(B.CreateBitCast(SF, FrameCall->getType()));
+  FrameCall->eraseFromParent();
+}
+
+void OpenCilkABI::lowerWorkerCall(CallBase *CI) {
+  const Function *Called = CI->getCalledFunction();
+  assert(Called && Called->getIntrinsicID() == Intrinsic::tapir_worker &&
+         "unexpected local data lookup");
+  assert(CI->data_operands_size() == 1);
+  FunctionCallee Fn = Get__cilkrts_worker();
+  CI->setCalledFunction(Fn);
+}
+
+void OpenCilkABI::lowerFiberCall(CallBase *CI) {
+  const Function *Called = CI->getCalledFunction();
+  assert(Called && Called->getIntrinsicID() == Intrinsic::tapir_fiber &&
+         "unexpected local data lookup");
+  assert(CI->data_operands_size() == 0);
+  FunctionCallee Fn = Get__cilkrts_fiber();
+  CI->setCalledFunction(Fn);
 }
 
 void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
@@ -1090,12 +1113,12 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
     const Type *SizeType = CI->getArgOperand(1)->getType();
     assert(isa<IntegerType>(SizeType));
     Fn = Get__cilkrts_reducer_register(SizeType->getIntegerBitWidth());
-    assert(Fn);
     break;
   }
   case Intrinsic::reducer_unregister:
     Fn = Get__cilkrts_reducer_unregister();
     break;
   }
+  assert(Fn);
   CI->setCalledFunction(Fn);
 }

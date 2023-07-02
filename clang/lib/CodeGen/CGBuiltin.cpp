@@ -5437,12 +5437,28 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
                                                      Str.getPointer(), Zeros);
     return RValue::get(Ptr);
   }
-  case Builtin::BI__tapir_magic: {
-    Function *F = CGM.getIntrinsic(Intrinsic::tapir_magic);
-    return RValue::get(Builder.CreateCall(F, {}));
+  case Builtin::BI__tapir_stack_and_not: {
+    Function *FSA = CGM.getIntrinsic(Intrinsic::stacksave_and_not, SizeTy);
+    auto Mask = EmitScalarExpr(E->getArg(0));
+    if (Mask->getType() != SizeTy)
+      Mask = Builder.CreateZExt(Mask, SizeTy);
+    return RValue::get(Builder.CreateCall(FSA, {Mask}));
+  }
+  case Builtin::BI__tapir_frame: {
+    Function *FF = CGM.getIntrinsic(Intrinsic::tapir_frame);
+    return RValue::get(Builder.CreateCall(FF, {}));
+  }
+  case Builtin::BI__tapir_fiber: {
+    Function *FF = CGM.getIntrinsic(Intrinsic::tapir_fiber);
+    return RValue::get(Builder.CreateCall(FF, {}));
+  }
+  case Builtin::BI__tapir_worker: {
+    Function *FW = CGM.getIntrinsic(Intrinsic::tapir_worker);
+    llvm::Value *Frame = EmitScalarExpr(E->getArg(0));
+    return RValue::get(Builder.CreateCall(FW, {Frame}));
   }
   case Builtin::BI__hyper_lookup: {
-    Function *FM = CGM.getIntrinsic(Intrinsic::tapir_magic);
+    Function *FM = CGM.getIntrinsic(Intrinsic::tapir_frame);
     llvm::Value *Magic = Builder.CreateCall(FM, { });
     llvm::Value *Size = EmitScalarExpr(E->getArg(1));
     Function *FL = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
