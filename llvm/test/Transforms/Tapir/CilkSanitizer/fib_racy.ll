@@ -1,4 +1,3 @@
-; RUN: opt %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -29,7 +28,7 @@ det.achd:                                         ; preds = %if.end
 ; CHECK-LABEL: det.achd:
 ; CHECK: call i32 @fib(
 ; CHECK: @__csan_store(
-; CHECK: store i32 %call, i32* %x
+; CHECK: store i32 %call, ptr %x
 ; CHECK: reattach within %syncreg,
 
 det.cont:                                         ; preds = %det.achd, %if.end
@@ -44,7 +43,7 @@ det.cont:                                         ; preds = %det.achd, %if.end
 ; CHECK-LABEL: det.cont:
 ; CHECK: call i32 @fib(
 ; CHECK: @__csan_store(
-; CHECK: store i32 %add, i32* %x
+; CHECK: store i32 %add, ptr %x
 
 ; CHECK: call void @__csan_sync(
 ; CHECK: sync within %syncreg,

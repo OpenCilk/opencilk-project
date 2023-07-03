@@ -1,10 +1,8 @@
 ; Check that CSI properly handles llvm.global_ctors initialized with
 ; zeroinitializer.
 ;
-; RUN: opt < %s -enable-new-pm=0 -csi -S -o - | FileCheck %s
-; RUN: opt < %s -passes='csi' -S -o - | FileCheck %s
-; RUN: opt < %s -enable-new-pm=0 -csan -S -o - | FileCheck %s
-; RUN: opt < %s -passes='cilksan' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='csi' -S | FileCheck %s
+; RUN: opt < %s -passes='cilksan' -S | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
@@ -132,7 +130,7 @@ $_ZN4absl13base_internal8HideMaskEv = comdat any
 @.str.4 = private unnamed_addr constant [43 x i8] c"Edge %u->%d has bad rank assignment %d->%d\00", align 1
 @llvm.global_ctors = appending global [0 x { i32, void ()*, i8* }] zeroinitializer
 
-; CHECK: @llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }] [{ i32, void ()*, i8* } { i32 0, void ()* @csirt.unit_ctor, i8* null }]
+; CHECK: @llvm.global_ctors = appending global [1 x { i32, ptr, ptr }] [{ i32, ptr, ptr } { i32 0, ptr @csirt.unit_ctor, ptr null }]
 
 @_ZN4absl24synchronization_internal11GraphCyclesC1Ev = dso_local unnamed_addr alias void (%"class.absl::synchronization_internal::GraphCycles"*), void (%"class.absl::synchronization_internal::GraphCycles"*)* @_ZN4absl24synchronization_internal11GraphCyclesC2Ev
 @_ZN4absl24synchronization_internal11GraphCyclesD1Ev = dso_local unnamed_addr alias void (%"class.absl::synchronization_internal::GraphCycles"*), void (%"class.absl::synchronization_internal::GraphCycles"*)* @_ZN4absl24synchronization_internal11GraphCyclesD2Ev

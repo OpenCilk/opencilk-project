@@ -1,7 +1,5 @@
-; RUN: opt < %s -enable-new-pm=0 -csan -ignore-sanitize-cilk-attr -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
-; RUN: opt < %s -passes='csi-setup,cilksan' -ignore-sanitize-cilk-attr -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
-; RUN: opt < %s -enable-new-pm=0 -csi -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
-; RUN: opt < %s -passes='csi-setup,csi' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
+; RUN: opt < %s -passes='csi-setup,cilksan' -ignore-sanitize-cilk-attr -S | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
+; RUN: opt < %s -passes='csi-setup,csi' -S | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -156,7 +154,7 @@ lpad:                                             ; preds = %det.achd2
 ; CHECK-CSI: call void @__csi_bb_exit(
 ; CHECK-CSI: call void @__csi_task_exit(
 ; CHECK-CSAN: call void @__csan_task_exit(
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg1,
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg1,
 ; CHECK-NEXT: to label %unreachable unwind label %lpad4
 
 lpad4:                                            ; preds = %det.cont, %lpad
@@ -358,7 +356,7 @@ ehcleanup22:                                      ; preds = %lpad19, %catch.disp
           to label %unreachable unwind label %lpad27
 
 ; CHECK: ehcleanup22:
-; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TRY_TF]],
+; CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TRY_TF]],
 ; CHECK-NEXT: to label %{{.+}} unwind label %lpad27
 
 lpad27:                                           ; preds = %ehcleanup22
@@ -393,7 +391,7 @@ lpad32:                                           ; preds = %det.achd31
 ; CHECK-CSI: call void @__csi_bb_exit(
 ; CHECK-CSI: call void @__csi_task_exit(
 ; CHECK-CSAN: call void @__csan_task_exit(
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg30,
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg30,
 ; CHECK-NEXT: to label %unreachable unwind label %lpad41
 
 lpad41:                                           ; preds = %try.cont, %lpad32
@@ -569,7 +567,7 @@ unreachable:                                      ; preds = %ehcleanup66, %ehcle
 ; CHECK-CSAN: call void @__csan_after_call(
 ; CHECK-CSI: call void @__csi_task_exit(
 ; CHECK-CSAN: call void @__csan_task_exit(
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg,
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg,
 ; CHECK-NEXT: to label %{{.+}} unwind label %[[CSI_CLEANUP_DU]]
 }
 

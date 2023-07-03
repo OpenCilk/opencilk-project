@@ -128,8 +128,8 @@ for.cond.cleanup:                                 ; preds = %for.cond
   call void @quadtree_detectLineCollision(%struct.QuadTree.29.73.128.139.150* %3, %struct.Line.25.69.124.135.146* %5, %struct.IEL_Reducer.31.75.130.141.152* bitcast ({ { { void (i8*, i8*, i8*)*, void (i8*, i8*)*, void (i8*, i8*)*, i8* (%struct.__cilkrts_hyperobject_base.23.67.122.133.144*, i64)*, void (%struct.__cilkrts_hyperobject_base.23.67.122.133.144*, i8*)* }, i32, i32, i64 }, [8 x i8], %struct.IntersectionEventList.27.71.126.137.148, [48 x i8] }* @intersectionEventListR to %struct.IEL_Reducer.31.75.130.141.152*), %struct.cilk_c_reducer_opadd_unsigned.32.76.131.142.153* %numLineLineCollisions)
   reattach within %syncreg, label %pfor.inc
 
-; CHECK: I = call void @quadtree_detectLineCollision(%struct.QuadTree.29.73.128.139.150* %3, %struct.Line.25.69.124.135.146* %5, %struct.IEL_Reducer.31.75.130.141.152* bitcast ({ { { void (i8*, i8*, i8*)*, void (i8*, i8*)*, void (i8*, i8*)*, i8* (%struct.__cilkrts_hyperobject_base.23.67.122.133.144*, i64)*, void (%struct.__cilkrts_hyperobject_base.23.67.122.133.144*, i8*)* }, i32, i32, i64 }, [8 x i8], %struct.IntersectionEventList.27.71.126.137.148, [48 x i8] }* @intersectionEventListR to %struct.IEL_Reducer.31.75.130.141.152*), %struct.cilk_c_reducer_opadd_unsigned.32.76.131.142.153* %numLineLineCollisions)
-; CHECK: Loc = %struct.IEL_Reducer.31.75.130.141.152* bitcast ({ { { void (i8*, i8*, i8*)*, void (i8*, i8*)*, void (i8*, i8*)*, i8* (%struct.__cilkrts_hyperobject_base.23.67.122.133.144*, i64)*, void (%struct.__cilkrts_hyperobject_base.23.67.122.133.144*, i8*)* }, i32, i32, i64 }, [8 x i8], %struct.IntersectionEventList.27.71.126.137.148, [48 x i8] }* @intersectionEventListR to %struct.IEL_Reducer.31.75.130.141.152*)
+; CHECK: I = call void @quadtree_detectLineCollision(ptr %3, ptr %5, ptr @intersectionEventListR, ptr %numLineLineCollisions)
+; CHECK: Loc = @intersectionEventListR
 ; CHECK-NEXT: OperandNum = 2
 
 for.body:                                         ; preds = %for.cond

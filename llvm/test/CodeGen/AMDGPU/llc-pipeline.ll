@@ -488,6 +488,7 @@
 ; GCN-O1-OPTS-NEXT:      Dominator Tree Construction
 ; GCN-O1-OPTS-NEXT:      Tapir Task Information
 ; GCN-O1-OPTS-NEXT:      SROA
+; GCN-O1-OPTS-NEXT:      Tapir Task Information
 ; GCN-O1-OPTS-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O1-OPTS-NEXT:      Function Alias Analysis Results
 ; GCN-O1-OPTS-NEXT:      Memory SSA
@@ -801,6 +802,7 @@
 ; GCN-O2-NEXT:      Dominator Tree Construction
 ; GCN-O2-NEXT:      Tapir Task Information
 ; GCN-O2-NEXT:      SROA
+; GCN-O2-NEXT:      Tapir Task Information
 ; GCN-O2-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O2-NEXT:      Function Alias Analysis Results
 ; GCN-O2-NEXT:      Memory SSA
@@ -1117,6 +1119,7 @@
 ; GCN-O3-NEXT:      Dominator Tree Construction
 ; GCN-O3-NEXT:      Tapir Task Information
 ; GCN-O3-NEXT:      SROA
+; GCN-O3-NEXT:      Tapir Task Information
 ; GCN-O3-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O3-NEXT:      Function Alias Analysis Results
 ; GCN-O3-NEXT:      Memory SSA

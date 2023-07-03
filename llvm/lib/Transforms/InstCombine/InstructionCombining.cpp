@@ -4293,7 +4293,7 @@ bool InstCombinerImpl::run() {
         if (NumUsers == 0) {
           // Don't sink if the successor follows through a sync instruction.
           if (isa<SyncInst>(BB->getTerminator()))
-            return None;
+            return std::nullopt;
 
           // Try sinking to another block. If that block is unreachable, then do
           // not bother. SimplifyCFG should handle it.

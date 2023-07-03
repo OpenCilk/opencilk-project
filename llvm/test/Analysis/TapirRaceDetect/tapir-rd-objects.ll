@@ -771,15 +771,15 @@ if.else.i179:                                     ; preds = %if.then11.i, %do.bo
   call void @llvm.dbg.value(metadata i32 %add.i178, metadata !2151, metadata !DIExpression()), !dbg !2542
   br label %86, !dbg !2542
 
-; CHECK: store %class.Pennant* %c.0.i.lcssa, %class.Pennant** %arrayidx21.i, align 8
-; CHECK-NEXT: %arrayidx21.i = getelementptr inbounds %class.Pennant*, %class.Pennant** %.lcssa, i64 %idxprom20.pre-phi.i
+; CHECK: store ptr %c.0.i.lcssa, ptr %arrayidx21.i, align 8
+; CHECK-NEXT: %arrayidx21.i = getelementptr inbounds ptr, ptr %.lcssa, i64 %idxprom20.pre-phi.i
 ; CHECK-DAG: Via Ancestor Mod Ref, Opaque
 ; CHECK-DAG: Local
 
 ; CHECK: Underlying objects of races:
-; CHECK: %{{83|78}} = load %class.Pennant**, %class.Pennant*** %65, align 8
+; CHECK: %{{83|78}} = load ptr, ptr %65, align 8
 ; CHECK-NEXT: Mod Ref
-; CHECK: %{{83|78}} = load %class.Pennant**, %class.Pennant*** %65, align 8
+; CHECK: %{{83|78}} = load ptr, ptr %65, align 8
 ; CHECK-NEXT: Mod Ref
 
 ; <label>:86:                                     ; preds = %if.else.i179, %85

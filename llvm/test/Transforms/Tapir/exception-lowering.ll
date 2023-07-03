@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -243,7 +242,7 @@ declare void @llvm.taskframe.use(token) #3
 define dso_local void @_Z16spawn_tf_nocatchi(i32 %n) local_unnamed_addr #6 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: define dso_local void @_Z16spawn_tf_nocatchi(i32 %n)
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: call void @__cilkrts_enter_frame_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_1(ptr %[[CILKSF]])
 entry:
   %syncreg = tail call token @llvm.syncregion.start()
   %0 = tail call token @llvm.taskframe.create()
@@ -279,7 +278,7 @@ declare void @llvm.taskframe.resume.sl_p0i8i32s(token, { i8*, i32 }) #9
 define dso_local void @_Z21spawn_stmt_destructori(i32 %n) local_unnamed_addr #4 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: define dso_local void @_Z21spawn_stmt_destructori(i32 %n)
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: call void @__cilkrts_enter_frame_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_1(ptr %[[CILKSF]])
 entry:
   %syncreg = tail call token @llvm.syncregion.start()
   %0 = tail call token @llvm.taskframe.create()
@@ -333,7 +332,7 @@ entry:
 define dso_local void @_Z21spawn_decl_destructori(i32 %n) local_unnamed_addr #4 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: define dso_local void @_Z21spawn_decl_destructori(i32 %n)
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: call void @__cilkrts_enter_frame_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_1(ptr %[[CILKSF]])
 entry:
   %syncreg = tail call token @llvm.syncregion.start()
   %0 = tail call token @llvm.taskframe.create()
@@ -379,7 +378,7 @@ lpad:                                             ; preds = %det.achd
 define dso_local void @_Z22spawn_block_destructori(i32 %n) local_unnamed_addr #6 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: define dso_local void @_Z22spawn_block_destructori(i32 %n)
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: call void @__cilkrts_enter_frame_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_1(ptr %[[CILKSF]])
 entry:
   %f = alloca %class.Foo, align 1
   %syncreg = tail call token @llvm.syncregion.start()
@@ -397,7 +396,7 @@ det.achd:                                         ; preds = %entry
   %call = invoke i32 @_Z3bazRK3Foo(%class.Foo* nonnull dereferenceable(1) %f)
           to label %invoke.cont unwind label %lpad
 ; CHECK: [[CALLHELPER]]:
-; CHECK-NEXT: invoke fastcc void @_Z22spawn_block_destructori.outline_entry.tf.otd1(%class.Foo*
+; CHECK-NEXT: invoke fastcc void @_Z22spawn_block_destructori.outline_entry.tf.otd1(ptr
 ; CHECK-NEXT: to label %[[CONTINUE]] unwind label %lpad9
 
 invoke.cont:                                      ; preds = %det.achd
@@ -431,13 +430,13 @@ lpad9:                                            ; preds = %lpad2
   call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %0) #10
   resume { i8*, i32 } %4
 ; CHECK: {{^lpad9}}:
-; CHECK-NEXT: landingpad { i8*, i32 }
+; CHECK-NEXT: landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK: call i8* @__cilk_catch_exception(%struct.__cilkrts_stack_frame* %[[CILKSF]]
-; CHECK: call void @_ZN3FooD2Ev(%class.Foo*
-; CHECK-NEXT: call void @llvm.lifetime.end.p0i8(
-; CHECK: call void @__cilk_parent_epilogue(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: resume { i8*, i32 }
+; CHECK: call ptr @__cilk_catch_exception(ptr %[[CILKSF]]
+; CHECK: call void @_ZN3FooD2Ev(ptr
+; CHECK-NEXT: call void @llvm.lifetime.end.p0(
+; CHECK: call void @__cilk_parent_epilogue(ptr %[[CILKSF]])
+; CHECK: resume { ptr, i32 }
 
 unreachable:                                      ; preds = %lpad2, %lpad
   unreachable
@@ -448,7 +447,7 @@ unreachable:                                      ; preds = %lpad2, %lpad
 define dso_local void @_Z18spawn_throw_inlinei(i32 %n) local_unnamed_addr #6 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: define dso_local void @_Z18spawn_throw_inlinei(i32 %n)
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: call void @__cilkrts_enter_frame_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_1(ptr %[[CILKSF]])
 entry:
   %syncreg = tail call token @llvm.syncregion.start()
   %0 = tail call token @llvm.taskframe.create()
@@ -508,7 +507,7 @@ sync.continue:                                    ; preds = %det.cont
 define dso_local void @_Z14spawn_tryblocki(i32 %n) local_unnamed_addr #6 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 ; CHECK-LABEL: define dso_local void @_Z14spawn_tryblocki(i32 %n)
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: call void @__cilkrts_enter_frame_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_1(ptr %[[CILKSF]])
 entry:
   %syncreg = tail call token @llvm.syncregion.start()
   %0 = tail call token @llvm.taskframe.create()
@@ -600,10 +599,10 @@ lpad16:                                           ; preds = %invoke.cont22, %det
   %11 = tail call i8* @__cxa_begin_catch(i8* %8) #10
   br i1 %matches, label %catch36, label %catch
 ; CHECK: [[TFLPAD_SPLIT]]:
-; CHECK-NEXT: landingpad { i8*, i32 }
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-; CHECK-NEXT: catch i8* null
-; CHECK: call i8* @__cilk_catch_exception(%struct.__cilkrts_stack_frame* %[[CILKSF]],
+; CHECK-NEXT: landingpad { ptr, i32 }
+; CHECK-NEXT: catch ptr @_ZTIi
+; CHECK-NEXT: catch ptr null
+; CHECK: call ptr @__cilk_catch_exception(ptr %[[CILKSF]],
 ; CHECK: br label %lpad16
 
 ; CHECK: {{^lpad16}}:
@@ -653,8 +652,8 @@ eh.resume:                                        ; preds = %lpad32, %lpad38
   %lpad.val45 = insertvalue { i8*, i32 } %lpad.val44, i32 %ehselector.slot18.0, 1
   resume { i8*, i32 } %lpad.val45
 ; CHECK: {{^eh.resume}}:
-; CHECK: call void @__cilk_parent_epilogue(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: resume { i8*, i32 }
+; CHECK: call void @__cilk_parent_epilogue(ptr %[[CILKSF]])
+; CHECK-NEXT: resume { ptr, i32 }
 
 terminate.lpad:                                   ; preds = %lpad32
   %20 = landingpad { i8*, i32 }
@@ -677,8 +676,8 @@ declare void @llvm.assume(i1) #10
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
@@ -689,46 +688,46 @@ declare void @llvm.assume(i1) #10
 ; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: %[[NEWRET:.+]] = invoke i8* @_Znwm(i64 1)
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: %[[NEWRET:.+]] = invoke ptr @_Znwm(i64 1)
 ; CHECK-NEXT: to label %[[NEWCONT:.+]] unwind label %[[NEWLPAD:.+]]
 
 ; CHECK: [[NEWCONT]]:
-; CHECK-NEXT: %[[FOOARG:.+]] = bitcast i8* %[[NEWRET]] to %class.Foo*
-; CHECK-NEXT: tail call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[FOOARG]])
-; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK-NEXT: %[[FOOARG:.+]] = bitcast ptr %[[NEWRET]] to ptr
+; CHECK-NEXT: tail call void @_ZN3FooC2Ev(ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK-NEXT: br label %[[BODY:.+]]
 
 ; CHECK: [[NEWLPAD]]:
-; CHECK-NEXT: %[[NEWLPADVAL:.+]] = landingpad { i8*, i32 }
+; CHECK-NEXT: %[[NEWLPADVAL:.+]] = landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK: call void @__cilk_parent_epilogue(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: resume { i8*, i32 } %[[NEWLPADVAL]]
+; CHECK: call void @__cilk_parent_epilogue(ptr %[[CILKSF]])
+; CHECK-NEXT: resume { ptr, i32 } %[[NEWLPADVAL]]
 
 ; CHECK: [[BODY]]:
-; CHECK: invoke i32 @_Z3barP3Foo(%class.Foo* {{.+}}%[[FOOARG]])
+; CHECK: invoke i32 @_Z3barP3Foo(ptr {{.+}}%[[FOOARG]])
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 ; CHECK: [[LPAD]]:
-; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad { i8*, i32 }
+; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK: %[[EXNDATA:.+]] = extractvalue { i8*, i32 } %[[LPADVAL]], 0
-; CHECK-NEXT: %[[FLAGSADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %[[CILKSF]], i32 0, i32 0
-; CHECK-NEXT: %[[FLAGS:.+]] = load {{.+}} i32, i32* %[[FLAGSADDR]]
+; CHECK: %[[EXNDATA:.+]] = extractvalue { ptr, i32 } %[[LPADVAL]], 0
+; CHECK-NEXT: %[[FLAGSADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, ptr %[[CILKSF]], i32 0, i32 0
+; CHECK-NEXT: %[[FLAGS:.+]] = load {{.+}} i32, ptr %[[FLAGSADDR]]
 ; CHECK-NEXT: %[[NEWFLAGS:.+]] = or i32 %[[FLAGS]],
 ; CHECK: store {{.+}} i32 %[[NEWFLAGS]],
-; CHECK: %[[EXNDATAADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %[[CILKSF]], i32 0, i32 4
-; CHECK-NEXT: store {{.+}} i8* %[[EXNDATA]], i8** %[[EXNDATAADDR]]
-; CHECK-NEXT: call void @__cilk_parent_epilogue(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: resume { i8*, i32 } %[[LPADVAL]]
+; CHECK: %[[EXNDATAADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, ptr %[[CILKSF]], i32 0, i32 4
+; CHECK-NEXT: store {{.+}} ptr %[[EXNDATA]], ptr %[[EXNDATAADDR]]
+; CHECK-NEXT: call void @__cilk_parent_epilogue(ptr %[[CILKSF]])
+; CHECK-NEXT: resume { ptr, i32 } %[[LPADVAL]]
 
 
 ; CHECK-LABEL: define private fastcc void @_Z14spawn_tryblocki.outline_det.cont11.tf.otd1(i32
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
@@ -739,21 +738,21 @@ declare void @llvm.assume(i1) #10
 ; CHECK-LABEL: define private fastcc void @_Z18spawn_throw_inlinei.outline_entry.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: %[[NEWRET:.+]] = tail call i8* @_Znwm(i64 1)
-; CHECK-NEXT: %[[FOOARG:.+]] = bitcast i8* %[[NEWRET]] to %class.Foo*
-; CHECK-NEXT: tail call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[FOOARG]])
-; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: %[[NEWRET:.+]] = tail call ptr @_Znwm(i64 1)
+; CHECK-NEXT: %[[FOOARG:.+]] = bitcast ptr %[[NEWRET]] to ptr
+; CHECK-NEXT: tail call void @_ZN3FooC2Ev(ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
-; CHECK: invoke i32 @_Z3barP3Foo(%class.Foo* {{.+}}%[[FOOARG]])
+; CHECK: invoke i32 @_Z3barP3Foo(ptr {{.+}}%[[FOOARG]])
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 ; CHECK: [[LPAD]]:
-; CHECK-NEXT: landingpad { i8*, i32 }
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
-; CHECK: tail call i8* @__cxa_begin_catch(
+; CHECK-NEXT: landingpad { ptr, i32 }
+; CHECK-NEXT: catch ptr @_ZTIi
+; CHECK: tail call ptr @__cxa_begin_catch(
 ; CHECK: invoke void @_Z10handle_exni(
 ; CHECK-NEXT: to label %[[HANDLEEXNCONT:.+]] unwind label %[[LPADIN:.+]]
 
@@ -768,48 +767,48 @@ declare void @llvm.assume(i1) #10
 ; CHECK: %[[ARG:[a-zA-Z0-9._]+]])
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
-; CHECK: invoke i32 @_Z3bazRK3Foo(%class.Foo* {{.+}}%[[ARG]])
+; CHECK: invoke i32 @_Z3bazRK3Foo(ptr {{.+}}%[[ARG]])
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 ; CHECK: [[LPAD]]:
-; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad { i8*, i32 }
+; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK: %[[EXNDATA:.+]] = extractvalue { i8*, i32 } %[[LPADVAL]], 0
-; CHECK-NEXT: %[[FLAGSADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %[[CILKSF]], i32 0, i32 0
-; CHECK-NEXT: %[[FLAGS:.+]] = load {{.+}} i32, i32* %[[FLAGSADDR]]
+; CHECK: %[[EXNDATA:.+]] = extractvalue { ptr, i32 } %[[LPADVAL]], 0
+; CHECK-NEXT: %[[FLAGSADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, ptr %[[CILKSF]], i32 0, i32 0
+; CHECK-NEXT: %[[FLAGS:.+]] = load {{.+}} i32, ptr %[[FLAGSADDR]]
 ; CHECK-NEXT: %[[NEWFLAGS:.+]] = or i32 %[[FLAGS]],
 ; CHECK: store {{.+}} i32 %[[NEWFLAGS]],
-; CHECK: %[[EXNDATAADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %[[CILKSF]], i32 0, i32 4
-; CHECK-NEXT: store {{.+}} i8* %[[EXNDATA]], i8** %[[EXNDATAADDR]]
-; CHECK-NEXT: call void @__cilk_parent_epilogue(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK-NEXT: resume { i8*, i32 } %[[LPADVAL]]
+; CHECK: %[[EXNDATAADDR:.+]] = getelementptr inbounds %struct.__cilkrts_stack_frame, ptr %[[CILKSF]], i32 0, i32 4
+; CHECK-NEXT: store {{.+}} ptr %[[EXNDATA]], ptr %[[EXNDATAADDR]]
+; CHECK-NEXT: call void @__cilk_parent_epilogue(ptr %[[CILKSF]])
+; CHECK-NEXT: resume { ptr, i32 } %[[LPADVAL]]
 
 
 ; CHECK-LABEL: define private fastcc void @_Z21spawn_decl_destructori.outline_entry.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, %class.Foo* %[[REFTMP]], i64 0, i32 0
-; CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[FOOARG]])
-; CHECK-NEXT: call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[REFTMP]])
-; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, ptr %[[REFTMP]], i64 0, i32 0
+; CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: call void @_ZN3FooC2Ev(ptr nonnull %[[REFTMP]])
+; CHECK-NEXT: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
-; CHECK: invoke i32 @_Z3bazRK3Foo(%class.Foo* {{.+}}%[[REFTMP]])
+; CHECK: invoke i32 @_Z3bazRK3Foo(ptr {{.+}}%[[REFTMP]])
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 ; CHECK: [[LPAD]]:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: call void @_ZN3FooD2Ev(%class.Foo* nonnull %[[REFTMP]])
-; CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[FOOARG]])
+; CHECK-NEXT: call void @_ZN3FooD2Ev(ptr nonnull %[[REFTMP]])
+; CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 1, ptr nonnull %[[FOOARG]])
 ; CHECK-NEXT: unreachable
 
 
@@ -817,37 +816,37 @@ declare void @llvm.assume(i1) #10
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: %[[REFTMP:.+]] = alloca %class.Foo
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, %class.Foo* %[[REFTMP]], i64 0, i32 0
-; CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[FOOARG]])
-; CHECK-NEXT: call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[REFTMP]])
-; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: %[[FOOARG:.+]] = getelementptr inbounds %class.Foo, ptr %[[REFTMP]], i64 0, i32 0
+; CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: call void @_ZN3FooC2Ev(ptr nonnull %[[REFTMP]])
+; CHECK-NEXT: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
-; CHECK: invoke i32 @_Z3bazRK3Foo(%class.Foo* {{.+}}%[[REFTMP]])
+; CHECK: invoke i32 @_Z3bazRK3Foo(ptr {{.+}}%[[REFTMP]])
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LPAD:.+]]
 
 ; CHECK: [[LPAD]]:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: call void @_ZN3FooD2Ev(%class.Foo* nonnull %[[REFTMP]])
-; CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[FOOARG]])
+; CHECK-NEXT: call void @_ZN3FooD2Ev(ptr nonnull %[[REFTMP]])
+; CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 1, ptr nonnull %[[FOOARG]])
 ; CHECK-NEXT: unreachable
 
 
 ; CHECK-LABEL: define private fastcc void @_Z16spawn_tf_nocatchi.outline_entry.tf.otd1()
 ; CHECK: %[[CILKSF:.+]] = alloca %struct.__cilkrts_stack_frame
 
-; CHECK: call void @__cilkrts_enter_frame_fast_1(%struct.__cilkrts_stack_frame* %[[CILKSF]])
-; CHECK: %[[NEWRET:.+]] = tail call i8* @_Znwm(i64 1)
-; CHECK-NEXT: %[[FOOARG:.+]] = bitcast i8* %[[NEWRET]] to %class.Foo*
-; CHECK-NEXT: call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[FOOARG]])
-; CHECK-NEXT: call void @__cilkrts_detach(%struct.__cilkrts_stack_frame* %[[CILKSF]])
+; CHECK: call void @__cilkrts_enter_frame_fast_1(ptr %[[CILKSF]])
+; CHECK: %[[NEWRET:.+]] = tail call ptr @_Znwm(i64 1)
+; CHECK-NEXT: %[[FOOARG:.+]] = bitcast ptr %[[NEWRET]] to ptr
+; CHECK-NEXT: call void @_ZN3FooC2Ev(ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: call void @__cilkrts_detach(ptr %[[CILKSF]])
 ; CHECK: br label %[[BODY:.+]]
 
 ; CHECK: [[BODY]]:
-; CHECK: tail call i32 @_Z3barP3Foo(%class.Foo* {{.+}}%[[FOOARG]])
+; CHECK: tail call i32 @_Z3barP3Foo(ptr {{.+}}%[[FOOARG]])
 
 ; CHECK-NOT: landingpad
 

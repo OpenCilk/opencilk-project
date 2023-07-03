@@ -1,8 +1,7 @@
 ; Check that Cilksan properly instruments programs with loops in the
 ; exits of Tapir loops.
 ;
-; RUN: opt < %s -enable-new-pm=0 -csan -S -o - | FileCheck %s
-; RUN: opt < %s -passes='csi-setup,cilksan' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='csi-setup,cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -424,7 +423,7 @@ if.then.i.i.i27.i.i.i:                            ; preds = %arraydestroy.body.i
 
 ; CHECK: if.then.i.i.i27.i.i.i:
 ; CHECK: call void @__csan_before_call(i64 %[[CALL_ID1:[a-zA-Z0-9._]+]], i64
-; CHECK-NEXT: invoke dereferenceable(96) %"struct.parlay::pool_allocator"* @_ZN6parlay8internal21get_default_allocatorEv()
+; CHECK-NEXT: invoke dereferenceable(96) ptr @_ZN6parlay8internal21get_default_allocatorEv()
 ; CHECK-NEXT: to label %call.i.i.i.i.i.noexc.i.i29.i.i.i unwind label %lpad.i.i31.i.i.i
 
 call.i.i.i.i.i.noexc.i.i29.i.i.i:                 ; preds = %if.then.i.i.i27.i.i.i
@@ -457,7 +456,7 @@ lpad.i.i31.i.i.i:                                 ; preds = %call.i.i.i.i.i.noex
 ; CHECK: %[[CALL_ID_PHI:.+]] = phi i64 [ %[[CALL_ID2]], %call.i.i.i.i.i.noexc.i.i29.i.i.i ], [ %[[CALL_ID1]], %{{.+}} ]
 ; CHECK: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* null
+; CHECK-NEXT: catch ptr null
 ; CHECK-NEXT: call void @__csan_after_call(i64 %[[CALL_ID_PHI]],
 
 _ZN6parlay14_sequence_baseIcNS_9allocatorIcEEED2Ev.exit32.i.i.i: ; preds = %.noexc.i.i30.i.i.i, %arraydestroy.body.i.i.i

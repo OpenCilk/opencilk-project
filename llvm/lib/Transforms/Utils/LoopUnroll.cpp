@@ -287,28 +287,30 @@ template <> struct GraphTraits<TaskExitGraph<BasicBlock *>> {
 
 // Clone task-exit blocks that are effectively part of the loop but don't appear
 // to be based on standard loop analysis.
-static void handleTaskExits(SmallPtrSetImpl<BasicBlock *> &TaskExits,
-                            SmallPtrSetImpl<BasicBlock *> &TaskExitSrcs,
-                            unsigned It, Loop *L, BasicBlock *Header,
-                            LoopInfo *LI, NewLoopsMap &NewLoops,
-                            SmallSetVector<Loop *, 4> &LoopsToSimplify,
-                            ValueToValueMapTy &LastValueMap,
-                            SmallVectorImpl<BasicBlock *> &NewBlocks,
-                            std::vector<BasicBlock *> &UnrolledLoopBlocks,
-                            DominatorTree *DT) {
+static void handleTaskExits(
+    SmallPtrSetImpl<BasicBlock *> &TaskExits,
+    SmallPtrSetImpl<BasicBlock *> &TaskExitSrcs, unsigned It, Loop *L,
+    BasicBlock *Header, BasicBlock *BBInsertPt, LoopInfo *LI,
+    NewLoopsMap &NewLoops, SmallSetVector<Loop *, 4> &LoopsToSimplify,
+    ValueToValueMapTy &LastValueMap, SmallVectorImpl<BasicBlock *> &NewBlocks,
+    std::vector<BasicBlock *> &UnrolledLoopBlocks, DominatorTree *DT) {
   // Get the TaskExits in reverse post order.  Using post_order here seems
   // necessary to ensure the custom filter for processing task exits is used.
   SmallVector<BasicBlock *, 8> TaskExitsRPO;
   for (BasicBlock *TEStart : TaskExitSrcs)
     for (BasicBlock *BB : post_order<TaskExitGraph<BasicBlock *>>((TEStart)))
       TaskExitsRPO.push_back(BB);
-  std::reverse(TaskExitsRPO.begin(), TaskExitsRPO.end());
+
+  if (TaskExitsRPO.empty())
+    // No task exits to handle.
+    return;
 
   // Process the task exits similarly to loop blocks.
-  for (BasicBlock *BB : TaskExitsRPO) {
+  auto BlockInsertPt = std::next(BBInsertPt->getIterator());
+  for (BasicBlock *BB : reverse(TaskExitsRPO)) {
     ValueToValueMapTy VMap;
     BasicBlock *New = CloneBasicBlock(BB, VMap, "." + Twine(It));
-    Header->getParent()->getBasicBlockList().push_back(New);
+    Header->getParent()->insert(BlockInsertPt, New);
 
     assert(BB != Header && "Header should not be a task exit");
     // Tell LI about New.
@@ -738,8 +740,8 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
 
     // Handle task-exit blocks from this loop similarly to ordinary loop-body
     // blocks.
-    handleTaskExits(TaskExits, TaskExitSrcs, It, L, Header, LI, NewLoops,
-                    LoopsToSimplify, LastValueMap, NewBlocks,
+    handleTaskExits(TaskExits, TaskExitSrcs, It, L, Header, Latches.back(), LI,
+                    NewLoops, LoopsToSimplify, LastValueMap, NewBlocks,
                     UnrolledLoopBlocks, DT);
 
     // Remap all instructions in the most recent iteration

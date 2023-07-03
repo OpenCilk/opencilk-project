@@ -3,7 +3,7 @@
 extern void identity_long(void *);
 extern void reduce_long(void *, void *);
 
-typedef long _Hyperobject(identity_long, reduce_long) rlong __attribute__((aligned(16)));
+typedef long _Hyperobject(identity_long, reduce_long) rlong;
 
 // CHECK-LABEL: local_array_of_hyper
 long local_array_of_hyper(unsigned int x)

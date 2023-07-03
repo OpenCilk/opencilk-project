@@ -381,7 +381,7 @@ public:
     IncompleteOnly = 3,
   };
 
-  enum class CSIExtensionPoint {
+  enum CSIExtensionPoint {
     // Don't run CSI
     CSI_None = 0,
     // The following extension points should be consistent with the extension

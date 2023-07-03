@@ -3033,16 +3033,18 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     MaybeDetach(this, SpawnedScp);
     return RValue::get(Builder.CreateCall(F, {Begin, End}));
   }
-  case Builtin::BI__builtin_trap:
+  case Builtin::BI__builtin_trap: {
     IsSpawnedScope SpawnedScp(this);
     MaybeDetach(this, SpawnedScp);
     EmitTrapCall(Intrinsic::trap);
     return RValue::get(nullptr);
-  case Builtin::BI__debugbreak:
+  }
+  case Builtin::BI__debugbreak: {
     IsSpawnedScope SpawnedScp(this);
     MaybeDetach(this, SpawnedScp);
     EmitTrapCall(Intrinsic::debugtrap);
     return RValue::get(nullptr);
+  }
   case Builtin::BI__builtin_unreachable: {
     IsSpawnedScope SpawnedScp(this);
     MaybeDetach(this, SpawnedScp);

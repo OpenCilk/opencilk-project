@@ -1,5 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -S | FileCheck %s
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -tapir-target=cilk -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 
@@ -1382,7 +1380,7 @@ entry.split.split:
 
 ; CHECK: %[[PHI:.+]] = phi i64 [ %.pre125, %.thread113 ],
 ; CHECK-NOT: store i64 %[[PHI]],
-; CHECK-NEXT: %.phi.trans.insert75122 = phi i32**
+; CHECK-NEXT: %.phi.trans.insert75122 = phi ptr
 
 det.achd:                                         ; preds = %29
   %39 = call i8* @llvm.task.frameaddress(i32 0)

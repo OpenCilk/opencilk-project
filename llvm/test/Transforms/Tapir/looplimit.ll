@@ -1,7 +1,6 @@
 ; Test that Tapir's loop spawning pass correctly transforms a loop
 ; that reads its original end iteration count.
 
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -S | FileCheck %s
 ; RUN: opt < %s -passes=loop-spawning -S | FileCheck %s
 
 source_filename = "looplimittest.c"
@@ -64,7 +63,7 @@ pfor.detach:                                      ; preds = %entry, %pfor.inc
 pfor.body:                                        ; preds = %pfor.detach
 ; CHECK: {{^(; <label>:)?}}[[BODY]]:
   %call = tail call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([13 x i8], [13 x i8]* @.str, i64 0, i64 0), i32 %limit)
-; CHECK: call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([13 x i8], [13 x i8]* @.str, i64 0, i64 0), i32 [[LIMITARG]])
+; CHECK: call i32 (ptr, ...) @printf(ptr @.str, i32 [[LIMITARG]])
   reattach within %syncreg, label %pfor.inc
 ; CHECK: br label %[[INC:[a-zA-Z0-9._]+]]
 

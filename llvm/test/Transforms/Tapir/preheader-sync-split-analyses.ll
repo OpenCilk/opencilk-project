@@ -1,8 +1,7 @@
 ; Check that preheader blocks of loops terminated by syncs are
 ; properly split and that compiler analyses are properly updated.
 ;
-; RUN: opt < %s -licm -S -o - | FileCheck %s
-; RUN: opt < %s -passes='lcssa,require<opt-remark-emit>,loop-mssa(licm)' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='lcssa,require<opt-remark-emit>,loop-mssa(licm)' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -232,7 +231,7 @@ for.body18:                                       ; preds = %for.body18, %pfor.c
 
 ; CHECK: for.body18:
 ; CHECK: call void @__csan_sqrt(i64 undef, i64 undef, i8 0, i64 0, double undef, double undef)
-; CHECK: %0 = load i64, i64* @__csi_unit_callsite_base_id, align 8
+; CHECK: %0 = load i64, ptr @__csi_unit_callsite_base_id, align 8
 ; CHECK: %1 = add i64 %0, 37
 ; CHECK: call void @__csan_sqrt(i64 %1, i64 undef, i8 0, i64 0, double undef, double undef)
 ; CHECK: br i1

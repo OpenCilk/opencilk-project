@@ -12,7 +12,7 @@ entry:
   unreachable
 }
 
-; CHECK: tail call void (i32, ...) bitcast (void (...)* @bpnn_initialize to void (i32, ...)*)(i32 7)
+; CHECK: tail call void (i32, ...) @bpnn_initialize(i32 7)
 ; CHECK: Opaque
 ; CHECK: Opaque racer
 

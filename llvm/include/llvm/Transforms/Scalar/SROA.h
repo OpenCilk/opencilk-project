@@ -174,7 +174,7 @@ private:
 
   /// Helper used by both the public run method and by the legacy pass.
   PreservedAnalyses runImpl(Function &F, DomTreeUpdater &RunDTU,
-                            AssumptionCache &RunAC);
+                            AssumptionCache &RunAC, TaskInfo &RunTI);
   PreservedAnalyses runImpl(Function &F, DominatorTree &RunDT,
                             AssumptionCache &RunAC, TaskInfo &RunTI);
 

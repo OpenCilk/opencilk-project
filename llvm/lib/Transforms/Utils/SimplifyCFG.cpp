@@ -1615,7 +1615,10 @@ bool SimplifyCFGOpt::HoistThenElseCodeToIf(BranchInst *BI,
       // Disallow hoisting of setjmp.  Although hoisting the setjmp technically
       // produces valid IR, it seems hard to generate appropariate machine code
       // from this IR, e.g., for X86.
-      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(C1))
+      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(I1))
+        if (Intrinsic::eh_sjlj_setjmp == II->getIntrinsicID())
+          return Changed;
+      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(I2))
         if (Intrinsic::eh_sjlj_setjmp == II->getIntrinsicID())
           return Changed;
 
@@ -5242,9 +5245,10 @@ bool SimplifyCFGOpt::simplifyUnreachable(UnreachableInst *UI) {
           DTU->applyUpdates(Updates);
           Updates.clear();
         }
-        auto *CI = cast<CallInst>(removeUnwindEdge(TI->getParent(), DTU));
-        if (!CI->doesNotThrow())
-          CI->setDoesNotThrow();
+        if (auto *CI =
+                dyn_cast<CallInst>(removeUnwindEdge(TI->getParent(), DTU)))
+          if (!CI->doesNotThrow())
+            CI->setDoesNotThrow();
         Changed = true;
       }
     } else if (auto *CSI = dyn_cast<CatchSwitchInst>(TI)) {
@@ -5312,7 +5316,7 @@ bool SimplifyCFGOpt::simplifyUnreachable(UnreachableInst *UI) {
       if (DI->getUnwindDest() == BB) {
         // If the unwind destination of the detach is unreachable, simply remove
         // the unwind edge.
-        removeUnwindEdge(DI->getParent());
+        removeUnwindEdge(DI->getParent(), DTU);
         Changed = true;
       }
       // Detaches of unreachables are handled via

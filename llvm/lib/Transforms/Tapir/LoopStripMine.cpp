@@ -130,7 +130,7 @@ void llvm::simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
         if (LI->replacementPreservesLCSSAForm(Inst, V))
           Inst->replaceAllUsesWith(V);
       if (isInstructionTriviallyDead(Inst))
-        BB->getInstList().erase(Inst);
+        Inst->eraseFromParent();
     }
   }
 
@@ -144,7 +144,7 @@ void llvm::simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
 /// flags, TTI overrides and user specified parameters.
 TargetTransformInfo::StripMiningPreferences llvm::gatherStripMiningPreferences(
     Loop *L, ScalarEvolution &SE, const TargetTransformInfo &TTI,
-    Optional<unsigned> UserCount) {
+    std::optional<unsigned> UserCount) {
   TargetTransformInfo::StripMiningPreferences SMP;
 
   // Set up the defaults
@@ -159,7 +159,7 @@ TargetTransformInfo::StripMiningPreferences llvm::gatherStripMiningPreferences(
   TTI.getStripMiningPreferences(L, SE, SMP);
 
   // Apply any user values specified by cl::opt
-  if (UserCount.hasValue())
+  if (UserCount)
     SMP.Count = *UserCount;
   if (StripMineUnrollRemainder.getNumOccurrences() > 0)
     SMP.UnrollRemainder = StripMineUnrollRemainder;
@@ -210,11 +210,11 @@ bool llvm::computeStripMineCount(
   // Solving for G yeilds G >= d/(\eps * S).  Substituting in \eps = 1/C for a
   // given coarsening factor C gives the equation below.
   Instruction *DetachI = L->getHeader()->getTerminator();
-  SMP.Count =
-      *((SMP.DefaultCoarseningFactor *
-         TTI.getUserCost(DetachI, TargetTransformInfo::TCK_SizeAndLatency) /
-         LoopCost)
-            .getValue());
+  SMP.Count = *((SMP.DefaultCoarseningFactor *
+                 TTI.getInstructionCost(
+                     DetachI, TargetTransformInfo::TCK_SizeAndLatency) /
+                 LoopCost)
+                    .getValue());
 
   return false;
 }
@@ -569,7 +569,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
         NewPHI->removeIncomingValue(Latch, false);
       } else {
         VMap[&*I] = NewPHI->getIncomingValueForBlock(Preheader);
-        cast<BasicBlock>(VMap[Header])->getInstList().erase(NewPHI);
+        NewPHI->eraseFromParent();
       }
     } else {
       unsigned idx = NewPHI->getBasicBlockIndex(Preheader);
@@ -678,7 +678,7 @@ static BasicBlock *NestDetachUnwindPredecessors(
     // from the old detach-unwind destination.
     Instruction *Clone = OrigLPad->clone();
     Clone->setName(Twine("lpad") + Suffix2);
-    OuterUD->getInstList().insert(OuterUD->getFirstInsertionPt(), Clone);
+    Clone->insertInto(OuterUD, OuterUD->getFirstInsertionPt());
 
     // Update the PHI nodes in EHCont to accommodate OuterUD.  If the PHI node
     // corresponds to the EHCont landingpad value, set its incoming value from
@@ -1045,10 +1045,8 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
                       ExtraTaskBlocks, SharedEHTaskBlocks, VMap, DT, LI);
 
   // Insert the cloned blocks into the function.
-  F->getBasicBlockList().splice(InsertBot->getIterator(),
-                                F->getBasicBlockList(),
-                                NewBlocks[0]->getIterator(),
-                                F->end());
+  F->splice(InsertBot->getIterator(), &*F, NewBlocks[0]->getIterator(),
+            F->end());
 
   // Loop structure should be the following:
   //  Epilog

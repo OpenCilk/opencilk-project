@@ -1,9 +1,7 @@
 ; Check that CilkSanitizer and CSI do not insert hooks for phi nodes
 ; at placeholder destinations of task exits.
 ;
-; RUN: opt < %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt < %s -passes='csi-setup,cilksan' -S | FileCheck %s
-; RUN: opt < %s -enable-new-pm=0 -csi -S | FileCheck %s
 ; RUN: opt < %s -passes='csi-setup,csi' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -116,11 +114,11 @@ pfor.inc173:                                      ; preds = %pfor.preattach172, 
 ; CHECK: unreachable
 
 ; CHECK: [[CSI_CLEANUP_TASK2]]:
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(
 ; CHECK-NEXT: to label %csi.cleanup.unreachable unwind label %{{.+}}
 
 ; CHECK: [[CSI_CLEANUP_TASK]]:
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(
 ; CHECK-NEXT: to label %csi.cleanup.unreachable unwind label %{{.+}}
 
 ; Function Attrs: argmemonly nounwind willreturn

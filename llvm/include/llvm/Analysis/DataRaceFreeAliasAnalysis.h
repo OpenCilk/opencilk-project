@@ -31,7 +31,7 @@ extern cl::opt<bool> EnableDRFAA;
 /// that may alias instructions may happen in parallel and the instructions are
 /// not otherwise marked atomic, then the data-race-free assumption asserts that
 /// they do not alias.
-class DRFAAResult : public AAResultBase<DRFAAResult> {
+class DRFAAResult : public AAResultBase {
   TaskInfo &TI;
 
 public:
@@ -43,7 +43,7 @@ public:
                   FunctionAnalysisManager::Invalidator &Inv);
 
   AliasResult alias(const MemoryLocation &LocA, const MemoryLocation &LocB,
-                    AAQueryInfo &AAQI);
+                    AAQueryInfo &AAQI, const Instruction *CtxI);
   ModRefInfo getModRefInfo(const CallBase *Call, const MemoryLocation &Loc,
                            AAQueryInfo &AAQI);
   ModRefInfo getModRefInfo(const CallBase *Call1, const CallBase *Call2,

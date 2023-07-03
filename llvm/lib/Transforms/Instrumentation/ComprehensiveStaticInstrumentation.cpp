@@ -39,6 +39,7 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/CSI.h"
@@ -187,14 +188,6 @@ INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
 INITIALIZE_PASS_END(ComprehensiveStaticInstrumentationLegacyPass, "csi",
                     "ComprehensiveStaticInstrumentation pass", false, false)
-
-ModulePass *llvm::createComprehensiveStaticInstrumentationLegacyPass() {
-  return new ComprehensiveStaticInstrumentationLegacyPass();
-}
-ModulePass *llvm::createComprehensiveStaticInstrumentationLegacyPass(
-    const CSIOptions &Options) {
-  return new ComprehensiveStaticInstrumentationLegacyPass(Options);
-}
 
 /// Return the first DILocation in the given basic block, or nullptr
 /// if none exists.
@@ -389,7 +382,7 @@ Value *ForensicTable::localToGlobalId(uint64_t LocalId,
   LLVMContext &C = IRB.getContext();
   Type *BaseIdTy = IRB.getInt64Ty();
   LoadInst *Base = IRB.CreateLoad(BaseIdTy, BaseId);
-  MDNode *MD = llvm::MDNode::get(C, None);
+  MDNode *MD = MDNode::get(C, std::nullopt);
   Base->setMetadata(LLVMContext::MD_invariant_load, MD);
   Value *Offset = IRB.getInt64(LocalId);
   return IRB.CreateAdd(Base, Offset);
@@ -903,8 +896,7 @@ void CSIImpl::splitBlocksAtCalls(Function &F, DominatorTree *DT, LoopInfo *LI) {
     SplitBlock(Call->getParent(), Call->getNextNode(), DT, LI);
 }
 
-int CSIImpl::getNumBytesAccessed(Value *Addr, Type *OrigTy,
-                                 const DataLayout &DL) {
+int CSIImpl::getNumBytesAccessed(Type *OrigTy, const DataLayout &DL) {
   assert(OrigTy->isSized());
   uint32_t TypeSize = DL.getTypeStoreSizeInBits(OrigTy);
   if (TypeSize % 8 != 0)
@@ -939,7 +931,7 @@ void CSIImpl::instrumentLoadOrStore(Instruction *I,
                         : cast<LoadInst>(I)->getPointerOperand();
   Type *Ty =
       IsWrite ? cast<StoreInst>(I)->getValueOperand()->getType() : I->getType();
-  int NumBytes = getNumBytesAccessed(Addr, Ty, DL);
+  int NumBytes = getNumBytesAccessed(Ty, DL);
   Type *AddrType = IRB.getInt8PtrTy();
 
   if (NumBytes == -1)
@@ -1513,7 +1505,7 @@ bool CSIImpl::getAllocFnArgs(const Instruction *I,
 
   // Return the old pointer argument for realloc-like functions or nullptr for
   // other allocation functions.
-  if (Value *Reallocated = getReallocatedOperand(CB, &TLI))
+  if (Value *Reallocated = getReallocatedOperand(CB))
     AllocFnArgs.push_back(Reallocated);
   else
     AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
@@ -1615,6 +1607,7 @@ void CSIImpl::instrumentFree(Instruction *I, const TargetLibraryInfo *TLI) {
   uint64_t LocalId = FreeFED.add(*I);
   Value *FreeId = FreeFED.localToGlobalId(LocalId, IRB);
 
+  // All currently supported free functions free the first argument.
   Value *Addr = FC->getArgOperand(0);
   CsiFreeProperty Prop;
   LibFunc FreeLibF;
@@ -2296,22 +2289,22 @@ bool CSIImpl::shouldNotInstrumentFunction(Function &F) {
   return false;
 }
 
-bool CSIImpl::isVtableAccess(Instruction *I) {
-  if (MDNode *Tag = I->getMetadata(LLVMContext::MD_tbaa))
+bool CSIImpl::isVtableAccess(const Instruction *I) {
+  if (const MDNode *Tag = I->getMetadata(LLVMContext::MD_tbaa))
     return Tag->isTBAAVtableAccess();
   return false;
 }
 
-bool CSIImpl::addrPointsToConstantData(Value *Addr) {
+bool CSIImpl::addrPointsToConstantData(const Value *Addr) {
   // If this is a GEP, just analyze its pointer operand.
-  if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Addr))
+  if (const GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Addr))
     Addr = GEP->getPointerOperand();
 
-  if (GlobalVariable *GV = dyn_cast<GlobalVariable>(Addr)) {
+  if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(Addr)) {
     if (GV->isConstant()) {
       return true;
     }
-  } else if (LoadInst *L = dyn_cast<LoadInst>(Addr)) {
+  } else if (const LoadInst *L = dyn_cast<LoadInst>(Addr)) {
     if (isVtableAccess(L)) {
       return true;
     }
@@ -2319,10 +2312,10 @@ bool CSIImpl::addrPointsToConstantData(Value *Addr) {
   return false;
 }
 
-bool CSIImpl::isAtomic(Instruction *I) {
-  if (LoadInst *LI = dyn_cast<LoadInst>(I))
+bool CSIImpl::isAtomic(const Instruction *I) {
+  if (const LoadInst *LI = dyn_cast<LoadInst>(I))
     return LI->isAtomic() && LI->getSyncScopeID() != SyncScope::SingleThread;
-  if (StoreInst *SI = dyn_cast<StoreInst>(I))
+  if (const StoreInst *SI = dyn_cast<StoreInst>(I))
     return SI->isAtomic() && SI->getSyncScopeID() != SyncScope::SingleThread;
   if (isa<AtomicRMWInst>(I))
     return true;
@@ -2333,8 +2326,10 @@ bool CSIImpl::isAtomic(Instruction *I) {
   return false;
 }
 
-bool CSIImpl::isThreadLocalObject(Value *Obj) {
-  if (GlobalValue *GV = dyn_cast<GlobalValue>(Obj))
+bool CSIImpl::isThreadLocalObject(const Value *Obj) {
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(Obj))
+    return Intrinsic::threadlocal_address == II->getIntrinsicID();
+  if (const GlobalValue *GV = dyn_cast<GlobalValue>(Obj))
     return GV->isThreadLocal();
   return false;
 }
@@ -2355,8 +2350,7 @@ void CSIImpl::computeLoadAndStoreProperties(
       WriteTargets.insert(Addr);
       CsiLoadStoreProperty Prop;
       // Update alignment property data
-      const Align Alignment = Store->getAlign();
-      Prop.setAlignment(Alignment.value());
+      Prop.setAlignment(MaybeAlign(Store->getAlign()));
       // Set vtable-access property
       Prop.setIsVtableAccess(isVtableAccess(Store));
       // Set constant-data-access property
@@ -2375,8 +2369,7 @@ void CSIImpl::computeLoadAndStoreProperties(
       Value *Addr = Load->getPointerOperand();
       CsiLoadStoreProperty Prop;
       // Update alignment property data
-      const Align Alignment = Load->getAlign();
-      Prop.setAlignment(Alignment.value());
+      Prop.setAlignment(MaybeAlign(Load->getAlign()));
       // Set vtable-access property
       Prop.setIsVtableAccess(isVtableAccess(Load));
       // Set constant-data-access-property
@@ -2403,9 +2396,8 @@ void CSIImpl::computeLoadAndStoreProperties(
 void CSIImpl::updateInstrumentedFnAttrs(Function &F) {
   F.removeFnAttr(Attribute::ReadOnly);
   F.removeFnAttr(Attribute::ReadNone);
-  F.removeFnAttr(Attribute::ArgMemOnly);
-  F.removeFnAttr(Attribute::InaccessibleMemOnly);
-  F.removeFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
+  F.setMemoryEffects(
+      MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef));
 }
 
 void CSIImpl::instrumentFunction(Function &F) {

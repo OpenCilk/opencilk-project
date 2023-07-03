@@ -67,7 +67,7 @@ define i64 @sum_2_at_with_int_conversion(ptr %A, ptr %B, i64 %N) {
 ; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <2 x i64> [[TMP13]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = tail call i64 @llvm.vector.reduce.add.v2i64(<2 x i64> [[BIN_RDX]])
 ; CHECK-NEXT:    br label [[LOOP_PREHEADER20]]
-; CHECK:       loop.preheader20:
+; CHECK:       loop.preheader21:
 ; CHECK-NEXT:    [[IV_PH:%.*]] = phi i64 [ 1, [[LOOP_PREHEADER]] ], [ [[IND_END]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[SUM_PH:%.*]] = phi i64 [ [[SUM_NEXT_PEEL]], [[LOOP_PREHEADER]] ], [ [[TMP15]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
@@ -193,7 +193,7 @@ define i64 @sum_3_at_with_int_conversion(ptr %A, ptr %B, ptr %C, i64 %N) {
 ; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <2 x i64> [[TMP17]], [[TMP16]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = tail call i64 @llvm.vector.reduce.add.v2i64(<2 x i64> [[BIN_RDX]])
 ; CHECK-NEXT:    br label [[LOOP_PREHEADER34]]
-; CHECK:       loop.preheader34:
+; CHECK:       loop.preheader35:
 ; CHECK-NEXT:    [[IV_PH:%.*]] = phi i64 [ 1, [[LOOP_PREHEADER]] ], [ [[IND_END]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[SUM_PH:%.*]] = phi i64 [ [[SUM_NEXT_PEEL]], [[LOOP_PREHEADER]] ], [ [[TMP19]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]

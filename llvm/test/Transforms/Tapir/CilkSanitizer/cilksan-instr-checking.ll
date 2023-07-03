@@ -2,7 +2,6 @@
 ; - Accesses based on NULL pointers
 ; - Calls to llvm.experimental.noalias.scope.decl
 ;
-; RUN: opt < %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt < %s -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -78,8 +77,8 @@ pfor.body34:
 ; CHECK: pfor.body34:
 ; CHECK: call void @__csan_task(
 
-; CHECK: call void @__csan_load(i64 %{{.+}}, i8* bitcast (%"class.std::basic_ostream"* (%"class.std::basic_ostream"*)* @_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_ to i8*),
-; CHECK: %funcload = load i32, i32* bitcast (%"class.std::basic_ostream"* (%"class.std::basic_ostream"*)* @_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_ to i32*), align 4
+; CHECK: call void @__csan_load(i64 %{{.+}}, ptr @_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_,
+; CHECK: %funcload = load i32, ptr @_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_, align 4
 
 handler.pointer_overflow36:
   tail call void @__ubsan_handle_pointer_overflow(i8* bitcast ({ { [18 x i8]*, i32, i32 } }* @0 to i8*), i64 %tmp, i64 %tmp2) #38
@@ -97,7 +96,7 @@ handler.type_mismatch38:
 
 ; CHECK: handler.type_mismatch38:
 ; CHECK-NOT: call void @__csan_store
-; CHECK: store i8 undef, i8* %arrayidx35,
+; CHECK: store i8 undef, ptr %arrayidx35,
 ; CHECK: call void @__csan_task_exit(
 ; CHECK-NEXT: reattach within %syncreg, label %pfor.inc41
 

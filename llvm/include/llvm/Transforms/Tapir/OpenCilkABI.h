@@ -60,7 +60,7 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSCilkForGrainsize32 = nullptr;
   FunctionCallee CilkRTSCilkForGrainsize64 = nullptr;
 
-  Align StackFrameAlign{8};  
+  MaybeAlign StackFrameAlign{8};
 
   // Accessors for CilkRTS ABI functions. When a bitcode file is loaded, these
   // functions should return the function defined in the bitcode file.

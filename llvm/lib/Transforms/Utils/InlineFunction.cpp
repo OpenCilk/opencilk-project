@@ -2845,8 +2845,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
       // Transfer all of the allocas over in a block.  Using splice means
       // that the instructions aren't removed from the symbol table, then
       // reinserted.
-      DetachedCtxEntryBlock.splice(InsertPoint, &*FirstNewBlock,
-                                   AI->getIterator(), I);
+      DetachedCtxEntryBlock->splice(InsertPoint, &*FirstNewBlock,
+                                    AI->getIterator(), I);
     }
 
     // Move any syncregion_start's into the entry basic block.  Avoid moving
@@ -2865,8 +2865,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
                cast<IntrinsicInst>(I)->getIntrinsicID())
           ++I;
 
-        DetachedCtxEntryBlock->getInstList().splice(
-            InsertPoint, FirstNewBlock->getInstList(), II->getIterator(), I);
+        DetachedCtxEntryBlock->splice(InsertPoint, &*FirstNewBlock,
+                                      II->getIterator(), I);
       }
     }
   }

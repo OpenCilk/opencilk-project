@@ -345,12 +345,6 @@ void PassManagerBuilder::populateModulePassManager(
   bool RerunAfterTapirLowering = false;
   bool TapirHasBeenLowered = (TapirTargetID::None == TapirTarget);
 
-  if (DisableTapirOpts && (TapirTargetID::None != TapirTarget)) {
-    MPM.add(createTaskCanonicalizePass());
-    MPM.add(createLowerTapirToTargetPass());
-    TapirHasBeenLowered = true;
-  }
-
   do {
     RerunAfterTapirLowering =
       !TapirHasBeenLowered && (TapirTargetID::None != TapirTarget);
@@ -559,7 +553,6 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createGlobalsAAWrapperPass());
 
     // Start of CallGraph SCC passes.
-    MPM.add(createPruneEHPass()); // Remove dead EH info
     MPM.add(createAlwaysInlinerLegacyPass());
 
     MPM.add(createPostOrderFunctionAttrsLegacyPass());
@@ -570,9 +563,6 @@ void PassManagerBuilder::populateModulePassManager(
     // pass manager that we are specifically trying to avoid. To prevent this
     // we must insert a no-op module pass to reset the pass manager.
     MPM.add(createBarrierNoopPass());
-
-    if (RunPartialInlining)
-      MPM.add(createPartialInliningPass());
 
     if (OptLevel > 1)
       // Remove avail extern fns and globals definitions if we aren't

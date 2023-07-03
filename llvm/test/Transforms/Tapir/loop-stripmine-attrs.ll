@@ -1,5 +1,4 @@
-; RUN: opt < %s -loop-stripmine -S -o - | FileCheck %s
-; RUN: opt < %s -passes='loop-stripmine' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='loop-stripmine' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -87,12 +86,12 @@ cleanup:                                          ; preds = %pfor.cond.cleanup, 
   ret void
 }
 
-; CHECK: define dso_local void @parfor_novec(double* noalias nocapture %y, double* noalias nocapture readonly %x, double %a, i32 %n)
+; CHECK: define dso_local void @parfor_novec(ptr noalias nocapture %y, ptr noalias nocapture readonly %x, double %a, i32 %n)
 ; CHECK: !llvm.loop [[STRPM_LOOPID1:![0-9]+]]
 ; CHECK: !llvm.loop [[STRPM_OUTER_LOOPID1:![0-9]+]]
 ; CHECK: !llvm.loop [[STRPM_EPIL_LOOPID1:![0-9]+]]
 
-; CHECK: define dso_local void @parfor_unroll_vec(double* noalias nocapture %y, double* noalias nocapture readonly %x, double %a, i32 %n)
+; CHECK: define dso_local void @parfor_unroll_vec(ptr noalias nocapture %y, ptr noalias nocapture readonly %x, double %a, i32 %n)
 ; CHECK: !llvm.loop [[STRPM_LOOPID2:![0-9]+]]
 ; CHECK: !llvm.loop [[STRPM_OUTER_LOOPID2:![0-9]+]]
 ; CHECK: !llvm.loop [[STRPM_EPIL_LOOPID2:![0-9]+]]

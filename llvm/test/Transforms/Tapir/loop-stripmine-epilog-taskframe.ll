@@ -192,7 +192,7 @@ pfor.cond.preheader:                              ; preds = %entry
 ; CHECK: [[EPIL_LPAD]]:
 ; CHECK-NEXT: %[[LANDINGPAD:.+]] = landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[REPLTF]], { i8*, i32 } %[[LANDINGPAD]])
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[REPLTF]], { ptr, i32 } %[[LANDINGPAD]])
 ; CHECK-NEXT: to label %[[UNREACHABLE:.+]] unwind label %[[DETLOOP_UNWIND:.+]]
 
 pfor.cond:                                        ; preds = %pfor.cond.preheader, %pfor.inc

@@ -1653,7 +1653,7 @@ BasicAAResult::checkInjectiveArguments(const Value *V1, const Value *O1,
     return AliasResult::MayAlias;
 
   // Two calls to the same function with the same value.
-  if (isValueEqualInPotentialCycles(A1, A2))
+  if (isValueEqualInPotentialCycles(A1, A2, AAQI))
     return Equal;
 
   // Two calls with different values based on the same object.
@@ -1667,9 +1667,10 @@ BasicAAResult::checkInjectiveArguments(const Value *V1, const Value *O1,
     BasicAAResult::DecomposedGEP DecompGEP2 =
         DecomposeGEPExpression(A2, DL, &AC, DT);
     if (DecompGEP1.VarIndices.empty() && DecompGEP2.VarIndices.empty() &&
-        isValueEqualInPotentialCycles(DecompGEP1.Base, DecompGEP2.Base))
-      return DecompGEP1.Offset == DecompGEP2.Offset ?
-          Equal : AliasResult(AliasResult::NoAlias);
+        isValueEqualInPotentialCycles(DecompGEP1.Base, DecompGEP2.Base, AAQI))
+      return DecompGEP1.Offset == DecompGEP2.Offset
+                 ? Equal
+                 : AliasResult(AliasResult::NoAlias);
     return AliasResult::MayAlias;
   }
 

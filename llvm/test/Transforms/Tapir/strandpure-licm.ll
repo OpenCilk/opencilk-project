@@ -1,5 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -licm -require-taskinfo-memoryssa -S -o - | FileCheck %s
-; RUN: opt < %s -aa-pipeline=basic-aa -passes='require<opt-remark-emit>,loop-mssa(licm)' -S -o - | FileCheck %s
+; RUN: opt < %s -aa-pipeline=basic-aa -passes='require<opt-remark-emit>,loop-mssa(licm)' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -153,14 +152,14 @@ pfor.inc:                                         ; preds = %invoke.cont2
   br i1 %inneriter.ncmp, label %pfor.inc.reattach, label %pfor.cond, !llvm.loop !27
 
 ; CHECK: pfor.cond.strpm.outer:
-; CHECK: call strand_noalias i8* @__cilkrts_hyper_lookup(
+; CHECK: call strand_noalias ptr @__cilkrts_hyper_lookup(
 ; CHECK: br label %pfor.cond
 
 ; CHECK: pfor.cond:
 ; CHECK: br label %pfor.body
 
 ; CHECK: pfor.body:
-; CHECK-NOT: call strand_noalias i8* @__cilkrts_hyper_lookup(
+; CHECK-NOT: call strand_noalias ptr @__cilkrts_hyper_lookup(
 ; CHECK: br label %pfor.inc
 
 ; CHECK: pfor.inc:

@@ -1,7 +1,5 @@
-; RUN: opt < %s -enable-new-pm=0 -simplifycfg -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
-; RUN: opt < %s -enable-new-pm=0 -task-simplify -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
-; RUN: opt < %s -passes='simplifycfg' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
-; RUN: opt < %s -passes='task-simplify' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
+; RUN: opt < %s -passes='simplifycfg' -S | FileCheck %s --check-prefixes=CHECK,CHECK-CFG
+; RUN: opt < %s -passes='task-simplify' -S | FileCheck %s --check-prefixes=CHECK,CHECK-TASK
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -101,7 +99,7 @@ lpad12.body:                                      ; preds = %lpad4, %lpad12
 ; CHECK-TASK: lpad12.tfsplit:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIPKc to i8*)
+; CHECK-NEXT: catch ptr @_ZTIPKc
 ; CHECK-TASK: br label %lpad12.body
 
 ; CHECK-TASK: lpad12.body:
@@ -159,7 +157,7 @@ ehcleanup26:                                      ; preds = %lpad15
           to label %unreachable unwind label %lpad12
 
 ; CHECK: ehcleanup26:
-; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %1, { i8*, i32 }
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i32s(token %1, { ptr, i32 }
 ; CHECK-CFG-NEXT: to label %unreachable unwind label %lpad12
 ; CHECK-TASK-NEXT: to label %unreachable unwind label %lpad12.tfsplit
 
@@ -168,7 +166,7 @@ ehcleanup44:                                      ; preds = %lpad12.body
           to label %unreachable unwind label %lpad49
 
 ; CHECK: ehcleanup44:
-; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i32s(
 ; CHECK-NEXT: to label %unreachable unwind label %lpad49
 
 lpad49:                                           ; preds = %ehcleanup44
@@ -234,7 +232,7 @@ lpad:                                             ; preds = %entry
 
 ; CHECK: lpad:
 ; CHECK-NEXT: landingpad
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 
 catch:                                            ; preds = %lpad
   %3 = extractvalue { i8*, i32 } %0, 0

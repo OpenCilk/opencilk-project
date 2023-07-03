@@ -134,7 +134,7 @@ _Z9pi_dprandl.exit:                               ; preds = %sync.continue.i, %f
 ; CHECK-NEXT: br label %ehcleanup18.i.us
 
 ; CHECK: ehcleanup18.i.us:
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg.i, { i8*, i32 } zeroinitializer)
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg.i, { ptr, i32 } zeroinitializer)
 ; CHECK-NEXT: to label %unreachable.i unwind label %lpad21.loopexit.i.split.us
 
 ; CHECK: lpad21.loopexit.i.split.us:

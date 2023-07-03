@@ -43,6 +43,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
+#include <optional>
 
 using namespace llvm;
 
@@ -4717,14 +4718,15 @@ bool X86InstrInfo::optimizeCompareInstr(MachineInstr &CmpInstr, Register SrcReg,
   return true;
 }
 
-Optional<BlockBRNZ> X86InstrInfo::isZeroTest(MachineBasicBlock &MBB) const {
+std::optional<BlockBRNZ>
+X86InstrInfo::isZeroTest(MachineBasicBlock &MBB) const {
   const X86RegisterInfo *TRI = &getRegisterInfo();
   SmallVector<MachineOperand, 4> Cond;
   MachineBasicBlock *TBB = nullptr, *FBB = nullptr;
   MachineBasicBlock *Zero = nullptr, *Nonzero = nullptr;
 
   if (analyzeBranch(MBB, TBB, FBB, Cond, false) || Cond.size() != 1)
-    return Optional<BlockBRNZ>();
+    return std::optional<BlockBRNZ>();
 
   switch (Cond[0].getImm()) {
   case X86::COND_E:
@@ -4736,14 +4738,14 @@ Optional<BlockBRNZ> X86InstrInfo::isZeroTest(MachineBasicBlock &MBB) const {
     Zero = FBB;
     break;
   default:
-    return Optional<BlockBRNZ>();
+    return std::optional<BlockBRNZ>();
   }
   MachineBasicBlock::const_reverse_instr_iterator MI = MBB.instr_rbegin();
   while (MI != MBB.instr_rend() && MI->isUnconditionalBranch())
     ++MI;
 
   if (MI == MBB.instr_rend() || !MI->isConditionalBranch())
-    return Optional<BlockBRNZ>();
+    return std::optional<BlockBRNZ>();
 
   BlockBRNZ Desc;
   Desc.Zero = Zero;
@@ -4759,7 +4761,7 @@ Optional<BlockBRNZ> X86InstrInfo::isZeroTest(MachineBasicBlock &MBB) const {
     if (MI->getOpcode() == X86::TEST32rr) {
       const MachineOperand &op = MI->getOperand(0);
       if (op.getReg() != MI->getOperand(1).getReg())
-        return Optional<BlockBRNZ>();
+        return std::optional<BlockBRNZ>();
       Desc.IsKill = op.isKill();
       Desc.Regs.push_back(op.getReg());
       break;
@@ -4767,10 +4769,10 @@ Optional<BlockBRNZ> X86InstrInfo::isZeroTest(MachineBasicBlock &MBB) const {
     // If EFLAGS is set other than by TEST32rr, fail.
     // TODO: Possibly also CMP32ri8?
     if (MI->modifiesRegister(X86::EFLAGS, TRI))
-      return Optional<BlockBRNZ>();
+      return std::optional<BlockBRNZ>();
   }
   if (Desc.Regs.size() != 1) {
-    return Optional<BlockBRNZ>();
+    return std::optional<BlockBRNZ>();
   }
   const Register &Reg0 = Desc.Regs[0];
 
@@ -4786,7 +4788,7 @@ Optional<BlockBRNZ> X86InstrInfo::isZeroTest(MachineBasicBlock &MBB) const {
       return Desc;
     }
     if (MI->modifiesRegister(Reg0, TRI))
-      return Optional<BlockBRNZ>();
+      return std::optional<BlockBRNZ>();
     if (MI->readsRegister(Reg0, TRI))
       Desc.IsKill = false;
   }

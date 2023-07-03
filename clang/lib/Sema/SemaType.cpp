@@ -1328,7 +1328,7 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
     return diag::confusing_hyperobject;
   }
   case Type::TypeOf:
-    Inner = cast<TypeOfType>(T)->getUnderlyingType();
+    Inner = cast<TypeOfType>(T)->getUnmodifiedType();
     break;
   case Type::TypeOfExpr:
     Inner = cast<TypeOfExprType>(T)->getUnderlyingExpr()->getType();

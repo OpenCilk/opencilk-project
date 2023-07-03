@@ -60,6 +60,10 @@ bool IntrinsicInst::mayLowerToFunctionCall(Intrinsic::ID IID) {
   case Intrinsic::objc_retain_autorelease:
   case Intrinsic::objc_sync_enter:
   case Intrinsic::objc_sync_exit:
+  case Intrinsic::hyper_lookup:
+  case Intrinsic::reducer_register:
+  case Intrinsic::reducer_unregister:
+  case Intrinsic::tapir_loop_grainsize:
     return true;
   default:
     return false;

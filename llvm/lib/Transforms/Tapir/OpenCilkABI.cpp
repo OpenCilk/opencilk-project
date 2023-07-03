@@ -29,6 +29,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -294,8 +295,7 @@ void OpenCilkABI::prepareModule() {
     }
     if (GlobalVariable *AlignVar =
         M.getGlobalVariable("__cilkrts_stack_frame_align", true)) {
-      if (auto Align = AlignVar->getAlign())
-        StackFrameAlign = Align.getValue();
+      StackFrameAlign = AlignVar->getAlign();
       // Mark this variable with private linkage, to avoid linker failures when
       // compiling with no optimizations.
       AlignVar->setLinkage(GlobalValue::PrivateLinkage);
@@ -343,8 +343,8 @@ void OpenCilkABI::addHelperAttributes(Function &Helper) {
   // function.
   if (getArgStructMode() != ArgStructMode::None) {
     Helper.removeFnAttr(Attribute::WriteOnly);
-    Helper.removeFnAttr(Attribute::ArgMemOnly);
-    Helper.removeFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
+    Helper.setMemoryEffects(
+        MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef));
   }
   // Note that the address of the helper is unimportant.
   Helper.setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
@@ -434,7 +434,8 @@ Value *OpenCilkABI::CreateStackFrame(Function &F) {
   AllocaInst *SF = B.CreateAlloca(SFTy, DL.getAllocaAddrSpace(),
                                   /*ArraySize*/ nullptr,
                                   /*Name*/ StackFrameName);
-  SF->setAlignment(StackFrameAlign);
+  if (StackFrameAlign)
+    SF->setAlignment(StackFrameAlign.valueOrOne());
 
   return SF;
 }
@@ -608,7 +609,8 @@ void OpenCilkABI::MarkSpawner(Function &F) {
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
-  F.removeFnAttr(Attribute::ArgMemOnly);
+  F.setMemoryEffects(
+      MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef));
 }
 
 /// Lower a call to get the grainsize of a Tapir loop.
@@ -655,8 +657,7 @@ BasicBlock *OpenCilkABI::GetDefaultSyncLandingpad(Function &F, Value *SF,
   // Insert a call to __cilkrts_enter_landingpad.
   Value *Sel = Builder.CreateExtractValue(LPad, {1}, "sel");
   Value *CilkLPadArgs[] = {SF, Sel};
-  CallInst *CI =
-      Builder.CreateCall(CILKRTS_FUNC(enter_landingpad), CilkLPadArgs, "");
+  Builder.CreateCall(CILKRTS_FUNC(enter_landingpad), CilkLPadArgs, "");
   // Insert a resume.
   Builder.CreateResume(LPad);
 

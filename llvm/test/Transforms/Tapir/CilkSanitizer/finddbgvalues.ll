@@ -55,8 +55,8 @@ cond.false.i.i.i.i.i:                             ; preds = %if.end9.i.i.i.i
 ; CHECK: define internal fastcc void @_ZN8pybind11L7type_idIN3c107variantIJNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEdxbEEEEES9_v(
 ; CHECK: cond.false.i.i.i.i.i:
 ; CHECK: call void @__csan_large_load(
-; CHECK: i8* inttoptr (i64 and (i64 add (i64 ptrtoint ([86 x i8]* @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to i8*),
-; CHECK: tail call void @llvm.memcpy.p0i8.p0i8.i64(i8* null, i8* inttoptr (i64 and (i64 add (i64 ptrtoint ([86 x i8]* @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to i8*), i64 0, i1 false)
+; CHECK: ptr inttoptr (i64 and (i64 add (i64 ptrtoint (ptr @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to ptr),
+; CHECK: tail call void @llvm.memcpy.p0.p0.i64(ptr null, ptr inttoptr (i64 and (i64 add (i64 ptrtoint (ptr @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to ptr), i64 0, i1 false)
 ; CHECK: ret void
 
 ; Function Attrs: nofree nosync nounwind readnone speculatable willreturn

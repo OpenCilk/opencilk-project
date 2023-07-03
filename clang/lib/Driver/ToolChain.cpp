@@ -1464,8 +1464,8 @@ std::string ToolChain::getOpenCilkBCBasename(const ArgList &Args,
   return (Prefix + Component + ArchAndEnv + Suffix).str();
 }
 
-Optional<std::string> ToolChain::getOpenCilkBC(const ArgList &Args,
-                                               StringRef Component) const {
+std::optional<std::string> ToolChain::getOpenCilkBC(const ArgList &Args,
+                                                    StringRef Component) const {
   // Check for runtime files without the architecture first.
   std::string BCBasename =
       getOpenCilkBCBasename(Args, Component, /*AddArch=*/false);
@@ -1473,7 +1473,7 @@ Optional<std::string> ToolChain::getOpenCilkBC(const ArgList &Args,
     SmallString<128> P(RuntimePath);
     llvm::sys::path::append(P, BCBasename);
     if (getVFS().exists(P))
-      return llvm::Optional<std::string>(std::string(P.str()));
+      return std::optional<std::string>(std::string(P.str()));
   }
 
   // Fall back to the OpenCilk name with the arch if the no-arch version does
@@ -1483,10 +1483,10 @@ Optional<std::string> ToolChain::getOpenCilkBC(const ArgList &Args,
     SmallString<128> P(RuntimePath);
     llvm::sys::path::append(P, BCBasename);
     if (getVFS().exists(P))
-      return llvm::Optional<std::string>(std::string(P.str()));
+      return std::optional<std::string>(std::string(P.str()));
   }
 
-  return None;
+  return std::nullopt;
 }
 
 void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,

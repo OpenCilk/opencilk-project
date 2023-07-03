@@ -1,4 +1,3 @@
-; RUN: opt %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -133,9 +132,9 @@ if.end:                                           ; preds = %entry
   br i1 %cmp762, label %for.body.lr.ph, label %for.cond.cleanup, !dbg !119
 ; CHECK: if.end:
 ; CHECK: %[[ALLOCA:.+]] = alloca i8, i64 %conv3
-; CHECK: @__csi_after_alloca(i64 {{.+}}, i8* %[[ALLOCA]]
-; CHECK: @__csan_large_load(i64 {{.+}}, i8* %a
-; CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* {{.+}}%[[ALLOCA]], i8* {{.+}}%a
+; CHECK: @__csi_after_alloca(i64 {{.+}}, ptr %[[ALLOCA]]
+; CHECK: @__csan_large_load(i64 {{.+}}, ptr %a
+; CHECK: call void @llvm.memcpy.p0.p0.i64(ptr {{.+}}%[[ALLOCA]], ptr {{.+}}%a
 
 for.body.lr.ph:                                   ; preds = %if.end
   %arrayidx = getelementptr inbounds i8, i8* %1, i64 %conv5
@@ -155,7 +154,7 @@ for.body:                                         ; preds = %for.inc, %for.body.
   br i1 %tobool, label %for.inc, label %if.then11, !dbg !126
 ; CHECK-LABEL: for.body:
 ; CHECK: @__csan_store
-; CHECK: store i8 %conv9, i8* %arrayidx
+; CHECK: store i8 %conv9, ptr %arrayidx
 ; CHECK: @__cilksan_disable_checking
 ; CHECK-NEXT: call i32 @ok(
 ; CHECK-NEXT: @__cilksan_enable_checking

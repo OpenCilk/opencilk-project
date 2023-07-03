@@ -6112,19 +6112,18 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
     // Is a hyperobject.
     DeclSpec DS(AttrFactory);
 
-    ParseTypeQualifierListOpt(DS, AR_GNUAttributesParsedAndRejected,
-                              true, !D.mayOmitIdentifier());
+    ParseTypeQualifierListOpt(DS, AR_GNUAttributesParsedAndRejected, true,
+                              !D.mayOmitIdentifier());
 
     Expr *Reduce = nullptr, *Identity = nullptr;
     if (Tok.is(tok::l_paren)) {
       SourceLocation Open = ConsumeParen(); // Eat the parenthesis
       SmallVector<Expr *, 3> Args;
-      SmallVector<SourceLocation, 3> Commas;
       bool Reported = false, Error = false;
       SourceLocation Close = Tok.getLocation();
 
       if (!Tok.is(tok::r_paren))
-        Reported = ParseSimpleExpressionList(Args, Commas);
+        Reported = ParseSimpleExpressionList(Args);
       if (Tok.is(tok::r_paren))
         Close = ConsumeParen(); // Eat the parenthesis
       else
@@ -6138,7 +6137,7 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
           }
         }
       }
-        
+
       switch (Args.size()) {
       case 0:
         break;
@@ -6151,8 +6150,8 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
         break;
       }
       if (Error && !Reported)
-        Diag(Loc, diag::error_hyperobject_arguments) <<
-          SourceRange(Open, Close);
+        Diag(Loc, diag::error_hyperobject_arguments)
+            << SourceRange(Open, Close);
     }
 
     D.ExtendWithDeclSpec(DS);
@@ -6161,14 +6160,12 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
     ParseDeclaratorInternal(D, DirectDeclParser);
     if (getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
       D.AddTypeInfo(DeclaratorChunk::getHyperobject(
-                          DS.getTypeQualifiers(),
-                          Loc, SourceLocation(), SourceLocation(),
-                          Identity, Reduce),
+                        DS.getTypeQualifiers(), Loc, SourceLocation(),
+                        SourceLocation(), Identity, Reduce),
                     std::move(DS.getAttributes()), SourceLocation());
     else
       Diag(Loc, diag::attribute_requires_cilk) << Kind;
-  }
-  else if (Kind == tok::star || Kind == tok::caret) {
+  } else if (Kind == tok::star || Kind == tok::caret) {
     // Is a pointer.
     DeclSpec DS(AttrFactory);
 

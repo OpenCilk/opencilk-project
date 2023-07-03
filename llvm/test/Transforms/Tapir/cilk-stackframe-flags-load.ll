@@ -1,7 +1,6 @@
 ; Check that the flags in a __cilkrts_stack_frame are reloaded after a
 ; call to a spawning function.
 ;
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -simplifycfg -function-attrs -always-inline -gvn -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target,function(simplifycfg),cgscc(function-attrs),always-inline,function(gvn)' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -129,11 +128,10 @@ sync.continue:                                    ; preds = %do.end
 
 ; CHECK: entry:
 ; CHECK: %[[CILK_SF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: %[[FLAGS:.+]] = getelementptr {{.*}}%struct.__cilkrts_stack_frame, %struct.__cilkrts_stack_frame* %[[CILK_SF]], i64 0, i32 0
 
 ; CHECK: sync.continue:
 ; CHECK: call {{.*}}void @fft_aux(
-; CHECK: %[[FLAG_LOAD:.+]] = load i32, i32* %[[FLAGS]]
+; CHECK: %[[FLAG_LOAD:.+]] = load i32, ptr %[[CILK_SF]]
 ; CHECK: %[[AND:.+]] = and i32 %[[FLAG_LOAD]], 128
 ; CHECK-NEXT: %[[CMP:.+]] = icmp eq i32 %[[AND]], 0
 ; CHECK-NEXT: br i1 %[[CMP]], label %[[TRUE:.+]], label %[[FALSE:.[a-zA-Z0-9_\.]+]]

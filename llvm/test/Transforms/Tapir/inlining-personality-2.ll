@@ -45,11 +45,11 @@ csi.cleanup:                                      ; preds = %entry
   resume { i8*, i32 } zeroinitializer
 }
 
-; CHECK: define linkonce_odr %"class.std::__1::basic_string"* @_ZN6google8protobuf5Arena20DoCreateMaybeMessageINSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEJRKS9_EEEPT_PS1_NS3_17integral_constantIbLb0EEEDpOT0_() personality i32 (...)* @__gxx_personality_v0 {
+; CHECK: define linkonce_odr ptr @_ZN6google8protobuf5Arena20DoCreateMaybeMessageINSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEJRKS9_EEEPT_PS1_NS3_17integral_constantIbLb0EEEDpOT0_() personality ptr @__gxx_personality_v0 {
 ; CHECK: entry:
 ; CHECK-NEXT: br label %call1.noexc
 ; CHECK: call1.noexc:
-; CHECK-NEXT: ret %"class.std::__1::basic_string"* null
+; CHECK-NEXT: ret ptr null
 
 ; Function Attrs: alwaysinline
 define linkonce_odr %"class.std::__1::basic_string"* @_ZN6google8protobuf5Arena14CreateInternalINSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEJRKS9_EEEPT_PS1_DpOT0_(%"class.google::protobuf::Arena"* %arena, %"class.std::__1::basic_string"* %args) #0 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {

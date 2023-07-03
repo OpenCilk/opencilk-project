@@ -3045,7 +3045,7 @@ static bool unswitchBestCondition(
     Loop &L, DominatorTree &DT, LoopInfo &LI, AssumptionCache &AC,
     AAResults &AA, TargetTransformInfo &TTI,
     function_ref<void(bool, bool, ArrayRef<Loop *>)> UnswitchCB,
-    ScalarEvolution *SE, MemorySSAUpdater *MSSAU,
+    ScalarEvolution *SE, TaskInfo *TaskI, MemorySSAUpdater *MSSAU,
     function_ref<void(Loop &, StringRef)> DestroyLoopCB) {
   // Collect all invariant conditions within this loop (as opposed to an inner
   // loop which would be handled when visiting that inner loop).

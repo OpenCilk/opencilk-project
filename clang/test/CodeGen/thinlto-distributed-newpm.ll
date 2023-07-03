@@ -94,8 +94,8 @@
 ; CHECK-O: Running pass: TaskSimplifyPass on main
 ; CHECK-O: Running pass: LoopSimplifyPass on main
 ; CHECK-O: Running pass: LCSSAPass on main
-; CHECK-O: Running pass: LoopSimplifyCFGPass on Loop at depth 1 containing: %b
-; CHECK-O: Running pass: LICMPass on Loop at depth 1 containing: %b
+; CHECK-O: Running pass: LoopSimplifyCFGPass on b
+; CHECK-O: Running pass: LICMPass on b
 ; CHECK-O: Running pass: JumpThreadingPass on main
 ; CHECK-O: Running analysis: LazyValueAnalysis on main
 ; CHECK-O: Running pass: CorrelatedValuePropagationPass on main

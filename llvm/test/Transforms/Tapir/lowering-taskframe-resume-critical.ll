@@ -1,7 +1,6 @@
 ; Check Tapir outlining properly handles taskframe.resume instructions
 ; with critical unwind edges.
 ;
-; RUN: opt < %s -tapir2target -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -447,8 +446,8 @@ _ZNSt6vectorIS_IlSaIlEESaIS1_EED2Ev.exit133:      ; preds = %invoke.cont.i131, %
 ; CHECK: landingpad
 ; CHECK-NEXT: cleanup
 
-; CHECK: call void @llvm.taskframe.load.guard.p0i64(i64* %{{.+}})
-; CHECK-NEXT: load i64, i64*
+; CHECK: call void @llvm.taskframe.load.guard.p0(ptr %{{.+}})
+; CHECK-NEXT: load i64, ptr
 ; CHECK-NEXT: br label %lpad10
 
 lpad10:                                           ; preds = %sync.continue, %lpad.body

@@ -890,7 +890,18 @@ public:
   }
 
   /// Set the value of the Alignment property.
-  void setAlignment(char v) { PropValue.Fields.Alignment = v; }
+  void setAlignment(const MaybeAlign A) {
+    if (unsigned EncAlign = encode(A))
+      PropValue.Fields.Alignment = 1 << (EncAlign - 1);
+    else
+      PropValue.Fields.Alignment = 0;
+  }
+  void setAlignment(const Align A) {
+    if (unsigned EncAlign = encode(A))
+      PropValue.Fields.Alignment = 1 << (EncAlign - 1);
+    else
+      PropValue.Fields.Alignment = 0;
+  }
   /// Set the value of the IsVtableAccess property.
   void setIsVtableAccess(bool v) { PropValue.Fields.IsVtableAccess = v; }
   /// Set the value of the IsConstant property.
@@ -1132,14 +1143,13 @@ public:
   bool run();
 
   /// Get the number of bytes accessed via the given address.
-  static int getNumBytesAccessed(Value *Addr, Type *OrigTy,
-                                 const DataLayout &DL);
+  static int getNumBytesAccessed(Type *OrigTy, const DataLayout &DL);
 
   /// Members to extract properties of loads/stores.
-  static bool isVtableAccess(Instruction *I);
-  static bool addrPointsToConstantData(Value *Addr);
-  static bool isAtomic(Instruction *I);
-  static bool isThreadLocalObject(Value *Obj);
+  static bool isVtableAccess(const Instruction *I);
+  static bool addrPointsToConstantData(const Value *Addr);
+  static bool isAtomic(const Instruction *I);
+  static bool isThreadLocalObject(const Value *Obj);
   static bool getAllocFnArgs(const Instruction *I,
                              SmallVectorImpl<Value *> &AllocFnArgs,
                              Type *SizeTy, Type *AddrTy,
@@ -1538,8 +1548,8 @@ protected:
   function_ref<LoopInfo &(Function &)> GetLoopInfo;
   function_ref<TaskInfo &(Function &)> GetTaskInfo;
   function_ref<TargetLibraryInfo &(Function &)> GetTLI;
-  Optional<function_ref<ScalarEvolution &(Function &)>> GetScalarEvolution;
-  Optional<function_ref<TargetTransformInfo &(Function &)>> GetTTI;
+  std::optional<function_ref<ScalarEvolution &(Function &)>> GetScalarEvolution;
+  std::optional<function_ref<TargetTransformInfo &(Function &)>> GetTTI;
   CSIOptions Options;
 
   FrontEndDataTable FunctionFED, FunctionExitFED, BasicBlockFED, LoopFED,

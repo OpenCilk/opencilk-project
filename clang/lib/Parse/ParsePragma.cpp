@@ -1317,7 +1317,7 @@ static std::string PragmaLoopHintString(Token PragmaName, Token Option) {
     ClangLoopStr += Option.getIdentifierInfo()->getName();
   std::string CilkStr("cilk ");
   if (Str == "cilk" && Option.getIdentifierInfo())
-    CilkLoopStr += Option.getIdentifierInfo()->getName();
+    CilkStr += Option.getIdentifierInfo()->getName();
   return std::string(llvm::StringSwitch<StringRef>(Str)
                          .Case("loop", ClangLoopStr)
                          .Case("unroll_and_jam", Str)
