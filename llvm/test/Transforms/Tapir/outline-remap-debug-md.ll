@@ -1,7 +1,6 @@
 ; Check that Tapir outlining properly remaps debug information,
 ; including debug metadata used withing llvm.dbg intrinsic functions.
 ;
-; RUN: opt < %s -tapir2target -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -61,8 +60,8 @@ det.cont.i:                                       ; preds = %entry
 ; CHECK-LABEL: define {{.*}}void @_ZN5utilsL14fork_no_resultIZN2gcIN20weight_balanced_tree7balanceI8aug_nodeINS2_4dataE18aug_map_full_entryIN9tree_plus10edge_entryEEEEEE19decrement_recursiveEPN10basic_nodeIS5_St4pairISE_IjPjEjEE4nodeEbEUlvE_ZNSC_19decrement_recursiveESK_bEUlvE0_EEvbT_T0_.outline_det.achd.i.otd1(
 
 ; CHECK: det.achd.i.otd1:
-; CHECK: call void @llvm.dbg.value(metadata %class.anon.181.290.582.874.1166.1458.1750.2332.2914* undef, metadata !6923, metadata !DIExpression()), !dbg ![[VALUE_DBG_1:[0-9]+]]
-; CHECK: call void @llvm.dbg.value(metadata %"struct.basic_node<weight_balanced_tree::data, std::pair<std::pair<unsigned int, unsigned int *>, unsigned int>>::node.66.358.650.942.1234.1526.2108.2690"* %{{.+}}, metadata !6893, metadata !DIExpression()), !dbg ![[VALUE_DBG_2:[0-9]+]]
+; CHECK: call void @llvm.dbg.value(metadata ptr undef, metadata !6923, metadata !DIExpression()), !dbg ![[VALUE_DBG_1:[0-9]+]]
+; CHECK: call void @llvm.dbg.value(metadata ptr %{{.+}}, metadata !6893, metadata !DIExpression()), !dbg ![[VALUE_DBG_2:[0-9]+]]
 ; CHECK: call void @llvm.dbg.value(metadata i1 false, metadata !6894, metadata !DIExpression(DW_OP_LLVM_convert, 1, DW_ATE_unsigned, DW_OP_LLVM_convert, 8, DW_ATE_unsigned, DW_OP_stack_value)), !dbg ![[VALUE_DBG_2]]
 ; CHECK: unreachable
 

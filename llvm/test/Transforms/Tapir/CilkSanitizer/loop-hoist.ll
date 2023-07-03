@@ -1,5 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -csan -S -o - | FileCheck %s
-; RUN: opt < %s -aa-pipeline=default -passes='cilksan' -S -o - | FileCheck %s
+; RUN: opt < %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -341,11 +340,10 @@ if.then98:                                        ; preds = %for.body83.lr.ph, %
   br i1 %cmp107262, label %for.body109, label %lor.lhs.false.1
 
 ; CHECK: if.then98:
-; CHECK: %[[SCEVGEP:.+]] = getelementptr i32, i32* %myset
-; CHECK: %[[SCEVBC:.+]] = bitcast i32* %[[SCEVGEP]] to i8*
+; CHECK: %[[SCEVGEP:.+]] = getelementptr i8, ptr %myset
 
 ; CHECK: for.body109.preheader:
-; CHECK: call void @__csan_large_load(i64 %{{.+}}, i8* %[[SCEVBC]],
+; CHECK: call void @__csan_large_load(i64 %{{.+}}, ptr %[[SCEVGEP]],
 ; CHECK: br label %for.body109
 
 for.body109:                                      ; preds = %if.then98, %if.end129.for.body109_crit_edge
@@ -374,7 +372,7 @@ for.body109:                                      ; preds = %if.then98, %if.end1
 
 ; CHECK: for.body109:
 ; CHECK-NOT: call void @__csan_load(
-; CHECK: load i32, i32* %arrayidx117
+; CHECK: load i32, ptr %arrayidx117
 ; CHECK: br i1 %cmp126, label %if.end129, label %if.then127
 
 if.then127:                                       ; preds = %for.body109

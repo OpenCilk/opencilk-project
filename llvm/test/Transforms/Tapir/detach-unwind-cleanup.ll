@@ -2,8 +2,7 @@
 ; detach when it is shared with another detach instruction but is
 ; unused with the other detach instruction.
 ;
-; RUN: opt < %s -simplifycfg -S | FileCheck %s
-; RUN: opt < %s -enable-new-pm=0 -simplifycfg -S | FileCheck %s
+; RUN: opt < %s -passes=simplifycfg -S | FileCheck %s
 
 ; ModuleID = 'simplifycfg-test.ll'
 source_filename = "KCore-0917ee.cpp"
@@ -100,7 +99,7 @@ lpad25:                                           ; preds = %lpad253, %pfor.cond
 ; CHECK: lpad253:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg.i.i,
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg.i.i,
 ; CHECK-NEXT: to label %lpad25.unreachable unwind label %lpad25
 
 ; CHECK: lpad25:

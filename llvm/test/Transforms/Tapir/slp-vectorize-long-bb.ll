@@ -9,58 +9,58 @@ target triple = "x86_64-unknown-linux-gnu"
 @buffer_helper = dso_local global [64 x i64] zeroinitializer, align 16
 @buffer = dso_local global [4 x [64 x i64]] zeroinitializer, align 16
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT: store <4 x i64>
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT': store <4 x i64>
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT: store <4 x i64>
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT: store <4 x i64>
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT: store <4 x i64>
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT: store <4 x i64>
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT: store <4 x i64>
 
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK: and <4 x i64> %{{.+}}, <i64 -8589934591, i64 -8589934591, i64 -8589934591, i64 -8589934591>
-; CHECK: load <4 x i64>, <4 x i64>*
+; CHECK: load <4 x i64>, ptr
 ; CHECK-NEXT: and <4 x i64> %{{.+}}, <i64 8589934590, i64 8589934590, i64 8589934590, i64 8589934590>
 ; CHECK-NEXT: or <4 x i64>
 ; CHECK-NEXT: store <4 x i64>
@@ -483,8 +483,8 @@ target triple = "x86_64-unknown-linux-gnu"
 ; CHECK-NEXT: shufflevector <2 x i64>
 ; CHECK-NEXT: shufflevector <4 x i64>
 ; CHECK-NEXT: insertelement <4 x i64>
-; CHECK-NEXT: shufflevector <2 x i64>
 ; CHECK-NEXT: insertelement <4 x i64>
+; CHECK-NEXT: shufflevector <4 x i64>
 
 ; CHECK-NEXT: and <4 x i64>
 ; CHECK-NEXT: load <4 x i64>

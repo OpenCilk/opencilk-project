@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -S | FileCheck %s
 ; RUN: opt < %s -passes='loop-spawning' -S | FileCheck %s
 
 ; ModuleID = 'vectoroutline.cpp'
@@ -151,9 +150,9 @@ cleanup:                                          ; preds = %pfor.cond.cleanup, 
   ret void
 }
 
-; CHECK: define dso_local void @_Z14vectorlooptestPjll(i32* nocapture %SA12, i64 %n1, i64 %n12) local_unnamed_addr [[ATTRIBUTE:#[0-9]+]] {
+; CHECK: define dso_local void @_Z14vectorlooptestPjll(ptr nocapture %SA12, i64 %n1, i64 %n12) local_unnamed_addr [[ATTRIBUTE:#[0-9]+]] {
 ; CHECK: call {{.*}}void @_Z14vectorlooptestPjll.outline_pfor.cond.strpm.outer.ls1(
-; CHECK: <8 x i64> %{{.+}}, i32* %{{.+}})
+; CHECK: <8 x i64> %{{.+}}, ptr %{{.+}})
 
 ; CHECK: define {{.*}}void @_Z14vectorlooptestPjll.outline_pfor.cond.strpm.outer.ls1(
 ; CHECK: [[ATTRIBUTE_HELPER:#[0-9]+]] {

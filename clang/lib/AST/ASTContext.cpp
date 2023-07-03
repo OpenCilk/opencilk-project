@@ -13058,6 +13058,14 @@ static QualType getCommonNonSugarTypeNode(ASTContext &Ctx, const Type *X,
         TX->getDepth(), TX->getIndex(), TX->isParameterPack(),
         getCommonDecl(TX->getDecl(), TY->getDecl()));
   }
+  case Type::Hyperobject: {
+    const auto *HX = cast<HyperobjectType>(X), *HY = cast<HyperobjectType>(Y);
+    assert(Ctx.hasSameExpr(HX->getIdentity(), HY->getIdentity()));
+    assert(Ctx.hasSameExpr(HX->getReduce(), HY->getReduce()));
+    return Ctx.getHyperobjectType(
+        Ctx.getCommonSugaredType(HX->getElementType(), HY->getElementType()),
+        HX->getIdentity(), HX->getReduce());
+  }
   }
   llvm_unreachable("Unknown Type Class");
 }
@@ -13088,6 +13096,7 @@ static QualType getCommonSugarTypeNode(ASTContext &Ctx, const Type *X,
     CANONICAL_TYPE(ExtVector)
     CANONICAL_TYPE(FunctionNoProto)
     CANONICAL_TYPE(FunctionProto)
+    CANONICAL_TYPE(Hyperobject)
     CANONICAL_TYPE(IncompleteArray)
     CANONICAL_TYPE(LValueReference)
     CANONICAL_TYPE(MemberPointer)

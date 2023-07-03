@@ -51,8 +51,8 @@ do.body:                                          ; preds = %cleanup66, %for.con
   br i1 %cmp7, label %pfor.cond, label %cleanup66
 
 ; SROA: do.body:
-; SROA-NOT: store i8 0, i8* %stop.sroa.0
-; SROA: store atomic i8 0, i8* %stop.sroa.0 seq_cst
+; SROA-NOT: store i8 0, ptr %stop.sroa.0
+; SROA: store atomic i8 0, ptr %stop.sroa.0 seq_cst
 
 pfor.cond:                                        ; preds = %do.body, %pfor.inc
   %__begin.0 = phi i32 [ %inc23, %pfor.inc ], [ 0, %do.body ]
@@ -110,26 +110,26 @@ if.then50:                                        ; preds = %pfor.body44
   br label %pfor.preattach57
 
 ; SROA: if.then50:
-; SROA-NOT: store i8 1, i8* %stop.sroa.0
-; SROA: store atomic i8 1, i8* %stop.sroa.0 seq_cst
+; SROA-NOT: store i8 1, ptr %stop.sroa.0
+; SROA: store atomic i8 1, ptr %stop.sroa.0 seq_cst
 ; SROA: br label %pfor.preattach57
 
 ; LICM: if.then50:
-; LICM: store atomic i8 1, i8* %stop.sroa.0 seq_cst
+; LICM: store atomic i8 1, ptr %stop.sroa.0 seq_cst
 ; LICM: br label %pfor.preattach57
 
 ; LICM: pfor.preattach57:
 ; LICM-NOT: phi i8
-; LICM-NOT: store i8 %{{.+}}, i8* %stop.sroa.0
+; LICM-NOT: store i8 %{{.+}}, ptr %stop.sroa.0
 ; LICM: reattach within %{{.+}}, label
 
 ; LICM: if.then50.epil:
-; LICM: store atomic i8 1, i8* %stop.sroa.0 seq_cst
+; LICM: store atomic i8 1, ptr %stop.sroa.0 seq_cst
 ; LICM: br label %pfor.preattach57.epil
 
 ; LICM: pfor.preattach57.epil:
 ; LICM-NOT: phi i8
-; LICM-NOT: store i8 %{{.+}}, i8* %stop.sroa.0
+; LICM-NOT: store i8 %{{.+}}, ptr %stop.sroa.0
 ; LICM: sync within %{{.+}}, label
 
 pfor.preattach57:                                 ; preds = %pfor.body44, %if.then50
@@ -156,8 +156,8 @@ cleanup66:                                        ; preds = %do.body, %sync.cont
   br i1 %tobool.i.i, label %do.body, label %do.end, !llvm.loop !13
 
 ; SROA: cleanup66:
-; SROA-NOT: load i8, i8* %stop.sroa.0
-; SROA: load atomic i8, i8* %stop.sroa.0 acquire
+; SROA-NOT: load i8, ptr %stop.sroa.0
+; SROA: load atomic i8, ptr %stop.sroa.0 acquire
 ; SROA: br i1 %tobool.i.i, label %do.body, label %do.end
 
 do.end:                                           ; preds = %cleanup66

@@ -22,11 +22,11 @@ det.cont:                                         ; preds = %det.achd, %entry
 
 ; CHECK: entry:
 ; CHECK: 1 = MemoryDef(liveOnEntry)
-; CHECK-NEXT: store i32 5, i32* @x
+; CHECK-NEXT: store i32 5, ptr @x
 
 ; CHECK: det.cont:
 ; CHECK: MemoryUse(1)
-; CHECK-NEXT: %1 = load i32, i32* @x
+; CHECK-NEXT: %1 = load i32, ptr @x
 
 ; Function Attrs: argmemonly nounwind
 declare token @llvm.syncregion.start() #1

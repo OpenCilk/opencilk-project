@@ -1,4 +1,4 @@
-; RUN: opt < %s -inline -S -o - | FileCheck %s
+; RUN: opt < %s -passes='inline' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -355,7 +355,7 @@ if.then28:                                        ; preds = %if.end26
 ; CHECK-NEXT: to label {{.+}} unwind label %lpad32
 
 ; CHECK: if.else.i:
-; CHECK-NEXT: call { double*, double* } @_Z5splitIdSt4lessIdEiESt4pairIPT_S4_ES4_T1_T0_
+; CHECK-NEXT: call { ptr, ptr } @_Z5splitIdSt4lessIdEiESt4pairIPT_S4_ES4_T1_T0_
 ; CHECK: br label %if.else.i.split
 
 ; CHECK: if.else.i.split:
@@ -378,11 +378,11 @@ if.then28:                                        ; preds = %if.end26
 ; CHECK-NEXT: sync within %syncreg.i, label %_Z9quickSortIdSt4lessIdEiEvPT_T1_T0_.exit
 
 ; CHECK: [[TASKFRAMELPAD]]:
-; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
+; CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]],
 ; CHECK-NEXT: to label %{{.+}} unwind label %lpad32
 
 ; CHECK: [[DETACHLPAD]]:
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg.i,
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg.i,
 ; CHECK-NEXT: to label %{{.+}} unwind label %[[TASKFRAMELPAD]]
 
 for.cond.preheader:                               ; preds = %if.then28
@@ -536,7 +536,7 @@ ehcleanup103:                                     ; preds = %ehcleanup99, %ehcle
   resume { i8*, i32 } %lpad.val105
 
 ; CHECK: ehcleanup103:
-; CHECK: resume { i8*, i32 } %lpad.val105
+; CHECK: resume { ptr, i32 } %lpad.val105
 }
 
 ; Function Attrs: inaccessiblememonly nounwind

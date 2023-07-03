@@ -2,7 +2,6 @@
 ; ABI functions so that they are not included in the final object
 ; file.
 ;
-; RUN: opt < %s -tapir2target -tapir-target=opencilk -use-opencilk-runtime-bc -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -globaldce -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target,globaldce' -tapir-target=opencilk -use-opencilk-runtime-bc -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -tapir-target=opencilk -use-opencilk-runtime-bc -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s --check-prefix=CHECK-NODCE
 

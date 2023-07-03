@@ -206,9 +206,9 @@ public:
         if (!RD.Racer.isValid())
           return ModRefInfo::ModRef;
         if (RD.Racer.isMod())
-          MRI = unionModRef(MRI, ModRefInfo::Mod);
+          MRI |= ModRefInfo::Mod;
         if (RD.Racer.isRef())
-          MRI = unionModRef(MRI, ModRefInfo::Ref);
+          MRI |= ModRefInfo::Ref;
       }
       return MRI;
     }

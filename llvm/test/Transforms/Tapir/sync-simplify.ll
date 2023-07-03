@@ -1,8 +1,7 @@
 ; Thanks to Daniele Vettorel for providing the original source code
 ; for this test.
 ;
-; RUN: opt < %s -task-simplify -S -o - | FileCheck %s
-; RUN: opt < %s -passes="task-simplify" -S -o - | FileCheck %s
+; RUN: opt < %s -passes="task-simplify" -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

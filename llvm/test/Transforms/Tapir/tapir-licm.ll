@@ -1,4 +1,4 @@
-; RUN: opt < %s -licm -S | FileCheck %s
+; RUN: opt < %s -passes='licm' -S | FileCheck %s
 
 ; Function Attrs: noinline nounwind uwtable
 define void @normalize(double* noalias %out, double* noalias %in, i32 %n) #0 {
@@ -10,7 +10,7 @@ entry:
 
 pfor.detach.lr.ph:                                ; preds = %entry
 ; CHECK: pfor.detach.lr.ph:
-; CHECK-NEXT: %call = call double @norm(double* %in, i32 %n)
+; CHECK-NEXT: %call = call double @norm(ptr %in, i32 %n)
   br label %pfor.detach
 
 pfor.detach:                                      ; preds = %pfor.detach.lr.ph, %pfor.inc

@@ -1,5 +1,4 @@
-; RUN: opt < %s -loop-stripmine -S -o - | FileCheck %s
-; RUN: opt < %s -passes="loop-stripmine" -S -o - | FileCheck %s
+; RUN: opt < %s -passes="loop-stripmine" -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -152,7 +151,7 @@ lpad:                                             ; preds = %if.then32
           to label %det.rethrow.unreachable unwind label %lpad37.loopexit, !dbg !3273
 
 ; CHECK: lpad:
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[DETACHLOOPSR]],
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[DETACHLOOPSR]],
 ; CHECK-NEXT: to label %det.rethrow.unreachable unwind label %lpad37.loopexit.strpm
 
 det.rethrow.unreachable:                          ; preds = %lpad
@@ -178,19 +177,19 @@ lpad37.loopexit:                                  ; preds = %pfor.cond, %lpad
 ; CHECK: lpad37.loopexit.strpm:
 ; CHECK-NEXT: %[[DETACHLOOPPHI:.+]] = landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %[[DETACHLOOPPHI]])
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg, { ptr, i32 } %[[DETACHLOOPPHI]])
 ; CHECK-NEXT: to label %{{.+}} unwind label %lpad37.loopexit.strpm.detachloop.unwind
 
 ; CHECK: lpad37.loopexit.strpm.detachloop.unwind:
-; CHECK-NEXT: %[[DETACHLOOPLPAD:.+]] = landingpad { i8*, i32 }
+; CHECK-NEXT: %[[DETACHLOOPLPAD:.+]] = landingpad { ptr, i32 }
 ; CHECK: br label %lpad37.loopexit
 
 ; CHECK: lpad37.loopexit:
-; CHECK-NEXT: %[[LP37LOOPEXITPHI:.+]] = phi { i8*, i32 } [ %[[DETACHLOOPLPAD]], %lpad37.loopexit.strpm.detachloop.unwind ]
+; CHECK-NEXT: %[[LP37LOOPEXITPHI:.+]] = phi { ptr, i32 } [ %[[DETACHLOOPLPAD]], %lpad37.loopexit.strpm.detachloop.unwind ]
 ; CHECK: br label %lpad37.loopexit.body
 
 ; CHECK: lpad37.loopexit.body:
-; CHECK-NEXT: %[[EPILPHI:.+]] = phi { i8*, i32 } [ %[[LP37LOOPEXITPHI]], %lpad37.loopexit ], [ %[[EPILLPAD:.+]], %lpad.epil ]
+; CHECK-NEXT: %[[EPILPHI:.+]] = phi { ptr, i32 } [ %[[LP37LOOPEXITPHI]], %lpad37.loopexit ], [ %[[EPILLPAD:.+]], %lpad.epil ]
 ; CHECK-NEXT: br label %lpad37
 
 lpad37:                                           ; preds = %lpad37.loopexit
@@ -198,7 +197,7 @@ lpad37:                                           ; preds = %lpad37.loopexit
   sync within %syncreg, label %sync.continue42, !dbg !3288
 
 ; CHECK: lpad37:
-; CHECK-NEXT: %lpad.phi = phi { i8*, i32 } [ %[[EPILPHI]], %lpad37.loopexit.body ]
+; CHECK-NEXT: %lpad.phi = phi { ptr, i32 } [ %[[EPILPHI]], %lpad37.loopexit.body ]
 ; CHECK-NEXT: sync within %syncreg, label %sync.continue42
 
 sync.continue42:                                  ; preds = %lpad37

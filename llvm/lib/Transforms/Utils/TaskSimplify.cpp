@@ -381,8 +381,7 @@ static bool hoistOutOfTaskFrame(Instruction *TFCreate) {
       ++I;
 
     // Move the instructions
-    Entry->getInstList().splice(InsertPoint, Entry->getInstList(),
-                                Start->getIterator(), I);
+    Entry->splice(InsertPoint, &*Entry, Start->getIterator(), I);
 
     Changed = true;
   }

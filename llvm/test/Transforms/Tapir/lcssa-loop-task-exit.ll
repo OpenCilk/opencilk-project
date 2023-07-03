@@ -2,10 +2,8 @@
 ; properly inserts PHI nodes in exit blocks that inherit the same
 ; value from the detach and detached.rethrow predecessors.
 ;
-; RUN: opt < %s -lcssa -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-LCSSA
-; RUN: opt < %s -passes='lcssa' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-LCSSA
-; RUN: opt < %s -lcssa -licm -S -o - | FileCheck %s
-; RUN: opt < %s -passes='lcssa,require<opt-remark-emit>,loop-mssa(licm)' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='lcssa' -S | FileCheck %s --check-prefixes=CHECK,CHECK-LCSSA
+; RUN: opt < %s -passes='lcssa,require<opt-remark-emit>,loop-mssa(licm)' -S | FileCheck %s
 
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -1285,7 +1283,7 @@ lpad2654.loopexit:                                ; preds = %lpad265455, %pfor.c
   br label %lpad2654
 
 ; CHECK: lpad2654.loopexit:
-; CHECK-LCSSA-NEXT: phi i8*
+; CHECK-LCSSA-NEXT: phi ptr
 ; CHECK-LCSSA-DAG: [ %38, %lpad265455 ]
 ; CHECK-LCSSA-DAG: [ %38, %pfor.cond.i ]
 ; CHECK-NEXT: %lpad.loopexit4 = landingpad
@@ -1428,10 +1426,10 @@ lpad53150.loopexit:                               ; preds = %lpad53150151, %pfor
   br label %lpad53150
 
 ; CHECK: lpad53150.loopexit:
-; CHECK-LCSSA-NEXT: phi i8*
+; CHECK-LCSSA-NEXT: phi ptr
 ; CHECK-LCSSA-DAG: [ %62, %lpad53150151 ]
 ; CHECK-LCSSA-DAG: [ %62, %pfor.cond.i142 ]
-; CHECK-LCSSA-NEXT: phi i8*
+; CHECK-LCSSA-NEXT: phi ptr
 ; CHECK-LCSSA-DAG: [ %38, %lpad53150151 ]
 ; CHECK-LCSSA-DAG: [ %38, %pfor.cond.i142 ]
 ; CHECK-NEXT: %lpad.loopexit1 = landingpad
@@ -1664,13 +1662,13 @@ lpad84274.loopexit:                               ; preds = %lpad84274275, %pfor
   br label %lpad84274
 
 ; CHECK: lpad84274.loopexit:
-; CHECK-LCSSA-NEXT: phi i8*
+; CHECK-LCSSA-NEXT: phi ptr
 ; CHECK-LCSSA-DAG: [ %99, %lpad84274275 ]
 ; CHECK-LCSSA-DAG: [ %99, %pfor.cond.i266 ]
-; CHECK-LCSSA-NEXT: phi i8*
+; CHECK-LCSSA-NEXT: phi ptr
 ; CHECK-LCSSA-DAG: [ %62, %lpad84274275 ]
 ; CHECK-LCSSA-DAG: [ %62, %pfor.cond.i266 ]
-; CHECK-LCSSA-NEXT: phi i8*
+; CHECK-LCSSA-NEXT: phi ptr
 ; CHECK-LCSSA-DAG: [ %38, %lpad84274275 ]
 ; CHECK-LCSSA-DAG: [ %38, %pfor.cond.i266 ]
 ; CHECK-NEXT: %lpad.loopexit = landingpad

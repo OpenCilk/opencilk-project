@@ -1,4 +1,4 @@
-; RUN: opt < %s -passes='csi-setup,csi' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='csi-setup,csi' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -8,7 +8,7 @@ target triple = "x86_64-unknown-linux-gnu"
 @.str = private unnamed_addr constant [14 x i8] c"fib(%d) = %d\0A\00", align 1
 @.str.1 = private unnamed_addr constant [11 x i8] c"Time = %f\0A\00", align 1
 
-; CHECK: @__csi_unit_size_tables = internal global [1 x { i64, { i32, i32 }* }] [{ i64, { i32, i32 }* } { i64 42, { i32, i32 }* getelementptr inbounds ([42 x { i32, i32 }], [42 x { i32, i32 }]* @__csi_unit_size_table, i32 0, i32 0) }]
+; CHECK: @__csi_unit_size_tables = internal global [1 x { i64, ptr }] [{ i64, ptr } { i64 42, ptr @__csi_unit_size_table }]
 
 ; Function Attrs: alwaysinline nounwind uwtable
 define dso_local i32 @fib_base(i32 %n) #0 !dbg !7 {

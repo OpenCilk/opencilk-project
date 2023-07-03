@@ -3,8 +3,6 @@
 ; normal destinations of those terminators are terminated by
 ; unreachable.
 ;
-; RUN: opt < %s -enable-new-pm=0 -csan -S | FileCheck %s
-; RUN: opt < %s -enable-new-pm=0 -csi -S | FileCheck %s
 ; RUN: opt < %s -passes='cilksan' -S | FileCheck %s
 ; RUN: opt < %s -passes='csi' -S | FileCheck %s
 
@@ -60,7 +58,7 @@ lpad:                                             ; preds = %pfor.body
           to label %unreachable unwind label %lpad9
 
 ; CHECK: lpad:
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg,
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg,
 ; CHECK-NEXT: to label %[[DR_UNREACHABLE:.+]] unwind label %[[DR_LPAD:.+]]
 
 pfor.inc:                                         ; preds = %pfor.cond

@@ -1,5 +1,4 @@
-; RUN: opt < %s -loop-stripmine -S -o - | FileCheck %s
-; RUN: opt < %s -passes='loop-stripmine' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='loop-stripmine' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -372,7 +371,7 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK: br label %[[EPILBODY:.+]], !dbg !51
 
 ; CHECK: [[EPILBODY]]:
-; CHECK-NEXT: call i8* @llvm.stacksave()
+; CHECK-NEXT: call ptr @llvm.stacksave()
 ; CHECK: alloca double
 ; CHECK: call void @llvm.lifetime.start
 ; CHECK: call void @llvm.lifetime.end
@@ -393,7 +392,7 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPINNERBODY]]:
-; CHECK: call i8* @llvm.stacksave()
+; CHECK: call ptr @llvm.stacksave()
 ; CHECK: alloca double
 ; CHECK: call void @llvm.lifetime.start
 ; CHECK: call void @llvm.lifetime.end

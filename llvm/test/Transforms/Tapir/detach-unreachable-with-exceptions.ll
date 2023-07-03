@@ -313,7 +313,7 @@ lpad.loopexit.split-lp21:                         ; preds = %call.i5.noexc, %if.
 ; TS: lpad.loopexit20.us-lcssa.us:
 ; TS-NEXT: landingpad
 ; TS-NEXT: cleanup
-; TS-NEXT: catch i8* null
+; TS-NEXT: catch ptr null
 ; TS: br label %lpad5.loopexit.us-lcssa.us.body
 
 lpad:                                             ; preds = %lpad.loopexit.split-lp21, %lpad.loopexit20
@@ -323,7 +323,7 @@ lpad:                                             ; preds = %lpad.loopexit.split
 
 ; TS: lpad.loopexit20.us-lcssa:
 ; TS-NOT: = phi
-; TS: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg
+; TS: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg
 
 det.rethrow.unreachable:                          ; preds = %lpad
   unreachable

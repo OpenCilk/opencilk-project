@@ -27177,8 +27177,8 @@ AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
                                   MachineBasicBlock *MBB) const {
   MachineFunction *MF = MBB->getParent();
   const TargetInstrInfo *TII = Subtarget->getInstrInfo();
-  const AArch64RegisterInfo *TRI = static_cast<const AArch64RegisterInfo *>(
-      MF->getSubtarget().getRegisterInfo());
+  const AArch64RegisterInfo *TRI =
+      &Subtarget->getInstrInfo()->getRegisterInfo();
   MachineRegisterInfo &MRI = MF->getRegInfo();
   DebugLoc DL = MI.getDebugLoc();
 
@@ -27221,7 +27221,7 @@ AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
   MF->insert(I, mainMBB);
   MF->insert(I, sinkMBB);
   MF->push_back(restoreMBB);
-  restoreMBB->setHasAddressTaken();
+  restoreMBB->setIsEHPad(true);
 
   MachineInstrBuilder MIB;
 

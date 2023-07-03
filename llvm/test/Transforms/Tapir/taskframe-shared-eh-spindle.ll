@@ -1,7 +1,6 @@
 ; Check that Tapir lowering properly handles shared EH spindles when
 ; computing taskframe inputs.
 ;
-; RUN: opt < %s -tapir2target -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -1639,7 +1638,7 @@ pfor.inc.i.i.4:                                   ; preds = %.noexc179.4, %pfor.
 ; CHECK-LABEL: define {{.*}}void @_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E.outline_pfor.body.i.i.4.otd1(
 ; CHECK: i64 %[[ARG1:[a-zA-Z0-9._]+]],
 ; CHECK: i64 %[[ARG2:[a-zA-Z0-9._]+]],
-; CHECK: [5 x %"class.parlay::sequence"]*
+; CHECK: ptr
 
 ; CHECK: pfor.body.i.i.4.otd1:
 ; CHECK: call void @__csan_task(i64 %[[ARG1]], i64 %[[ARG2]]
@@ -1653,7 +1652,7 @@ pfor.inc.i.i.4:                                   ; preds = %.noexc179.4, %pfor.
 ; CHECK-LABEL: define {{.*}}void @_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E.outline_pfor.body.i.i.3.otd1(
 ; CHECK: i64 %[[ARG1:[a-zA-Z0-9._]+]],
 ; CHECK: i64 %[[ARG2:[a-zA-Z0-9._]+]],
-; CHECK: [5 x %"class.parlay::sequence"]*
+; CHECK: ptr
 
 ; CHECK: pfor.body.i.i.3.otd1:
 ; CHECK: call void @__csan_task(i64 %[[ARG1]], i64 %[[ARG2]]
@@ -1667,7 +1666,7 @@ pfor.inc.i.i.4:                                   ; preds = %.noexc179.4, %pfor.
 ; CHECK-LABEL: define {{.*}}void @_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E.outline_pfor.body.i.i.2.otd1(
 ; CHECK: i64 %[[ARG1:[a-zA-Z0-9._]+]],
 ; CHECK: i64 %[[ARG2:[a-zA-Z0-9._]+]],
-; CHECK: [5 x %"class.parlay::sequence"]*
+; CHECK: ptr
 
 ; CHECK: pfor.body.i.i.2.otd1:
 ; CHECK: call void @__csan_task(i64 %[[ARG1]], i64 %[[ARG2]]
@@ -1681,7 +1680,7 @@ pfor.inc.i.i.4:                                   ; preds = %.noexc179.4, %pfor.
 ; CHECK-LABEL: define {{.*}}void @_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E.outline_pfor.body.i.i.otd1(
 ; CHECK: i64 %[[ARG1:[a-zA-Z0-9._]+]],
 ; CHECK: i64 %[[ARG2:[a-zA-Z0-9._]+]],
-; CHECK: [5 x %"class.parlay::sequence"]*
+; CHECK: ptr
 
 ; CHECK: pfor.body.i.i.otd1:
 ; CHECK: call void @__csan_task(i64 %[[ARG1]], i64 %[[ARG2]]

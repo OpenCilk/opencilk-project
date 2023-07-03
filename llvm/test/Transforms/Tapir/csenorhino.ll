@@ -1,4 +1,4 @@
-; RUN: opt < %s -early-cse -S -o - | FileCheck %s
+; RUN: opt < %s -passes='early-cse' -S | FileCheck %s
 
 @x = common local_unnamed_addr global i32 0, align 4
 

@@ -1,6 +1,6 @@
 ; Check that function inlining properly splits taskframe intrinsics in the callee.
 ;
-; RUN: opt < %s -inline -S | FileCheck %s
+; RUN: opt < %s -passes='inline' -S | FileCheck %s
 
 %struct.edgeArray = type <{ %struct.timezone*, i32, i32, i32, [4 x i8] }>
 %struct.timezone = type { i32, i32 }
@@ -130,17 +130,17 @@ define i32 @main() personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to 
 
 ; CHECK: [[START]]:
 ; CHECK: %[[TF1:.+]] = call token @llvm.taskframe.create()
-; CHECK: %[[X:.+]] = call noalias i8* @malloc(
+; CHECK: %[[X:.+]] = call noalias ptr @malloc(
 
 ; CHECK: %[[TF2:.+]] = call token @llvm.taskframe.create()
-; CHECK: %[[Y:.+]] = call noalias i8* @malloc(
+; CHECK: %[[Y:.+]] = call noalias ptr @malloc(
 
-; CHECK: call void @free(i8* noundef %[[Y]])
+; CHECK: call void @free(ptr noundef %[[Y]])
 ; CHECK: call void @llvm.taskframe.end(token %[[TF2]])
 ; CHECK-NEXT: br label %[[TFEND:.+]]
 
 ; CHECK: [[TFEND]]:
-; CHECK: call void @free(i8* noundef %[[X]])
+; CHECK: call void @free(ptr noundef %[[X]])
 ; CHECK: br label %[[START]]
 
 ; Function Attrs: argmemonly nounwind willreturn

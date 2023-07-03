@@ -8,7 +8,6 @@
 ; Credit to I-Ting Angelina Lee for the original source code for this
 ; test.
 ;
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -O3 -S | FileCheck %s
 ; RUN: opt < %s -passes="tapir2target,default<O3>" -tapir-target=cilk -S | FileCheck %s
 
 ; Function Attrs: argmemonly nounwind

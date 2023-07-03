@@ -19,7 +19,7 @@ entry:
 ; CHECK: define fastcc void @_ZN2at6native7cpublas12_GLOBAL__N_110matmul_dacIffEEvPT_PKS4_S7_xxxxxxT0_S8_bbbN3c104impl19LocalDispatchKeySetEb(
 ; CHECK: entry:
 ; CHECK: %[[SF:.+]] = alloca %struct.__cilkrts_stack_frame
-; CHECK: call void @__cilkrts_enter_frame(%struct.__cilkrts_stack_frame* %[[SF]]), !dbg
+; CHECK: call void @__cilkrts_enter_frame(ptr %[[SF]]), !dbg
 
 tailrecurse.outer.split.lr.ph.lr.ph:              ; preds = %entry
   %cmp.i.i.i542558 = icmp slt i64 %m, %n

@@ -2,7 +2,6 @@
 ;
 ; Thanks to Helen Xu and Amanda Li for the original source for this issue.
 ;
-; RUN: opt < %s -loop-unroll -S | FileCheck %s
 ; RUN: opt < %s -passes='loop-unroll' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -40,7 +39,7 @@ pfor.inc:                                         ; preds = %pfor.preattach, %pf
 
 ; CHECK: pfor.body:
 ; CHECK: %times = alloca [4 x i64]
-; CHECK: invoke void bitcast (void ()* @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm to void
+; CHECK: invoke void @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm
 ; CHECK-NEXT: to label %pfor.preattach unwind label %lpad8
 
 ; CHECK: pfor.inc:
@@ -48,40 +47,41 @@ pfor.inc:                                         ; preds = %pfor.preattach, %pf
 
 ; CHECK: pfor.body.1:
 ; CHECK: %times.1 = alloca [4 x i64]
-; CHECK: invoke void bitcast (void ()* @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm to void
+; CHECK: invoke void @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm
 ; CHECK-NEXT: to label %pfor.preattach.1 unwind label %lpad8.1
 
 ; CHECK: pfor.inc.1:
 ; CHECK-NEXT: detach within %syncreg, label %pfor.body.2, label %pfor.inc.2 unwind label %lpad23
+
+; CHECK: lpad8.1:
+; CHECK: bitcast ptr %times
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg, { ptr, i32 } undef)
+; CHECK-NEXT: to label %unreachable unwind label %lpad23
+
 ; CHECK: pfor.body.2:
 ; CHECK: %times.2 = alloca [4 x i64]
-; CHECK: invoke void bitcast (void ()* @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm to void
+; CHECK: invoke void @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm
 ; CHECK-NEXT: to label %pfor.preattach.2 unwind label %lpad8.2
 
 ; CHECK: pfor.inc.2:
 ; CHECK-NEXT: detach within %syncreg, label %pfor.body.3, label %pfor.inc.3 unwind label %lpad23
 
+; CHECK: lpad8.2:
+; CHECK: bitcast ptr %times.2
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg, { ptr, i32 } undef)
+; CHECK-NEXT: to label %unreachable unwind label %lpad23
+
 ; CHECK: pfor.body.3:
 ; CHECK: %times.3 = alloca [4 x i64]
-; CHECK: invoke void bitcast (void ()* @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm to void
+; CHECK: invoke void @_Z27test_btree_unordered_insertImEvmRSt8seed_seqPm
 ; CHECK-NEXT: to label %pfor.preattach.3 unwind label %lpad8.3
 
 ; CHECK: pfor.inc.3:
 ; CHECK-NEXT: ret i32 undef
 
-; CHECK: lpad8.1:
-; CHECK: bitcast [4 x i64]* %times.1
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } undef)
-; CHECK-NEXT: to label %unreachable unwind label %lpad23
-
-; CHECK: lpad8.2:
-; CHECK: bitcast [4 x i64]* %times.2
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } undef)
-; CHECK-NEXT: to label %unreachable unwind label %lpad23
-
 ; CHECK: lpad8.3:
-; CHECK: bitcast [4 x i64]* %times.3
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } undef)
+; CHECK: bitcast ptr %times.3
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg, { ptr, i32 } undef)
 ; CHECK-NEXT: to label %unreachable unwind label %lpad23
 
 

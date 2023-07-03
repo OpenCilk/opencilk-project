@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -S | FileCheck %s --check-prefixes=CHECK,CHECK-LCSSA
 ; RUN: opt < %s -passes=loop-spawning -S | FileCheck %s --check-prefixes=CHECK,CHECK-NOLCSSA
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -456,10 +455,10 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK-NEXT: reattach within %[[SYNCREG]], label %[[RECURCONT]]
 
 ; CHECK: {{^pfor.body.ls1}}:
-; CHECK-NEXT: %[[NEWRET:.+]] = tail call i8* @_Znwm(i64 1)
-; CHECK-NEXT: %[[FOOARG:.+]] = bitcast i8* %[[NEWRET]] to %class.Foo*
-; CHECK-NEXT: tail call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[FOOARG]])
-; CHECK-NEXT: %[[BARCALL:.+]] = tail call i32 @_Z3barP3Foo(%class.Foo* nonnull %[[FOOARG]])
+; CHECK-NEXT: %[[NEWRET:.+]] = tail call ptr @_Znwm(i64 1)
+; CHECK-NEXT: %[[FOOARG:.+]] = bitcast ptr %[[NEWRET]] to ptr
+; CHECK-NEXT: tail call void @_ZN3FooC2Ev(ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: %[[BARCALL:.+]] = tail call i32 @_Z3barP3Foo(ptr nonnull %[[FOOARG]])
 ; CHECK-NEXT: br label %pfor.inc.ls1
 
 ; CHECK-NOT: invoke
@@ -479,16 +478,16 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK-NEXT: reattach within %[[SYNCREG]], label %[[RECURCONT]]
 
 ; CHECK: {{^pfor.body23.ls1}}:
-; CHECK-NEXT: %[[NEWRET:.+]] = invoke i8* @_Znwm(i64 1)
+; CHECK-NEXT: %[[NEWRET:.+]] = invoke ptr @_Znwm(i64 1)
 ; CHECK-NEXT: to label %invoke.cont.ls1 unwind label %lpad.ls1
 ; CHECK: {{^lpad.ls1}}:
 ; CHECK-NEXT: landingpad [[LPADTYPE:.+]]
 ; CHECK-NEXT: cleanup
 ; CHECK: resume [[LPADTYPE]] %{{.+}}
 ; CHECK: {{^invoke.cont.ls1}}:
-; CHECK-NEXT: %[[FOOARG:.+]] = bitcast i8* %[[NEWRET]] to %class.Foo*
-; CHECK-NEXT: tail call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[FOOARG]])
-; CHECK-NEXT: %[[BARCALL:.+]] = invoke i32 @_Z3barP3Foo(%class.Foo* nonnull %[[FOOARG]])
+; CHECK-NEXT: %[[FOOARG:.+]] = bitcast ptr %[[NEWRET]] to ptr
+; CHECK-NEXT: tail call void @_ZN3FooC2Ev(ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: %[[BARCALL:.+]] = invoke i32 @_Z3barP3Foo(ptr nonnull %[[FOOARG]])
 ; CHECK-NEXT: to label %pfor.preattach29.ls1 unwind label %lpad.ls1
 
 ; CHECK: [[RECURUW]]:
@@ -521,7 +520,7 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK-NEXT: reattach within %[[SYNCREG]], label %[[RECURCONT]]
 
 ; CHECK: {{^pfor.body.ls1}}:
-; CHECK-NEXT: %[[NEWRET:.+]] = invoke i8* @_Znwm(i64 1)
+; CHECK-NEXT: %[[NEWRET:.+]] = invoke ptr @_Znwm(i64 1)
 ; CHECK-NEXT: to label %invoke.cont.ls1 unwind label %lpad.ls1
 ; CHECK: {{^lpad.ls1}}:
 ; CHECK-NEXT: landingpad [[LPADTYPE:.+]]
@@ -530,14 +529,14 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK: {{^lpad.body.ls1}}:
 ; CHECK: resume [[LPADTYPE]] %{{.+}}
 ; CHECK: {{^invoke.cont.ls1}}:
-; CHECK-NEXT: %[[FOOARG:.+]] = bitcast i8* %[[NEWRET]] to %class.Foo*
-; CHECK-NEXT: tail call void @_ZN3FooC2Ev(%class.Foo* nonnull %[[FOOARG]])
-; CHECK-NEXT: %call.i.ls1 = invoke i32 @_Z3barP3Foo(%class.Foo* nonnull %[[FOOARG]])
+; CHECK-NEXT: %[[FOOARG:.+]] = bitcast ptr %[[NEWRET]] to ptr
+; CHECK-NEXT: tail call void @_ZN3FooC2Ev(ptr nonnull %[[FOOARG]])
+; CHECK-NEXT: %call.i.ls1 = invoke i32 @_Z3barP3Foo(ptr nonnull %[[FOOARG]])
 ; CHECK-NEXT: to label %pfor.preattach.ls1 unwind label %lpad.i.ls1
 ; CHECK: {{^lpad.i.ls1}}:
 ; CHECK-NEXT: landingpad [[LPADTYPE]]
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch {{.+}} bitcast
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK-NOLCSSA: br i1 %{{.+}}, label %[[CATCHIN:.+]], label %[[RESUMEIN:.+]]
 ; CHECK-LCSSA: br i1 %{{.+}}, label %[[CATCHIN:.+]], label %[[RESUME_LOOPEXIT:.+]]
 ; CHECK-LCSSA: [[RESUME_LOOPEXIT]]:
@@ -545,7 +544,7 @@ unreachable:                                      ; preds = %lpad.body
 ; CHECK: [[RESUMEIN]]:
 ; CHECK: br label %lpad.body.ls1
 ; CHECK: [[CATCHIN]]:
-; CHECK: tail call i8* @__cxa_begin_catch(
+; CHECK: tail call ptr @__cxa_begin_catch(
 ; CHECK: invoke void @_Z10handle_exni(
 ; CHECK: br label %[[RESUMEIN]]
 

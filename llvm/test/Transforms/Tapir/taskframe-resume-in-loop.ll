@@ -1,5 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -S -o - | FileCheck %s
-; RUN: opt < %s -passes='loop-spawning' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='loop-spawning' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -1911,7 +1910,7 @@ csi.cleanup187189:                                ; preds = %sync.continue.i.i15
 ; CHECK: %[[TF:.+]] = tail call token @llvm.taskframe.create()
 
 ; CHECK: csi.cleanup176178.ls1:
-; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TF]],
+; CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TF]],
 ; CHECK-NEXT: to label %[[UNREACHABLE:.+]] unwind label %csi.cleanup176.ls1
 
 ; CHECK: [[UNREACHABLE]]:

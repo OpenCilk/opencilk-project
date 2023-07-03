@@ -1,5 +1,4 @@
-; RUN: opt < %s -licm -require-taskinfo-memoryssa -S -o - | FileCheck %s
-; RUN: opt < %s -aa-pipeline=basic-aa -passes='require<opt-remark-emit>,loop-mssa(licm)' -S -o - | FileCheck %s
+; RUN: opt < %s -aa-pipeline=basic-aa -passes='require<opt-remark-emit>,loop-mssa(licm)' -S | FileCheck %s
 
 ; ModuleID = 'wls.c'
 source_filename = "wls.c"

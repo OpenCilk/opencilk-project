@@ -134,7 +134,7 @@ for.inc.us.i.8:                                   ; preds = %for.inc.us.i.7
   br i1 undef, label %getneighbors.exit, label %for.cond2.preheader.us.i, !llvm.loop !7
 }
 
-; CHECK: Src:  store <2 x i32> undef, <2 x i32>* %6, align 4, !tbaa !3 --> Dst:  %8 = load i32, i32* %arrayidx283.1, align 4, !tbaa !3
+; CHECK: Src:  store <2 x i32> undef, ptr %6, align 4, !tbaa !3 --> Dst:  %8 = load i32, ptr %arrayidx283.1, align 4, !tbaa !3
 ; CHECK-NEXT: da analyze - flow [|<]!
 
 ; Function Attrs: argmemonly nofree nosync nounwind willreturn
