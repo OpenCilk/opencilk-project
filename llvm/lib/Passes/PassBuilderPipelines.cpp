@@ -1515,7 +1515,8 @@ PassBuilder::buildTapirLoopLoweringPipeline(OptimizationLevel Level,
 
   if (Level == OptimizationLevel::O0)
     // Form SSA out of local memory accesses.
-    MPM.addPass(createModuleToFunctionPassAdaptor(SROAPass()));
+    MPM.addPass(
+        createModuleToFunctionPassAdaptor(SROAPass(SROAOptions::ModifyCFG)));
 
   // Rotate Loop - disable header duplication at -Oz
   LPM1.addPass(LoopRotatePass(Level != OptimizationLevel::Oz));
@@ -2312,7 +2313,7 @@ PassBuilder::buildPostCilkInstrumentationPipeline(OptimizationLevel Level) {
   ModulePassManager MPM;
   if (Level != OptimizationLevel::O0) {
     FunctionPassManager FPM;
-    FPM.addPass(SROAPass());
+    FPM.addPass(SROAPass(SROAOptions::ModifyCFG));
     FPM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
     FPM.addPass(JumpThreadingPass());
     FPM.addPass(CorrelatedValuePropagationPass());
@@ -2350,7 +2351,7 @@ PassBuilder::buildPostCilkInstrumentationPipeline(OptimizationLevel Level) {
       MPM.addPass(GlobalOptPass());
       MPM.addPass(GlobalDCEPass());
       FunctionPassManager FPM;
-      FPM.addPass(SROAPass());
+      FPM.addPass(SROAPass(SROAOptions::ModifyCFG));
       FPM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
       FPM.addPass(JumpThreadingPass());
       FPM.addPass(CorrelatedValuePropagationPass());

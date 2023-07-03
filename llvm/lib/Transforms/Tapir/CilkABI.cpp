@@ -25,6 +25,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
@@ -101,8 +102,8 @@ void CilkABI::addHelperAttributes(Function &Helper) {
   // function.
   if (getArgStructMode() != ArgStructMode::None) {
     Helper.removeFnAttr(Attribute::WriteOnly);
-    Helper.removeFnAttr(Attribute::ArgMemOnly);
-    Helper.removeFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
+    Helper.setMemoryEffects(
+        MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef));
   }
   // Note that the address of the helper is unimportant.
   Helper.setUnnamedAddr(GlobalValue::UnnamedAddr::Global);

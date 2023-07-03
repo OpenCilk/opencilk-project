@@ -21,19 +21,15 @@ define void @arm_mult_q15(ptr %pSrcA, ptr %pSrcB, ptr noalias %pDst, i32 %blockS
 ; CHECK-NEXT:    [[IND_END:%.*]] = and i32 [[BLOCKSIZE]], 7
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i32 [[N_VEC]], 1
 ; CHECK-NEXT:    [[IND_END7:%.*]] = getelementptr i8, ptr [[PSRCA:%.*]], i32 [[TMP0]]
-; CHECK-NEXT:    [[TMP1:%.*]] = shl i32 [[N_VEC]], 1
-; CHECK-NEXT:    [[IND_END9:%.*]] = getelementptr i8, ptr [[PDST:%.*]], i32 [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[N_VEC]], 1
-; CHECK-NEXT:    [[IND_END11:%.*]] = getelementptr i8, ptr [[PSRCB:%.*]], i32 [[TMP2]]
+; CHECK-NEXT:    [[IND_END9:%.*]] = getelementptr i8, ptr [[PDST:%.*]], i32 [[TMP0]]
+; CHECK-NEXT:    [[IND_END11:%.*]] = getelementptr i8, ptr [[PSRCB:%.*]], i32 [[TMP0]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl i32 [[INDEX]], 1
 ; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[PSRCA]], i32 [[TMP3]]
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i32 [[INDEX]], 1
-; CHECK-NEXT:    [[NEXT_GEP13:%.*]] = getelementptr i8, ptr [[PDST]], i32 [[TMP4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = shl i32 [[INDEX]], 1
-; CHECK-NEXT:    [[NEXT_GEP14:%.*]] = getelementptr i8, ptr [[PSRCB]], i32 [[TMP5]]
+; CHECK-NEXT:    [[NEXT_GEP13:%.*]] = getelementptr i8, ptr [[PDST]], i32 [[TMP3]]
+; CHECK-NEXT:    [[NEXT_GEP14:%.*]] = getelementptr i8, ptr [[PSRCB]], i32 [[TMP3]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i16>, ptr [[NEXT_GEP]], align 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = sext <8 x i16> [[WIDE_LOAD]] to <8 x i32>
 ; CHECK-NEXT:    [[WIDE_LOAD15:%.*]] = load <8 x i16>, ptr [[NEXT_GEP14]], align 2

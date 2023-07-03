@@ -1,6 +1,5 @@
 ; Check how Cilksan handles a pointer that cannot be stripped.
 ;
-; RUN: opt < %s -enable-new-pm=0 -csan -ignore-sanitize-cilk-attr -S | FileCheck %s
 ; RUN: opt < %s -passes='cilksan' -ignore-sanitize-cilk-attr -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -104,8 +103,8 @@ do.body.i.i.i:                                    ; preds = %_ZN4pbbs14list_allo
   ret void
 
 ; CHECK: do.body.i.i.i:
-; CHECK: @__csan_load(i64 %{{.+}}, i8* getelementptr (i8, i8* bitcast (%"class.pbbs::concurrent_stack<pbbs::list_allocator<gbbs::em_data_block>::block *>::prim_concurrent_stack"* getelementptr inbounds (%"class.pbbs::concurrent_stack.3", %"class.pbbs::concurrent_stack.3"* @_ZN4pbbs14list_allocatorIN4gbbs13em_data_blockEE12global_stackE, i64 0, i32 1) to i8*), i64 8)
-; CHEK-NEXT: %oldHead.sroa.5.0.copyload.i.i.i = load i64, i64* bitcast (i8* getelementptr (i8, i8* bitcast (%"class.pbbs::concurrent_stack<pbbs::list_allocator<gbbs::em_data_block>::block *>::prim_concurrent_stack"* getelementptr inbounds (%"class.pbbs::concurrent_stack.3", %"class.pbbs::concurrent_stack.3"* @_ZN4pbbs14list_allocatorIN4gbbs13em_data_blockEE12global_stackE, i64 0, i32 1) to i8*), i64 8) to i64*)
+; CHECK: @__csan_load(i64 %{{.+}}, ptr getelementptr inbounds (%"class.pbbs::concurrent_stack.3", ptr @_ZN4pbbs14list_allocatorIN4gbbs13em_data_blockEE12global_stackE, i64 0, i32 1),
+; CHEK-NEXT: %oldHead.sroa.5.0.copyload.i.i.i = load ptr, ptr getelementptr inbounds ("class.pbbs::concurrent_stack.3", ptr @_ZN4pbbs14list_allocatorIN4gbbs13em_data_blockEE12global_stackE, i64 0, i32 1),
 
 if.else13:                                        ; preds = %det.cont, %entry
   %sub67 = phi i64 [ %sub6, %det.cont ], [ %sub64, %entry ]

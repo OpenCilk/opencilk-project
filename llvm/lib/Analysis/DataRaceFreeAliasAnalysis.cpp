@@ -64,9 +64,10 @@ static bool notDifferentParent(const Value *O1, const Value *O2) {
 #endif
 
 AliasResult DRFAAResult::alias(const MemoryLocation &LocA,
-                               const MemoryLocation &LocB, AAQueryInfo &AAQI) {
+                               const MemoryLocation &LocB, AAQueryInfo &AAQI,
+                               const Instruction *CtxI) {
   if (!EnableDRFAA)
-    return AAResultBase::alias(LocA, LocB, AAQI);
+    return AAResultBase::alias(LocA, LocB, AAQI, CtxI);
 
   LLVM_DEBUG(dbgs() << "DRFAA:\n\tLocA.Ptr = " << *LocA.Ptr
              << "\n\tLocB.Ptr = " << *LocB.Ptr << "\n");
@@ -77,7 +78,7 @@ AliasResult DRFAAResult::alias(const MemoryLocation &LocA,
     if (const Instruction *AddrB = dyn_cast<Instruction>(LocB.Ptr))
       if (TI.mayHappenInParallel(AddrA->getParent(), AddrB->getParent()))
         return AliasResult::NoAlias;
-  return AAResultBase::alias(LocA, LocB, AAQI);
+  return AAResultBase::alias(LocA, LocB, AAQI, CtxI);
 }
 
 ModRefInfo DRFAAResult::getModRefInfo(const CallBase *Call,

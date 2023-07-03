@@ -1,7 +1,5 @@
-; RUN: opt < %s -enable-new-pm=0 -csan -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
-; RUN: opt < %s -aa-pipeline=default -passes='cilksan' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
-; RUN: opt < %s -enable-new-pm=0 -csi -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
-; RUN: opt < %s -passes='csi' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
+; RUN: opt < %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
+; RUN: opt < %s -passes='csi' -S | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -453,7 +451,7 @@ if.end48:                                         ; preds = %if.end39
   %call56 = invoke dereferenceable(280) %"class.std::basic_istream"* @_ZNSi6ignoreEli(%"class.std::basic_istream"* nonnull %22, i64 9223372036854775807, i32 10)
           to label %while.cond unwind label %lpad.loopexit.split-lp
 ; CHECK: if.end48:
-; CHECK: invoke dereferenceable(280) %"class.std::basic_istream"* @_ZNSi6ignoreEli(%"class.std::basic_istream"* nonnull %{{.+}}, i64 9223372036854775807, i32 10)
+; CHECK: invoke dereferenceable(280) ptr @_ZNSi6ignoreEli(ptr nonnull %{{.+}}, i64 9223372036854775807, i32 10)
 ; CHECK-NEXT: to label %[[WHILE_COND_PREHEADER:.+]] unwind label %lpad.loopexit.split-lp
 
 ; CHECK: [[WHILE_COND_PREHEADER]]:
@@ -471,7 +469,7 @@ while.cond:                                       ; preds = %if.end48, %while.bo
 ; CHECK-CSAN: call void @__csan_before_call(
 ; CHECK-CSI-NOT: call void @__csi_after_call(
 ; CHECK-CSI: call void @__csi_before_call(
-; CHECK-NEXT: invoke i32 @_ZNSi4peekEv(%"class.std::basic_istream"* nonnull %{{.+}})
+; CHECK-NEXT: invoke i32 @_ZNSi4peekEv(ptr nonnull %{{.+}})
 
 invoke.cont57:                                    ; preds = %while.cond
   %cmp = icmp eq i32 %call58, 37
@@ -484,7 +482,7 @@ while.body:                                       ; preds = %invoke.cont57
 ; CHECK: while.body:
 ; CHECK-CSAN: call void @__csan_before_call(
 ; CHECK-CSI: call void @__csi_before_call(
-; CHECK-NEXT: invoke dereferenceable(280) %"class.std::basic_istream"* @_ZNSi6ignoreEli(%"class.std::basic_istream"* nonnull %{{.+}}, i64 2048, i32 10)
+; CHECK-NEXT: invoke dereferenceable(280) ptr @_ZNSi6ignoreEli(ptr nonnull %{{.+}}, i64 2048, i32 10)
 ; CHECK-NOT: to label %while.cond unwind label %lpad.loopexit
 
 while.end:                                        ; preds = %invoke.cont57

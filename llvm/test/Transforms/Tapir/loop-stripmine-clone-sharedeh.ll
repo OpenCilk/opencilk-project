@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-stripmine -require-parallel-epilog -S | FileCheck %s --check-prefixes=CHECK,CHECK-OLD
 ; RUN: opt < %s -passes='loop-stripmine' -require-parallel-epilog -S | FileCheck %s --check-prefixes=CHECK,CHECK-NEW
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -113,9 +112,6 @@ pfor.cond864.us.preheader:                        ; preds = %pfor.cond864.prehea
 ; CHECK-NEXT: detach within %[[SYNCREG_US_DETLOOP]], label %pfor.body870.us.strpm.outer, label %pfor.inc1049.us.strpm.outer
 
 ; CHECK: pfor.body870.us.strpm.outer:
-; CHECK-NEXT: %inverse_component_with_lamda.i.us = alloca [4 x double]
-; CHECK-NEXT: %inverse_component_final.i.us = alloca [4 x double]
-; CHECK-NEXT: %new_value.us = alloca
 ; CHECK-NEXT: mul i64 {{[0-9]+}}, %[[NITER_US]]
 ; CHECK-NEXT: br label %pfor.cond864.us
 
@@ -140,9 +136,6 @@ pfor.body870.us:                                  ; preds = %pfor.cond864.us
 
 ; CHECK: pfor.body870.us:
 ; CHECK-NOT: alloca
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
 ; CHECK: br i1 {{.+}}, label %if.end888.us, label %land.lhs.true874.us
 
 land.lhs.true874.us:                              ; preds = %pfor.body870.us
@@ -186,9 +179,6 @@ pfor.preattach1048.us:                            ; preds = %if.end888.us
 
 ; CHECK: pfor.preattach1048.us:
 ; CHECK-NOT: reattach
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
 ; CHECK: br label %pfor.inc1049.us
 
 pfor.inc1049.us:                                  ; preds = %pfor.preattach1048.us, %pfor.cond864.us
@@ -221,9 +211,6 @@ pfor.inc1049.us:                                  ; preds = %pfor.preattach1048.
 ; CHECK-NEXT: detach within %[[SYNCREG_DETLOOP]], label %pfor.body870.strpm.outer, label %pfor.inc1049.strpm.outer
 
 ; CHECK: pfor.body870.strpm.outer:
-; CHECK-NEXT: %inverse_component_with_lamda.i = alloca [4 x double]
-; CHECK-NEXT: %inverse_component_final.i = alloca [4 x double]
-; CHECK-NEXT: %new_value = alloca
 ; CHECK-NEXT: mul i64 {{[0-9]+}}, %[[NITER]]
 ; CHECK-NEXT: br label %pfor.cond864
 
@@ -247,9 +234,6 @@ pfor.body870:                                     ; preds = %pfor.cond864
 
 ; CHECK: pfor.body870:
 ; CHECK-NOT: alloca
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
 ; CHECK: br i1 {{.+}}, label %if.end888, label %land.lhs.true874
 
 land.lhs.true874:                                 ; preds = %pfor.body870
@@ -317,9 +301,6 @@ pfor.preattach1048:                               ; preds = %if.end888
 
 ; CHECK: pfor.preattach1048:
 ; CHECK-NOT: reattach
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
 ; CHECK: br label %pfor.inc1049
 
 pfor.inc1049:                                     ; preds = %pfor.preattach1048, %pfor.cond864
@@ -360,18 +341,12 @@ pfor.inc1049:                                     ; preds = %pfor.preattach1048,
 
 ; CHECK: pfor.body870.us.epil:
 ; CHECK-NOT: alloca
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
 ; CHECK: br i1 {{.+}}, label %if.end888.us.epil, label %land.lhs.true874.us.epil
 
 ; CHECK: if.end888.us.epil:
 ; CHECK: br i1 {{.+}}, label %pfor.preattach1048.us.epil, label %if.then893.loopexit.epil
 
 ; CHECK: pfor.preattach1048.us.epil:
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
 ; CHECK: br label %pfor.inc1049.us.epil
 
 ; CHECK: pfor.inc1049.us.epil:
@@ -430,18 +405,12 @@ pfor.inc1049:                                     ; preds = %pfor.preattach1048,
 
 ; CHECK: pfor.body870.epil:
 ; CHECK-NOT: alloca
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
-; CHECK: call void @llvm.lifetime.start
 ; CHECK: br i1 {{.+}}, label %if.end888.epil, label %land.lhs.true874.epil
 
 ; CHECK: if.end888.epil:
 ; CHECK: br i1 {{.+}}, label %pfor.preattach1048.epil, label %if.then893.loopexit1565.epil
 
 ; CHECK: pfor.preattach1048.epil:
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.lifetime.end
 ; CHECK: br label %pfor.inc1049.epil
 
 ; CHECK: pfor.inc1049.epil:

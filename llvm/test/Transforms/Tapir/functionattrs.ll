@@ -2,7 +2,6 @@
 ; properties for a function that uses Tapir instructions.  In this
 ; case, functionattrs should recognize @fib() as readnone.
 ;
-; RUN: opt < %s -function-attrs -S | FileCheck %s
 ; RUN: opt < %s -passes='cgscc(function-attrs)' -S | FileCheck %s
 
 ; Function Attrs: noinline nounwind uwtable
@@ -54,7 +53,7 @@ attributes #0 = { noinline nounwind uwtable "correctly-rounded-divide-sqrt-fp-ma
 attributes #1 = { argmemonly nounwind willreturn }
 
 ; CHECK: attributes #[[ATTRNUM]] = {
-; CHECK: readnone
+; CHECK: memory(none)
 ; CHECK: attributes
 ; CHECK: attributes
 ; CHECK-NOT: attributes

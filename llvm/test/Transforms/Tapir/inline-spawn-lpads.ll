@@ -1,8 +1,7 @@
 ; Test inliner when the caller or callee contain Tapir tasks and when
 ; the caller or callee contains landingpads.
 ;
-; RUN: opt < %s -inline -S -o - | FileCheck %s
-; RUN: opt < %s -passes='inline' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='inline' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -91,17 +90,17 @@ sync.continue:                                    ; preds = %det.cont
 
 ; CHECK: [[LPADI]]:
 ; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad [[LPADTYPE:{.+}]]
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIc to i8*)
+; CHECK-NEXT: catch ptr @_ZTIc
 ; CHECK: br i1 %{{.+}}, label %[[EXITI:.+]], label %[[RESUMEI:.+]]
 
 ; CHECK: [[RESUMEI]]:
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]], [[LPADTYPE]] %[[LPADVAL]])
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]], [[LPADTYPE]] %[[LPADVAL]])
 ; CHECK-NEXT: to label %[[NEWUNREACHABLE:.+]] unwind label %[[DETUNWIND]]
 
 ; CHECK: [[DETUNWIND]]:
 ; CHECK-NEXT: %[[LPADVALSPLIT:.+]] = landingpad [[LPADTYPE]]
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]], [[LPADTYPE]] %[[LPADVALSPLIT]])
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]], [[LPADTYPE]] %[[LPADVALSPLIT]])
 ; CHECK-NEXT: to label %[[NEWUNREACHABLE]] unwind label %[[RESUMEISPLITSPLIT:.+]]
 
 ; CHECK: [[RESUMEISPLITSPLIT]]:
@@ -211,13 +210,13 @@ eh.resume:                                        ; preds = %lpad
 ; CHECK: [[DETUNWIND]]:
 ; CHECK-NEXT: %[[TFLPADVAL:.+]] = landingpad [[LPADTYPE:{.+}]]
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]], [[LPADTYPE]] %[[TFLPADVAL]])
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]], [[LPADTYPE]] %[[TFLPADVAL]])
 ; CHECK-NEXT: to label %[[NEWUNREACHABLE]] unwind label %[[LPAD:.+]]
 
 ; CHECK: [[TASKLPAD]]:
 ; CHECK-NEXT: %[[TASKLPADVAL:.+]] = landingpad [[LPADTYPE]]
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]], [[LPADTYPE]] %[[TASKLPADVAL]])
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]], [[LPADTYPE]] %[[TASKLPADVAL]])
 ; CHECK-NEXT: to label %[[NEWUNREACHABLE]] unwind label %[[DETUNWIND]]
 
 ; CHECK: [[EXITI]]:
@@ -225,7 +224,7 @@ eh.resume:                                        ; preds = %lpad
 
 ; CHECK: [[LPAD]]:
 ; CHECK-NEXT: %[[LPADVAL:.+]] = landingpad [[LPADTYPE]]
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: br i1 %{{.+}}, label %[[CATCH:.+]], label %[[RESUME:.+]]
 
 ; CHECK: [[CATCH]]:
@@ -357,20 +356,20 @@ eh.resume:                                        ; preds = %lpad
 ; CHECK-NEXT: %[[TASKLPADIVAL:.+]] = landingpad [[LPADTYPE:{.+}]]
 ; CHECK-NEXT: cleanup
 ; CHECK-NOT: catch
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]], [[LPADTYPE]] %[[TASKLPADIVAL]])
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]], [[LPADTYPE]] %[[TASKLPADIVAL]])
 ; CHECK-NEXT: to label %[[UNREACHABLEI:.+]] unwind label %[[DETUNWIND:.+]]
 
 ; CHECK: [[DETUNWIND]]:
 ; CHECK-NEXT: %[[DETUNWINDLPADVAL:.+]] = landingpad [[LPADTYPE]]
 ; CHECK-NEXT: cleanup
 ; CHECK-NOT: catch
-; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]], [[LPADTYPE]] %[[DETUNWINDLPADVAL]])
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]], [[LPADTYPE]] %[[DETUNWINDLPADVAL]])
 ; CHECK-NEXT: to label %[[UNREACHABLEI]] unwind label %[[LPADI:.+]]
 
 ; CHECK: [[LPADI]]:
 ; CHECK-NEXT: %[[LPADIVAL:.+]] = landingpad [[LPADTYPE]]
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIc to i8*)
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIc
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: br i1 %{{.+}}, label %[[CATCHI:.+]], label %[[RESUMEI:.+]]
 
 ; CHECK: [[CATCHI]]:

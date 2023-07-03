@@ -522,14 +522,14 @@ static void GetGeneralAccesses(
   //
   // This logic is based on that in AliasSetTracker.cpp.
   if (const CallBase *Call = dyn_cast<CallBase>(I)) {
-    ModRefInfo CallMask = createModRefInfo(AA->getModRefBehavior(Call));
+    ModRefInfo CallMask = AA->getMemoryEffects(Call).getModRef();
 
     // Some intrinsics are marked as modifying memory for control flow modelling
     // purposes, but don't actually modify any specific memory location.
     using namespace PatternMatch;
     if (Call->use_empty() &&
         match(Call, m_Intrinsic<Intrinsic::invariant_start>()))
-      CallMask = clearMod(CallMask);
+      CallMask &= ModRefInfo::Ref;
     // TODO: See if we need to exclude additional intrinsics.
 
     if (isAllocationFn(Call, TLI)) {
@@ -544,7 +544,7 @@ static void GetGeneralAccesses(
         // If we assume malloc is safe, don't worry about opaque accesses by
         // realloc.
         if (!AssumeSafeMalloc)
-          AccI.push_back(GeneralAccess(I, None, CallMask));
+          AccI.push_back(GeneralAccess(I, std::nullopt, CallMask));
         return;
       }
     }
@@ -559,11 +559,8 @@ static void GetGeneralAccesses(
       if (AA->pointsToConstantMemory(ArgLoc))
         continue;
       ModRefInfo ArgMask = AA->getArgModRefInfo(Call, ArgIdx);
-      ArgMask = intersectModRef(CallMask, ArgMask);
+      ArgMask &= CallMask;
       if (!isNoModRef(ArgMask)) {
-        // dbgs() << "New GA for " << *I << "\n  arg " << *Arg << "\n";
-        // if (ArgLoc.Size != LocationSize::unknown())
-        //   dbgs() << "  size " << ArgLoc.Size.getValue() << "\n";
         AccI.push_back(GeneralAccess(I, ArgLoc, ArgIdx, ArgMask));
       }
     }
@@ -576,7 +573,7 @@ static void GetGeneralAccesses(
     if (!Call->onlyAccessesArgMemory())
       // Add a generic GeneralAccess for this call to represent the fact that it
       // might access arbitrary global memory.
-      AccI.push_back(GeneralAccess(I, None, CallMask));
+      AccI.push_back(GeneralAccess(I, std::nullopt, CallMask));
     return;
   }
 }
@@ -1015,8 +1012,8 @@ bool AccessPtrAnalysis::checkOpaqueAccesses(GeneralAccess &GA1,
         assert(!AA->doesNotAccessMemory(Call1) &&
                !AA->doesNotAccessMemory(Call2) &&
                "Opaque call does not access memory.");
-        assert(!AA->onlyAccessesArgPointees(AA->getModRefBehavior(Call1)) &&
-               !AA->onlyAccessesArgPointees(AA->getModRefBehavior(Call2)) &&
+        assert(!AA->getMemoryEffects(Call1).onlyAccessesArgPointees() &&
+               !AA->getMemoryEffects(Call2).onlyAccessesArgPointees() &&
                "Opaque call only accesses arg pointees.");
       });
     // // If both calls only read memory, then there's no dependence.
@@ -1141,7 +1138,7 @@ static void setObjectMRForRace(RaceInfo::ObjectMRTy &ObjectMRForRace,
                                const Value *Ptr, ModRefInfo MRI) {
   if (!ObjectMRForRace.count(Ptr))
     ObjectMRForRace[Ptr] = ModRefInfo::NoModRef;
-  ObjectMRForRace[Ptr] = unionModRef(ObjectMRForRace[Ptr], MRI);
+  ObjectMRForRace[Ptr] |= MRI;
 }
 
 void AccessPtrAnalysis::recordLocalRace(const GeneralAccess &GA,
@@ -1226,6 +1223,8 @@ AccessPtrAnalysis::underlyingObjectsAlias(const GeneralAccess &GAA,
 }
 
 static bool isThreadLocalObject(const Value *V) {
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(V))
+    return Intrinsic::threadlocal_address == II->getIntrinsicID();
   if (const GlobalValue *GV = dyn_cast<GlobalValue>(V))
     return GV->isThreadLocal();
   return false;

@@ -283,8 +283,7 @@ bool llvm::MoveStaticAllocasInBlock(
 
     // Transfer all of the allocas over in a block.  Using splice means that the
     // instructions aren't removed from the symbol table, then reinserted.
-    Entry->getInstList().splice(
-        InsertPoint, Block->getInstList(), AI->getIterator(), I);
+    Entry->splice(InsertPoint, &*Block, AI->getIterator(), I);
   }
 
   // Move any syncregion_start's into the entry basic block.
@@ -299,8 +298,7 @@ bool llvm::MoveStaticAllocasInBlock(
                cast<IntrinsicInst>(I)->getIntrinsicID())
       ++I;
 
-    Entry->getInstList().splice(
-        InsertPoint, Block->getInstList(), II->getIterator(), I);
+    Entry->splice(InsertPoint, &*Block, II->getIterator(), I);
   }
 
   // Leave lifetime markers for the static alloca's, scoping them to the
@@ -2342,7 +2340,7 @@ void llvm::TapirLoopHints::writeHintsToMetadata(ArrayRef<Hint> HintTypes) {
   SmallVector<Metadata *, 4> MDs;
 
   // Reserve first location for self reference to the LoopID metadata node.
-  TempMDTuple TempNode = MDNode::getTemporary(Context, None);
+  TempMDTuple TempNode = MDNode::getTemporary(Context, std::nullopt);
   MDs.push_back(TempNode.get());
 
   // If the loop already has metadata, then ignore the existing operands.
@@ -2379,7 +2377,7 @@ void llvm::TapirLoopHints::writeHintsToClonedMetadata(ArrayRef<Hint> HintTypes,
   SmallVector<Metadata *, 4> MDs;
 
   // Reserve first location for self reference to the LoopID metadata node.
-  TempMDTuple TempNode = MDNode::getTemporary(Context, None);
+  TempMDTuple TempNode = MDNode::getTemporary(Context, std::nullopt);
   MDs.push_back(TempNode.get());
 
   // If the loop already has metadata, then ignore the existing operands.
@@ -2419,7 +2417,7 @@ void llvm::TapirLoopHints::clearHintsMetadata() {
   SmallVector<Metadata *, 4> MDs;
 
   // Reserve first location for self reference to the LoopID metadata node.
-  TempMDTuple TempNode = MDNode::getTemporary(Context, None);
+  TempMDTuple TempNode = MDNode::getTemporary(Context, std::nullopt);
   MDs.push_back(TempNode.get());
 
   // If the loop already has metadata, then ignore the existing operands.

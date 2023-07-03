@@ -129,9 +129,7 @@ bool DRFScopedNoAliasImpl::populateTaskScopeNoAliasInBlock(
         continue;
 
       IsFuncCall = true;
-      FunctionModRefBehavior MRB = AA.getModRefBehavior(ICS);
-      if (MRB == FMRB_OnlyAccessesArgumentPointees ||
-          MRB == FMRB_OnlyReadsArgumentPointees)
+      if (ICS->onlyAccessesArgMemory())
         IsArgMemOnlyCall = true;
 
       for (Value *Arg : ICS->args()) {

@@ -4,7 +4,6 @@
 ; Credit to I-Ting Angelina Lee for the original source code for this
 ; test.
 ;
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -S | FileCheck %s
 ; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -55,7 +54,7 @@ if.end7:                                          ; preds = %if.end4
   %call8 = tail call i64 @binary_search(i64* %source_2.tr, i64 %size_2.tr, i64 %3)
   %add9 = add nsw i64 %call8, 1
   detach within %syncreg, label %det.achd, label %det.cont
-; CHECK: define private fastcc void @cilk_merge.outline_det.achd.otd1(i64* align 1 %source_1.tr.otd1, i64 %div.otd1, i64* align 1 %source_2.tr.otd1, i64 %add9.otd1, i64*
+; CHECK: define private fastcc void @cilk_merge.outline_det.achd.otd1(ptr align 1 %source_1.tr.otd1, i64 %div.otd1, ptr align 1 %source_2.tr.otd1, i64 %add9.otd1, ptr
 ; CHECK-NOT: returned
 ; CHECK: %target.otd1) unnamed_addr
 det.achd:                                         ; preds = %if.end7

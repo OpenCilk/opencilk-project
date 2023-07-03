@@ -1,7 +1,6 @@
 ; Check that Tapir lowering correctly handles PHI nodes following
 ; detached.rethrow terminators.
 ;
-; RUN: opt < %s -tapir2target -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -1638,9 +1637,9 @@ unreachable:                                      ; preds = %lpad308
 ; CHECK-NEXT: to label %pfor.inc326.strpm.outer.otd1 unwind label %lpad325.loopexit.strpm.otd1
 
 ; CHECK: lpad325.loopexit.strpm.otd1:
-; CHECK-NEXT: %[[LPAD_VAL:.+]] = landingpad { i8*, i32 }
+; CHECK-NEXT: %[[LPAD_VAL:.+]] = landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK: resume { i8*, i32 } %[[LPAD_VAL]]
+; CHECK: resume { ptr, i32 } %[[LPAD_VAL]]
 
 declare dso_local i32 @__cilkrts_get_nworkers() local_unnamed_addr #0
 

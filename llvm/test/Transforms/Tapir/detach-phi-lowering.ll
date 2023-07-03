@@ -1,7 +1,6 @@
 ; Check that PHI nodes in detached blocks are handled properly during
 ; Tapir lowering.
 ;
-; RUN: opt < %s -tapir2target -tapir-target=opencilk -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target' -tapir-target=opencilk -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 
 ; ModuleID = 'bugpoint-reduced-simplified.bc'
@@ -49,7 +48,7 @@ pfor.inc:                                         ; preds = %pfor.cond
 ; CHECK: br label %pfor.inc
 
 ; CHECK: pfor.body.entry:
-; CHECK-NOT: phi i64*
+; CHECK-NOT: phi ptr
 
 ; CHECK: pfor.inc:
 

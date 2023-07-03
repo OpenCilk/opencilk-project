@@ -51,11 +51,11 @@ entry:
   ret %"struct.tlx::BTree<unsigned long, unsigned long, tlx::btree_set<unsigned long, std::less<unsigned long>, tlx::btree_default_traits<unsigned long, unsigned long>, std::allocator<unsigned long>, false>::key_of_value, std::less<unsigned long>, tlx::btree_default_traits<unsigned long, unsigned long>, false, std::allocator<unsigned long>, false>::LeafNode"* null
 }
 
-; CHECK: define linkonce_odr %"struct.tlx::BTree<unsigned long, unsigned long, tlx::btree_set<unsigned long, std::less<unsigned long>, tlx::btree_default_traits<unsigned long, unsigned long>, std::allocator<unsigned long>, false>::key_of_value, std::less<unsigned long>, tlx::btree_default_traits<unsigned long, unsigned long>, false, std::allocator<unsigned long>, false>::LeafNode"* @_ZN3tlx5BTreeImmNS_9btree_setImSt4lessImENS_20btree_default_traitsImmEESaImELb0EE12key_of_valueES3_S5_Lb0ES6_Lb0EE13allocate_leafEv() personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
+; CHECK: define linkonce_odr ptr @_ZN3tlx5BTreeImmNS_9btree_setImSt4lessImENS_20btree_default_traitsImmEESaImELb0EE12key_of_valueES3_S5_Lb0ES6_Lb0EE13allocate_leafEv() personality ptr @__gxx_personality_v0 {
 ; CHECK: entry:
 ; CHECK-NEXT: br label %invoke.cont
 ; CHECK: invoke.cont:
-; CHECK-NEXT: ret %"struct.tlx::BTree<unsigned long, unsigned long, tlx::btree_set<unsigned long, std::less<unsigned long>, tlx::btree_default_traits<unsigned long, unsigned long>, std::allocator<unsigned long>, false>::key_of_value, std::less<unsigned long>, tlx::btree_default_traits<unsigned long, unsigned long>, false, std::allocator<unsigned long>, false>::LeafNode"* null
+; CHECK-NEXT: ret ptr null
 
 ; Function Attrs: argmemonly nofree nounwind willreturn writeonly
 declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i1 immarg) #3

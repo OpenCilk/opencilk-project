@@ -5165,9 +5165,9 @@ PreservedAnalyses SROAPass::runImpl(Function &F, DomTreeUpdater &RunDTU,
 }
 
 PreservedAnalyses SROAPass::runImpl(Function &F, DominatorTree &RunDT,
-                                    AssumptionCache &RunAC) {
+                                    AssumptionCache &RunAC, TaskInfo &RunTI) {
   DomTreeUpdater DTU(RunDT, DomTreeUpdater::UpdateStrategy::Lazy);
-  return runImpl(F, DTU, RunAC);
+  return runImpl(F, DTU, RunAC, RunTI);
 }
 
 PreservedAnalyses SROAPass::run(Function &F, FunctionAnalysisManager &AM) {

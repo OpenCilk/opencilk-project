@@ -1,6 +1,5 @@
 ; Thanks to Brian Wheatman for the source code behind this test.
 ;
-; RUN: opt %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -378,9 +377,9 @@ if.then:                                          ; preds = %invoke.cont62
   %add.i820 = add nsw i32 %call.i819, 1, !dbg !2671
   %conv.i821 = sext i32 %add.i820 to i64, !dbg !2669
 ; CHECK: {{^if.then}}
-; CHECK: load i64, i64* @__csi_func_id__ZN3OFM11print_arrayEm
+; CHECK: load i64, ptr @__csi_func_id__ZN3OFM11print_arrayEm
 ; CHECK: call void @__csan_before_call(
-; CHECK-NEXT: invoke void @_ZN3OFM11print_arrayEm(%class.OFM* nonnull
+; CHECK-NEXT: invoke void @_ZN3OFM11print_arrayEm(ptr nonnull
 ; CHECK-NEXT: to label %invoke.cont81
   invoke void @_ZN3OFM11print_arrayEm(%class.OFM* nonnull %49, i64 %conv.i821)
           to label %invoke.cont81 unwind label %lpad52.loopexit.split-lp, !dbg !2672
@@ -578,9 +577,9 @@ if.then197:                                       ; preds = %invoke.cont192
   %add.i836 = add nsw i32 %call.i835, 1, !dbg !2756
   %conv.i837 = sext i32 %add.i836 to i64, !dbg !2754
 ; CHECK: {{^if.then197}}
-; CHECK: load i64, i64* @__csi_func_id__ZN3OFM11print_arrayEm
+; CHECK: load i64, ptr @__csi_func_id__ZN3OFM11print_arrayEm
 ; CHECK: call void @__csan_before_call(
-; CHECK-NEXT: invoke void @_ZN3OFM11print_arrayEm(%class.OFM* nonnull
+; CHECK-NEXT: invoke void @_ZN3OFM11print_arrayEm(ptr nonnull
 ; CHECK-NEXT: to label %invoke.cont212
   invoke void @_ZN3OFM11print_arrayEm(%class.OFM* nonnull %68, i64 %conv.i837)
           to label %invoke.cont212 unwind label %lpad182.loopexit.split-lp, !dbg !2757

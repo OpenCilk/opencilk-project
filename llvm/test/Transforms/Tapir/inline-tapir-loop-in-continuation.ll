@@ -1,4 +1,4 @@
-; RUN: opt < %s -inline -S -o - | FileCheck %s
+; RUN: opt < %s -passes=inline -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -87,7 +87,6 @@ if.end9:                                          ; preds = %det.achd7, %if.then
 
 ; CHECK: if.end9:
 ; CHECK-NOT: call token @llvm.taskframe.create
-; CHECK-NEXT: getelementptr
 ; CHECK-NEXT: load
 ; CHECK-NEXT: %nodes = getelementptr inbounds %class.Graph
 ; CHECK-NEXT: %edges = getelementptr inbounds %class.Graph
@@ -116,7 +115,7 @@ pfor.body:                                        ; preds = %pfor.body.entry
 ; CHECK-NOT: call fastcc void @_ZL14pbfs_proc_NodePKiiP11Bag_reducerIiEjPjS0_S0_
 ; CHECK: %[[TF:.+]] = call token @llvm.taskframe.create()
 ; CHECK-NEXT: call token @llvm.syncregion.start
-; CHECK: call {{.*}}%class.Bag* @_ZN11Bag_reducerIiE13get_referenceEv(
+; CHECK: call {{.*}}ptr @_ZN11Bag_reducerIiE13get_referenceEv(
 ; CHECK: br label %for.body.i
 
 ; CHECK: _ZL14pbfs_proc_NodePKiiP11Bag_reducerIiEjPjS0_S0_.exit:

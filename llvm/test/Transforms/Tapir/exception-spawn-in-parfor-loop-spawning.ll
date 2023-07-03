@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -S | FileCheck %s
 ; RUN: opt < %s -passes=loop-spawning -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -634,13 +633,13 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: lpad66.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
+; CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]],
 ; CHECK-NEXT: to label %[[UNREACHABLE:.+]] unwind label %lpad75.ls1
 
 ; CHECK: lpad75.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: tail call void @_Z9catchfn_iii(i32 2,
 
 ; CHECK: det.achd56.ls1:
@@ -651,7 +650,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: lpad57.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]],
 ; CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %lpad66.ls1
 
 ; CHECK: [[INVOKECONT]]:
@@ -678,13 +677,13 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: lpad7.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
+; CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]],
 ; CHECK-NEXT: to label %[[UNREACHABLE:.+]] unwind label %lpad15.ls1
 
 ; CHECK: lpad15.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: tail call void @_Z9catchfn_iii(i32 1,
 
 ; CHECK: det.achd5.ls1:
@@ -695,7 +694,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: lpad.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]],
 ; CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %lpad7.ls1
 
 ; CHECK: [[INVOKECONT]]:
@@ -719,14 +718,14 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: reattach within %[[DACSYNCREG]], label %[[DACCONT]]
 
 ; CHECK: pfor.body76.ls1:
-; CHECK: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[B3PTR:.+]])
-; CHECK-NEXT: invoke void @_ZN3BarC1Ev(%class.Bar* nonnull %[[B3:.+]])
+; CHECK: call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %[[B3PTR:.+]])
+; CHECK-NEXT: invoke void @_ZN3BarC1Ev(ptr nonnull %[[B3:.+]])
 ; CHECK-NEXT: to label %[[B3CONSTRCONT:.+]] unwind label %lpad77.ls1
 
 ; CHECK: lpad77.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: br label %ehcleanup104.ls1
 
 ; CHECK: [[B3CONSTRCONT]]:
@@ -734,26 +733,26 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: detach within %[[SYNCREG]], label %det.achd82.ls1, label %det.cont95.ls1 unwind label %lpad92.ls1
 
 ; CHECK: ehcleanup104.ls1:
-; CHECK: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[B3PTR]])
+; CHECK: call void @llvm.lifetime.end.p0(i64 1, ptr nonnull %[[B3PTR]])
 
 ; CHECK: det.cont95.ls1:
 ; CHECK-NEXT: call void @_Z9nothrowfni(i32 5)
 ; CHECK-NEXT: sync within %[[SYNCREG]], label %sync.continue102.ls1
 
 ; CHECK: sync.continue102.ls1:
-; CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* nonnull %[[B3]])
-; CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[B3PTR]])
+; CHECK-NEXT: call void @_ZN3BarD1Ev(ptr nonnull %[[B3]])
+; CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 1, ptr nonnull %[[B3PTR]])
 
 ; CHECK: lpad92.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
+; CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]],
 ; CHECK-NEXT: to label %[[UNREACHABLE:.+]] unwind label %lpad101.ls1
 
 ; CHECK: lpad101.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: br label %ehcleanup104.ls1
 
 ; CHECK: det.achd82.ls1:
@@ -764,7 +763,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: lpad83.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]],
 ; CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %lpad92.ls1
 
 ; CHECK: [[INVOKECONT]]:
@@ -780,7 +779,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: [[DACLPAD]]:
 ; CHECK: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[DACSYNCREG]],
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[DACSYNCREG]],
 ; CHECK-NEXT: to label %[[UNREACHABLE2:.+]] unwind label %[[DACDU]]
 
 
@@ -798,14 +797,14 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: reattach within %[[DACSYNCREG]], label %[[DACCONT]]
 
 ; CHECK: pfor.body.ls1:
-; CHECK: call void @llvm.lifetime.start.p0i8(i64 1, i8* nonnull %[[B2PTR:.+]])
-; CHECK-NEXT: invoke void @_ZN3BarC1Ev(%class.Bar* nonnull %[[B2:.+]])
+; CHECK: call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %[[B2PTR:.+]])
+; CHECK-NEXT: invoke void @_ZN3BarC1Ev(ptr nonnull %[[B2:.+]])
 ; CHECK-NEXT: to label %[[B2CONSTRCONT:.+]] unwind label %lpad15.ls1
 
 ; CHECK: lpad15.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: br label %ehcleanup41.ls1
 
 ; CHECK: [[B2CONSTRCONT]]:
@@ -813,26 +812,26 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK-NEXT: detach within %[[SYNCREG]], label %det.achd20.ls1, label %det.cont33.ls1 unwind label %lpad30.ls1
 
 ; CHECK: ehcleanup41.ls1:
-; CHECK: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[B2PTR]])
+; CHECK: call void @llvm.lifetime.end.p0(i64 1, ptr nonnull %[[B2PTR]])
 
 ; CHECK: det.cont33.ls1:
 ; CHECK-NEXT: call void @_Z9nothrowfni(i32 3)
 ; CHECK-NEXT: sync within %[[SYNCREG]], label %sync.continue.ls1
 
 ; CHECK: sync.continue.ls1:
-; CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* nonnull %[[B2]])
-; CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 1, i8* nonnull %[[B2PTR]])
+; CHECK-NEXT: call void @_ZN3BarD1Ev(ptr nonnull %[[B2]])
+; CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 1, ptr nonnull %[[B2PTR]])
 
 ; CHECK: lpad30.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],
+; CHECK: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]],
 ; CHECK-NEXT: to label %[[UNREACHABLE:.+]] unwind label %lpad39.ls1
 
 ; CHECK: lpad39.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: catch i8* bitcast (i8** @_ZTIi to i8*)
+; CHECK-NEXT: catch ptr @_ZTIi
 ; CHECK: br label %ehcleanup41.ls1
 
 ; CHECK: det.achd20.ls1:
@@ -843,7 +842,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: lpad21.ls1:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[SYNCREG]],
 ; CHECK-NEXT: to label %[[UNREACHABLE]] unwind label %lpad30.ls1
 
 ; CHECK: [[INVOKECONT]]:
@@ -859,7 +858,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 ; CHECK: [[DACLPAD]]:
 ; CHECK: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[DACSYNCREG]],
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[DACSYNCREG]],
 ; CHECK-NEXT: to label %[[UNREACHABLE2:.+]] unwind label %[[DACDU]]
 
 attributes #0 = { uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }

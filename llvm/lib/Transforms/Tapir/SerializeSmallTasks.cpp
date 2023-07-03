@@ -54,7 +54,7 @@ static bool trySerializeSmallLoop(
   TapirLoopHints Hints(L);
 
   TargetTransformInfo::StripMiningPreferences SMP =
-    gatherStripMiningPreferences(L, SE, TTI, None);
+      gatherStripMiningPreferences(L, SE, TTI, std::nullopt);
 
   SmallPtrSet<const Value *, 32> EphValues;
   CodeMetrics::collectEphemeralValues(L, &AC, EphValues);

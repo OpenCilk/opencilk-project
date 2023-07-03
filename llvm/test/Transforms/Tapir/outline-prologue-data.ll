@@ -1,7 +1,7 @@
 ; Check that prologue data attached to a function with Tapir
 ; instructions does not get copied to a generated helper function.
 ;
-; RUN: opt < %s -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
+; RUN: opt < %s -passes=tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 

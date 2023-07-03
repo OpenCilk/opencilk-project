@@ -22,7 +22,7 @@ cont7:                                            ; preds = %pfor.cond
   br label %cont9
 
 ; CHECK: cont7:
-; CHECK-NEXT: invoke void @foo(i64 0, i64 0, i8* null, i8* null, i64 0)
+; CHECK-NEXT: invoke void @foo(i64 0, i64 0, ptr null, ptr null, i64 0)
 ; CHECK-NEXT: to label %{{.+}} unwind label %[[TSAN_CLEANUP_TASK:.+]]
 
 cont9:                                            ; preds = %cont7
@@ -43,7 +43,7 @@ pfor.inc:                                         ; preds = %cont11, %pfor.cond
 ; CHECK: [[TSAN_CLEANUP_TASK]]:
 ; CHECK-NEXT: landingpad
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %{{.+}})
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg, { ptr, i32 } %{{.+}})
 ; CHECK-NEXT: to label %{{.+}} unwind label %[[TSAN_CLEANUP]]
 }
 

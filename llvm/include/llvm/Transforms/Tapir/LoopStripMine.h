@@ -35,7 +35,7 @@ void simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
 
 TargetTransformInfo::StripMiningPreferences gatherStripMiningPreferences(
     Loop *L, ScalarEvolution &SE, const TargetTransformInfo &TTI,
-    Optional<unsigned> UserCount);
+    std::optional<unsigned> UserCount);
 
 bool computeStripMineCount(Loop *L, const TargetTransformInfo &TTI,
                            InstructionCost LoopCost,

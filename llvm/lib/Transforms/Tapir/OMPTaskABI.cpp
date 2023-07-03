@@ -34,6 +34,7 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
@@ -283,8 +284,8 @@ void OMPTaskABI::addHelperAttributes(Function &Helper) {
   // function.
   if (getArgStructMode() != ArgStructMode::None) {
     Helper.removeFnAttr(Attribute::WriteOnly);
-    Helper.removeFnAttr(Attribute::ArgMemOnly);
-    Helper.removeFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
+    Helper.setMemoryEffects(
+        MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef));
   }
   // Note that the address of the helper is unimportant.
   Helper.setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
@@ -559,7 +560,7 @@ void OMPTaskABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   // the OpenMP runtime, especially to accommodate vector arguments.
   AllocaInst *ArgAlloca = cast<AllocaInst>(ReplCall->getArgOperand(0));
   uint64_t Alignment =
-      DL.getPrefTypeAlignment(ArgAlloca->getAllocatedType());
+      DL.getPrefTypeAlign(ArgAlloca->getAllocatedType()).value();
 
   {
     // Populate the OMP function helper.

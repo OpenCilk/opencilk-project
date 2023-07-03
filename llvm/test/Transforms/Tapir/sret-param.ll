@@ -4,9 +4,7 @@
 ; Credit to Tim Kaler for producing the source code that inspired this test
 ; case.
 ;
-; RUN: opt < %s -enable-new-pm=0 -indvars -loop-spawning-ti -simplifycfg -S | FileCheck %s --check-prefix=LS
-; RUN: opt < %s -lcssa -loop-simplify -S | opt -passes='function(require<targetir>,require<scalar-evolution>,require<domtree>,require<tasks>,loop(indvars)),loop-spawning,function(simplifycfg)' -S | FileCheck %s --check-prefix=LS
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -simplifycfg -S | FileCheck %s --check-prefix=TT
+; RUN: opt < %s -passes='lcssa,loop-simplify' -S | opt -passes='function(require<targetir>,require<scalar-evolution>,require<domtree>,require<tasks>,loop(indvars)),loop-spawning,function(simplifycfg)' -S | FileCheck %s --check-prefix=LS
 ; RUN: opt < %s -passes='tapir2target,function(simplifycfg)' -tapir-target=cilk -S | FileCheck %s --check-prefix=TT
 
 ; ModuleID = 'sret-test.cpp'
@@ -134,10 +132,10 @@ pfor.detach.lr.ph:                                ; preds = %invoke.cont4
   %_M_finish.i.i225 = getelementptr inbounds %"class.std::vector.0", %"class.std::vector.0"* %agg.result, i64 0, i32 0, i32 0, i32 1
   br label %pfor.detach
 ; LS: pfor.detach.lr.ph:
-; LS: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(%"class.std::vector.0"* %agg.result, [[IVTYPE:i[0-9]+]] 0, [[IVTYPE]] %{{.+}}, [[IVTYPE]] %{{.+}},
+; LS: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(ptr %agg.result, [[IVTYPE:i[0-9]+]] 0, [[IVTYPE]] %{{.+}}, [[IVTYPE]] %{{.+}},
 ; LS-NEXT: to label %{{.+}} unwind label %lpad78.loopexit
 ; TT: pfor.detach.split:
-; TT-NEXT: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.body.otd1(%"class.std::vector.0"* %agg.result,
+; TT-NEXT: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.body.otd1(ptr %agg.result,
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc76, %if.end.i, %invoke.cont4
   %__cur.0.lcssa.i.i.i.i.i368 = phi %"class.std::vector.0"* [ %__cur.0.lcssa.i.i.i.i.i, %invoke.cont4 ], [ null, %if.end.i ], [ %__cur.0.lcssa.i.i.i.i.i, %pfor.inc76 ]
@@ -800,12 +798,12 @@ _ZNSt12_Vector_baseISt5tupleIJidiEESaIS1_EE13_M_deallocateEPS1_m.exit71: ; preds
 ; Function Attrs: argmemonly nounwind
 declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 
-; LS-LABEL: define private fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(%"class.std::vector.0"* noalias sret(%"class.std::vector.0") align 8 %agg.result.ls1,
+; LS-LABEL: define private fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(ptr noalias sret(%"class.std::vector.0") align 8 %agg.result.ls1,
 ; LS: [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.*}}%[[GRAINSIZE:.+]],
 ; LS: {{^.split:}}
-; LS-NEXT: call fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(%"class.std::vector.0"* %agg.result.ls1, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.*}}[[GRAINSIZE]],
+; LS-NEXT: call fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(ptr %agg.result.ls1, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.*}}[[GRAINSIZE]],
 
-; TT-LABEL: define private fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.body.otd1(%"class.std::vector.0"* {{.*}}sret(%"class.std::vector.0") {{.*}}%agg.result.otd1,
+; TT-LABEL: define private fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.body.otd1(ptr {{.*}}sret(%"class.std::vector.0") {{.*}}%agg.result.otd1,
 
 attributes #0 = { uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind }

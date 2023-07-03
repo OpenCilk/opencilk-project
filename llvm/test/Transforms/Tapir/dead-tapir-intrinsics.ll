@@ -1,9 +1,7 @@
 ; Test that basic -O1 optimizations effectively remove Tapir
 ; instructions and intrinsics.
 ;
-; RUN: opt < %s -O1 -simplify-taskframes=false -S | FileCheck %s --check-prefixes=CHECK,CHECK-NOTFSIMPLIFY
 ; RUN: opt < %s -passes='default<O1>' -simplify-taskframes=false -S | FileCheck %s --check-prefixes=CHECK,CHECK-NOTFSIMPLIFY
-; RUN: opt < %s -O1 -S | FileCheck %s --check-prefixes=CHECK,CHECK-TFSIMPLIFY
 ; RUN: opt < %s -passes='default<O1>' -S | FileCheck %s --check-prefixes=CHECK,CHECK-TFSIMPLIFY
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -38,9 +36,9 @@ define dso_local void @_Z6parentl(i64 %x) #1 personality i8* bitcast (i32 (...)*
 ; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
 ; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
 ; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
-; CHECK-TFSIMPLIFY: call i8* @llvm.stacksave()
-; CHECK-TFSIMPLIFY: call i8* @llvm.stacksave()
-; CHECK-TFSIMPLIFY: call i8* @llvm.stacksave()
+; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave()
+; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave()
+; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave()
 ; CHECK-TFSIMPLIFY-NOT: call token @llvm.taskframe.create()
 ; CHECK: call token @llvm.taskframe.create()
 ; CHECK detach within %[[SYNCREG]]

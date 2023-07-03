@@ -477,6 +477,10 @@
 ; GCN-O1-OPTS-NEXT:      Dominator Tree Construction
 ; GCN-O1-OPTS-NEXT:      Tapir Task Information
 ; GCN-O1-OPTS-NEXT:      SROA
+; GCN-O1-OPTS-NEXT:      Tapir Task Information
+; GCN-O1-OPTS-NEXT:      Basic Alias Analysis (stateless AA impl)
+; GCN-O1-OPTS-NEXT:      Function Alias Analysis Results
+; GCN-O1-OPTS-NEXT:      Memory SSA
 ; GCN-O1-OPTS-NEXT:      Natural Loop Information
 ; GCN-O1-OPTS-NEXT:      Split GEPs to a variadic base and a constant offset for better CSE
 ; GCN-O1-OPTS-NEXT:      Scalar Evolution Analysis
@@ -790,6 +794,7 @@
 ; GCN-O2-NEXT:      Cycle Info Analysis
 ; GCN-O2-NEXT:      Uniformity Analysis
 ; GCN-O2-NEXT:      AMDGPU IR optimizations
+; GCN-O2-NEXT:      Tapir Task Information
 ; GCN-O2-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O2-NEXT:      Function Alias Analysis Results
 ; GCN-O2-NEXT:      Memory SSA
@@ -1108,6 +1113,7 @@
 ; GCN-O3-NEXT:      Cycle Info Analysis
 ; GCN-O3-NEXT:      Uniformity Analysis
 ; GCN-O3-NEXT:      AMDGPU IR optimizations
+; GCN-O3-NEXT:      Tapir Task Information
 ; GCN-O3-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; GCN-O3-NEXT:      Function Alias Analysis Results
 ; GCN-O3-NEXT:      Memory SSA

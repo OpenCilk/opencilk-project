@@ -1,7 +1,7 @@
 ; Check that Tapir lowering perperly handles debug information around
 ; taskframe.end intrinsics.
 ;
-; RUN: opt < %s -tapir2target -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
+; RUN: opt < %s -passes='tapir2target' -tapir-target=opencilk -opencilk-runtime-bc-path=%S/libopencilk-abi.bc -S | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
@@ -1003,7 +1003,7 @@ if.end:                                           ; preds = %_ZL14quickSort_test
 ; CHECK: define internal fastcc void @_Z24suffixArrayInternal_testPhlPSt4pairIjjEjPjP3segj.outline_if.else.tf.tf.tf.otf0(
 ; CHECK: %[[SF:.+]] = alloca %struct.__cilkrts_stack_frame
 ; CHECK: _ZL14quickSort_testISt4pairIjjE9pairCompFjEvPT_T1_T0_.exit.tfend.tfend.otf0:
-; CHECK: call void @__cilk_parent_epilogue(%struct.__cilkrts_stack_frame* %[[SF]]), !dbg
+; CHECK: call void @__cilk_parent_epilogue(ptr %[[SF]]), !dbg
 ; CHECK: ret void
 
 ; Function Attrs: mustprogress nofree nosync nounwind readnone speculatable willreturn

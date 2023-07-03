@@ -4337,8 +4337,8 @@ bool DependenceInfo::tryDelinearize(GeneralAccess *SrcA, GeneralAccess *DstA,
   return true;
 }
 
-static bool tryDelinearizeFixedSizeImpl(
-    ScalarEvolution *SE, GeneraAccess *GA, const SCEV *AccessFn,
+static bool tryDelinearizeGAFixedSizeImpl(
+    ScalarEvolution *SE, GeneralAccess *GA, const SCEV *AccessFn,
     SmallVectorImpl<const SCEV *> &Subscripts, SmallVectorImpl<int> &Sizes) {
   Value *SrcPtr = getGeneralAccessPointerOperand(GA);
 
@@ -4390,10 +4390,10 @@ bool DependenceInfo::tryDelinearizeFixedSize(
 
   SmallVector<int, 4> SrcSizes;
   SmallVector<int, 4> DstSizes;
-  if (!tryDelinearizeFixedSizeImpl(SE, SrcA, SrcAccessFn, SrcSubscripts,
-                                   SrcSizes) ||
-      !tryDelinearizeFixedSizeImpl(SE, DstA, DstAccessFn, DstSubscripts,
-                                   DstSizes))
+  if (!tryDelinearizeGAFixedSizeImpl(SE, SrcA, SrcAccessFn, SrcSubscripts,
+                                     SrcSizes) ||
+      !tryDelinearizeGAFixedSizeImpl(SE, DstA, DstAccessFn, DstSubscripts,
+                                     DstSizes))
     return false;
 
   // Check that the two size arrays are non-empty and equal in length and

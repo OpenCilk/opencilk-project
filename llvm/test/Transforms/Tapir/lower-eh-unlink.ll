@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 
 %struct.vertex = type { %class._point2d, %struct.tri*, %struct.tri*, i32, i32 }
@@ -492,7 +491,7 @@ declare noalias i8* @malloc(i64) local_unnamed_addr #1
 ; CHECK: define private fastcc void @_ZN8sequence4packIP6vertexiNS_4getAIS2_iEEEE4_seqIT_EPS6_PbT0_SA_T1_.outline_pfor.body71.otd1(i64 %indvars.iv.otd1
 ; CHECK: lpad90.otd1:
 ; CHECK: %[[LPAD:.+]] = landingpad
-; CHECK: call void @__cilk_parent_epilogue(%struct.__cilkrts_stack_frame* %__cilkrts_sf)
+; CHECK: call void @__cilk_parent_epilogue(ptr %__cilkrts_sf)
 ; CHECK: resume {{.+}} %[[LPAD]]
 
 ; CHECK: define private fastcc void @_ZN8sequence4packIP6vertexiNS_4getAIS2_iEEEE4_seqIT_EPS6_PbT0_SA_T1_.outline_pfor.body.otd1(i64 %indvars.iv221.otd1

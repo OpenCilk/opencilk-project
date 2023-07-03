@@ -104,7 +104,7 @@ struct BlockBRNZ {
 
 struct BlockDesc {
   bool IsSimple = false;
-  Optional<BlockBRNZ> BRNZ;
+  std::optional<BlockBRNZ> BRNZ;
 };
 
 //---------------------------------------------------------------------------
@@ -1654,8 +1654,8 @@ public:
 
   /// Return a descriptor if this block branches depending on whether a register
   /// is nonzero.
-  virtual Optional<BlockBRNZ> isZeroTest(MachineBasicBlock &MBB) const {
-    return Optional<BlockBRNZ>();
+  virtual std::optional<BlockBRNZ> isZeroTest(MachineBasicBlock &MBB) const {
+    return std::optional<BlockBRNZ>();
   }
 
   /// If this instruction sets a register to a constant integer value,

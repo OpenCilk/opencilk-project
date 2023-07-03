@@ -1,7 +1,6 @@
 ; Test to check that MemorySSA treats Tapir sync instructions like
 ; fences.
 ;
-; RUN: opt < %s -S -enable-new-pm=0 -print-memoryssa 2>&1 | FileCheck %s
 ; RUN: opt < %s -S -passes='print<memoryssa>' -disable-output 2>&1 | FileCheck %s
 
 ; Function Attrs: nounwind readnone uwtable
@@ -39,7 +38,7 @@ sync.continue:                                    ; preds = %det.cont
   br label %cleanup
 ; CHECK: sync.continue:
 ; CHECK: MemoryUse([[SYNCDEF]])
-; CHECK-NEXT: %x.0.load10 = load i32, i32* %x, align 4
+; CHECK-NEXT: %x.0.load10 = load i32, ptr %x, align 4
 
 cleanup:                                          ; preds = %entry, %sync.continue
   %retval.0 = phi i32 [ %add, %sync.continue ], [ %n, %entry ]

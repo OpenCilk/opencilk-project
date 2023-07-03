@@ -8,7 +8,7 @@
 
 define i32 @main() {
 ; CHECK-LABEL: @main(
-; CHECK-NEXT:  entry:
+; CHECK-NEXT:  bar.exit:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr @e, align 8
 ; CHECK-NEXT:    store i32 0, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    store ptr null, ptr @e, align 8

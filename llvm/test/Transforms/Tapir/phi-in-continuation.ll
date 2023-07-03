@@ -1,7 +1,6 @@
 ; Check that Tapir lowering to the Cilk runtime correctly updates PHI
 ; nodes in detach-continuation blocks.
 ;
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -S | FileCheck %s
 ; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -333,7 +332,7 @@ if.end65:                                         ; preds = %if.end47.thread, %i
 ; CHECK: %tobool48398 = phi i1
 ; CHECK-DAG: [ %tobool48, %if.then57.split ]
 ; CHECK-DAG: [ %tobool48, %if.then57 ]
-; CHECK: %arrayidx67 = getelementptr inbounds %struct.InternalNode, %struct.InternalNode* %a, i64 0, i32 0, i64 2
+; CHECK: %arrayidx67 = getelementptr inbounds %struct.InternalNode, ptr %a, i64 0, i32 0, i64 2
 
 land.lhs.true69:                                  ; preds = %if.end65
   %arrayidx71 = getelementptr inbounds %struct.InternalNode, %struct.InternalNode* %b, i64 0, i32 0, i64 0

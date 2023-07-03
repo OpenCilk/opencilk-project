@@ -40,7 +40,7 @@ Value *OutlineMaterializer::materialize(Value *V) {
     // Add a new syncregion to the entry block of the destination function
     Instruction *NewSyncReg = cast<Instruction>(SrcSyncRegion)->clone();
     BasicBlock *EntryBlock = &DstFunc->getEntryBlock();
-    EntryBlock->getInstList().push_back(NewSyncReg);
+    NewSyncReg->insertInto(EntryBlock, EntryBlock->end());
     // Record the entry block as needing remapping
     BlocksToRemap.insert(EntryBlock);
     return NewSyncReg;
@@ -552,7 +552,7 @@ void llvm::AddAlignmentAssumptions(
     // Ignore arguments to non-pointer types
     if (!Arg->getType()->isPointerTy()) continue;
     // If the argument already has an alignment attribute, skip it.
-    if (Arg->getParamAlignment()) continue;
+    if (Arg->getParamAlign()) continue;
     // Get any known alignment information for this argument's value.
     Align Alignment = getKnownAlignment(ArgVal, DL, CallSite, AC, DT);
     // If we have alignment data, add it as an attribute to the outlined

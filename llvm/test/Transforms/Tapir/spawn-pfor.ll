@@ -1,5 +1,4 @@
-; RUN: opt < %s -task-simplify -S -o - 2>&1 | FileCheck %s
-; RUN: opt < %s -passes="task-simplify" -S -o - 2>&1 | FileCheck %s
+; RUN: opt < %s -passes="task-simplify" -S 2>&1 | FileCheck %s
 
 ; ModuleID = 'spawn-pfor.c'
 source_filename = "spawn-pfor.c"

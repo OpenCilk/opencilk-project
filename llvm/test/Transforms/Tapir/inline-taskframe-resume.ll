@@ -1,5 +1,4 @@
-; RUN: opt < %s -inline -S -o - | FileCheck %s
-; RUN: opt < %s -passes='inline' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='inline' -S | FileCheck %s
 ; REQUIRES: x86-registered-target
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -139,21 +138,21 @@ entry:
 ; CHECK-NEXT: to label %invoke.cont.i.i unwind label %lpad.i.i
 
 ; CHECK: lpad.i.i:
-; CHECK: landingpad { i8*, i32 }
+; CHECK: landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]], { i8*, i32 } undef)
+; CHECK-NEXT: invoke void @llvm.taskframe.resume.sl_p0i32s(token %[[TASKFRAME]], { ptr, i32 } undef)
 ; CHECK-NEXT: to label %{{.+}} unwind label %lpad.i.i.split
 
 ; CHECK: lpad.i.i.split:
-; CHECK: %[[LPAD:.+]] = landingpad { i8*, i32 }
+; CHECK: %[[LPAD:.+]] = landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %[[LPAD]])
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg, { ptr, i32 } %[[LPAD]])
 ; CHECK-NEXT: to label %{{.+}} unwind label %lpad.i.i.split.split
 
 ; CHECK: lpad.i.i.split.split:
-; CHECK: %[[LPAD2:.+]] = landingpad { i8*, i32 }
+; CHECK: %[[LPAD2:.+]] = landingpad { ptr, i32 }
 ; CHECK-NEXT: cleanup
-; CHECK-NEXT: resume { i8*, i32 } %[[LPAD2]]
+; CHECK-NEXT: resume { ptr, i32 } %[[LPAD2]]
 
 define dso_local fastcc void @"_ZZN6parlay3mapIRKNS_8sequenceISt4pairINS1_IcNS_9allocatorIcEEEEmENS3_IS6_EEEEZ21writeHistogramsToFileS8_PcE3$_1EEDaOT_OT0_mENKUlmE_clEm"() unnamed_addr #2 align 2 personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
 entry:

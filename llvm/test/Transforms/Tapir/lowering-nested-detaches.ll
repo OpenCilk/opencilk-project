@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -debug-abi-calls -simplifycfg -instcombine -S | FileCheck %s
 ; RUN: opt < %s -passes='tapir2target,function(simplifycfg,instcombine)' -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
 
 source_filename = "c2islModule"
@@ -17,10 +16,10 @@ loop_body:                                        ; preds = %loop_latch, %entry
 ; CHECK-LABEL: define void @kernel_anon(
 ; CHECK-LABEL: loop_body.split: ; preds = %loop_body
 ; CHECK-NEXT: call fastcc void @kernel_anon.outline_det.achd.otd1(
-; CHECK-DAG: [24 x float]* %O1
+; CHECK-DAG: ptr %O1
 ; CHECK-DAG: i64 %c06
-; CHECK-DAG: [24 x float]* %B
-; CHECK-DAG: [24 x [21 x [33 x float]]]* %A
+; CHECK-DAG: ptr %B
+; CHECK-DAG: ptr %A
 ; CHECK-NEXT: {{br label %loop_latch|br label %loop_body.split.split}}
 
 loop_latch:                                       ; preds = %synced21, %loop_body
@@ -120,34 +119,34 @@ declare token @llvm.syncregion.start() #1
 ; CHECK-LABEL: define private fastcc void @kernel_anon.outline_det.achd12.otd3(
 ; CHECK: loop_body14.otd3.split:
 ; CHECK-NEXT: call fastcc void @kernel_anon.outline_det.achd18.otd4(
-; CHECK-DAG: [24 x [21 x [33 x float]]]* %A.otd3
+; CHECK-DAG: ptr %A.otd3
 ; CHECK-DAG: i64 %c06.otd3
 ; CHECK-DAG: i64 %c14.otd3
 ; CHECK-DAG: i64 %c22.otd3
 ; CHECK-DAG: i64 %c31.otd3
 ; CHECK-DAG: float %.otd31
-; CHECK-DAG: float* %.otd3
+; CHECK-DAG: ptr %.otd3
 ; CHECK-NEXT: {{br label %loop_latch15.otd3|loop_body14.otd3.split.split}}
 
 ; CHECK-LABEL: define private fastcc void @kernel_anon.outline_block_exit.otd2(
 ; CHECK-LABEL: loop_body8.otd2.split: ; preds = %loop_body8.otd2
 ; CHECK-NEXT: call fastcc void @kernel_anon.outline_det.achd12.otd3(
-; CHECK-DAG: [24 x [21 x [33 x float]]]* %A.otd2
+; CHECK-DAG: ptr %A.otd2
 ; CHECK-DAG: i64 %c06.otd2
 ; CHECK-DAG: i64 %c14.otd2
 ; CHECK-DAG: i64 %c22.otd2
 ; CHECK-DAG: float %2
-; CHECK-DAG: float* nonnull %0
+; CHECK-DAG: ptr nonnull %0
 ; CHECK-NEXT: {{br label %loop_latch9.otd2|br label %loop_body8.otd2.split.split}}
 
 ; CHECK-LABEL: define private fastcc void @kernel_anon.outline_det.achd.otd1(
 ; CHECK-LABEL: loop_body2.otd1.split: ; preds = %loop_body2.otd1
 ; CHECK-NEXT: call fastcc void @kernel_anon.outline_block_exit.otd2(
-; CHECK-DAG: [24 x float]* %O1.otd1
+; CHECK-DAG: ptr %O1.otd1
 ; CHECK-DAG: i64 %c06.otd1
 ; CHECK-DAG: i64 %c14.otd1
-; CHECK-DAG: [24 x float]* %B.otd1
-; CHECK-DAG: [24 x [21 x [33 x float]]]* %A.otd1
+; CHECK-DAG: ptr %B.otd1
+; CHECK-DAG: ptr %A.otd1
 ; CHECK-NEXT: {{br label %loop_latch3.otd1|br label %loop_body2.otd1.split.split}}
 
 attributes #0 = { nounwind }
