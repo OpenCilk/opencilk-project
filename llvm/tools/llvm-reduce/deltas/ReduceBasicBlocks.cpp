@@ -63,6 +63,9 @@ static void replaceBranchTerminator(BasicBlock &BB,
       ChunkSuccessors.clear();
     }
     IsBranch = true;
+  } else if (isa<SyncInst>(Term) || isa<ReattachInst>(Term) ||
+             isa<DetachInst>(Term)) {
+    IsBranch = true;
   }
 
   Value *Address = nullptr;
