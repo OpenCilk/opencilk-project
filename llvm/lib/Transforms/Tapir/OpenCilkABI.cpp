@@ -265,8 +265,8 @@ void OpenCilkABI::prepareModule() {
       {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
       {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
       {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
-      {"__cilkrts_fiber", FiberTy, CilkRTSFiber},
-      {"__cilkrts_worker", WorkerTy, CilkRTSWorker},
+      {"__cilkrts_get_fiber", FiberTy, CilkRTSFiber},
+      {"__cilkrts_get_worker", WorkerTy, CilkRTSWorker},
   };
 
   if (UseOpenCilkRuntimeBC) {
