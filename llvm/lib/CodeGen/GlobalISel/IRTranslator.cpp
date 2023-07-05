@@ -2151,6 +2151,7 @@ bool IRTranslator::translateKnownIntrinsic(const CallInst &CI, Intrinsic::ID ID,
   }
 
   case Intrinsic::stacksave_and_not:
+    return false;
   case Intrinsic::stacksave: {
     // Save the stack pointer to the location provided by the intrinsic.
     Register Reg = getOrCreateVReg(CI);
@@ -2163,9 +2164,6 @@ bool IRTranslator::translateKnownIntrinsic(const CallInst &CI, Intrinsic::ID ID,
       return false;
 
     MIRBuilder.buildCopy(Reg, StackPtr);
-
-    if (ID == Intrinsic::stacksave_and_not)
-      llvm_unreachable("stacksave_and_not NYI");
     return true;
   }
   case Intrinsic::stackrestore: {
