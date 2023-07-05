@@ -1699,7 +1699,11 @@ BUILTIN(__hyper_lookup, "v*vC*z(vv*)(vv*v*)", "nU")
 BUILTIN(__tapir_worker, "v*v*", "n")
 BUILTIN(__tapir_frame, "v*", "n")
 BUILTIN(__tapir_fiber, "v*", "n")
-BUILTIN(__tapir_stack_and_not, "v*UZIi", "n")
+
+// Return as an integer (size_t, but really uintptr_t) the value
+// of the stack pointer with bits cleared according to the provided
+// mask.
+BUILTIN(__tapir_stack_and_not, "zz", "n")
 
 #undef BUILTIN
 #undef LIBBUILTIN

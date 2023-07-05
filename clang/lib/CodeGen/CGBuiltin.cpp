@@ -5438,11 +5438,11 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     return RValue::get(Ptr);
   }
   case Builtin::BI__tapir_stack_and_not: {
-    Function *FSA = CGM.getIntrinsic(Intrinsic::stacksave_and_not, SizeTy);
+    Function *F = CGM.getIntrinsic(Intrinsic::stacksave_and_not, SizeTy);
     auto Mask = EmitScalarExpr(E->getArg(0));
-    if (Mask->getType() != SizeTy)
-      Mask = Builder.CreateZExt(Mask, SizeTy);
-    return RValue::get(Builder.CreateCall(FSA, {Mask}));
+    assert(Mask->getType() == SizeTy);
+    // Mask = Builder.CreateZExt(Mask, SizeTy);
+    return RValue::get(Builder.CreateCall(F, {Mask}));
   }
   case Builtin::BI__tapir_frame: {
     Function *FF = CGM.getIntrinsic(Intrinsic::tapir_frame);

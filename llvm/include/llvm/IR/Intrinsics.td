@@ -1403,7 +1403,8 @@ def int_tapir_fiber
 // directly to prevent optimizations from making a physical register live
 // across basic blocks.
 def int_stacksave_and_not
-    : Intrinsic<[llvm_ptr_ty], [llvm_anyint_ty], [IntrWillReturn,IntrReadMem]>;
+    : Intrinsic<[llvm_anyint_ty], [LLVMMatchType<0>],
+                [IntrWillReturn,IntrReadMem]>;
 
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.
