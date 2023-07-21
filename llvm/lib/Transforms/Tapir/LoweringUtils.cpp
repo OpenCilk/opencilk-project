@@ -17,6 +17,7 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Transforms/IPO/FunctionAttrs.h"
 #include "llvm/Transforms/Tapir/CilkABI.h"
 #include "llvm/Transforms/Tapir/LambdaABI.h"
 #include "llvm/Transforms/Tapir/OMPTaskABI.h"
@@ -651,8 +652,7 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
 /// \p T to instructions in the new helper function.
 Function *llvm::createHelperForTask(
     Function &F, Task *T, ValueSet &Args, Module *DestM,
-    ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
-    DominatorTree *DT) {
+    ValueToValueMapTy &VMap, Type *ReturnType, OutlineAnalysis &OA) {
   // Collect all basic blocks in this task.
   std::vector<BasicBlock *> TaskBlocks;
   // Reattach instructions and detached rethrows in this task might need special
@@ -663,7 +663,7 @@ Function *llvm::createHelperForTask(
   // rewritten in the cloned helper.
   SmallPtrSet<BasicBlock *, 4> SharedEHEntries;
   getTaskBlocks(T, TaskBlocks, ReattachBlocks, TaskResumeBlocks,
-                SharedEHEntries, DT);
+                SharedEHEntries, &OA.DT);
 
   SmallVector<ReturnInst *, 4> Returns;  // Ignore returns cloned.
   ValueSet Outputs;
@@ -695,7 +695,7 @@ Function *llvm::createHelperForTask(
 
   // Add alignment assumptions to arguments of helper, based on alignment of
   // values in old function.
-  AddAlignmentAssumptions(&F, Args, VMap, DI, AC, DT);
+  AddAlignmentAssumptions(&F, Args, VMap, DI, &OA.AC, &OA.DT);
 
   // Move allocas in the newly cloned detached CFG to the entry block of the
   // helper.
@@ -742,6 +742,8 @@ Function *llvm::createHelperForTask(
     ReplaceInstWithInst(ClonedDI, DetachRepl);
     VMap[DI] = DetachRepl;
   }
+
+  Helper->setMemoryEffects(computeFunctionBodyMemoryAccess(*Helper, OA.AA));
 
   return Helper;
 }
@@ -802,8 +804,7 @@ static BasicBlock *getTaskFrameContinue(Spindle *TF) {
 /// TF to instructions in the new helper function.
 Function *llvm::createHelperForTaskFrame(
     Function &F, Spindle *TF, ValueSet &Args, Module *DestM,
-    ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
-    DominatorTree *DT) {
+    ValueToValueMapTy &VMap, Type *ReturnType, OutlineAnalysis &OA) {
   // Collect all basic blocks in this task.
   std::vector<BasicBlock *> TaskBlocks;
   // Reattach instructions and detached rethrows in this task might need special
@@ -912,7 +913,7 @@ Function *llvm::createHelperForTaskFrame(
 
   // Add alignment assumptions to arguments of helper, based on alignment of
   // values in old function.
-  AddAlignmentAssumptions(&F, Args, VMap, &Header->front(), AC, DT);
+  AddAlignmentAssumptions(&F, Args, VMap, &Header->front(), &OA.AC, &OA.DT);
 
   // Move allocas in the newly cloned detached CFG to the entry block of the
   // helper.
@@ -953,6 +954,9 @@ Function *llvm::createHelperForTaskFrame(
     for (Instruction *ClonedTFEnd : TFEndsToRemove)
       ClonedTFEnd->eraseFromParent();
   }
+
+  Helper->setMemoryEffects(computeFunctionBodyMemoryAccess(*Helper, OA.AA));
+
   return Helper;
 }
 
@@ -964,10 +968,10 @@ TaskOutlineInfo llvm::outlineTaskFrame(
     Spindle *TF, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
     Module *DestM, ValueToValueMapTy &VMap,
     TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
-    ValueToValueMapTy &InputMap, AssumptionCache *AC, DominatorTree *DT) {
+    ValueToValueMapTy &InputMap, OutlineAnalysis &OA) {
   if (Task *T = TF->getTaskFromTaskFrame())
     return outlineTask(T, Inputs, HelperInputs, DestM, VMap, useArgStruct,
-                       ReturnType, InputMap, AC, DT);
+                       ReturnType, InputMap, OA);
 
   Function &F = *TF->getEntry()->getParent();
   BasicBlock *Entry = TF->getEntry();
@@ -988,7 +992,7 @@ TaskOutlineInfo llvm::outlineTaskFrame(
 
   // Clone the blocks into a helper function.
   Function *Helper = createHelperForTaskFrame(F, TF, HelperArgs, DestM, VMap,
-                                              ReturnType, AC, DT);
+                                              ReturnType, OA);
   Instruction *ClonedTF = cast<Instruction>(VMap[TF->getTaskFrameCreate()]);
   return TaskOutlineInfo(Helper, Entry, nullptr, ClonedTF, Inputs,
                          ArgsStart, StorePt, Continue, Unwind);
@@ -1061,7 +1065,7 @@ TaskOutlineInfo llvm::outlineTask(
     Task *T, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
     Module *DestM, ValueToValueMapTy &VMap,
     TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
-    ValueToValueMapTy &InputMap, AssumptionCache *AC, DominatorTree *DT) {
+    ValueToValueMapTy &InputMap, OutlineAnalysis &OA) {
   assert(!T->isRootTask() && "Cannot outline the root task.");
   Function &F = *T->getEntry()->getParent();
   DetachInst *DI = T->getDetach();
@@ -1088,7 +1092,7 @@ TaskOutlineInfo llvm::outlineTask(
 
   // Clone the blocks into a helper function.
   Function *Helper = createHelperForTask(F, T, HelperArgs, DestM, VMap,
-                                         ReturnType, AC, DT);
+                                         ReturnType, OA);
   Value *ClonedTFCreate = TFCreate ? VMap[TFCreate] : nullptr;
   return TaskOutlineInfo(Helper, T->getEntry(),
                          dyn_cast_or_null<Instruction>(VMap[DI]),
