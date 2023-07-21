@@ -15,6 +15,7 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -435,14 +436,16 @@ Function *llvm::CreateHelper(
       MD[SP].reset(SP);
   }
 
-  // We assume that the Helper reads and writes its arguments.  If the parent
-  // function had stronger attributes on memory access -- specifically, if the
-  // parent is marked as only reading memory -- we must replace this attribute
-  // with an appropriate weaker form.
-  if (OldFunc->onlyReadsMemory()) {
-    NewFunc->removeFnAttr(Attribute::ReadNone);
-    NewFunc->removeFnAttr(Attribute::ReadOnly);
-    NewFunc->setOnlyAccessesArgMemory();
+  // If the outlined function has pointer arguments its memory effects are
+  // unknown.  Otherwise it inherits the memory effects of its parent.
+  for (Argument &Arg : NewFunc->args()) {
+    if (Arg.getType()->isPointerTy()) {
+      MemoryEffects RW = NewFunc->getMemoryEffects();
+      RW |= MemoryEffects(MemoryEffects::ArgMem, ModRefInfo::ModRef);
+      RW |= MemoryEffects(MemoryEffects::Other, ModRefInfo::ModRef);
+      NewFunc->setMemoryEffects(RW);
+      break;
+    }
   }
 
   // Inherit the calling convention from the parent.
