@@ -80,8 +80,8 @@ CreateHelper(const ValueSet &Inputs, const ValueSet &Outputs,
 // alignment data in the caller.
 void AddAlignmentAssumptions(const Function *Caller, const ValueSet &Args,
                              ValueToValueMapTy &VMap,
-                             const Instruction *CallSite, AssumptionCache *AC,
-                             DominatorTree *DT);
+                             const Instruction *CallSite,
+                             AssumptionCache *AC, DominatorTree *DT);
 
 } // End llvm namespace
 

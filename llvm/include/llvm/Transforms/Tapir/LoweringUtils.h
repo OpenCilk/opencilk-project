@@ -24,6 +24,7 @@
 
 namespace llvm {
 
+class AAResults;
 class AssumptionCache;
 class BasicBlock;
 class DominatorTree;
@@ -40,6 +41,14 @@ using ValueSet = SetVector<Value *>;
 using SpindleSet = SetVector<Spindle *>;
 using TaskValueSetMap = DenseMap<const Task *, ValueSet>;
 using TFValueSetMap = DenseMap<const Spindle *, ValueSet>;
+
+struct OutlineAnalysis {
+  OutlineAnalysis(AAResults &AA, AssumptionCache &AC, DominatorTree &DT)
+    : AA(AA), AC(AC), DT(DT) { }
+  AAResults &AA;
+  AssumptionCache &AC;
+  DominatorTree &DT;
+};
 
 /// Structure that captures relevant information about an outlined task,
 /// including the following:
@@ -502,8 +511,7 @@ void getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
 /// \p T to instructions in the new helper function.
 Function *createHelperForTask(
     Function &F, Task *T, ValueSet &Inputs, Module *DestM,
-    ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
-    DominatorTree *DT);
+    ValueToValueMapTy &VMap, Type *ReturnType, OutlineAnalysis &OA);
 
 /// Outlines the content of taskframe \p TF in function \p F into a new helper
 /// function.  The parameter \p Inputs specified the inputs to the helper
@@ -511,8 +519,7 @@ Function *createHelperForTask(
 /// TF to instructions in the new helper function.
 Function *createHelperForTaskFrame(
     Function &F, Spindle *TF, ValueSet &Args, Module *DestM,
-    ValueToValueMapTy &VMap, Type *ReturnType, AssumptionCache *AC,
-    DominatorTree *DT);
+    ValueToValueMapTy &VMap, Type *ReturnType, OutlineAnalysis &OA);
 
 /// Replaces the taskframe \p TF, with associated TaskOutlineInfo \p Out, with a
 /// call or invoke to the outlined helper function created for \p TF.
@@ -527,7 +534,7 @@ TaskOutlineInfo outlineTask(
     Task *T, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
     Module *DestM, ValueToValueMapTy &VMap,
     TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
-    ValueToValueMapTy &InputMap, AssumptionCache *AC, DominatorTree *DT);
+    ValueToValueMapTy &InputMap, OutlineAnalysis &OA);
 
 /// Outlines a taskframe \p TF into a helper function that accepts the inputs \p
 /// Inputs.  The map \p VMap is updated with the mapping of instructions in \p
@@ -537,7 +544,7 @@ TaskOutlineInfo outlineTaskFrame(
     Spindle *TF, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
     Module *DestM, ValueToValueMapTy &VMap,
     TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
-    ValueToValueMapTy &InputMap, AssumptionCache *AC, DominatorTree *DT);
+    ValueToValueMapTy &InputMap, OutlineAnalysis &OA);
 
 //----------------------------------------------------------------------------//
 // Methods for lowering Tapir loops

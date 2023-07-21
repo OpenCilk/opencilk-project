@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/Outline.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -438,12 +439,10 @@ Function *llvm::CreateHelper(
 
   // If the outlined function has pointer arguments its memory effects are
   // unknown.  Otherwise it inherits the memory effects of its parent.
+  // The caller can improve on this if desired.
   for (Argument &Arg : NewFunc->args()) {
     if (Arg.getType()->isPointerTy()) {
-      MemoryEffects RW = NewFunc->getMemoryEffects();
-      RW |= MemoryEffects(MemoryEffects::ArgMem, ModRefInfo::ModRef);
-      RW |= MemoryEffects(MemoryEffects::Other, ModRefInfo::ModRef);
-      NewFunc->setMemoryEffects(RW);
+      NewFunc->removeFnAttr(Attribute::Memory);
       break;
     }
   }

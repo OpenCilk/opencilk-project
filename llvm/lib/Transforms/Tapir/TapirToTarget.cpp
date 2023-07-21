@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/TapirToTarget.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -45,11 +46,14 @@ static const char TimerGroupDescription[] = "Tapir to Target";
 
 class TapirToTargetImpl {
 public:
-  TapirToTargetImpl(Module &M, function_ref<DominatorTree &(Function &)> GetDT,
+  TapirToTargetImpl(Module &M, function_ref<AAResults &(Function &)> GetAA,
+                    function_ref<DominatorTree &(Function &)> GetDT,
                     function_ref<TaskInfo &(Function &)> GetTI,
                     function_ref<AssumptionCache &(Function &)> GetAC,
                     function_ref<TargetLibraryInfo &(Function &)> GetTLI)
-      : M(M), GetDT(GetDT), GetTI(GetTI), GetAC(GetAC), GetTLI(GetTLI) {}
+      : M(M), GetAA(GetAA), GetDT(GetDT), GetTI(GetTI), GetAC(GetAC),
+        GetTLI(GetTLI)
+  {}
   ~TapirToTargetImpl() {
     if (Target)
       delete Target;
@@ -62,23 +66,21 @@ private:
   bool processFunction(Function &F, SmallVectorImpl<Function *> &NewHelpers);
   TFOutlineMapTy outlineAllTasks(Function &F,
                                  SmallVectorImpl<Spindle *> &AllTaskFrames,
-                                 DominatorTree &DT, AssumptionCache &AC,
-                                 TaskInfo &TI);
+                                 OutlineAnalysis &OA, TaskInfo &TI);
   bool processSimpleABI(Function &F, BasicBlock *TFEntry);
   bool processRootTask(Function &F, TFOutlineMapTy &TFToOutline,
-                       DominatorTree &DT, AssumptionCache &AC, TaskInfo &TI);
+                       OutlineAnalysis &OA, TaskInfo &TI);
   bool processSpawnerTaskFrame(Spindle *TF, TFOutlineMapTy &TFToOutline,
-                               DominatorTree &DT, AssumptionCache &AC,
-                               TaskInfo &TI);
+                               OutlineAnalysis &OA, TaskInfo &TI);
   bool processOutlinedTask(Task *T, TFOutlineMapTy &TFToOutline,
-                           DominatorTree &DT, AssumptionCache &AC,
-                           TaskInfo &TI);
+                           OutlineAnalysis &OA, TaskInfo &TI);
 
 private:
   TapirTarget *Target = nullptr;
 
   Module &M;
 
+  function_ref<AAResults &(Function &)> GetAA;
   function_ref<DominatorTree &(Function &)> GetDT;
   function_ref<TaskInfo &(Function &)> GetTI;
   function_ref<AssumptionCache &(Function &)> GetAC;
@@ -129,15 +131,14 @@ bool TapirToTargetImpl::unifyReturns(Function &F) {
 TFOutlineMapTy
 TapirToTargetImpl::outlineAllTasks(Function &F,
                                    SmallVectorImpl<Spindle *> &AllTaskFrames,
-                                   DominatorTree &DT, AssumptionCache &AC,
-                                   TaskInfo &TI) {
+                                   OutlineAnalysis &OA, TaskInfo &TI) {
   NamedRegionTimer NRT("outlineAllTasks", "Outline all tasks", TimerGroupName,
                        TimerGroupDescription, TimePassesIsEnabled);
   TFOutlineMapTy TFToOutline;
 
   // Determine the inputs for all tasks.
   TFValueSetMap TFInputs, TFOutputs;
-  findAllTaskFrameInputs(TFInputs, TFOutputs, AllTaskFrames, F, DT, TI);
+  findAllTaskFrameInputs(TFInputs, TFOutputs, AllTaskFrames, F, OA.DT, TI);
 
   DenseMap<Spindle *, SmallVector<Value *, 8>> HelperInputs;
 
@@ -160,8 +161,7 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
       TFToOutline[TF] = outlineTaskFrame(TF, TFInputs[TF], HelperInputs[TF],
                                          &Target->getDestinationModule(), VMap,
                                          Target->getArgStructMode(),
-                                         Target->getReturnType(), InputMap, &AC,
-                                         &DT);
+                                         Target->getReturnType(), InputMap, OA);
       // If the taskframe TF does not catch an exception from the taskframe,
       // then the outlined function cannot throw.
       if (F.doesNotThrow() && !getTaskFrameResume(TF->getTaskFrameCreate()))
@@ -190,7 +190,7 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
     TFToOutline[TF] = outlineTask(T, TFInputs[TF], HelperInputs[TF],
                                   &Target->getDestinationModule(), VMap,
                                   Target->getArgStructMode(),
-                                  Target->getReturnType(), InputMap, &AC, &DT);
+                                  Target->getReturnType(), InputMap, OA);
     // If the detach for task T does not catch an exception from the task, then
     // the outlined function cannot throw.
     if (F.doesNotThrow() && !T->getDetach()->hasUnwindDest())
@@ -295,8 +295,8 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
 }
 
 bool TapirToTargetImpl::processRootTask(
-    Function &F, TFOutlineMapTy &TFToOutline, DominatorTree &DT,
-    AssumptionCache &AC, TaskInfo &TI) {
+    Function &F, TFOutlineMapTy &TFToOutline, OutlineAnalysis &OA,
+    TaskInfo &TI) {
   NamedRegionTimer NRT("processRootTask", "Process root task",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -317,7 +317,7 @@ bool TapirToTargetImpl::processRootTask(
     // Process each call to a subtask.
     for (Spindle *TF : TI.getRootTask()->taskframe_roots())
       if (TF->getTaskFromTaskFrame())
-        Target->processSubTaskCall(TFToOutline[TF], DT);
+        Target->processSubTaskCall(TFToOutline[TF], OA.DT);
 
     Target->postProcessRootSpawner(F, &F.getEntryBlock());
   }
@@ -327,8 +327,8 @@ bool TapirToTargetImpl::processRootTask(
 }
 
 bool TapirToTargetImpl::processSpawnerTaskFrame(
-    Spindle *TF, TFOutlineMapTy &TFToOutline, DominatorTree &DT,
-    AssumptionCache &AC, TaskInfo &TI) {
+    Spindle *TF, TFOutlineMapTy &TFToOutline, OutlineAnalysis &OA,
+    TaskInfo &TI) {
   NamedRegionTimer NRT("processSpawnerTaskFrame", "Process spawner taskframe",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -340,7 +340,7 @@ bool TapirToTargetImpl::processSpawnerTaskFrame(
   // Process each call to a subtask.
   for (Spindle *SubTF : TF->subtaskframes())
     if (SubTF->getTaskFromTaskFrame())
-      Target->processSubTaskCall(TFToOutline[SubTF], DT);
+      Target->processSubTaskCall(TFToOutline[SubTF], OA.DT);
 
   Target->postProcessRootSpawner(F, TF->getEntry());
 
@@ -350,8 +350,7 @@ bool TapirToTargetImpl::processSpawnerTaskFrame(
 }
 
 bool TapirToTargetImpl::processOutlinedTask(
-    Task *T, TFOutlineMapTy &TFToOutline, DominatorTree &DT,
-    AssumptionCache &AC, TaskInfo &TI) {
+    Task *T, TFOutlineMapTy &TFToOutline, OutlineAnalysis &OA, TaskInfo &TI) {
   NamedRegionTimer NRT("processOutlinedTask", "Process outlined task",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -366,7 +365,7 @@ bool TapirToTargetImpl::processOutlinedTask(
   // Process each call to a subtask.
   for (Spindle *SubTF : TF->subtaskframes())
     if (SubTF->getTaskFromTaskFrame())
-      Target->processSubTaskCall(TFToOutline[SubTF], DT);
+      Target->processSubTaskCall(TFToOutline[SubTF], OA.DT);
 
   Target->postProcessOutlinedTask(F, DetachPt, TaskFrameCreate, !T->isSerial(),
                                   TF->getEntry());
@@ -394,11 +393,10 @@ bool TapirToTargetImpl::processFunction(
   LLVM_DEBUG(dbgs() << "Tapir: Processing function " << F.getName() << "\n");
 
   // Get the necessary analysis results.
-  DominatorTree &DT = GetDT(F);
+  OutlineAnalysis OA(GetAA(F), GetAC(F), GetDT(F));
   TaskInfo &TI = GetTI(F);
-  splitTaskFrameCreateBlocks(F, &DT, &TI);
+  splitTaskFrameCreateBlocks(F, &OA.DT, &TI);
   TI.findTaskFrameTree();
-  AssumptionCache &AC = GetAC(F);
 
   bool ChangedCFG = false;
   {
@@ -426,18 +424,18 @@ bool TapirToTargetImpl::processFunction(
 
   // Fixup external uses of values defined in taskframes.
   for (Spindle *TF : AllTaskFrames)
-    fixupTaskFrameExternalUses(TF, TI, DT);
+    fixupTaskFrameExternalUses(TF, TI, OA.DT);
 
   // Outline all tasks in a target-oblivious manner.
-  TFOutlineMapTy TFToOutline = outlineAllTasks(F, AllTaskFrames, DT, AC, TI);
+  TFOutlineMapTy TFToOutline = outlineAllTasks(F, AllTaskFrames, OA, TI);
 
   // Perform target-specific processing of this function and all newly created
   // helpers.
   for (Spindle *TF : AllTaskFrames) {
     if (isSpawningTaskFrame(TF) && !isSpawnedTaskFrame(TF))
-      processSpawnerTaskFrame(TF, TFToOutline, DT, AC, TI);
+      processSpawnerTaskFrame(TF, TFToOutline, OA, TI);
     else if (isSpawnedTaskFrame(TF))
-      processOutlinedTask(TF->getTaskFromTaskFrame(), TFToOutline, DT, AC, TI);
+      processOutlinedTask(TF->getTaskFromTaskFrame(), TFToOutline, OA, TI);
     else
       if (!Target->processOrdinaryFunction(*TFToOutline[TF].Outline,
                                            TF->getEntry()))
@@ -445,7 +443,7 @@ bool TapirToTargetImpl::processFunction(
     NewHelpers.push_back(TFToOutline[TF].Outline);
   }
   // Process the root task
-  processRootTask(F, TFToOutline, DT, AC, TI);
+  processRootTask(F, TFToOutline, OA, TI);
 
   {
   NamedRegionTimer NRT("TargetPostProcess", "Target postprocessing",
@@ -529,6 +527,9 @@ bool TapirToTargetImpl::run() {
 
 PreservedAnalyses TapirToTargetPass::run(Module &M, ModuleAnalysisManager &AM) {
   auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+  auto GetAA = [&FAM](Function &F) -> AAResults & {
+    return FAM.getResult<AAManager>(F);
+  };
   auto GetDT = [&FAM](Function &F) -> DominatorTree & {
     return FAM.getResult<DominatorTreeAnalysis>(F);
   };
@@ -542,7 +543,7 @@ PreservedAnalyses TapirToTargetPass::run(Module &M, ModuleAnalysisManager &AM) {
     return FAM.getResult<TargetLibraryAnalysis>(F);
   };
 
-  bool Changed = TapirToTargetImpl(M, GetDT, GetTI, GetAC, GetTLI).run();
+  bool Changed = TapirToTargetImpl(M, GetAA, GetDT, GetTI, GetAC, GetTLI).run();
 
   if (Changed)
     return PreservedAnalyses::none();
@@ -582,6 +583,9 @@ INITIALIZE_PASS_END(LowerTapirToTarget, "tapir2target",
 bool LowerTapirToTarget::runOnModule(Module &M) {
   if (skipModule(M))
     return false;
+  auto GetAA = [this](Function &F) -> AAResults & {
+    return this->getAnalysis<AAResultsWrapperPass>(F).getAAResults();
+  };
   auto GetDT = [this](Function &F) -> DominatorTree & {
     return this->getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
   };
@@ -596,7 +600,7 @@ bool LowerTapirToTarget::runOnModule(Module &M) {
     return this->getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
   };
 
-  return TapirToTargetImpl(M, GetDT, GetTI, GetAC, GetTLI).run();
+  return TapirToTargetImpl(M, GetAA, GetDT, GetTI, GetAC, GetTLI).run();
 }
 
 // createLowerTapirToTargetPass - Provide an entry point to create this pass.
