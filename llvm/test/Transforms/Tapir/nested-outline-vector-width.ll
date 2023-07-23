@@ -1,5 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -simplifycfg -function-attrs -tapir2target -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -simplifycfg -function-attrs -tapir2target -always-inline -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes="loop-spawning,function(simplifycfg),cgscc(function-attrs),tapir2target" -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 ; RUN: opt < %s -passes="loop-spawning,function(simplifycfg),cgscc(function-attrs),tapir2target,always-inline" -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 
