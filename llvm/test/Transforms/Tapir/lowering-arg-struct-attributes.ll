@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -tapir2target -tapir-target=cilk -debug-abi-calls -cilk-use-arg-struct -S | FileCheck %s
 ; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -cilk-use-arg-struct -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
