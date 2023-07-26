@@ -1265,17 +1265,17 @@ TSTToUnaryTransformType(DeclSpec::TST SwitchTST) {
   }
 }
 
-static Optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl);
+static std::optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl);
 
 // It is forbidden to add new bits to the Type class so there is no
 // room for a cached or precomputed flag.  Do a deep search on every
 // hyperobject type creation.
-static Optional<unsigned> ContainsHyperobject(QualType Outer) {
+static std::optional<unsigned> ContainsHyperobject(QualType Outer) {
   const Type *T = Outer.getCanonicalType().getTypePtr();
   if (T->isVariablyModifiedType())
     return diag::variable_length_hyperobject;
   if (T->isDependentType())
-    return Optional<unsigned>();
+    return std::optional<unsigned>();
   QualType Inner;
   switch (T->getTypeClass()) {
   case Type::Hyperobject:
@@ -1321,7 +1321,7 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
           return diag::confusing_hyperobject;
         }
       }
-      return Optional<unsigned>();
+      return std::optional<unsigned>();
     }
     if (const RecordDecl *Def = Decl->getDefinition())
       return DeclContainsHyperobject(Def);
@@ -1356,16 +1356,16 @@ static Optional<unsigned> ContainsHyperobject(QualType Outer) {
   case Type::Builtin:
   case Type::TemplateTypeParm:
   default:
-    return Optional<unsigned>();
+    return std::optional<unsigned>();
   }
   return ContainsHyperobject(Inner);
 }
 
-static Optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl) {
+static std::optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl) {
   for (const FieldDecl *FD : Decl->fields())
-    if (Optional<unsigned> O = ContainsHyperobject(FD->getType()))
+    if (std::optional<unsigned> O = ContainsHyperobject(FD->getType()))
       return O;
-  return Optional<unsigned>();
+  return std::optional<unsigned>();
 }
 
 /// Convert the specified declspec to the appropriate type
@@ -2472,7 +2472,7 @@ QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
   QualType Result = Element;
   if (!RequireCompleteType(Loc, Element, CompleteTypeKind::Normal,
                            diag::incomplete_hyperobject)) {
-    if (Optional<unsigned> Code = ContainsHyperobject(Result))
+    if (std::optional<unsigned> Code = ContainsHyperobject(Result))
       Diag(Loc, *Code) << Result;
   }
 
