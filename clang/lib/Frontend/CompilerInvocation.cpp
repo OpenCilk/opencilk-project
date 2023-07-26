@@ -1276,19 +1276,18 @@ static SmallVector<StringRef, 4> serializeSanitizerKinds(SanitizerSet S) {
   return Values;
 }
 
-static LangOptions::CilktoolKind parseCilktoolKind(StringRef FlagName,
-                                                   ArgList &Args,
-                                                   DiagnosticsEngine &Diags) {
+static LangOptions::CilktoolKind
+parseCilktoolKind(StringRef FlagName, ArgList &Args, DiagnosticsEngine &Diags) {
   if (Arg *A = Args.getLastArg(OPT_fcilktool_EQ)) {
     StringRef Val = A->getValue();
     LangOptions::CilktoolKind ParsedCilktool =
-      llvm::StringSwitch<LangOptions::CilktoolKind>(Val)
-      .Case("cilkscale", LangOptions::Cilktool_Cilkscale)
-      .Case("cilkscale-instructions",
-            LangOptions::Cilktool_Cilkscale_InstructionCount)
-      .Case("cilkscale-benchmark",
-            LangOptions::Cilktool_Cilkscale_Benchmark)
-      .Default(LangOptions::Cilktool_None);
+        llvm::StringSwitch<LangOptions::CilktoolKind>(Val)
+            .Case("cilkscale", LangOptions::Cilktool_Cilkscale)
+            .Case("cilkscale-instructions",
+                  LangOptions::Cilktool_Cilkscale_InstructionCount)
+            .Case("cilkscale-benchmark",
+                  LangOptions::Cilktool_Cilkscale_Benchmark)
+            .Default(LangOptions::Cilktool_None);
     if (ParsedCilktool == LangOptions::Cilktool_None)
       Diags.Report(diag::err_drv_invalid_value) << FlagName << Val;
     else
@@ -1297,8 +1296,9 @@ static LangOptions::CilktoolKind parseCilktoolKind(StringRef FlagName,
   return LangOptions::Cilktool_None;
 }
 
-static Optional<StringRef> serializeCilktoolKind(LangOptions::CilktoolKind K) {
-  Optional<StringRef> CilktoolStr;
+static std::optional<StringRef>
+serializeCilktoolKind(LangOptions::CilktoolKind K) {
+  std::optional<StringRef> CilktoolStr;
   switch (K) {
   case LangOptions::Cilktool_Cilkscale:
     CilktoolStr = "cilkscale";
@@ -1321,13 +1321,13 @@ parseCSIExtensionPoint(StringRef FlagName, ArgList &Args,
   if (Arg *A = Args.getLastArg(OPT_fcsi_EQ)) {
     StringRef Val = A->getValue();
     LangOptions::CSIExtensionPoint ParsedExt =
-      llvm::StringSwitch<LangOptions::CSIExtensionPoint>(Val)
-      .Case("first",           LangOptions::CSI_EarlyAsPossible)
-      .Case("early",           LangOptions::CSI_ModuleOptimizerEarly)
-      .Case("last",            LangOptions::CSI_OptimizerLast)
-      .Case("tapirlate",       LangOptions::CSI_TapirLate)
-      .Case("aftertapirloops", LangOptions::CSI_TapirLoopEnd)
-      .Default(LangOptions::CSI_None);
+        llvm::StringSwitch<LangOptions::CSIExtensionPoint>(Val)
+            .Case("first", LangOptions::CSI_EarlyAsPossible)
+            .Case("early", LangOptions::CSI_ModuleOptimizerEarly)
+            .Case("last", LangOptions::CSI_OptimizerLast)
+            .Case("tapirlate", LangOptions::CSI_TapirLate)
+            .Case("aftertapirloops", LangOptions::CSI_TapirLoopEnd)
+            .Default(LangOptions::CSI_None);
     if (ParsedExt == LangOptions::CSI_None) {
       Diags.Report(diag::err_drv_invalid_value) << FlagName << Val;
       return LangOptions::CSI_None;
@@ -1339,9 +1339,9 @@ parseCSIExtensionPoint(StringRef FlagName, ArgList &Args,
   return LangOptions::CSI_None;
 }
 
-static Optional<StringRef>
+static std::optional<StringRef>
 serializeCSIExtensionPoint(LangOptions::CSIExtensionPoint X) {
-  Optional<StringRef> CSIExtPtStr;
+  std::optional<StringRef> CSIExtPtStr;
   switch (X) {
   case LangOptions::CSI_EarlyAsPossible:
     CSIExtPtStr = "first";
@@ -1455,7 +1455,7 @@ void CompilerInvocation::GenerateCodeGenArgs(
   else if (!Opts.DirectAccessExternalData && LangOpts->PICLevel == 0)
     GenerateArg(Args, OPT_fno_direct_access_external_data, SA);
 
-  if (Optional<StringRef> TapirTargetStr =
+  if (std::optional<StringRef> TapirTargetStr =
           serializeTapirTarget(Opts.getTapirTarget()))
     GenerateArg(Args, OPT_ftapir_EQ, *TapirTargetStr, SA);
 
@@ -3421,10 +3421,10 @@ void CompilerInvocation::GenerateLangArgs(const LangOptions &Opts,
       GenerateArg(Args, OPT_pic_is_pie, SA);
     for (StringRef Sanitizer : serializeSanitizerKinds(Opts.Sanitize))
       GenerateArg(Args, OPT_fsanitize_EQ, Sanitizer, SA);
-    if (Optional<StringRef> CSIExtPt = serializeCSIExtensionPoint(
+    if (std::optional<StringRef> CSIExtPt = serializeCSIExtensionPoint(
             Opts.getComprehensiveStaticInstrumentation()))
       GenerateArg(Args, OPT_fcsi_EQ, *CSIExtPt, SA);
-    if (Optional<StringRef> Cilktool =
+    if (std::optional<StringRef> Cilktool =
             serializeCilktoolKind(Opts.getCilktool()))
       GenerateArg(Args, OPT_fcilktool_EQ, *Cilktool, SA);
 
@@ -3628,10 +3628,11 @@ void CompilerInvocation::GenerateLangArgs(const LangOptions &Opts,
   else if (Opts.DefaultFPContractMode == LangOptions::FPM_FastHonorPragmas)
     GenerateArg(Args, OPT_ffp_contract, "fast-honor-pragmas", SA);
 
-  if (Optional<StringRef> CSIExtPt = serializeCSIExtensionPoint(
+  if (std::optional<StringRef> CSIExtPt = serializeCSIExtensionPoint(
           Opts.getComprehensiveStaticInstrumentation()))
     GenerateArg(Args, OPT_fcsi_EQ, *CSIExtPt, SA);
-  if (Optional<StringRef> Cilktool = serializeCilktoolKind(Opts.getCilktool()))
+  if (std::optional<StringRef> Cilktool =
+          serializeCilktoolKind(Opts.getCilktool()))
     GenerateArg(Args, OPT_fcilktool_EQ, *Cilktool, SA);
 
   for (StringRef Sanitizer : serializeSanitizerKinds(Opts.Sanitize))
