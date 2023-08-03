@@ -420,6 +420,8 @@ bool JumpThreadingPass::runImpl(Function &F, TargetLibraryInfo *TLI_,
   if (!ThreadAcrossLoopHeaders)
     findLoopHeaders(F);
 
+  findTapirTasks(F, DT);
+
   bool EverChanged = false;
   bool Changed;
   do {
@@ -628,6 +630,32 @@ void JumpThreadingPass::findLoopHeaders(Function &F) {
 
   for (const auto &Edge : Edges)
     LoopHeaders.insert(Edge.second);
+}
+
+/// findTapirTasks - We must be careful when threading the continuation of a
+/// Tapir task, in order to make sure that reattaches always go to the
+/// continuation of their associated detaches.  To ensure this we first record
+/// all the associations between detaches and reattaches.
+void JumpThreadingPass::findTapirTasks(Function &F, DominatorTree &DT) {
+  for (const BasicBlock &BB : F) {
+    if (const DetachInst *DI = dyn_cast<DetachInst>(BB.getTerminator())) {
+      // Scan the predecessors of the detach continuation for reattaches that
+      // pair with this detach.
+      const BasicBlock *Detached = DI->getDetached();
+      for (const BasicBlock *PredBB : predecessors(DI->getContinue()))
+        if (isa<ReattachInst>(PredBB->getTerminator()) &&
+            DT.dominates(Detached, PredBB))
+          TapirTasks[&BB].insert(PredBB);
+
+      if (DI->hasUnwindDest())
+        // Scan the predecessors of the detach unwind for detached-rethrows that
+        // pair with this detach.
+        for (const BasicBlock *PredBB : predecessors(DI->getUnwindDest()))
+          if (isDetachedRethrow(PredBB->getTerminator()) &&
+              DT.dominates(Detached, PredBB))
+            TapirTasks[&BB].insert(PredBB);
+    }
+  }
 }
 
 /// getKnownConstant - Helper method to determine if we can thread over a
@@ -1723,6 +1751,43 @@ bool JumpThreadingPass::processThreadableEdges(Value *Cond, BasicBlock *BB,
 
     PredToDestList.emplace_back(Pred, DestBB);
   }
+
+  // For Tapir, remove any edges from detaches, reattaches, or detached-rethrows
+  // if we are trying to thread only a subset of the the associated detaches,
+  // reattaches, and detached-rethrows among the predecesors.
+  erase_if(
+      PredToDestList,
+      [&](const std::pair<BasicBlock *, BasicBlock *> &PredToDest) {
+        // Bail if the predecessor is not terminated by a detach.
+        if (isa<DetachInst>(PredToDest.first->getTerminator())) {
+          // If we are threading through a detach-continue or detach-unwind,
+          // check that all associated reattaches and detached-rethrows are also
+          // predecessors in PredToDestList.
+          for (const BasicBlock *TaskPred : TapirTasks[PredToDest.first]) {
+            if (isa<ReattachInst>(TaskPred->getTerminator()) ||
+                isDetachedRethrow(TaskPred->getTerminator())) {
+              return none_of(
+                  PredToDestList,
+                  [&](const std::pair<BasicBlock *, BasicBlock *> &PredToDest) {
+                    return TaskPred == PredToDest.first;
+                  });
+            }
+          }
+        } else if (isa<ReattachInst>(PredToDest.first->getTerminator()) ||
+                   isDetachedRethrow(PredToDest.first->getTerminator())) {
+          // If we have a reattach or detached-rethrow predecessor, check that
+          // the associated detach is also a predecessor in PredToDestList.
+          const BasicBlock *ReattachPred = PredToDest.first;
+          return none_of(
+              PredToDestList,
+              [&](const std::pair<BasicBlock *, BasicBlock *> &PredToDest) {
+                return isa<DetachInst>(PredToDest.first->getTerminator()) &&
+                    TapirTasks.count(PredToDest.first) &&
+                    TapirTasks[PredToDest.first].contains(ReattachPred);
+              });
+        }
+        return false;
+      });
 
   // If all edges were unthreadable, we fail.
   if (PredToDestList.empty())
