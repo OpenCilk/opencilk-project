@@ -1857,9 +1857,11 @@ def int_ptrmask: DefaultAttrsIntrinsic<[llvm_any_ty], [LLVMMatchType<0>, llvm_an
                            [IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
 
 // Intrinsic to wrap a thread local variable.
-def int_threadlocal_address : DefaultAttrsIntrinsic<[llvm_anyptr_ty], [LLVMMatchType<0>],
-                                                    [NonNull<RetIndex>, NonNull<ArgIndex<0>>,
-                                                     IntrNoMem, IntrSpeculatable, IntrWillReturn]>;
+def int_threadlocal_address
+    : DefaultAttrsIntrinsic<[llvm_anyptr_ty], [LLVMMatchType<0>], [
+      NonNull<RetIndex>, NonNull<ArgIndex<0>>, IntrInaccessibleMemOnly,
+      IntrReadMem, IntrSpeculatable, IntrWillReturn
+    ]>;
 
 def int_experimental_stepvector : DefaultAttrsIntrinsic<[llvm_anyvector_ty],
                                                         [], [IntrNoMem]>;
