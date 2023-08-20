@@ -374,6 +374,144 @@ private:
 
 } // end anonymous namespace
 
+static bool isFreeFn(const Instruction *I, const TargetLibraryInfo *TLI) {
+  if (!isa<CallBase>(I))
+    return false;
+  const CallBase *CB = dyn_cast<CallBase>(I);
+
+  if (!TLI)
+    return false;
+
+  if (getFreedOperand(CB, TLI))
+    return true;
+
+  // Ideally we would just use getFreedOperand to determine whether I is a call
+  // to a libfree funtion.  But if -fno-builtin is used, then getFreedOperand
+  // won't recognize any libfree functions.  For instrumentation purposes,
+  // it's sufficient to recognize the function name.
+  const StringRef FreeFnNames[] = {
+    "_ZdlPv",
+    "_ZdaPv",
+    "_ZdlPvj",
+    "_ZdlPvm",
+    "_ZdlPvRKSt9nothrow_t",
+    "_ZdlPvSt11align_val_t",
+    "_ZdaPvj",
+    "_ZdaPvm",
+    "_ZdaPvRKSt9nothrow_t",
+    "_ZdaPvSt11align_val_t",
+    "_ZdlPvSt11align_val_tRKSt9nothrow_t",
+    "_ZdaPvSt11align_val_tRKSt9nothrow_t",
+    "_ZdlPvjSt11align_val_t",
+    "_ZdlPvmSt11align_val_t",
+    "_ZdaPvjSt11align_val_t",
+    "_ZdaPvmSt11align_val_t",
+    "??3@YAXPAX@Z",
+    "??3@YAXPAXABUnothrow_t@std@@@Z",
+    "??3@YAXPAXI@Z",
+    "??3@YAXPEAX@Z",
+    "??3@YAXPEAXAEBUnothrow_t@std@@@Z",
+    "??3@YAXPEAX_K@Z",
+    "??_V@YAXPAX@Z",
+    "??_V@YAXPAXABUnothrow_t@std@@@Z",
+    "??_V@YAXPAXI@Z",
+    "??_V@YAXPEAX@Z",
+    "??_V@YAXPEAXAEBUnothrow_t@std@@@Z",
+    "??_V@YAXPEAX_K@Z",
+    "__kmpc_free_shared"
+  };
+
+  if (const Function *Called = CB->getCalledFunction()) {
+    StringRef FnName = Called->getName();
+    if (!llvm::any_of(FreeFnNames, [&](const StringRef FreeFnName) {
+          return FnName == FreeFnName;
+        }))
+      return false;
+
+    // Confirm that this function is a recognized library function
+    LibFunc F;
+    bool FoundLibFunc = TLI->getLibFunc(*Called, F);
+    return FoundLibFunc;
+  }
+
+  return false;
+}
+
+static bool isAllocFn(const Instruction *I, const TargetLibraryInfo *TLI) {
+  if (!isa<CallBase>(I))
+    return false;
+
+  if (!TLI)
+    return false;
+
+  if (isAllocationFn(I, TLI))
+    return true;
+
+  // Ideally we would just use isAllocationFn to determine whether I is a call
+  // to an allocation funtion.  But if -fno-builtin is used, then isAllocationFn
+  // won't recognize any allocation functions.  For instrumentation purposes,
+  // it's sufficient to recognize the function name.
+  const StringRef AllocFnNames[] = {
+    "_Znwj",
+    "_ZnwjRKSt9nothrow_t",
+    "_ZnwjSt11align_val_t",
+    "_ZnwjSt11align_val_tRKSt9nothrow_t",
+    "_Znwm",
+    "_ZnwmRKSt9nothrow_t",
+    "_ZnwmSt11align_val_t",
+    "_ZnwmSt11align_val_tRKSt9nothrow_t",
+    "_Znaj",
+    "_ZnajRKSt9nothrow_t",
+    "_ZnajSt11align_val_t",
+    "_ZnajSt11align_val_tRKSt9nothrow_t",
+    "_Znam",
+    "_ZnamRKSt9nothrow_t",
+    "_ZnamSt11align_val_t",
+    "_ZnamSt11align_val_tRKSt9nothrow_t",
+    "??2@YAPAXI@Z",
+    "??2@YAPAXIABUnothrow_t@std@@@Z",
+    "??2@YAPEAX_K@Z",
+    "??2@YAPEAX_KAEBUnothrow_t@std@@@Z",
+    "??_U@YAPAXI@Z",
+    "??_U@YAPAXIABUnothrow_t@std@@@Z",
+    "??_U@YAPEAX_K@Z",
+    "??_U@YAPEAX_KAEBUnothrow_t@std@@@Z",
+    "strdup",
+    "dunder_strdup",
+    "strndup",
+    "dunder_strndup",
+    "__kmpc_alloc_shared",
+    "posix_memalign"
+  };
+
+  if (const Function *Called = dyn_cast<CallBase>(I)->getCalledFunction()) {
+    StringRef FnName = Called->getName();
+    if (!llvm::any_of(AllocFnNames, [&](const StringRef AllocFnName) {
+          return FnName == AllocFnName;
+        }))
+      return false;
+
+    // Confirm that this function is a recognized library function
+    LibFunc F;
+    bool FoundLibFunc = TLI->getLibFunc(*Called, F);
+    return FoundLibFunc;
+  }
+
+  return false;
+}
+
+static bool isAllocFn(const Value *V, const TargetLibraryInfo *TLI) {
+  if (const CallBase *CB = dyn_cast<CallBase>(V))
+    return isAllocFn(CB, TLI);
+  return false;
+}
+
+static bool isReallocFn(const CallBase *Call) {
+  return (static_cast<AllocFnKind>(
+              Call->getFnAttr(Attribute::AllocKind).getValueAsInt()) &
+          AllocFnKind::Realloc) != AllocFnKind::Unknown;
+}
+
 static bool checkInstructionForRace(const Instruction *I,
                                     const TargetLibraryInfo *TLI) {
   if (isa<LoadInst>(I) || isa<StoreInst>(I) || isa<VAArgInst>(I) ||
@@ -432,13 +570,8 @@ static bool checkInstructionForRace(const Instruction *I,
     }
 
     // We can assume allocation functions are safe.
-    if (AssumeSafeMalloc && isAllocationFn(I, TLI)) {
-      // Check if this is a realloc, because we have to handle those specially.
-      LibFunc F;
-      bool FoundLibFunc = TLI->getLibFunc(*Call->getCalledFunction(), F);
-      if (FoundLibFunc && ((F == LibFunc_realloc || F == LibFunc_reallocf)))
-        return true;
-      return false;
+    if (AssumeSafeMalloc && isAllocFn(Call, TLI)) {
+      return isReallocFn(Call);
     }
 
     // If this call occurs in a termination block of the program, ignore it.
@@ -532,11 +665,9 @@ static void GetGeneralAccesses(
       CallMask &= ModRefInfo::Ref;
     // TODO: See if we need to exclude additional intrinsics.
 
-    if (isAllocationFn(Call, TLI)) {
+    if (isAllocFn(Call, TLI)) {
       // Handle realloc as a special case.
-      LibFunc F;
-      bool FoundLibFunc = TLI->getLibFunc(*Call->getCalledFunction(), F);
-      if (FoundLibFunc && ((F == LibFunc_realloc || F == LibFunc_reallocf))) {
+      if (isReallocFn(Call)) {
         // TODO: Try to get the size of the object being copied from.
         AccI.push_back(GeneralAccess(I, MemoryLocation::getForArgument(
                                          Call, 0, TLI), 0,
@@ -1318,7 +1449,7 @@ void AccessPtrAnalysis::checkForRacesHelper(
             // Races on alloca'd objects are checked locally.
             continue;
 
-          if (isAllocationFn(Obj, TLI) && AssumeSafeMalloc)
+          if (AssumeSafeMalloc && isAllocFn(Obj, TLI))
             // Races on malloc'd objects are checked locally.
             continue;
 
@@ -1902,8 +2033,8 @@ void AccessPtrAnalysis::processAccessPtrs(
       if (!GA.getPtr()) {
         if (const CallBase *Call = dyn_cast<CallBase>(GA.I)) {
           if (!Call->onlyAccessesArgMemory() &&
-              !(AssumeSafeMalloc && (isAllocationFn(Call, TLI) ||
-                                     getFreedOperand(Call, TLI)))) {
+              !(AssumeSafeMalloc &&
+                (isAllocFn(Call, TLI) || isFreeFn(Call, TLI)))) {
             LLVM_DEBUG(dbgs() << "Setting opaque race:\n"
                               << "  GA.I: " << *GA.I << "\n"
                               << "  no explicit racer\n");
