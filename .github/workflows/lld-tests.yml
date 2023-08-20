@@ -17,6 +17,8 @@ on:
     ignore-forks: true
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'lld/**'
       - '.github/workflows/lld-tests.yml'
