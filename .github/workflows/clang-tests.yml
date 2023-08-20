@@ -17,6 +17,8 @@ on:
     ignore-forks: true
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'clang/**'
       - '.github/workflows/clang-tests.yml'

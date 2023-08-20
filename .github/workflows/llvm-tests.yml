@@ -16,6 +16,8 @@ on:
     ignore-forks: true
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'llvm/**'
       - '.github/workflows/llvm-tests.yml'
