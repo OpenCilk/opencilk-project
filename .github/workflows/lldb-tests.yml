@@ -9,6 +9,8 @@ on:
     ignore-forks: true
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'lldb/**'
       - '.github/workflows/lldb-tests.yml'
@@ -19,6 +21,8 @@ on:
     ignore-forks: true
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'lldb/**'
       - '.github/workflows/lldb-tests.yml'
