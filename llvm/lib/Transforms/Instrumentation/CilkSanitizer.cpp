@@ -342,14 +342,9 @@ struct CilkSanitizerImpl : public CSIImpl {
   static Constant *objTableToUnitObjTable(Module &M,
                                           StructType *UnitObjTableType,
                                           ObjectTable &ObjTable);
-  static bool isFreeFn(const Instruction *I, const TargetLibraryInfo *TLI);
-  static bool isAllocFn(const Instruction *I, const TargetLibraryInfo *TLI);
   static bool isLibCall(const Instruction &I, const TargetLibraryInfo *TLI);
   static bool simpleCallCannotRace(const Instruction &I);
   static bool shouldIgnoreCall(const Instruction &I);
-  static bool getAllocFnArgs(
-      const Instruction *I, SmallVectorImpl<Value*> &AllocFnArgs,
-      Type *SizeTy, Type *AddrTy, const TargetLibraryInfo &TLI);
 
   static DebugLoc searchForDebugLoc(Instruction *I) {
     if (DebugLoc Loc = I->getDebugLoc())
@@ -1122,6 +1117,7 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
   SmallVector<BasicBlock *, 4> SyncPreds;
   SmallVector<BasicBlock *, 4> SyncUnwindPreds;
   SmallVector<BasicBlock *, 4> AllocFnPreds;
+  SmallVector<BasicBlock *, 4> FreeFnPreds;
   DenseMap<const Function *, SmallVector<BasicBlock *, 4>> LibCallPreds;
   SmallVector<BasicBlock *, 4> InvokePreds;
   bool HasOtherPredTypes = false;
@@ -1141,6 +1137,8 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
       SyncUnwindPreds.push_back(Pred);
     else if (CilkSanitizerImpl::isAllocFn(Pred->getTerminator(), TLI))
       AllocFnPreds.push_back(Pred);
+    else if (CilkSanitizerImpl::isFreeFn(Pred->getTerminator(), TLI))
+      FreeFnPreds.push_back(Pred);
     else if (CilkSanitizerImpl::isLibCall(*Pred->getTerminator(), TLI)) {
       const Function *Called =
           dyn_cast<CallBase>(Pred->getTerminator())->getCalledFunction();
@@ -1156,6 +1154,7 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
     static_cast<unsigned>(!SyncPreds.empty()) +
     static_cast<unsigned>(!SyncUnwindPreds.empty()) +
     static_cast<unsigned>(!AllocFnPreds.empty()) +
+    static_cast<unsigned>(!FreeFnPreds.empty()) +
     static_cast<unsigned>(LibCallPreds.size()) +
     static_cast<unsigned>(!InvokePreds.empty()) +
     static_cast<unsigned>(HasOtherPredTypes);
@@ -1172,6 +1171,10 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
   }
   if (!AllocFnPreds.empty() && NumPredTypes > 1) {
     BBToSplit = SplitOffPreds(BBToSplit, AllocFnPreds, DT, LI);
+    NumPredTypes--;
+  }
+  if (!FreeFnPreds.empty() && NumPredTypes > 1) {
+    BBToSplit = SplitOffPreds(BBToSplit, FreeFnPreds, DT, LI);
     NumPredTypes--;
   }
   if (!LibCallPreds.empty() && NumPredTypes > 1) {
@@ -1421,7 +1424,7 @@ bool CilkSanitizerImpl::unknownObjectUses(const Value *Addr, LoopInfo *LI,
 
   // If the base object is not an allocation function, return true.
   for (const Value *BaseObj : BaseObjs)
-    if (!isAllocationFn(BaseObj, TLI))
+    if (!isAllocFn(BaseObj, TLI))
       return true;
 
   return false;
@@ -1469,51 +1472,6 @@ void CilkSanitizerImpl::chooseInstructionsToInstrument(
     All.push_back(I);
   }
   Local.clear();
-}
-
-bool CilkSanitizerImpl::isFreeFn(const Instruction *I,
-                                 const TargetLibraryInfo *TLI) {
-  if (!isa<CallBase>(I))
-    return false;
-
-  const Function *Callee = dyn_cast<CallBase>(I)->getCalledFunction();
-  if (!Callee)
-    return false;
-
-  LibFunc TLIFn;
-  if (TLI && TLI->getLibFunc(*Callee, TLIFn) && TLI->has(TLIFn) &&
-      isLibFreeFunction(Callee, TLIFn))
-    return true;
-
-  Attribute Attr = Callee->getFnAttribute(Attribute::AllocKind);
-  if (!Attr.isValid())
-    return false;
-  AllocFnKind Kind = AllocFnKind(Attr.getValueAsInt());
-  return ((Kind & AllocFnKind::Free) != AllocFnKind::Unknown);
-}
-
-bool CilkSanitizerImpl::isAllocFn(const Instruction *I,
-                                  const TargetLibraryInfo *TLI) {
-  if (!isa<CallBase>(I))
-    return false;
-
-  if (!TLI)
-    return false;
-
-  if (isAllocationFn(I, TLI))
-    return true;
-
-  if (const Function *Called = dyn_cast<CallBase>(I)->getCalledFunction()) {
-    if (Called->getName() != "posix_memalign")
-      return false;
-
-    // Confirm that this function is a recognized library function
-    LibFunc F;
-    bool FoundLibFunc = TLI->getLibFunc(*Called, F);
-    return FoundLibFunc;
-  }
-
-  return false;
 }
 
 bool CilkSanitizerImpl::isLibCall(const Instruction &I,
@@ -4439,7 +4397,6 @@ bool CilkSanitizerImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
   return true;
 }
 
-
 void CilkSanitizerImpl::instrumentTapirLoop(Loop &L, TaskInfo &TI,
                                        DenseMap<Value *, unsigned> &SyncRegNums,
                                        ScalarEvolution *SE) {
@@ -4590,45 +4547,6 @@ static Value *getHeapObject(Value *I) {
 
   // Otherwise just use the heap-allocation call directly.
   return I;
-}
-
-bool CilkSanitizerImpl::getAllocFnArgs(
-    const Instruction *I, SmallVectorImpl<Value*> &AllocFnArgs,
-    Type *SizeTy, Type *AddrTy, const TargetLibraryInfo &TLI) {
-  const CallBase *CB = dyn_cast<CallBase>(I);
-
-  std::pair<Value *, Value *> SizeArgs = getAllocSizeArgs(CB, &TLI);
-  // If the first size argument is null, then we failed to get size arguments
-  // for this call.
-  if (!SizeArgs.first)
-    return false;
-
-  Value *AlignmentArg = getAllocAlignment(CB, &TLI);
-
-  // Push the size arguments.
-  AllocFnArgs.push_back(SizeArgs.first);
-  // The second size argument is the number of elements allocated (i.e., for
-  // calloc-like functions).
-  if (SizeArgs.second)
-    AllocFnArgs.push_back(SizeArgs.second);
-  else
-    // Report number of elements == 1.
-    AllocFnArgs.push_back(ConstantInt::get(SizeTy, 1));
-
-  // Push the alignment argument or 0 if there is no alignment argument.
-  if (AlignmentArg)
-    AllocFnArgs.push_back(AlignmentArg);
-  else
-    AllocFnArgs.push_back(ConstantInt::get(SizeTy, 0));
-
-  // Return the old pointer argument for realloc-like functions or nullptr for
-  // other allocation functions.
-  if (Value *Reallocated = getReallocatedOperand(CB))
-    AllocFnArgs.push_back(Reallocated);
-  else
-    AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
-
-  return true;
 }
 
 bool CilkSanitizerImpl::instrumentAllocFnLibCall(Instruction *I,

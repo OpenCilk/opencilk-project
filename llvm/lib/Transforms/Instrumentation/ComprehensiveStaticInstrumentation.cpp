@@ -793,6 +793,7 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
   SmallVector<BasicBlock *, 4> SyncPreds;
   SmallVector<BasicBlock *, 4> SyncUnwindPreds;
   SmallVector<BasicBlock *, 4> AllocFnPreds;
+  SmallVector<BasicBlock *, 4> FreeFnPreds;
   SmallVector<BasicBlock *, 4> InvokePreds;
   bool HasOtherPredTypes = false;
   unsigned NumPredTypes = 0;
@@ -809,8 +810,10 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
       SyncPreds.push_back(Pred);
     else if (isSyncUnwind(Pred->getTerminator()))
       SyncUnwindPreds.push_back(Pred);
-    else if (isAllocationFn(Pred->getTerminator(), TLI))
+    else if (CSIImpl::isAllocFn(Pred->getTerminator(), TLI))
       AllocFnPreds.push_back(Pred);
+    else if (CSIImpl::isFreeFn(Pred->getTerminator(), TLI))
+      FreeFnPreds.push_back(Pred);
     else if (isa<InvokeInst>(Pred->getTerminator()))
       InvokePreds.push_back(Pred);
     else
@@ -822,6 +825,7 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
                  static_cast<unsigned>(!SyncPreds.empty()) +
                  static_cast<unsigned>(!SyncUnwindPreds.empty()) +
                  static_cast<unsigned>(!AllocFnPreds.empty()) +
+                 static_cast<unsigned>(!FreeFnPreds.empty()) +
                  static_cast<unsigned>(!InvokePreds.empty()) +
                  static_cast<unsigned>(HasOtherPredTypes);
 
@@ -837,6 +841,10 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
   }
   if (!AllocFnPreds.empty() && NumPredTypes > 1) {
     BBToSplit = SplitOffPreds(BBToSplit, AllocFnPreds, DT, LI);
+    NumPredTypes--;
+  }
+  if (!FreeFnPreds.empty() && NumPredTypes > 1) {
+    BBToSplit = SplitOffPreds(BBToSplit, FreeFnPreds, DT, LI);
     NumPredTypes--;
   }
   if (!InvokePreds.empty() && NumPredTypes > 1) {
@@ -894,6 +902,132 @@ void CSIImpl::splitBlocksAtCalls(Function &F, DominatorTree *DT, LoopInfo *LI) {
 
   for (Instruction *Call : CallsToSplit)
     SplitBlock(Call->getParent(), Call->getNextNode(), DT, LI);
+}
+
+bool CSIImpl::isFreeFn(const Instruction *I, const TargetLibraryInfo *TLI) {
+  if (!isa<CallBase>(I))
+    return false;
+  const CallBase *CB = dyn_cast<CallBase>(I);
+
+  if (!TLI)
+    return false;
+
+  if (getFreedOperand(CB, TLI))
+    return true;
+
+  // Ideally we would just use getFreedOperand to determine whether I is a call
+  // to a libfree funtion.  But if -fno-builtin is used, then getFreedOperand
+  // won't recognize any libfree functions.  For instrumentation purposes,
+  // it's sufficient to recognize the function name.
+  const StringRef FreeFnNames[] = {
+    "_ZdlPv",
+    "_ZdaPv",
+    "_ZdlPvj",
+    "_ZdlPvm",
+    "_ZdlPvRKSt9nothrow_t",
+    "_ZdlPvSt11align_val_t",
+    "_ZdaPvj",
+    "_ZdaPvm",
+    "_ZdaPvRKSt9nothrow_t",
+    "_ZdaPvSt11align_val_t",
+    "_ZdlPvSt11align_val_tRKSt9nothrow_t",
+    "_ZdaPvSt11align_val_tRKSt9nothrow_t",
+    "_ZdlPvjSt11align_val_t",
+    "_ZdlPvmSt11align_val_t",
+    "_ZdaPvjSt11align_val_t",
+    "_ZdaPvmSt11align_val_t",
+    "??3@YAXPAX@Z",
+    "??3@YAXPAXABUnothrow_t@std@@@Z",
+    "??3@YAXPAXI@Z",
+    "??3@YAXPEAX@Z",
+    "??3@YAXPEAXAEBUnothrow_t@std@@@Z",
+    "??3@YAXPEAX_K@Z",
+    "??_V@YAXPAX@Z",
+    "??_V@YAXPAXABUnothrow_t@std@@@Z",
+    "??_V@YAXPAXI@Z",
+    "??_V@YAXPEAX@Z",
+    "??_V@YAXPEAXAEBUnothrow_t@std@@@Z",
+    "??_V@YAXPEAX_K@Z",
+    "__kmpc_free_shared"
+  };
+
+  if (const Function *Called = CB->getCalledFunction()) {
+    StringRef FnName = Called->getName();
+    if (!llvm::any_of(FreeFnNames, [&](const StringRef FreeFnName) {
+          return FnName == FreeFnName;
+        }))
+      return false;
+
+    // Confirm that this function is a recognized library function
+    LibFunc F;
+    bool FoundLibFunc = TLI->getLibFunc(*Called, F);
+    return FoundLibFunc;
+  }
+
+  return false;
+}
+
+bool CSIImpl::isAllocFn(const Instruction *I, const TargetLibraryInfo *TLI) {
+  if (!isa<CallBase>(I))
+    return false;
+
+  if (!TLI)
+    return false;
+
+  if (isAllocationFn(I, TLI))
+    return true;
+
+  // Ideally we would just use isAllocationFn to determine whether I is a call
+  // to an allocation funtion.  But if -fno-builtin is used, then isAllocationFn
+  // won't recognize any allocation functions.  For instrumentation purposes,
+  // it's sufficient to recognize the function name.
+  const StringRef AllocFnNames[] = {
+    "_Znwj",
+    "_ZnwjRKSt9nothrow_t",
+    "_ZnwjSt11align_val_t",
+    "_ZnwjSt11align_val_tRKSt9nothrow_t",
+    "_Znwm",
+    "_ZnwmRKSt9nothrow_t",
+    "_ZnwmSt11align_val_t",
+    "_ZnwmSt11align_val_tRKSt9nothrow_t",
+    "_Znaj",
+    "_ZnajRKSt9nothrow_t",
+    "_ZnajSt11align_val_t",
+    "_ZnajSt11align_val_tRKSt9nothrow_t",
+    "_Znam",
+    "_ZnamRKSt9nothrow_t",
+    "_ZnamSt11align_val_t",
+    "_ZnamSt11align_val_tRKSt9nothrow_t",
+    "??2@YAPAXI@Z",
+    "??2@YAPAXIABUnothrow_t@std@@@Z",
+    "??2@YAPEAX_K@Z",
+    "??2@YAPEAX_KAEBUnothrow_t@std@@@Z",
+    "??_U@YAPAXI@Z",
+    "??_U@YAPAXIABUnothrow_t@std@@@Z",
+    "??_U@YAPEAX_K@Z",
+    "??_U@YAPEAX_KAEBUnothrow_t@std@@@Z",
+    "strdup",
+    "dunder_strdup",
+    "strndup",
+    "dunder_strndup",
+    "__kmpc_alloc_shared",
+    "posix_memalign"
+  };
+
+  if (const Function *Called = dyn_cast<CallBase>(I)->getCalledFunction()) {
+    StringRef FnName = Called->getName();
+    if (!llvm::any_of(AllocFnNames, [&](const StringRef AllocFnName) {
+          return FnName == AllocFnName;
+        }))
+      return false;
+
+    // Confirm that this function is a recognized library function
+    LibFunc F;
+    bool FoundLibFunc = TLI->getLibFunc(*Called, F);
+    return FoundLibFunc;
+  }
+
+  return false;
 }
 
 int CSIImpl::getNumBytesAccessed(Type *OrigTy, const DataLayout &DL) {
@@ -2481,9 +2615,9 @@ void CSIImpl::instrumentFunction(Function &F) {
         // Record this function call as either an allocation function, a call to
         // free (or delete), a memory intrinsic, or an ordinary real function
         // call.
-        if (isAllocationFn(&I, TLI))
+        if (isAllocFn(&I, TLI))
           AllocationFnCalls.push_back(&I);
-        else if (getFreedOperand(CB, TLI))
+        else if (isFreeFn(CB, TLI))
           FreeCalls.push_back(&I);
         else if (isa<MemIntrinsic>(I))
           MemIntrinsics.push_back(&I);
