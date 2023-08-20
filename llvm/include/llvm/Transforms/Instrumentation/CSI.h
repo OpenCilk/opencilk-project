@@ -1150,10 +1150,17 @@ public:
   static bool addrPointsToConstantData(const Value *Addr);
   static bool isAtomic(const Instruction *I);
   static bool isThreadLocalObject(const Value *Obj);
+  static bool isAllocFn(const Instruction *I, const TargetLibraryInfo *TLI);
+  static bool isAllocFn(const Value *V, const TargetLibraryInfo *TLI) {
+    if (const CallBase *CB = dyn_cast<CallBase>(V))
+      return isAllocFn(CB, TLI);
+    return false;
+  }
   static bool getAllocFnArgs(const Instruction *I,
                              SmallVectorImpl<Value *> &AllocFnArgs,
                              Type *SizeTy, Type *AddrTy,
                              const TargetLibraryInfo &TLI);
+  static bool isFreeFn(const Instruction *I, const TargetLibraryInfo *TLI);
 
   /// Helper functions to set up the CFG for CSI instrumentation.
   static void setupCalls(Function &F);
