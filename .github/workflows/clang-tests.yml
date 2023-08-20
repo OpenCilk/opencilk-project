@@ -18,6 +18,8 @@ on:
   pull_request:
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'clang/**'
       - '.github/workflows/clang-tests.yml'

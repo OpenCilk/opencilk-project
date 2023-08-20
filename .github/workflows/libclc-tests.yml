@@ -8,6 +8,8 @@ on:
   push:
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'libclc/**'
       - '.github/workflows/libclc-tests.yml'
@@ -17,6 +19,8 @@ on:
   pull_request:
     branches:
       - 'release/**'
+      - 'dev/**'
+      - 'ci/**'
     paths:
       - 'libclc/**'
       - '.github/workflows/libclc-tests.yml'
