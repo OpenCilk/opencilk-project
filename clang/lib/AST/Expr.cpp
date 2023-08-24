@@ -74,6 +74,8 @@ const CXXRecordDecl *Expr::getBestDynamicClassType() const {
   if (DerivedType->isDependentType())
     return nullptr;
 
+  DerivedType = DerivedType.stripHyperobject();
+
   const RecordType *Ty = DerivedType->castAs<RecordType>();
   Decl *D = Ty->getDecl();
   return cast<CXXRecordDecl>(D);
