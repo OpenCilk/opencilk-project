@@ -2229,17 +2229,8 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   if (Pointer) {
     VarAddr = E;
   } else if (Difficult) {
-    IdentifierInfo *BAI = PP.getIdentifierInfo("__builtin_addressof");
-    ValueDecl *BAV = dyn_cast<ValueDecl>(
-        LazilyCreateBuiltin(BAI, BAI->getBuiltinID(),
-                            /* Scope = */ nullptr,
-                            /* ForRedeclaration = */ false, SourceLocation()));
-    assert(BAV && "no __builtin_addressof builtin");
-    DeclRefExpr *BAD = BuildDeclRefExpr(BAV, Builtin->getType(), VK_PRValue,
-                                        SourceLocation(), nullptr);
-
-    ExprResult Address = BuildCallExpr(nullptr, BAD, E->getExprLoc(), {E},
-                                       E->getExprLoc(), nullptr);
+    ExprResult Address =
+      BuildBuiltinCallExpr(E->getExprLoc(), Builtin::BI__builtin_addressof, E);
     assert(Address.isUsable());
     VarAddr = Address.get();
   } else {
