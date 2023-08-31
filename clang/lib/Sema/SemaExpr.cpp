@@ -2199,18 +2199,6 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
 
   bool Difficult = CurContext->isDependentContext();
 
-  // For now all hyperobjects use the same lookup function.
-  IdentifierInfo *ID = PP.getIdentifierInfo("__hyper_lookup");
-  ValueDecl *Builtin = dyn_cast<ValueDecl>(
-      LazilyCreateBuiltin(ID, ID->getBuiltinID(),
-                          /* Scope = */ nullptr,
-                          /* ForRedeclaration = */ false, SourceLocation()));
-  // __hyper_lookup must be defined in Builtins.def.
-  assert(Builtin && "no __hyper_lookup builtin");
-
-  DeclRefExpr *Lookup = BuildDeclRefExpr(Builtin, Builtin->getType(),
-                                         VK_PRValue, SourceLocation(), nullptr);
-
   QualType ResultType = HT->getElementType().withFastQualifiers(
       InputType.getLocalFastQualifiers());
   QualType Ptr = Context.getPointerType(ResultType);
@@ -2240,8 +2228,8 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   }
   Expr *CallArgs[] = {VarAddr, SizeExpr.get(), HT->getIdentity(),
                       HT->getReduce()};
-  ExprResult Call = BuildCallExpr(nullptr, Lookup, E->getExprLoc(), CallArgs,
-                                  E->getExprLoc(), nullptr);
+  ExprResult Call =
+    BuildBuiltinCallExpr(E->getExprLoc(), Builtin::BI__hyper_lookup, CallArgs);
 
   // Template expansion normally strips out implicit casts, so make this
   // explicit in C++.
