@@ -771,13 +771,17 @@ static BasicBlock *SplitOffPreds(BasicBlock *BB,
   }
 
   BasicBlock *NewBB = SplitBlockPredecessors(BB, Preds, ".csi-split", DT, LI);
-  if (isa<UnreachableInst>(BB->getFirstNonPHIOrDbg()))
+  if (isa<UnreachableInst>(BB->getFirstNonPHIOrDbg())) {
     // If the block being split is simply contains an unreachable, then replace
     // the terminator of the new block with an unreachable.  This helps preserve
     // invariants on the CFG structure for Tapir placeholder blocks following
     // detached.rethrow and taskframe.resume terminators.
     ReplaceInstWithInst(NewBB->getTerminator(),
                         new UnreachableInst(BB->getContext()));
+    if (DT) {
+      DT->deleteEdge(NewBB, BB);
+    }
+  }
   return BB;
 }
 
@@ -829,36 +833,43 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
                  static_cast<unsigned>(!InvokePreds.empty()) +
                  static_cast<unsigned>(HasOtherPredTypes);
 
+  // Splitting predecessors works differently for landingpads versus normal
+  // basic blocks.  If the block is not a landingpad, split off every type of
+  // predecessor.
+  unsigned NumPredTypesRequired = static_cast<unsigned>(BB->isLandingPad());
+  if (NumPredTypes <= NumPredTypesRequired)
+    return;
+
   BasicBlock *BBToSplit = BB;
   // Split off the predecessors of each type.
-  if (!SyncPreds.empty() && NumPredTypes > 1) {
+  if (!SyncPreds.empty() && NumPredTypes > NumPredTypesRequired) {
     BBToSplit = SplitOffPreds(BBToSplit, SyncPreds, DT, LI);
     NumPredTypes--;
   }
-  if (!SyncUnwindPreds.empty() && NumPredTypes > 1) {
+  if (!SyncUnwindPreds.empty() && NumPredTypes > NumPredTypesRequired) {
     BBToSplit = SplitOffPreds(BBToSplit, SyncUnwindPreds, DT, LI);
     NumPredTypes--;
   }
-  if (!AllocFnPreds.empty() && NumPredTypes > 1) {
+  if (!AllocFnPreds.empty() && NumPredTypes > NumPredTypesRequired) {
     BBToSplit = SplitOffPreds(BBToSplit, AllocFnPreds, DT, LI);
     NumPredTypes--;
   }
-  if (!FreeFnPreds.empty() && NumPredTypes > 1) {
+  if (!FreeFnPreds.empty() && NumPredTypes > NumPredTypesRequired) {
     BBToSplit = SplitOffPreds(BBToSplit, FreeFnPreds, DT, LI);
     NumPredTypes--;
   }
-  if (!InvokePreds.empty() && NumPredTypes > 1) {
+  if (!InvokePreds.empty() && NumPredTypes > NumPredTypesRequired) {
     BBToSplit = SplitOffPreds(BBToSplit, InvokePreds, DT, LI);
     NumPredTypes--;
   }
-  if (!TFResumePreds.empty() && NumPredTypes > 1) {
+  if (!TFResumePreds.empty() && NumPredTypes > NumPredTypesRequired) {
     BBToSplit = SplitOffPreds(BBToSplit, TFResumePreds, DT, LI);
     NumPredTypes--;
   }
   // We handle detach and detached.rethrow predecessors at the end to preserve
   // invariants on the CFG structure about the deadness of basic blocks after
   // detached-rethrows.
-  if (!DetachPreds.empty() && NumPredTypes > 1) {
+  if (!DetachPreds.empty() && NumPredTypes > NumPredTypesRequired) {
     BBToSplit = SplitOffPreds(BBToSplit, DetachPreds, DT, LI);
     NumPredTypes--;
   }

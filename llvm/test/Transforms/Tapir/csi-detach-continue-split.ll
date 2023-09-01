@@ -1,6 +1,7 @@
-; Check that the CSI pass properly splits the predecessors of a detach-continuation block.
+; Check that the CSI pass properly splits the predecessors of a
+; detach-continuation block.
 ;
-; RUN: opt < %s -passes='csi' -S | FileCheck %s
+; RUN: opt < %s -passes='csi' -S -csi-instrument-basic-blocks=false | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -25,10 +26,6 @@ det.cont.tf:                                      ; preds = %if.then.tf
 ; CHECK: det.cont.tf:
 ; CHECK: detach within %syncreg.i28, label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
 
-; CHECK: [[CONTINUE]]:
-; CHECK-NEXT: call void @__csi_detach_continue(
-; CHECK-NEXT: br label %if.end
-
 det.achd1.tf.tf.tf:                               ; preds = %det.cont.tf
   br label %det.achd1.tf.tf.tf.tf
 
@@ -49,6 +46,10 @@ if.else:                                          ; preds = %entry
 ; CHECK: [[SYNC_SPLIT]]:
 ; CHECK: call void @__csi_after_sync(
 ; CHECK: br label %if.end
+
+; CHECK: [[CONTINUE]]:
+; CHECK-NEXT: call void @__csi_detach_continue(
+; CHECK-NEXT: br label %if.end
 
 if.end:                                           ; preds = %if.else, %det.achd1.tf.tf.tf.tf, %det.cont.tf
   ret void
