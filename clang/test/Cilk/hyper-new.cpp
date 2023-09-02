@@ -33,7 +33,7 @@ template<typename Char>
 int testfn(int argc, char *argv[]) {
     // Should call derived::derived(const base &)
     // CHECK: ptr @_Znwm
-    // CHECK: void @_ZN7derivedIcEC1ERK4baseIcE
+    // CHECK: {{void|ptr}} @_ZN7derivedIcEC1ERK4baseIcE
     reducer<char> *r = new reducer<char>(var);
     // Should lookup view
     // CHECK: @llvm.hyper.lookup
