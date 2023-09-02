@@ -33,7 +33,7 @@ template<typename Char>
 int testfn(int argc, char *argv[]) {
     // Should call derived::derived(const base &)
     // CHECK: ptr @_Znwm
-    // CHECK: void @_ZN7derivedIcEC1ERK4baseIcE
+    // CHECK: {{void|ptr}} @_ZN7derivedIcEC1ERK4baseIcE
     reducer<char> *r = new reducer<char>(var);
     // Should lookup view
     // CHECK: @llvm.hyper.lookup
@@ -41,7 +41,7 @@ int testfn(int argc, char *argv[]) {
     use(*r, "Hello\n");
     // CHECK-LABEL: delete.notnull
     // The destructor should be called directly as derived::~derived.
-    // CHECK: call void @_ZN7derivedIcED1Ev
+    // CHECK: call {{void|.*ptr}} @_ZN7derivedIcED1Ev
     // CHECK: call void @_ZdlPv
     delete r;
     return 0;
