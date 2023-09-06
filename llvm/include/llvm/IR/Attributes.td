@@ -223,7 +223,6 @@ def ReadOnly : EnumAttr<"readonly", [ParamAttr]>;
 
 /// Tapir reducer-related attributes.
 def HyperView : EnumAttr<"hyper_view", [FnAttr]>;
-def HyperToken : EnumAttr<"hyper_token", [FnAttr]>;
 def ReducerRegister : EnumAttr<"reducer_register", [FnAttr]>;
 def ReducerUnregister : EnumAttr<"reducer_unregister", [FnAttr]>;
 

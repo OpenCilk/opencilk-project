@@ -2385,9 +2385,6 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
     if (TargetDecl->hasAttr<HyperViewAttr>()) {
       FuncAttrs.addAttribute(llvm::Attribute::HyperView);
     }
-    else if (TargetDecl->hasAttr<HyperTokenAttr>()) {
-      FuncAttrs.addAttribute(llvm::Attribute::HyperToken);
-    }
     if (TargetDecl->hasAttr<RestrictAttr>())
       RetAttrs.addAttribute(llvm::Attribute::NoAlias);
     else if (TargetDecl->hasAttr<StrandMallocAttr>())
