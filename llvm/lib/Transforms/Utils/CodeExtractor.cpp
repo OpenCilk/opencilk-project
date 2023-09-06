@@ -910,7 +910,6 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::AllocSize:
       case Attribute::Builtin:
       case Attribute::Convergent:
-      case Attribute::HyperToken:
       case Attribute::HyperView:
       case Attribute::Injective:
       case Attribute::JumpTable:
