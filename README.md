@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-### Parallel loops
+#### Parallel loops
 
 The `cilk_for` keyword can be used to define a parallel loop, in which all
 iterations of the loop are allowed to execute simultaneously.  In Cilk,
@@ -157,7 +157,7 @@ void square_matmul(double *C, const double *A, const double *B, size_t n) {
 }
 ```
 
-## Using OpenCilk's tools
+### Using OpenCilk's tools
 
 OpenCilk provides two Cilk-specific tools to check and analyze Cilk programs.
 The Cilksan race detector checks Cilk programs dynamically for determinacy
@@ -171,7 +171,7 @@ programs.  For example, to check your Cilk program for memory errors using
 AddressSanitizer, compile and link your Cilk program with
 the additional `-fsanitize=address` and then run it normally.
 
-### Checking for races using Cilksan
+#### Checking for races using Cilksan
 
 For a given Cilk program and input, Cilksan is guaranteed to either detect a
 determinacy race, if one exists, or certify that the program is
@@ -209,7 +209,7 @@ Race detected on location 1112ffd41
       Call 100fff428 main nqueens.c:103:9
 ```
 
-### Measuring parallel scalability using Cilkscale
+#### Measuring parallel scalability using Cilkscale
 
 To use Cilkscale, compile and link the Cilk program with the additional flag
 `-fcilktool=cilkscale`, and then run the program normally.
@@ -260,7 +260,7 @@ a range of processor counts and plot those performance results.  For more
 information on Cilkscale's automatic benchmarking facility, see the
 [Cilkscale user guide](https://www.opencilk.org/doc/users-guide/cilkscale/).
 
-## Advanced Cilk programming features
+### Advanced Cilk programming features
 
 OpenCilk supports several advanced parallel-programming features, including
 reducer hyperobjects and deterministic parallel random-number generation.
@@ -305,7 +305,7 @@ In this case, the function `zero_i` sets the identity value to be the
 integer `0`, and `plus_i` defines a binary reduction of adding two
 integers.
 
-### Deterministic parallel random-number generation
+#### Deterministic parallel random-number generation
 
 OpenCilk supports deterministic parallel (pseudo)random-number
 generation.  A deterministic parallel random-number generator (DPRNG)
