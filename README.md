@@ -4,7 +4,7 @@ Welcome to the OpenCilk project!
 
 [***OpenCilk***][SchardlLe23] is a state-of-the-art open-source
 implementation of the Cilk task-parallel programming platform. 
-OpenCilk supports writing fast task-parallel programs using the Cilk
+OpenCilk supports writing fast parallel programs using the Cilk
 task-parallel language extensions to C/C++.  In addition, OpenCilk
 provides a platform to develop compilers, runtime systems, and
 program-analysis tools for task-parallel code.
@@ -13,15 +13,19 @@ This repository contains the source code for the OpenCilk compiler,
 which is based on the [LLVM compiler infrastructure](https://llvm.org/)
 and implements the latest official version of
 [***Tapir***][SchardlMoLe17], a compiler intermediate representation
-(IR) for task parallelism.  OpenCilk also contains a
+(IR) for task parallelism.  By using Tapir, the OpenCilk compiler is
+able to optimize task-parallel programs more effectively than
+mainstream compilers.  OpenCilk also contains an efficient
 [parallel runtime library](https://github.com/OpenCilk/cheetah),
 that automatically schedules and load-balances the Cilk computation,
 and a [suite of tools](https://github.com/OpenCilk/productivity-tools),
-including a race detector and a scalability analyzer.
+for Cilk programs, including a race detector and a scalability analyzer.
 
-This README provides a brief overview of how to get and use OpenCilk.
-For more information about OpenCilk, including installation guides,
-user guides, tutorials, and references, please see the
+This README provides a brief, noncomprehensive overview of how to get
+and use OpenCilk.  This overview aims to help you get started using
+OpenCilk to write fast parallel programs in Cilk.  For more information
+about OpenCilk, including installation guides, user guides, tutorials,
+and references, please see the
 [OpenCilk website](https://www.opencilk.org/).
 
 ## Getting OpenCilk
@@ -43,12 +47,12 @@ The scripts in the
 repository make it easy to build a particular release of OpenCilk from
 source.  For example, the following steps will download the
 OpenCilk release tagged `<release_tag>` into the `opencilk`
-subdirectory in the current working directory, and the build OpenCilk
+subdirectory in the current working directory and then build OpenCilk
 into the `build` subdirectory of the current working directory:
 ```console
 git clone https://github.com/OpenCilk/infrastructure
 infrastructure/tools/get -t <release_tag> $(pwd)/opencilk
-infrastrcture/tools/build $(pwd)/opencilk $(pwd)/build
+infrastructure/tools/build $(pwd)/opencilk $(pwd)/build
 ```
 
 For more instructions on building OpenCilk from source, see the
@@ -87,7 +91,7 @@ command will run `fib` using 4 Cilk worker threads:
 CILK_NWORKERS=4 ./fib 40
 ```
 
-## A quick introduction to Cilk programming
+## A brief introduction to Cilk programming
 
 Cilk extends C and C++ with a few keywords to expose logical parallelism
 in a program.  These keywords create parallel subcomputations, or
@@ -103,14 +107,13 @@ A `cilk_spawn` can be inserted before a function call to allow that call
 to execute in parallel with its continuation.  A `cilk_scope` defines a
 lexical scope in which all spawned subcomputations must complete before
 program execution leaves the scope.  Cilk supports ***recursive***
-spawning of tasks, in which a task may itself spawn subtasks.
+spawning of tasks, in which a task may itself spawn and synchronize
+subtasks.
 
 For example, the following Cilk program shows how one can
 parallelize the simple exponential-time algorithm to compute the nth
 Fibonacci number using `cilk_spawn` and `cilk_scope`.
 ```c
-#include <stdio.h>
-#include <stdlib.h>
 #include <cilk/cilk.h>
 
 int fib(int n) {
@@ -123,16 +126,44 @@ int fib(int n) {
   }
   return x+y;
 }
+```
+The return value of a `cilk_spawn` is simply the return value of the
+spawned function.  Accessing the return value of a spawned function
+before synchronizing that spawn results in a race.
 
-int main(int argc, char *argv[]) {
-  int n = 10;
-  if (argc > 1)
-    n = atoi(argv[1]);
-  int result = fib(n);
-  printf("fib(%d) = %d\n", n, result);
-  return 0;
+One can also spawn functions that do not return a value, as in the
+following example:
+```cpp
+#include <algorithm>
+#include <cilk/cilk.h>
+
+constexpr std::ptrdiff_t BASE_CASE_LENGTH = 32;
+
+template <typename T> void sample_qsort(T* begin, T* end) {
+  if (end - begin < BASE_CASE_LENGTH) {
+    std::sort(begin, end);  // Base case: Serial sort
+  } else {
+    --end;  // Exclude last element (pivot) from partition
+    T* middle = std::partition(begin, end, [pivot=*end](T a) { return a < pivot; });
+    std::swap(*end, *middle);  // Move pivot to middle
+    cilk_scope {
+      cilk_spawn sample_qsort(begin, middle);
+      sample_qsort(++middle, ++end);  // Exclude pivot and restore end
+    }
+  }
 }
 ```
+
+> [!NOTE]
+> OpenCilk also continues to support the `cilk_sync` statement from
+> previous versions of Cilk for synchronizing spawned tasks in a function
+> without encapsulating those tasks in a lexical scope.
+
+> [!NOTE]
+> The OpenCilk runtime system assumes that all spawned children of any
+> function are synchronized before the function returns.  The `-fopencilk`
+> flag ensures an implicit synchronization at the end of every
+> function of that function's spawned children.
 
 ### Parallel loops
 
@@ -155,6 +186,25 @@ void square_matmul(double *C, const double *A, const double *B, size_t n) {
 }
 ```
 
+Internally, the OpenCilk runtime system implements `cilk_for` using
+`cilk_spawn` and `cilk_scope` to spawn the `cilk_for` loop iterations
+efficiently using a parallel divide-and-conquer algorithm.  This efficient
+implementation of `cilk_for` requires `-O1`-level compiler optimizations or
+higher.
+
+### The serial projection
+
+The semantics of a Cilk program can often be understood based on its
+***serial projection***, which is the serial program derived by transforming
+the Cilk code to replace all of Cilk's task-parallel language constructs with
+serial equivalents.  Roughly speaking, one can derive the serial projection
+of a Cilk program by replacing all `cilk_for`s with ordinary `for`s and
+removing all other Cilk language constructs.  The serial projection
+corresponds with the execution of a Cilk program on a single worker, that is,
+with `CILK_NWORKERS=1`.  If a Cilk program is deterministic, then all
+parallel executions of a Cilk program have the same behavior as its serial
+projection.
+
 ## Using OpenCilk's tools
 
 OpenCilk provides two Cilk-specific tools to check and analyze Cilk programs.
@@ -163,21 +213,24 @@ races.  The Cilkscale scalability analyzer measures a Cilk program's parallel
 scalability.
 
 In addition, OpenCilk integrates standard tools packaged with LLVM for
-analyzing C/C++ programs, including Google's sanitizers.  You can use those
-tools with Cilk programs in the same way that you use them for regular C/C++
-programs.  For example, to check your Cilk program for memory errors using
-AddressSanitizer, compile and link your Cilk program with
+analyzing C/C++ programs, including
+[Google's Sanitizers](https://github.com/google/sanitizers).  You can use
+those tools with Cilk programs in the same way that you use them for regular
+C/C++ programs.  For example, to check your Cilk program for memory errors
+using AddressSanitizer, compile and link your Cilk program with
 the additional `-fsanitize=address` and then run it normally.
 
 ### Checking for races using Cilksan
 
 For a given Cilk program and input, Cilksan is guaranteed to either detect a
 determinacy race, if one exists, or certify that the program is
-determinacy-race free.  For each race that Cilksan detects, it will produce
-a race report that includes the memory address being raced on and the call
-stacks of the two instructions involved in the race.  Cilksan will avoid
-reporting races where both racing instructions are atomic operations or
-protected by a common lock.  
+determinacy-race free.  Cilksan is therefore useful for debugging and
+regression-testing race bugs in Cilk programs.
+  
+For each race that Cilksan detects, it will produce a race report that
+includes the memory address being raced on and the call stacks of the two
+instructions involved in the race.  Cilksan will avoid reporting races where
+both racing instructions are atomic operations or protected by a common lock.  
 
 To use Cilksan, compile and link the Cilk program with the additional
 flag `-fsanitize=cilk`, and then run it normally.  It is also recommended
@@ -190,7 +243,7 @@ As an example, here is a Cilksan race report from building and running the
 ```
 Race detected on location 1112ffd41
 *     Read 100ffeb84 nqueens nqueens.c:64:3
-|        `-to variable a (declared at tutorial/nqueens.c:50)
+|        `-to variable a (declared at nqueens.c:50)
 +     Call 100fffb80 nqueens nqueens.c:70:31
 +    Spawn 100ffec8c nqueens nqueens.c:70:31
 |*   Write 100ffed14 nqueens nqueens.c:68:12
@@ -207,14 +260,30 @@ Race detected on location 1112ffd41
       Call 100fff428 main nqueens.c:103:9
 ```
 
-### Measuring parallel scalability using Cilkscale
+> [!NOTE]
+> Cilksan is compatible with compiler optimizations.  Be advised, however,
+> that compiler optimizations can affect debug symbols, which can in turn
+> affect Cilksan's race reports.
+>
+> In addition, the OpenCilk compiler can choose to optimize some parallel
+> computation by serializing it, which may eliminate races in the original
+> program.  The OpenCilk compiler is not allowed to introduce new
+> determinacy races into a program through optimizations.
 
-To use Cilkscale, compile and link the Cilk program with the additional flag
-`-fcilktool=cilkscale`, and then run the program normally.
+### Analyzing parallel scalability using Cilkscale
 
-Cilkscale measures the work, span, and parallelism of a Cilk program
-execution.  Cilkscale also produces "burdened" span and parallelism
-measurements, which estimate the performance impact of scheduling overhead.
+The Cilkscale scalability analyzer measures the parallel scalability of
+a Cilk program.  Cilkscale measures the parallel performance of a Cilk
+program in terms of ***work*** --- total computation --- and ***span***
+--- length of a longest path of dependencies.  Cilkscale uses these
+measures to evaluate the program's ***parallelism***, which bounds the
+maximum possible parallel speedup the program can achieve on any number
+of parallel processors.  Cilkscale also produces "burdened" span and
+parallelism measurements, which estimate the performance impact of
+scheduling overhead.
+
+To use Cilkscale, compile and link the Cilk program with the additional
+flag `-fcilktool=cilkscale`, and then run the program normally.
 
 By default,Cilkscale reports these measurements in CSV format.  Here is an
 example of Cilkscale's output.
@@ -229,7 +298,7 @@ By default, Cilkscale measures the whole program execution.  Cilkscale also
 provides a library API, similar to `clock_gettime()`, to measure specific 
 regions of the program.  To measure a particular region in a Cilk program:
 1. Include the Cilkscale header file, `cilk/cilkscale.h`, in the source
-program.
+   program.
 2. Insert calls to the `wsp_getworkspan()` probe function around the region
    of interest.  For instance:
    ```c
@@ -265,20 +334,22 @@ reducer hyperobjects and deterministic parallel random-number generation.
 
 ### Reducer hyperobjects
 
-OpenCilk supports ***reducer hyperobjects*** (or ***reducers*** for short)
-to coordinate parallel modifications to shared variables.
+OpenCilk supports
+[***reducer hyperobjects***](https://dl.acm.org/doi/10.1145/1583991.1584017)
+(or ***reducers*** for short) to coordinate parallel modifications to shared
+variables.
 
 Reducers provide a flexible parallel reduction mechanism.  When a Cilk
 program runs, the OpenCilk runtime system automatically creates new
 ***views*** of a reducer, each initialized to an ***identity*** value, and
 applies parallel modifications to the reducer to these independent views.
 As parallel subcomputations complete, the runtime system automatically
-combines these views in parallel, using a binary ***reduction*** operator.
+combines these views in parallel using a binary ***reduction*** operator.
 
 A Cilk reducer produces a deterministic result, regardless of how the
 program is scheduled at runtime, as long as its identity and reduction
-operator defines a monoid.  In particular, an *associative* reduction
-is all that's needed to get a deterministic result; the reduction need not
+operator define a monoid.  In particular, an *associative* reduction
+is all that's needed to obtain a deterministic result; the reduction need not
 be commutative.
 
 With OpenCilk, you can define a variable to be a reducer by adding the
@@ -299,7 +370,7 @@ int sum_array(int *array, size_t n) {
   return sum;
 }  
 ```
-In this case, the function `zero_i` sets the identity value to be the
+In this example, the function `zero_i` sets the identity value to be the
 integer `0`, and `plus_i` defines a binary reduction of adding two
 integers.
 
@@ -326,7 +397,6 @@ link the program `-lopencilk-pedigrees`.
 For example, the following Cilk program uses this fast DPRNG to
 implement a parallel Monte Carlo algorithm for estimating pi:
 ```cpp
-#include <cstdlib>
 #include <cstdint>
 #include <limits>
 #include <cilk/cilk.h>
@@ -366,40 +436,48 @@ OpenCilk also supports the
 [pedigree runtime mechanism](https://dl.acm.org/doi/10.1145/2145816.2145841)
 for user-defined DPRNGs, using the same `cilk/cilk_api.h` header and
 `-lopencilk-pedigrees` library.  At any point in a Cilk program, the
-`__cilkrts_get_pedigree()` function returns the current pedigree in
-the form of a singly linked list of `__cilkrts_pedigree` nodes.
+`__cilkrts_get_pedigree()` function returns the current pedigree in the 
+form of a singly linked list of `__cilkrts_pedigree` nodes.
 
-## OpenCilk system architecture
+## OpenCilk's system architecture
 
-The OpenCilk system has three core components: a compiler, a
-runtime-system library, and a suite of tools.
+The OpenCilk system has three core components: a compiler, a runtime-system
+library, and a suite of Cilk tools.
 
-The OpenCilk compiler (this respository) is based on the
+The OpenCilk compiler (this repository) is based on the
 [LLVM compiler infrastructure](https://llvm.org/).
-The OpenCilk compiler extends LLVM with Tapir, a compiler IR
-for task parallelism that enables effective compiler analysis and
-optimization of task-parallel programs.
+The OpenCilk compiler extends LLVM with [Tapir][SchardlMoLe19], a compiler
+IR for task parallelism that enables effective compiler analysis and
+optimization of task-parallel programs.  Tapir provides a generic
+representation of task-parallel control flow that is independent of the
+Cilk language and the runtime implementation.
 
 The OpenCilk [runtime library](https://github.com/OpenCilk/cheetah)
 is based on the Cheetah runtime system.  This runtime system schedules
-and load-balances the Cilk computation using a provably efficient
-randomized work-stealing scheduler.
+and load-balances the Cilk computation using an efficient randomized
+work-stealing scheduler.  The scheduler offers a
+[mathematical guarantee](https://dl.acm.org/doi/10.1145/324133.324234)
+to schedule efficiently on the available parallel processors on a
+shared-memory multicore.  Furthermore, the OpenCilk runtime system
+ensures that this theoretical efficiency is borne out in practice.
 
 The OpenCilk [tool suite](https://github.com/OpenCilk/productivity-tools)
-includes two tools for analyzing Cilk programs.  The Cilksan race
-detector checks Cilk programs for determinacy races.  The Cilkscale
-scalability analyzer measures the parallel scalability of Cilk
-programs.
+includes two tools for analyzing Cilk programs.  The Cilksan
+race detector implements an extension of the
+[SP-bags algorithm](https://dl.acm.org/doi/10.1145/258492.258493) to
+check a Cilk program's execution on a given input for determinacy races.
+The Cilkscale scalability analyzer implements a parallel version of
+the [Cilkview algorithm](https://dl.acm.org/doi/10.1145/1810479.1810509)
+to analyze the parallel scalability of a Cilk program.
 
 Although all OpenCilk components are integrated with each other,
-OpenCilk's system architecture aims to make it easy to modify and
-extend individual components.  OpenCilk's tools use
-compiler-inserted instrumentation hooks that instrument LLVM's IR
-and Tapir instructions.  Furthermore, the OpenCilk compiler
-implements a general Tapir-lowering infrastructure that makes use
-of LLVM bitcode — a binary representation of LLVM IR — to make it
-easy to compile Cilk programs to use different parallel runtime
-systems.  For more information, see the
+OpenCilk's system architecture aims to make it easy to modify and extend
+individual components.  OpenCilk's tools use compiler-inserted
+instrumentation hooks that instrument LLVM's IR and Tapir instructions.
+Furthermore, the OpenCilk compiler implements a general Tapir-lowering
+infrastructure that makes use of LLVM bitcode — a binary representation of
+LLVM IR — to make it easy to compile Cilk programs to use different
+parallel runtime systems.  For more information, see the
 [OpenCilk paper][SchardlLe23].
 
 ## How to cite OpenCilk
@@ -494,7 +572,7 @@ keywords = {compiling, fork-join parallelism, Tapir, control-flow graph, optimiz
 ## How to reach us
 
 Found a bug in OpenCilk?  Please report it on the
-[GitHub issue tracker](https://github.com/OpenCilk/opencilk-project/issues).
+[issue tracker](https://github.com/OpenCilk/opencilk-project/issues).
 
 Have a question or comment?  Start a thread on the
 [Discussions page](https://github.com/orgs/OpenCilk/discussions) or send us 
@@ -508,9 +586,9 @@ website for more information.
 ## Acknowledgments
 
 OpenCilk is supported in part by the National Science Foundation,
-under grant number CCRI-1925609, and in part by the [USAF-MIT AI
-Accelerator](https://aia.mit.edu/), which is sponsored by United
-States Air Force Research Laboratory under Cooperative Agreement
+under grant number CCRI-1925609, and in part by the
+[USAF-MIT AI Accelerator](https://aia.mit.edu/), which is sponsored by the
+United States Air Force Research Laboratory under Cooperative Agreement
 Number FA8750-19-2-1000.
 
 Any opinions, findings, and conclusions or recommendations expressed
