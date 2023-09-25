@@ -1247,11 +1247,10 @@ protected:
   void instrumentBasicBlock(BasicBlock &BB);
   void instrumentLoop(Loop &L, TaskInfo &TI, ScalarEvolution *SE);
 
-  void instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
-                        LoopInfo &LI,
-                        const DenseMap<Value *, Value *> &TrackVars);
-  void instrumentSync(SyncInst *SI,
-                      const DenseMap<Value *, Value *> &TrackVars);
+  void instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
+                        unsigned NumSyncRegs, DominatorTree *DT, TaskInfo &TI,
+                        LoopInfo &LI);
+  void instrumentSync(SyncInst *SI, unsigned SyncRegNum);
   void instrumentAlloca(Instruction *I);
   void instrumentAllocFn(Instruction *I, DominatorTree *DT,
                          const TargetLibraryInfo *TLI);
@@ -1261,11 +1260,6 @@ protected:
 
   void instrumentFunction(Function &F);
   /// @}
-
-  DenseMap<Value *, Value *>
-  keepTrackOfSpawns(Function &F,
-                    const SmallVectorImpl<DetachInst *> &Detaches,
-                    const SmallVectorImpl<SyncInst *> &Syncs);
 
   /// Obtain the signature for the interposition function given the
   /// original function that needs interpositioning.
@@ -1596,7 +1590,6 @@ protected:
   DenseMap<std::pair<BasicBlock *, Function *>,
            SmallVector<PHINode *, 4>> ArgPHIs;
   SmallPtrSet<SyncInst *, 12> SyncsWithUnwinds;
-  DenseMap<BasicBlock *, CallInst *> callsAfterSync;
   std::unique_ptr<InstrumentationConfig> Config;
 
   // Declarations of interposition functions.
