@@ -857,9 +857,9 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   SpawnPt->eraseFromParent();
 }
 
-// Helper function to inline calls to compiler-generated Cilk Plus runtime
-// functions when possible.  This inlining is necessary to properly implement
-// some Cilk runtime "calls," such as __cilk_sync().
+// Helper function to inline calls to compiler-generated Cilk runtime functions
+// when possible.  This inlining is necessary to properly implement some Cilk
+// runtime "calls," such as __cilk_sync().
 static inline void inlineCilkFunctions(
     Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
   for (CallBase *CB : CallsToInline) {
