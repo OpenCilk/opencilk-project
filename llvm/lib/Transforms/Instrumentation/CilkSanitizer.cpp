@@ -42,6 +42,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/ProfileData/InstrProf.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/CSI.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
@@ -391,7 +392,9 @@ struct CilkSanitizerImpl : public CSIImpl {
                                  ArgsTy... Args) {
     FunctionCallee Callee = M.getOrInsertFunction(Name, AL, RetTy, Args...);
     if (Function *Fn = dyn_cast<Function>(Callee.getCallee())) {
-      Fn->setOnlyAccessesInaccessibleMemOrArgMem();
+      MemoryEffects ME = MemoryEffects::argMemOnly(ModRefInfo::Ref) |
+                         MemoryEffects::inaccessibleMemOnly(ModRefInfo::ModRef);
+      Fn->setMemoryEffects(ME);
       Fn->setDoesNotThrow();
     }
     return Callee;
@@ -459,7 +462,7 @@ struct CilkSanitizerImpl : public CSIImpl {
   void instrumentTapirLoop(Loop &L, TaskInfo &TI,
                       DenseMap<Value *, unsigned> &SyncRegNums,
                       ScalarEvolution *SE = nullptr);
-  bool instrumentAlloca(Instruction *I);
+  bool instrumentAlloca(Instruction *I, TaskInfo &TI);
 
   bool instrumentFunctionUsingRI(Function &F);
   // Helper method for RI-based race detection for instrumenting an access by a
@@ -1056,6 +1059,11 @@ void CilkSanitizerImpl::initializeCsanHooks() {
     GetMAAP =
         getHookFunction("__csan_get_MAAP", FnAttrs, RetType,
                         PointerType::get(MAAPTy, 0), IDType, IRB.getInt8Ty());
+    // Unlike other hooks, GetMAAP writes to its pointer argument.  Make sure
+    // the MemoryEffects on the hook reflect this fact.
+    Function *HookFn = cast<Function>(GetMAAP.getCallee());
+    HookFn->setMemoryEffects(HookFn->getMemoryEffects() |
+                             MemoryEffects::argMemOnly(ModRefInfo::ModRef));
   }
   {
     SetMAAP = getHookFunction("__csan_set_MAAP", RetType, MAAPTy, IDType);
@@ -1640,7 +1648,7 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentAncillaryInstructions(
   // race.
   for (Instruction *I : Allocas) {
     // The simple instrumentor just instruments everything
-    CilkSanImpl.instrumentAlloca(I);
+    CilkSanImpl.instrumentAlloca(I, TI);
     getDetachesForInstruction(I);
     Result = true;
   }
@@ -1754,7 +1762,7 @@ void CilkSanitizerImpl::Instrumentor::InsertArgMAAPs(Function &F,
   if (!MAAPChecks)
     return;
   LLVM_DEBUG(dbgs() << "InsertArgMAAPs: " << F.getName() << "\n");
-  IRBuilder<> IRB(&*(++(cast<Instruction>(FuncId)->getIterator())));
+  IRBuilder<> IRB(cast<Instruction>(FuncId)->getNextNode());
   unsigned ArgIdx = 0;
   for (Argument &Arg : F.args()) {
     if (!Arg.getType()->isPtrOrPtrVectorTy())
@@ -2009,7 +2017,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
     }
 
     Value *CalleeID = CilkSanImpl.GetCalleeFuncID(CB->getCalledFunction(), IRB);
-    // We set the MAAPs in reverse order to support stack-like accesses of the
+    // We set the MAAPs in reverse order to support stack-like access of the
     // MAAPs by in-order calls to GetMAAP in the callee.
     for (Value *MAAPVal : reverse(MAAPVals))
       IRB.CreateCall(CilkSanImpl.SetMAAP, {MAAPVal, CalleeID});
@@ -2646,7 +2654,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentAncillaryInstructions(
   for (Instruction *I : Allocas) {
     if (CilkSanImpl.ObjectMRForRace.count(I) ||
         CilkSanImpl.lookupPointerMayBeCaptured(I)) {
-      CilkSanImpl.instrumentAlloca(I);
+      CilkSanImpl.instrumentAlloca(I, TI);
       getDetachesForInstruction(I);
       Result = true;
     }
@@ -3397,7 +3405,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
     ObjectMRForRace[ObjRD.first] = ObjRD.second;
 
   uint64_t LocalId = getLocalFunctionID(F);
-  IRBuilder<> IRB(&*F.getEntryBlock().getFirstInsertionPt());
+  IRBuilder<> IRB(getEntryBBInsertPt(F.getEntryBlock()));
   Value *FuncId = FunctionFED.localToGlobalId(LocalId, IRB);
 
   bool Result = false;
@@ -3454,7 +3462,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   if (Result) {
     bool MaySpawn = !TI.isSerial();
     if (InstrumentationSet & SERIESPARALLEL) {
-      IRBuilder<> IRB(&*(++(cast<Instruction>(FuncId)->getIterator())));
+      IRBuilder<> IRB(cast<Instruction>(FuncId)->getNextNode());
       CsiFuncProperty FuncEntryProp;
       FuncEntryProp.setMaySpawn(MaySpawn);
       if (MaySpawn)
@@ -4005,24 +4013,6 @@ bool CilkSanitizerImpl::instrumentCallsite(Instruction *I,
   Value *DefaultID = getDefaultID(IRB);
   Value *CallsiteId = CallsiteFED.localToGlobalId(LocalId, IRB);
   Value *FuncId = GetCalleeFuncID(Called, IRB);
-  // GlobalVariable *FuncIdGV = NULL;
-  // if (Called) {
-  //   std::string GVName =
-  //     CsiFuncIdVariablePrefix + Called->getName().str();
-  //   FuncIdGV = dyn_cast<GlobalVariable>(M.getOrInsertGlobal(GVName,
-  //                                                           IRB.getInt64Ty()));
-  //   assert(FuncIdGV);
-  //   FuncIdGV->setConstant(false);
-  //   if (Options.jitMode && !Called->empty())
-  //     FuncIdGV->setLinkage(Called->getLinkage());
-  //   else
-  //     FuncIdGV->setLinkage(GlobalValue::WeakAnyLinkage);
-  //   FuncIdGV->setInitializer(IRB.getInt64(CsiCallsiteUnknownTargetId));
-  //   FuncId = IRB.CreateLoad(FuncIdGV);
-  // } else {
-  //   // Unknown targets (i.e. indirect calls) are always unknown.
-  //   FuncId = IRB.getInt64(CsiCallsiteUnknownTargetId);
-  // }
   assert(FuncId != NULL);
 
   Value *NumMVVal = IRB.getInt8(0);
@@ -4249,7 +4239,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
 
   LLVMContext &Ctx = DI->getContext();
   BasicBlock *TaskEntryBlock = TI.getTaskFor(DI->getParent())->getEntry();
-  IRBuilder<> IDBuilder(&*TaskEntryBlock->getFirstInsertionPt());
+  IRBuilder<> IDBuilder(getEntryBBInsertPt(*TaskEntryBlock));
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
   ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), SyncRegNum);
   ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
@@ -4424,7 +4414,6 @@ void CilkSanitizerImpl::instrumentTapirLoop(Loop &L, TaskInfo &TI,
   unsigned SyncRegNum = SyncRegNums[T->getDetach()->getSyncRegion()];
   // We assign a local ID for this loop here, so that IDs for loops follow a
   // depth-first ordering.
-  // csi_id_t LocalId = LoopFED.add(*Header);
   csi_id_t LocalId = LoopFED.add(*T->getDetach());
 
   SmallVector<BasicBlock *, 4> ExitingBlocks;
@@ -4461,28 +4450,6 @@ void CilkSanitizerImpl::instrumentTapirLoop(Loop &L, TaskInfo &TI,
   insertHookCall(&*IRB.GetInsertPoint(), CsanBeforeLoop, {LoopCsiId, TripCount,
                                                           LoopPropVal});
 
-  // // Insert loop-body-entry hook.
-  // IRB.SetInsertPoint(&*Header->getFirstInsertionPt());
-  // // TODO: Pass IVs to hook?
-  // insertHookCall(&*IRB.GetInsertPoint(), CsiLoopBodyEntry, {LoopCsiId,
-  //                                                           LoopPropVal});
-
-  // // Insert hooks at the ends of the exiting blocks.
-  // for (BasicBlock *BB : ExitingBlocks) {
-  //   // Record properties of this loop exit
-  //   CsiLoopExitProperty LoopExitProp;
-  //   LoopExitProp.setIsLatch(L.isLoopLatch(BB));
-
-  //   // Insert the loop-exit hook
-  //   IRB.SetInsertPoint(BB->getTerminator());
-  //   csi_id_t LocalExitId = LoopExitFED.add(*BB);
-  //   Value *ExitCsiId = LoopFED.localToGlobalId(LocalExitId, IRB);
-  //   Value *LoopExitPropVal = LoopExitProp.getValue(IRB);
-  //   // TODO: For latches, record whether the loop will repeat.
-  //   insertHookCall(&*IRB.GetInsertPoint(), CsiLoopBodyExit,
-  //                  {ExitCsiId, LoopCsiId, LoopExitPropVal});
-  // }
-
   // Insert after-loop hooks.
   for (BasicBlock *BB : ExitBlocks) {
     // If the exit block is simply enclosed inside the task, then its on an
@@ -4498,13 +4465,16 @@ void CilkSanitizerImpl::instrumentTapirLoop(Loop &L, TaskInfo &TI,
   }
 }
 
-bool CilkSanitizerImpl::instrumentAlloca(Instruction *I) {
+bool CilkSanitizerImpl::instrumentAlloca(Instruction *I, TaskInfo &TI) {
   // Only insert instrumentation if requested
   if (!(InstrumentationSet & SHADOWMEMORY))
     return true;
 
   IRBuilder<> IRB(I);
-  AllocaInst* AI = cast<AllocaInst>(I);
+  bool AllocaInEntryBlock = isEntryBlock(*I->getParent(), TI);
+  if (AllocaInEntryBlock)
+    IRB.SetInsertPoint(getEntryBBInsertPt(*I->getParent()));
+  AllocaInst *AI = cast<AllocaInst>(I);
 
   uint64_t LocalId = AllocaFED.add(*I);
   Value *CsiId = AllocaFED.localToGlobalId(LocalId, IRB);
@@ -4525,8 +4495,12 @@ bool CilkSanitizerImpl::instrumentAlloca(Instruction *I) {
                                                     IRB.getInt64Ty()));
 
   BasicBlock::iterator Iter(I);
-  Iter++;
-  IRB.SetInsertPoint(&*Iter);
+  if (!AllocaInEntryBlock) {
+    Iter++;
+    IRB.SetInsertPoint(&*Iter);
+  } else {
+    Iter = IRB.GetInsertPoint();
+  }
 
   Type *AddrType = IRB.getInt8PtrTy();
   Value *Addr = IRB.CreatePointerCast(I, AddrType);
