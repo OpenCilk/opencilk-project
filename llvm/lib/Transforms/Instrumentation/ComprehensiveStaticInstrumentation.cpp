@@ -719,35 +719,35 @@ void CSIImpl::initializeTapirHooks() {
   LLVMContext &C = M.getContext();
   IRBuilder<> IRB(C);
   Type *IDType = IRB.getInt64Ty();
+  Type *SyncRegType = IRB.getInt32Ty();
   Type *RetType = IRB.getVoidTy();
   Type *TaskPropertyTy = CsiTaskProperty::getType(C);
   Type *TaskExitPropertyTy = CsiTaskExitProperty::getType(C);
   Type *DetachPropertyTy = CsiDetachProperty::getType(C);
   Type *DetContPropertyTy = CsiDetachContinueProperty::getType(C);
 
-  CsiDetach = M.getOrInsertFunction("__csi_detach", RetType,
-                                    /* detach_id */ IDType,
-                                    IntegerType::getInt32Ty(C)->getPointerTo(),
-                                    DetachPropertyTy);
+  CsiDetach =
+      M.getOrInsertFunction("__csi_detach", RetType,
+                            /* detach_id */ IDType,
+                            /* sync_reg */ SyncRegType, DetachPropertyTy);
   CsiTaskEntry = M.getOrInsertFunction("__csi_task", RetType,
                                        /* task_id */ IDType,
-                                       /* detach_id */ IDType,
-                                       TaskPropertyTy);
-  CsiTaskExit = M.getOrInsertFunction("__csi_task_exit", RetType,
-                                      /* task_exit_id */ IDType,
-                                      /* task_id */ IDType,
-                                      /* detach_id */ IDType,
-                                      TaskExitPropertyTy);
-  CsiDetachContinue = M.getOrInsertFunction("__csi_detach_continue", RetType,
-                                            /* detach_continue_id */ IDType,
-                                            /* detach_id */ IDType,
-                                            DetContPropertyTy);
-  CsiBeforeSync = M.getOrInsertFunction(
-      "__csi_before_sync", RetType, IDType,
-      IntegerType::getInt32Ty(C)->getPointerTo());
-  CsiAfterSync = M.getOrInsertFunction(
-      "__csi_after_sync", RetType, IDType,
-      IntegerType::getInt32Ty(C)->getPointerTo());
+                                       /* detach_id */ IDType, TaskPropertyTy);
+  CsiTaskExit =
+      M.getOrInsertFunction("__csi_task_exit", RetType,
+                            /* task_exit_id */ IDType,
+                            /* task_id */ IDType,
+                            /* detach_id */ IDType,
+                            /* sync_reg */ SyncRegType, TaskExitPropertyTy);
+  CsiDetachContinue =
+      M.getOrInsertFunction("__csi_detach_continue", RetType,
+                            /* detach_continue_id */ IDType,
+                            /* detach_id */ IDType,
+                            /* sync_reg */ SyncRegType, DetContPropertyTy);
+  CsiBeforeSync =
+      M.getOrInsertFunction("__csi_before_sync", RetType, IDType, SyncRegType);
+  CsiAfterSync =
+      M.getOrInsertFunction("__csi_after_sync", RetType, IDType, SyncRegType);
 }
 
 // Prepare any calls in the CFG for instrumentation, e.g., by making sure any
@@ -1400,27 +1400,25 @@ CSIImpl::getFirstInsertionPtInDetachedBlock(BasicBlock *Detached) {
   return Detached->getFirstInsertionPt();
 }
 
-void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
-                               LoopInfo &LI,
-                               const DenseMap<Value *, Value *> &TrackVars) {
+void CSIImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
+                               unsigned NumSyncRegs, DominatorTree *DT,
+                               TaskInfo &TI, LoopInfo &LI) {
   LLVMContext &Ctx = DI->getContext();
   BasicBlock *TaskEntryBlock = TI.getTaskFor(DI->getParent())->getEntry();
   IRBuilder<> IDBuilder(&*TaskEntryBlock->getFirstInsertionPt());
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
+  ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), SyncRegNum);
+  ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
+  CsiDetachProperty DetachProp;
+  DetachProp.setForTapirLoopBody(TapirLoopBody);
   // Instrument the detach instruction itself
   Value *DetachID;
   {
     IRBuilder<> IRB(DI);
     uint64_t LocalID = DetachFED.add(*DI);
     DetachID = DetachFED.localToGlobalId(LocalID, IDBuilder);
-    Value *TrackVar = TrackVars.lookup(DI->getSyncRegion());
-    IRB.CreateStore(
-        Constant::getIntegerValue(IntegerType::getInt32Ty(Ctx), APInt(32, 1)),
-        TrackVar);
-    CsiDetachProperty DetachProp;
-    DetachProp.setForTapirLoopBody(TapirLoopBody);
     insertHookCall(DI, CsiDetach,
-                   {DetachID, TrackVar, DetachProp.getValue(IRB)});
+                   {DetachID, SyncRegVal, DetachProp.getValue(IRB)});
   }
 
   // Find the detached block, continuation, and associated reattaches.
@@ -1434,11 +1432,12 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
   // Instrument the entry and exit points of the detached task.
   {
     // Instrument the entry point of the detached task.
-    IRBuilder<> IRB(&*DetachedBlock->getFirstInsertionPt());
+    IRBuilder<> IRB(&*getFirstInsertionPtInDetachedBlock(DetachedBlock));
     uint64_t LocalID = TaskFED.add(*DetachedBlock);
     Value *TaskID = TaskFED.localToGlobalId(LocalID, IDBuilder);
     CsiTaskProperty Prop;
     Prop.setIsTapirLoopBody(TapirLoopBody);
+    Prop.setNumSyncReg(NumSyncRegs);
     Instruction *Call = IRB.CreateCall(CsiTaskEntry, {TaskID, DetachID,
                                                       Prop.getValue(IRB)});
     setInstrumentationDebugLoc(*DetachedBlock, Call);
@@ -1450,8 +1449,9 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
       Value *ExitID = TaskExitFED.localToGlobalId(LocalID, IDBuilder);
       CsiTaskExitProperty ExitProp;
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
-      insertHookCall(Exit->getTerminator(), CsiTaskExit,
-                     {ExitID, TaskID, DetachID, ExitProp.getValue(IRB)});
+      insertHookCall(
+          Exit->getTerminator(), CsiTaskExit,
+          {ExitID, TaskID, DetachID, SyncRegVal, ExitProp.getValue(IRB)});
     }
     // Instrument the EH exits of the detached task.
     for (BasicBlock *Exit : TaskResumes) {
@@ -1460,8 +1460,9 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
       Value *ExitID = TaskExitFED.localToGlobalId(LocalID, IDBuilder);
       CsiTaskExitProperty ExitProp;
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
-      insertHookCall(Exit->getTerminator(), CsiTaskExit,
-                     {ExitID, TaskID, DetachID, ExitProp.getValue(IRB)});
+      insertHookCall(
+          Exit->getTerminator(), CsiTaskExit,
+          {ExitID, TaskID, DetachID, SyncRegVal, ExitProp.getValue(IRB)});
     }
 
     Value *DefaultID = getDefaultID(IDBuilder);
@@ -1474,8 +1475,8 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
       ExitProp.setIsTapirLoopBody(TapirLoopBody);
       insertHookCallAtSharedEHSpindleExits(
           SharedEH, T, CsiTaskExit, TaskExitFED,
-          {TaskID, DetachID, ExitProp.getValueImpl(Ctx)},
-          {DefaultID, DefaultID,
+          {TaskID, DetachID, SyncRegVal, ExitProp.getValueImpl(Ctx)},
+          {DefaultID, DefaultID, DefaultSyncRegVal,
            CsiTaskExitProperty::getDefaultValueImpl(Ctx)});
     }
   }
@@ -1492,8 +1493,9 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
     CsiDetachContinueProperty ContProp;
     ContProp.setForTapirLoopBody(TapirLoopBody);
-    Instruction *Call = IRB.CreateCall(
-        CsiDetachContinue, {ContinueID, DetachID, ContProp.getValue(IRB)});
+    Instruction *Call =
+        IRB.CreateCall(CsiDetachContinue, {ContinueID, DetachID, SyncRegVal,
+                                           ContProp.getValue(IRB)});
     setInstrumentationDebugLoc(*ContinueBlock, Call);
   }
   // Instrument the unwind of the detach, if it exists.
@@ -1516,30 +1518,31 @@ void CSIImpl::instrumentDetach(DetachInst *DI, DominatorTree *DT, TaskInfo &TI,
     Value *DefaultPropVal = ContProp.getValueImpl(Ctx);
     ContProp.setIsUnwind();
     ContProp.setForTapirLoopBody(TapirLoopBody);
-    insertHookCallInSuccessorBB(UnwindBlock, PredBlock, CsiDetachContinue,
-                                {ContinueID, DetachID, ContProp.getValue(Ctx)},
-                                {DefaultID, DefaultID, DefaultPropVal});
+    insertHookCallInSuccessorBB(
+        UnwindBlock, PredBlock, CsiDetachContinue,
+        {ContinueID, DetachID, SyncRegVal, ContProp.getValue(Ctx)},
+        {DefaultID, DefaultID, DefaultSyncRegVal, DefaultPropVal});
     for (BasicBlock *DRPred : predecessors(UnwindBlock))
       if (isDetachedRethrow(DRPred->getTerminator(), DI->getSyncRegion()))
         insertHookCallInSuccessorBB(
             UnwindBlock, DRPred, CsiDetachContinue,
-            {ContinueID, DetachID, ContProp.getValue(Ctx)},
-            {DefaultID, DefaultID, DefaultPropVal});
+            {ContinueID, DetachID, SyncRegVal, ContProp.getValue(Ctx)},
+            {DefaultID, DefaultID, DefaultSyncRegVal, DefaultPropVal});
   }
 }
 
-void CSIImpl::instrumentSync(SyncInst *SI,
-                             const DenseMap<Value *, Value *> &TrackVars) {
+void CSIImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
+  LLVMContext &Ctx = SI->getContext();
   IRBuilder<> IRB(SI);
   Value *DefaultID = getDefaultID(IRB);
   // Get the ID of this sync.
   uint64_t LocalID = SyncFED.add(*SI);
   Value *SyncID = SyncFED.localToGlobalId(LocalID, IRB);
-
-  Value *TrackVar = TrackVars.lookup(SI->getSyncRegion());
+  ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), SyncRegNum);
+  ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
 
   // Insert instrumentation before the sync.
-  insertHookCall(SI, CsiBeforeSync, {SyncID, TrackVar});
+  insertHookCall(SI, CsiBeforeSync, {SyncID, SyncRegVal});
   BasicBlock *SyncBB = SI->getParent();
   BasicBlock *SyncCont = SI->getSuccessor(0);
   BasicBlock *SyncUnwind = nullptr;
@@ -1550,43 +1553,17 @@ void CSIImpl::instrumentSync(SyncInst *SI,
     SyncCont = II->getNormalDest();
   }
 
-  CallInst *Call = insertHookCallInSuccessorBB(
-      SyncCont, SyncBB, CsiAfterSync, {SyncID, TrackVar},
-      {DefaultID,
-       ConstantPointerNull::get(
-           IntegerType::getInt32Ty(SI->getContext())->getPointerTo())});
-  // Reset the tracking variable to 0.
-  if (Call != nullptr) {
-    callsAfterSync.insert({SyncCont, Call});
-    IRB.SetInsertPoint(Call->getNextNode());
-    IRB.CreateStore(
-        Constant::getIntegerValue(IntegerType::getInt32Ty(SI->getContext()),
-                                  APInt(32, 0)),
-        TrackVar);
-  } else {
-    assert(callsAfterSync.find(SyncCont) != callsAfterSync.end());
-  }
+  insertHookCallInSuccessorBB(SyncCont, SyncBB, CsiAfterSync,
+                              {SyncID, SyncRegVal},
+                              {DefaultID, DefaultSyncRegVal});
 
   // If we have no unwind for the sync, then we're done.
   if (!SyncUnwind)
     return;
 
-  Call = insertHookCallInSuccessorBB(
-      SyncUnwind, SyncBB, CsiAfterSync, {SyncID, TrackVar},
-      {DefaultID,
-       ConstantPointerNull::get(
-           IntegerType::getInt32Ty(SI->getContext())->getPointerTo())});
-  // Reset the tracking variable to 0.
-  if (Call != nullptr) {
-    callsAfterSync.insert({SyncUnwind, Call});
-    IRB.SetInsertPoint(Call->getNextNode());
-    IRB.CreateStore(
-        Constant::getIntegerValue(IntegerType::getInt32Ty(SI->getContext()),
-                                  APInt(32, 0)),
-        TrackVar);
-  } else {
-    assert(callsAfterSync.find(SyncUnwind) != callsAfterSync.end());
-  }
+  insertHookCallInSuccessorBB(SyncUnwind, SyncBB, CsiAfterSync,
+                              {SyncID, SyncRegVal},
+                              {DefaultID, DefaultSyncRegVal});
 }
 
 void CSIImpl::instrumentAlloca(Instruction *I) {
@@ -2594,6 +2571,9 @@ void CSIImpl::instrumentFunction(Function &F) {
   bool MaySpawn = false;
   SmallPtrSet<BasicBlock *, 4> BBsToIgnore;
 
+  DenseMap<BasicBlock *, unsigned> SRCounters;
+  DenseMap<Value *, unsigned> SyncRegNums;
+
   TaskInfo &TI = GetTaskInfo(F);
   ScalarEvolution *SE = nullptr;
   if (GetScalarEvolution)
@@ -2623,6 +2603,20 @@ void CSIImpl::instrumentFunction(Function &F) {
           BBsToIgnore.insert(SI->getSuccessor(0));
         }
       } else if (CallBase *CB = dyn_cast<CallBase>(&I)) {
+        if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(CB)) {
+          if (Intrinsic::syncregion_start == II->getIntrinsicID()) {
+            // Identify this sync region with a counter value, where all sync
+            // regions within a function or task are numbered from 0.
+            if (TI.getTaskFor(&BB)) {
+              BasicBlock *TEntry = TI.getTaskFor(&BB)->getEntry();
+              // Create a new counter if need be.
+              if (!SRCounters.count(TEntry))
+                SRCounters[TEntry] = 0;
+              SyncRegNums[&I] = SRCounters[TEntry]++;
+            }
+          }
+        }
+
         // Record this function call as either an allocation function, a call to
         // free (or delete), a memory intrinsic, or an ordinary real function
         // call.
@@ -2658,20 +2652,16 @@ void CSIImpl::instrumentFunction(Function &F) {
 
   // Instrument Tapir constructs.
   if (Options.InstrumentTapir) {
-    // Allocate a local variable that will keep track of whether
-    // a spawn has occurred before a sync. It will be set to 1 after
-    // a spawn and reset to 0 after a sync.
-    auto TrackVars = keepTrackOfSpawns(F, Detaches, Syncs);
-
     if (Config->DoesFunctionRequireInstrumentationForPoint(
             F.getName(), InstrumentationPoint::INSTR_TAPIR_DETACH)) {
       for (DetachInst *DI : Detaches)
-        instrumentDetach(DI, DT, TI, LI, TrackVars);
+        instrumentDetach(DI, SyncRegNums[DI->getSyncRegion()],
+                         SRCounters[DI->getDetached()], DT, TI, LI);
     }
     if (Config->DoesFunctionRequireInstrumentationForPoint(
             F.getName(), InstrumentationPoint::INSTR_TAPIR_SYNC)) {
       for (SyncInst *SI : Syncs)
-        instrumentSync(SI, TrackVars);
+        instrumentSync(SI, SyncRegNums[SI->getSyncRegion()]);
     }
   }
 
@@ -2725,6 +2715,8 @@ void CSIImpl::instrumentFunction(Function &F) {
             F.getName(), InstrumentationPoint::INSTR_FUNCTION_ENTRY)) {
       CsiFuncProperty FuncEntryProp;
       FuncEntryProp.setMaySpawn(MaySpawn);
+      if (MaySpawn)
+        FuncEntryProp.setNumSyncReg(SRCounters[TI.getRootTask()->getEntry()]);
       Value *PropVal = FuncEntryProp.getValue(IRB);
       insertHookCall(&*IRB.GetInsertPoint(), CsiFuncEntry, {FuncId, PropVal});
     }
@@ -2732,7 +2724,6 @@ void CSIImpl::instrumentFunction(Function &F) {
             F.getName(), InstrumentationPoint::INSTR_FUNCTION_EXIT)) {
       EscapeEnumerator EE(F, "csi.cleanup", false);
       while (IRBuilder<> *AtExit = EE.Next()) {
-        // uint64_t ExitLocalId = FunctionExitFED.add(F);
         uint64_t ExitLocalId = FunctionExitFED.add(*AtExit->GetInsertPoint());
         Value *ExitCsiId =
             FunctionExitFED.localToGlobalId(ExitLocalId, *AtExit);
@@ -2747,42 +2738,6 @@ void CSIImpl::instrumentFunction(Function &F) {
   }
 
   updateInstrumentedFnAttrs(F);
-}
-
-DenseMap<Value *, Value *>
-llvm::CSIImpl::keepTrackOfSpawns(Function &F,
-                                 const SmallVectorImpl<DetachInst *> &Detaches,
-                                 const SmallVectorImpl<SyncInst *> &Syncs) {
-
-  DenseMap<Value *, Value *> TrackVars;
-
-  SmallPtrSet<Value *, 8> Regions;
-  for (auto &Detach : Detaches) {
-    Regions.insert(Detach->getSyncRegion());
-  }
-  for (auto &Sync : Syncs) {
-    Regions.insert(Sync->getSyncRegion());
-  }
-
-  LLVMContext &C = F.getContext();
-
-  IRBuilder<> Builder{&F.getEntryBlock(),
-                      F.getEntryBlock().getFirstInsertionPt()};
-
-  size_t RegionIndex = 0;
-  for (auto Region : Regions) {
-    Value *TrackVar = Builder.CreateAlloca(IntegerType::getInt32Ty(C), nullptr,
-                                           "has_spawned_region_" +
-                                               std::to_string(RegionIndex));
-    Builder.CreateStore(
-        Constant::getIntegerValue(IntegerType::getInt32Ty(C), APInt(32, 0)),
-        TrackVar);
-
-    TrackVars.insert({Region, TrackVar});
-    RegionIndex++;
-  }
-
-  return TrackVars;
 }
 
 Function *CSIImpl::getInterpositionFunction(Function *F) {
