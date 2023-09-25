@@ -23,7 +23,8 @@ entry:
 ; CHECK-CSI: call void @__csi_bb_exit(
 ; CHECK-CSI: call void @__csi_before_call(
 ; CHECK-CSAN: call void @__csan_before_call(
-; CHECK-NEXT: invoke void @_Z3foov()
+; CHECK-NOT: call {{.*}}@__{{csi|csan}}
+; CHECK: invoke void @_Z3foov()
 ; CHECK-NEXT: to label %[[FOO1_CONT:.+]] unwind label %[[CSI_CLEANUP:.+]]
 
 ; CHECK: [[FOO1_CONT]]:

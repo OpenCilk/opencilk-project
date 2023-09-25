@@ -1182,6 +1182,9 @@ public:
   static BasicBlock::iterator
   getFirstInsertionPtInDetachedBlock(BasicBlock *Detached);
 
+  // Return true if BB is an entry block to a function or task, false otherwise.
+  static bool isEntryBlock(const BasicBlock &BB, const TaskInfo &TI);
+
 protected:
   /// Initialize the CSI pass.
   void initializeCsi();
@@ -1228,6 +1231,8 @@ protected:
   /// of externally-visible global variables.
   void generateInitCallsiteToFunction();
 
+  Instruction *getEntryBBInsertPt(BasicBlock &BB);
+
   /// Compute CSI properties on the given ordered list of loads and stores.
   void computeLoadAndStoreProperties(
       SmallVectorImpl<std::pair<Instruction *, CsiLoadStoreProperty>>
@@ -1244,14 +1249,14 @@ protected:
   void instrumentAtomic(Instruction *I);
   bool instrumentMemIntrinsic(Instruction *I);
   void instrumentCallsite(Instruction *I, DominatorTree *DT);
-  void instrumentBasicBlock(BasicBlock &BB);
+  void instrumentBasicBlock(BasicBlock &BB, const TaskInfo &TI);
   void instrumentLoop(Loop &L, TaskInfo &TI, ScalarEvolution *SE);
 
   void instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
                         unsigned NumSyncRegs, DominatorTree *DT, TaskInfo &TI,
                         LoopInfo &LI);
   void instrumentSync(SyncInst *SI, unsigned SyncRegNum);
-  void instrumentAlloca(Instruction *I);
+  void instrumentAlloca(Instruction *I, TaskInfo &TI);
   void instrumentAllocFn(Instruction *I, DominatorTree *DT,
                          const TargetLibraryInfo *TLI);
   void instrumentFree(Instruction *I, const TargetLibraryInfo *TLI);
@@ -1570,7 +1575,7 @@ protected:
   FunctionCallee CsiLoopBodyEntry = nullptr, CsiLoopBodyExit = nullptr;
   FunctionCallee CsiBeforeRead = nullptr, CsiAfterRead = nullptr;
   FunctionCallee CsiBeforeWrite = nullptr, CsiAfterWrite = nullptr;
-  FunctionCallee CsiBeforeAlloca = nullptr, CsiAfterAlloca = nullptr;
+  FunctionCallee CsiAfterAlloca = nullptr;
   FunctionCallee CsiDetach = nullptr, CsiDetachContinue = nullptr;
   FunctionCallee CsiTaskEntry = nullptr, CsiTaskExit = nullptr;
   FunctionCallee CsiBeforeSync = nullptr, CsiAfterSync = nullptr;
@@ -1590,6 +1595,8 @@ protected:
   DenseMap<std::pair<BasicBlock *, Function *>,
            SmallVector<PHINode *, 4>> ArgPHIs;
   SmallPtrSet<SyncInst *, 12> SyncsWithUnwinds;
+  DenseMap<BasicBlock *, Instruction *> EntryBBInsertPt;
+
   std::unique_ptr<InstrumentationConfig> Config;
 
   // Declarations of interposition functions.

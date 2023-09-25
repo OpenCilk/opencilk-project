@@ -32,6 +32,7 @@
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
@@ -295,6 +296,8 @@ bool CSIImpl::callsPlaceholderFunction(const Instruction &I) {
     case Intrinsic::taskframe_use:
     case Intrinsic::taskframe_end:
     case Intrinsic::taskframe_load_guard:
+    case Intrinsic::tapir_runtime_start:
+    case Intrinsic::tapir_runtime_end:
       // These intrinsics don't actually represent code after lowering.
       return true;
     }
@@ -637,9 +640,6 @@ void CSIImpl::initializeAllocaHooks() {
   Type *AddrType = IRB.getInt8PtrTy();
   Type *PropType = CsiAllocaProperty::getType(C);
 
-  CsiBeforeAlloca = M.getOrInsertFunction("__csi_before_alloca",
-                                          IRB.getVoidTy(), IDType, IntptrTy,
-                                          PropType);
   CsiAfterAlloca = M.getOrInsertFunction("__csi_after_alloca", IRB.getVoidTy(),
                                          IDType, AddrType, IntptrTy, PropType);
 }
@@ -1138,8 +1138,11 @@ bool CSIImpl::instrumentMemIntrinsic(Instruction *I) {
   return false;
 }
 
-void CSIImpl::instrumentBasicBlock(BasicBlock &BB) {
+void CSIImpl::instrumentBasicBlock(BasicBlock &BB, const TaskInfo &TI) {
   IRBuilder<> IRB(&*BB.getFirstInsertionPt());
+  bool isEntry = isEntryBlock(BB, TI);
+  if (isEntry)
+    IRB.SetInsertPoint(getEntryBBInsertPt(BB));
   uint64_t LocalId = BasicBlockFED.add(BB);
   uint64_t BBSizeId = BBSize.add(BB, GetTTI ?
                                  &(*GetTTI)(*BB.getParent()) : nullptr);
@@ -1149,11 +1152,15 @@ void CSIImpl::instrumentBasicBlock(BasicBlock &BB) {
   CsiBBProperty Prop;
   Prop.setIsLandingPad(BB.isLandingPad());
   Prop.setIsEHPad(BB.isEHPad());
-  Instruction *TI = BB.getTerminator();
+  Instruction *TermI = BB.getTerminator();
   Value *PropVal = Prop.getValue(IRB);
   insertHookCall(&*IRB.GetInsertPoint(), CsiBBEntry, {CsiId, PropVal});
-  IRB.SetInsertPoint(TI);
-  insertHookCall(TI, CsiBBExit, {CsiId, PropVal});
+  IRB.SetInsertPoint(TermI);
+  CallInst *Call = insertHookCall(TermI, CsiBBExit, {CsiId, PropVal});
+  // If this is an entry block and the insert point is the terminator, make the
+  // BBExit hook be the insert point instead.
+  if (isEntry && getEntryBBInsertPt(BB) == TermI)
+    EntryBBInsertPt[&BB] = Call;
 }
 
 // Helper function to get a value for the runtime trip count of the given loop.
@@ -1405,7 +1412,7 @@ void CSIImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
                                TaskInfo &TI, LoopInfo &LI) {
   LLVMContext &Ctx = DI->getContext();
   BasicBlock *TaskEntryBlock = TI.getTaskFor(DI->getParent())->getEntry();
-  IRBuilder<> IDBuilder(&*TaskEntryBlock->getFirstInsertionPt());
+  IRBuilder<> IDBuilder(getEntryBBInsertPt(*TaskEntryBlock));
   bool TapirLoopBody = spawnsTapirLoopBody(DI, LI, TI);
   ConstantInt *SyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), SyncRegNum);
   ConstantInt *DefaultSyncRegVal = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
@@ -1566,8 +1573,11 @@ void CSIImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
                               {DefaultID, DefaultSyncRegVal});
 }
 
-void CSIImpl::instrumentAlloca(Instruction *I) {
+void CSIImpl::instrumentAlloca(Instruction *I, TaskInfo &TI) {
   IRBuilder<> IRB(I);
+  bool AllocaInEntryBlock = isEntryBlock(*I->getParent(), TI);
+  if (AllocaInEntryBlock)
+    IRB.SetInsertPoint(getEntryBBInsertPt(*I->getParent()));
   AllocaInst *AI = cast<AllocaInst>(I);
 
   uint64_t LocalId = AllocaFED.add(*I);
@@ -1585,10 +1595,13 @@ void CSIImpl::instrumentAlloca(Instruction *I) {
                             IRB.CreateZExtOrBitCast(AI->getArraySize(),
                                                     IRB.getInt64Ty()));
 
-  insertHookCall(I, CsiBeforeAlloca, {CsiId, SizeVal, PropVal});
   BasicBlock::iterator Iter(I);
-  Iter++;
-  IRB.SetInsertPoint(&*Iter);
+  if (!AllocaInEntryBlock) {
+    Iter++;
+    IRB.SetInsertPoint(&*Iter);
+  } else {
+    Iter = IRB.GetInsertPoint();
+  }
 
   Type *AddrType = IRB.getInt8PtrTy();
   Value *Addr = IRB.CreatePointerCast(I, AddrType);
@@ -2518,8 +2531,84 @@ void CSIImpl::computeLoadAndStoreProperties(
 void CSIImpl::updateInstrumentedFnAttrs(Function &F) {
   F.removeFnAttr(Attribute::ReadOnly);
   F.removeFnAttr(Attribute::ReadNone);
-  F.setMemoryEffects(
-      MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef));
+  MemoryEffects CurrentME = F.getMemoryEffects();
+  if (MemoryEffects::unknown() != CurrentME) {
+    F.setMemoryEffects(
+        CurrentME |
+        MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef) |
+        MemoryEffects(MemoryEffects::Location::InaccessibleMem,
+                      ModRefInfo::ModRef));
+  }
+}
+
+// Return true if BB is an entry block to a function or task, false otherwise.
+bool CSIImpl::isEntryBlock(const BasicBlock &BB, const TaskInfo &TI) {
+  return &BB == TI.getTaskFor(&BB)->getEntry();
+}
+
+// Check whether function-entry instrumentation can be inserted after
+// instruction \p I.
+static bool skipInstructionInEntryBB(const Instruction &I) {
+  if (isa<AllocaInst>(I))
+    return true;
+
+  if (isa<DbgInfoIntrinsic>(I))
+    return true;
+
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
+    // Skip simple intrinsics
+    switch(II->getIntrinsicID()) {
+    case Intrinsic::annotation:
+    case Intrinsic::assume:
+    case Intrinsic::sideeffect:
+    case Intrinsic::invariant_start:
+    case Intrinsic::invariant_end:
+    case Intrinsic::launder_invariant_group:
+    case Intrinsic::strip_invariant_group:
+    case Intrinsic::is_constant:
+    case Intrinsic::lifetime_start:
+    case Intrinsic::lifetime_end:
+    case Intrinsic::objectsize:
+    case Intrinsic::ptr_annotation:
+    case Intrinsic::var_annotation:
+    case Intrinsic::experimental_gc_result:
+    case Intrinsic::experimental_gc_relocate:
+    case Intrinsic::experimental_noalias_scope_decl:
+    case Intrinsic::syncregion_start:
+    case Intrinsic::taskframe_create:
+    case Intrinsic::taskframe_use:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  return false;
+}
+
+// Scan the entry basic block \p BB to find the first point to insert
+// instrumentation.
+Instruction *CSIImpl::getEntryBBInsertPt(BasicBlock &BB) {
+  // If a previous insertion point was already found for this entry block,
+  // return it.
+  if (EntryBBInsertPt.count(&BB))
+    return EntryBBInsertPt[&BB];
+
+  BasicBlock::iterator BI(BB.getFirstInsertionPt());
+  BasicBlock::const_iterator BE(BB.end());
+
+  // Scan the basic block for the first instruction we should not skip.
+  while (BI != BE) {
+    if (!skipInstructionInEntryBB(*BI)) {
+      EntryBBInsertPt.insert(std::make_pair(&BB, &*BI));
+      return &*BI;
+    }
+    ++BI;
+  }
+
+  // We reached the end of the basic block; return the terminator.
+  EntryBBInsertPt.insert(std::make_pair(&BB, BB.getTerminator()));
+  return BB.getTerminator();
 }
 
 void CSIImpl::instrumentFunction(Function &F) {
@@ -2642,13 +2731,15 @@ void CSIImpl::instrumentFunction(Function &F) {
   }
 
   uint64_t LocalId = getLocalFunctionID(F);
+  IRBuilder<> IRB(getEntryBBInsertPt(F.getEntryBlock()));
+  Value *FuncId = FunctionFED.localToGlobalId(LocalId, IRB);
 
   // Instrument basic blocks.  Note that we do this before other instrumentation
   // so that we put this at the beginning of the basic block, and then the
   // function entry call goes before the call to basic block entry.
   if (Options.InstrumentBasicBlocks)
     for (BasicBlock *BB : BasicBlocks)
-      instrumentBasicBlock(*BB);
+      instrumentBasicBlock(*BB, TI);
 
   // Instrument Tapir constructs.
   if (Options.InstrumentTapir) {
@@ -2664,6 +2755,12 @@ void CSIImpl::instrumentFunction(Function &F) {
         instrumentSync(SI, SyncRegNums[SI->getSyncRegion()]);
     }
   }
+
+  // Instrument allocas early, because they may require instrumentation inserted
+  // at an unusual place.
+  if (Options.InstrumentAllocas)
+    for (Instruction *I : Allocas)
+      instrumentAlloca(I, TI);
 
   if (Options.InstrumentLoops)
     // Recursively instrument all loops
@@ -2691,10 +2788,6 @@ void CSIImpl::instrumentFunction(Function &F) {
     for (Instruction *I : Callsites)
       instrumentCallsite(I, DT);
 
-  if (Options.InstrumentAllocas)
-    for (Instruction *I : Allocas)
-      instrumentAlloca(I);
-
   if (Options.InstrumentAllocFns) {
     for (Instruction *I : AllocationFnCalls)
       instrumentAllocFn(I, DT, TLI);
@@ -2709,8 +2802,7 @@ void CSIImpl::instrumentFunction(Function &F) {
 
   // Instrument function entry/exit points.
   if (Options.InstrumentFuncEntryExit) {
-    IRBuilder<> IRB(&*F.getEntryBlock().getFirstInsertionPt());
-    Value *FuncId = FunctionFED.localToGlobalId(LocalId, IRB);
+    IRBuilder<> IRB(cast<Instruction>(FuncId)->getNextNode());
     if (Config->DoesFunctionRequireInstrumentationForPoint(
             F.getName(), InstrumentationPoint::INSTR_FUNCTION_ENTRY)) {
       CsiFuncProperty FuncEntryProp;
