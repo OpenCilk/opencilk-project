@@ -10532,8 +10532,6 @@ def note_protected_by_cilk_scope: Note<
   "jump bypasses '_Cilk_scope'">;
 
 // cilk_spawn
-def err_not_a_call : Error<
-  "the argument to _Cilk_spawn must be a function call">;
 def err_spawn_invalid_scope : Error<
   "'_Cilk_spawn' not allowed in this scope">;
 def err_spawn_invalid_decl : Error<
@@ -10558,6 +10556,8 @@ def note_exits_spawn : Note<
   "jump exits the scope of a '_Cilk_spawn'">;
 def err_jump_out_of_spawn : Error<
   "cannot jump out of '_Cilk_spawn' statement">;
+def err_cilk_spawn_cannot_return: Error<
+  "cannot return from within a '_Cilk_spawn' statement">;
 def warn_return_cilk_spawn : Warning<
   "no parallelism from a '_Cilk_spawn' in a return statement">, InGroup<ReturnCilkSpawn>;
 

@@ -54,10 +54,26 @@ static FunctionScopeInfo *checkCilkContext(Sema &S, SourceLocation Loc,
   return ScopeInfo;
 }
 
+// Borrowed from SemaDeclCXX.cpp and modified.
+static void SearchForReturnInStmt(Sema &Self, Stmt *S) {
+  if (isa<ReturnStmt>(S))
+    Self.Diag(S->getBeginLoc(),
+              diag::err_cilk_spawn_cannot_return);
+
+  for (Stmt *SubStmt : S->children()) {
+    if (!SubStmt)
+      continue;
+    if (!isa<Expr>(SubStmt))
+      SearchForReturnInStmt(Self, SubStmt);
+  }
+}
+
 StmtResult
 Sema::ActOnCilkSpawnStmt(SourceLocation SpawnLoc, Stmt *SubStmt) {
   if (!checkCilkContext(*this, SpawnLoc, "_Cilk_spawn"))
     return StmtError();
+
+  SearchForReturnInStmt(*this, SubStmt);
 
   setFunctionHasBranchProtectedScope();
 
