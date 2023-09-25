@@ -1075,9 +1075,14 @@ TaskOutlineInfo llvm::outlineTask(
   Instruction *StorePt = DI;
   BasicBlock *Unwind = DI->getUnwindDest();
   if (Spindle *TaskFrameCreate = T->getTaskFrameCreateSpindle()) {
+    // If this task uses a taskframe, determine load and store points based on
+    // taskframe intrinsics.
     LoadPt = &*++TaskFrameCreate->getEntry()->begin();
     StorePt =
         TaskFrameCreate->getEntry()->getSinglePredecessor()->getTerminator();
+    // Ensure debug information on StorePt
+    if (!StorePt->getDebugLoc())
+      StorePt->setDebugLoc(DI->getDebugLoc());
     if (Unwind)
       // Find the corresponding taskframe.resume.
       Unwind = getTaskFrameResumeDest(T->getTaskFrameUsed());
