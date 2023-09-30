@@ -748,7 +748,7 @@ static void HandleInlinedTasksHelper(
         Worklist.push_back(DI->getUnwindDest());
       }
       // Add the continuation to the worklist.
-      if (isTaskFrameUnwind(UnwindEdge) &&
+      if (CurrentTaskFrame && isTaskFrameUnwind(UnwindEdge) &&
           (CurrentTaskFrame == getTaskFrameUsed(DI->getDetached()))) {
         // This detach-continuation terminates the current taskframe, so push it
         // onto the parent worklist.
