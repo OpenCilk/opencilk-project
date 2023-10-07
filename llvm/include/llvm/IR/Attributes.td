@@ -380,6 +380,7 @@ def : MergeRule<"setOR<NoImplicitFloatAttr>">;
 def : MergeRule<"setOR<NoJumpTablesAttr>">;
 def : MergeRule<"setOR<ProfileSampleAccurateAttr>">;
 def : MergeRule<"setOR<SpeculativeLoadHardeningAttr>">;
+def : MergeRule<"setOR<StealableAttr>">;
 def : MergeRule<"adjustCallerSSPLevel">;
 def : MergeRule<"adjustCallerStackProbes">;
 def : MergeRule<"adjustCallerStackProbeSize">;
