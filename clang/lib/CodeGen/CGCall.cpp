@@ -2230,7 +2230,7 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
     }
     if (TargetDecl->hasAttr<StrandPureAttr>()) {
       FuncAttrs.addAttribute(llvm::Attribute::StrandPure);
-      FuncAttrs.addAttribute(llvm::Attribute::ReadOnly);
+      FuncAttrs.addMemoryAttr(llvm::MemoryEffects::readOnly());
       FuncAttrs.addAttribute(llvm::Attribute::NoUnwind);
     }
     if (TargetDecl->hasAttr<ReducerRegisterAttr>()) {
