@@ -892,11 +892,10 @@ void TaskInfo::findTaskFrameTreeHelper(
     SmallPtrSetImpl<Spindle *> &SubTFVisited) {
   const Value *TFCreate = TFSpindle->getTaskFrameCreate();
   const Task *UserT = TFSpindle->getTaskFromTaskFrame();
-  const Spindle *Continuation = nullptr;
-  const Spindle *EHContinuation = nullptr;
+  SmallPtrSet<const Spindle *, 1> Continuations, EHContinuations;
   if (UserT) {
-    Continuation = UserT->getContinuationSpindle();
-    EHContinuation = UserT->getEHContinuationSpindle();
+    Continuations.insert(UserT->getContinuationSpindle());
+    EHContinuations.insert(UserT->getEHContinuationSpindle());
   } else {
     // This taskframe is not associated with a task.  Examine the uses of the
     // taskframe to determine its continuation and exceptional-continuation
@@ -904,11 +903,12 @@ void TaskInfo::findTaskFrameTreeHelper(
     for (const User *U : TFCreate->users()) {
       if (const Instruction *I = dyn_cast<Instruction>(U)) {
         if (isTapirIntrinsic(Intrinsic::taskframe_end, I) &&
-            isCanonicalTaskFrameEnd(I))
-          Continuation = getSpindleFor(I->getParent()->getSingleSuccessor());
-        else if (isTaskFrameResume(I)) {
+            isCanonicalTaskFrameEnd(I)) {
+          Continuations.insert(
+              getSpindleFor(I->getParent()->getSingleSuccessor()));
+        } else if (isTaskFrameResume(I)) {
           const InvokeInst *II = dyn_cast<InvokeInst>(I);
-          EHContinuation = getSpindleFor(II->getUnwindDest());
+          EHContinuations.insert(getSpindleFor(II->getUnwindDest()));
         }
       }
     }
@@ -976,12 +976,12 @@ void TaskInfo::findTaskFrameTreeHelper(
         }
 
       // Add the normal continuation to parent worklist.
-      if (SuccEdge.first == Continuation) {
+      if (Continuations.contains(SuccEdge.first)) {
         ParentWorkList.push_back(SuccEdge.first);
         continue;
       }
       // Add the exception-handling continuation to the appropriate worklist.
-      if (SuccEdge.first == EHContinuation) {
+      if (EHContinuations.contains(SuccEdge.first)) {
         // If TFSpindle corresponds to a taskframe.create associated with a
         // task, push the successor onto our worklist.  Otherwise push it onto
         // the parent's worklist.
