@@ -41,7 +41,7 @@ class DRFScopedNoAliasImpl {
 public:
   DRFScopedNoAliasImpl(Function &F, TaskInfo &TI, AliasAnalysis &AA,
                        LoopInfo *LI)
-      : F(F), TI(TI), AA(AA), LI(LI) {
+      : F(F), TI(TI), LI(LI) {
     TI.evaluateParallelState<MaybeParallelTasks>(MPTasks);
   }
 
@@ -62,7 +62,6 @@ private:
 
   Function &F;
   TaskInfo &TI;
-  AliasAnalysis &AA;
   LoopInfo *LI;
 
   MaybeParallelTasks MPTasks;
