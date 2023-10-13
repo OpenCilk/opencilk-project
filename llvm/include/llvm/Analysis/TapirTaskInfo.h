@@ -329,7 +329,7 @@ protected:
   friend class TaskInfo;
 
   /// This creates an empty spindle.
-  Spindle() {}
+  Spindle() = default;
 
   explicit Spindle(BasicBlock *BB, SPType Ty) : Ty(Ty) {
     Blocks.push_back(BB);
@@ -1154,7 +1154,7 @@ class TaskInfo {
                                SmallPtrSetImpl<Spindle *> &SubTFVisited);
 
 public:
-  TaskInfo() {}
+  TaskInfo() = default;
   ~TaskInfo() { releaseMemory(); }
 
   TaskInfo(TaskInfo &&Arg)
@@ -1178,6 +1178,14 @@ public:
   }
 
   void releaseMemory() {
+    for (auto BBToSpindle : BBMap)
+      if (!BBToSpindle.getSecond()->getParentTask())
+        BBToSpindle.getSecond()->~Spindle();
+    for (auto SpindleToTask : SpindleMap)
+      if (RootTask != SpindleToTask.getSecond() &&
+          !SpindleToTask.getSecond()->getParentTask())
+        SpindleToTask.getSecond()->~Task();
+
     BBMap.clear();
     SpindleMap.clear();
     if (RootTask)
@@ -1185,7 +1193,7 @@ public:
     RootTask = nullptr;
     if (MPTasks) {
       MPTasks->TaskList.clear();
-      MPTasks.release();
+      MPTasks.reset();
     }
     ComputedTaskFrameTree = false;
     TaskAllocator.Reset();

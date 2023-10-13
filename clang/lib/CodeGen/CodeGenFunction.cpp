@@ -551,6 +551,11 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
       ReturnValue = Address::invalid();
     }
   }
+
+  if (CurSyncRegion) {
+    PopSyncRegion();
+    assert(!CurSyncRegion && "Nested sync regions at end of function.");
+  }
 }
 
 /// ShouldInstrumentFunction - Return true if the current function should be

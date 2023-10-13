@@ -731,15 +731,19 @@ void llvm::cloneEHBlocks(Function *F,
     // relevant loops.
     for (BasicBlock *EHBlock : EHBlocksToClone) {
       if (!DT->isReachableFromEntry(EHBlock)) {
+        Loop *L = nullptr;
         if (LI->isLoopHeader(EHBlock)) {
           // Delete the whole loop.
-          Loop *L = LI->getLoopFor(EHBlock);
+          L = LI->getLoopFor(EHBlock);
           if (Loop *ParentL = L->getParentLoop())
             ParentL->removeChildLoop(llvm::find(*ParentL, L));
           else
             LI->removeLoop(llvm::find(*LI, L));
         }
         LI->removeBlock(EHBlock);
+        // If EHBlock is a loop header, finish destroying the whole loop.
+        if (L)
+          LI->destroy(L);
       }
     }
   }
@@ -932,7 +936,8 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   }
 
   // Handle any detached-rethrows in the task.
-  if (DI->hasUnwindDest()) {
+  bool HasUnwind = DI->hasUnwindDest();
+  if (HasUnwind) {
     assert(InlinedLPads && "Missing set of landing pads in task.");
     assert(DetachedRethrows && "Missing set of detached rethrows in task.");
     if (ReplaceWithTaskFrame) {
@@ -979,7 +984,7 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
 
   // Replace the detach with an unconditional branch to the task entry.
   Continue->removePredecessor(Spawner);
-  if (DI->hasUnwindDest())
+  if (HasUnwind)
     Unwind->removePredecessor(Spawner);
   ReplaceInstWithInst(DI, BranchInst::Create(TaskEntry));
 
@@ -991,7 +996,7 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   if (DT) {
     if (ReattachDom && DT->dominates(Spawner, Continue))
       DT->changeImmediateDominator(Continue, ReattachDom);
-    if (DI->hasUnwindDest())
+    if (HasUnwind)
       DT->deleteEdge(Spawner, Unwind);
   }
 }
