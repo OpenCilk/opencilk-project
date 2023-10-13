@@ -1332,9 +1332,11 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   // argument, undo the eariler temporarily mapping.
   if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount())) {
     VMap.erase(TL->getTripCount());
-    // Delete the ArgEndMaterializer.
-    delete Mat;
   }
+
+  // Delete the ArgEndMaterializer or OutlineMaterializer.
+  if (Mat)
+    delete Mat;
 
   // Rewrite cloned IV's to start at their start-iteration arguments.
   updateClonedIVs(TL, Preheader, Args, VMap, IVArgIndex);

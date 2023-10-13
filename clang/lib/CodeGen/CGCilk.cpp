@@ -431,12 +431,12 @@ llvm::Instruction *CodeGenFunction::EmitSyncRegionStart() {
 
 /// EmitCilkSyncStmt - Emit a _Cilk_sync node.
 void CodeGenFunction::EmitCilkSyncStmt(const CilkSyncStmt &S) {
-  llvm::BasicBlock *ContinueBlock = createBasicBlock("sync.continue");
-
   // Check if we are generating unreachable code.
   if (!HaveInsertPoint())
     // We don't need to generate actual code.
     return;
+
+  llvm::BasicBlock *ContinueBlock = createBasicBlock("sync.continue");
 
   // Generate a stoppoint if we are emitting debug info.
   EmitStopPoint(&S);

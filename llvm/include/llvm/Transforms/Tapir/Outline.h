@@ -34,7 +34,9 @@ class OutlineMaterializer : public ValueMaterializer {
 public:
   OutlineMaterializer(const Value *SrcSyncRegion = nullptr)
       : SrcSyncRegion(SrcSyncRegion) {}
-  virtual ~OutlineMaterializer() {}
+  virtual ~OutlineMaterializer() {
+    BlocksToRemap.clear();
+  }
 
   Value *materialize(Value *V) override;
 
