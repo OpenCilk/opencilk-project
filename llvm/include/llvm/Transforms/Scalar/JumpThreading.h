@@ -89,7 +89,8 @@ class JumpThreadingPass : public PassInfoMixin<JumpThreadingPass> {
 #else
   SmallSet<AssertingVH<const BasicBlock>, 16> LoopHeaders;
 #endif
-  DenseMap<const BasicBlock *, SmallPtrSet<const BasicBlock *, 16>> TapirTasks;
+  DenseMap<AssertingVH<const BasicBlock>, SmallPtrSet<const BasicBlock *, 16>>
+      TapirTasks;
 
   unsigned BBDupThreshold;
   unsigned DefaultBBDupThreshold;
