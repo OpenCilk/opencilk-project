@@ -354,6 +354,7 @@ bool JumpThreadingPass::runImpl(Function &F_, FunctionAnalysisManager *FAM_,
                           << '\n');
         LoopHeaders.erase(&BB);
         LVI->eraseBlock(&BB);
+        TapirTasks.erase(&BB);
         DeleteDeadBlock(&BB, DTU.get());
         Changed = ChangedSinceLastAnalysisUpdate = true;
         continue;
@@ -383,6 +384,7 @@ bool JumpThreadingPass::runImpl(Function &F_, FunctionAnalysisManager *FAM_,
   } while (Changed);
 
   LoopHeaders.clear();
+  TapirTasks.clear();
   return EverChanged;
 }
 
