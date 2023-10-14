@@ -451,6 +451,7 @@ bool JumpThreadingPass::runImpl(Function &F, TargetLibraryInfo *TLI_,
                           << '\n');
         LoopHeaders.erase(&BB);
         LVI->eraseBlock(&BB);
+        TapirTasks.erase(&BB);
         DeleteDeadBlock(&BB, DTU);
         Changed = true;
         continue;
@@ -480,6 +481,7 @@ bool JumpThreadingPass::runImpl(Function &F, TargetLibraryInfo *TLI_,
   } while (Changed);
 
   LoopHeaders.clear();
+  TapirTasks.clear();
   return EverChanged;
 }
 
