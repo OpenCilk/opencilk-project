@@ -728,6 +728,7 @@ struct AddressSanitizer {
   bool maybeInsertAsanInitAtFunctionEntry(Function &F);
   bool maybeInsertDynamicShadowAtFunctionEntry(Function &F);
   void markEscapedLocalAllocas(Function &F);
+  void recordInterestingParallelAllocas(const Function &F);
 
 private:
   friend struct FunctionStackPoisoner;
@@ -786,6 +787,7 @@ private:
   Value *LocalDynamicShadow = nullptr;
   const StackSafetyGlobalInfo *SSGI;
   DenseMap<const AllocaInst *, bool> ProcessedAllocas;
+  SmallPtrSet<const AllocaInst *, 16> InterestingParallelAllocas;
 
   FunctionCallee AMDGPUAddressShared;
   FunctionCallee AMDGPUAddressPrivate;
@@ -1287,7 +1289,7 @@ bool AddressSanitizer::isInterestingAlloca(const AllocaInst &AI) {
        // Promotable allocas are common under -O0.
        (!ClSkipPromotableAllocas || !isAllocaPromotable(&AI)) &&
        (!ClSkipPromotableAllocas ||
-        (TI->isSerial() || !TI->isAllocaParallelPromotable(&AI))) &&
+        (TI->isSerial() || InterestingParallelAllocas.contains(&AI))) &&
        // inalloca allocas are not treated as static, and we don't want
        // dynamic alloca instrumentation for them as well.
        !AI.isUsedWithInAlloca() &&
@@ -2847,6 +2849,21 @@ void AddressSanitizer::markEscapedLocalAllocas(Function &F) {
   }
 }
 
+void AddressSanitizer::recordInterestingParallelAllocas(const Function &F) {
+  if (!ClSkipPromotableAllocas || TI->isSerial())
+    return;
+
+  for (const BasicBlock &BB : F)
+    for (const Instruction &I : BB)
+      if (const AllocaInst *AI = dyn_cast<AllocaInst>(&I))
+        if (AI->getAllocatedType()->isSized() &&
+            ((!AI->isStaticAlloca()) || getAllocaSizeInBytes(*AI) > 0) &&
+            // We are only interested in allocas not promotable to registers.
+            // Promotable allocas are common under -O0.
+            !isAllocaPromotable(AI) && !TI->isAllocaParallelPromotable(AI))
+          InterestingParallelAllocas.insert(AI);
+}
+
 bool AddressSanitizer::suppressInstrumentationSiteForDebug(int &Instrumented) {
   bool ShouldInstrument =
       ClDebugMin < 0 || ClDebugMax < 0 ||
@@ -2888,6 +2905,10 @@ bool AddressSanitizer::instrumentFunction(Function &F,
   // We can't instrument allocas used with llvm.localescape. Only static allocas
   // can be passed to that intrinsic.
   markEscapedLocalAllocas(F);
+
+  // Record all interesting parallel allocas, using TaskInfo analysis before
+  // instrumentation may disrupt the validity of the analysis.
+  recordInterestingParallelAllocas(F);
 
   // We want to instrument every address only once per basic block (unless there
   // are calls between uses).
