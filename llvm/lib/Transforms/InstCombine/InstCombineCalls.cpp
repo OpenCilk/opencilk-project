@@ -2440,8 +2440,8 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     BasicBlock::iterator Iter(CI);
     while (++Iter != CI.getParent()->end()) {
       if (isTapirIntrinsic(Intrinsic::tapir_runtime_end, &*Iter, &CI)) {
-        eraseInstFromFunction(CI);
-        return eraseInstFromFunction(*Iter);
+        eraseInstFromFunction(*Iter);
+        return eraseInstFromFunction(CI);
       }
       if (isa<CallBase>(&*Iter) && !isa<DbgInfoIntrinsic>(&*Iter))
         // We found a nontrivial call.  Give up.
