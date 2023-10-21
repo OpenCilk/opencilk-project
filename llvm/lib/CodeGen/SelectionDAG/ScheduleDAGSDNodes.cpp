@@ -203,6 +203,8 @@ static void RemoveUnusedGlue(SDNode *N, SelectionDAG *DAG) {
 void ScheduleDAGSDNodes::ClusterNeighboringLoads(SDNode *Node) {
   SDValue Chain;
   unsigned NumOps = Node->getNumOperands();
+  if (NumOps == 0)
+    return;
   if (Node->getOperand(NumOps-1).getValueType() == MVT::Other)
     Chain = Node->getOperand(NumOps-1);
   if (!Chain)
