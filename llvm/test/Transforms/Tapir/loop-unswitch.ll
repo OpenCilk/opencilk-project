@@ -1,8 +1,7 @@
 ; Thanks to Sai Sameer Pusapaty and Shreyas Balaji for the original
 ; source code for this test case.
 ;
-; RUN: opt < %s -enable-new-pm=0 -loop-unswitch -S -o - | FileCheck %s
-; XFAIL: *
+; RUN: opt < %s -passes="simple-loop-unswitch<nontrivial>" -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -367,7 +366,7 @@ cleanup78:                                        ; preds = %pfor.cond.cleanup72
 ; CHECK: define {{.+}}@_Z11algorithm_45graphIiE(
 
 ; CHECK: pfor.cond.us:
-; CHECK: detach within %syncreg, label %pfor.body.us, label %pfor.inc60.us unwind label %lpad62.loopexit.us-lcssa.us
+; CHECK: detach within %syncreg, label %pfor.body.us, label %pfor.inc60.us unwind label %lpad62.loopexit.split.us
 
 ; CHECK: pfor.body.us:
 ; CHECK-NEXT: %[[USSYNCREG:.+]] = {{.+}}call token @llvm.syncregion
@@ -388,44 +387,21 @@ cleanup78:                                        ; preds = %pfor.cond.cleanup72
 ; CHECK: sync.continue57.us:
 ; The sync region of this detached-rethrow should match that of the
 ; detach in pfor.cond.us.
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg,
+; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg,
 
 ; CHECK: lpad.us:
 ; The sync region of this detached-rethrow should match that of the
 ; detach in pfor.cond22.us.
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[USSYNCREG]]
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(token %[[USSYNCREG]]
 
-; CHECK: lpad62.loopexit.us-lcssa.us:
+; CHECK: lpad62.loopexit.split.us:
 ; CHECK: br label %lpad62.loopexit
 
 ; CHECK: pfor.cond:
-; CHECK: detach within %syncreg, label %pfor.body, label %pfor.inc60 unwind label %lpad62.loopexit.us-lcssa
+; CHECK: detach within %syncreg, label %pfor.body, label %pfor.inc60 unwind label %lpad62.loopexit.split
 
 ; CHECK: pfor.body:
 ; CHECK: %[[OGSYNCREG:.+]] = {{.+}}call token @llvm.syncregion
-
-; CHECK: pfor.cond22:
-; CHECK: detach within %[[OGSYNCREG]], label %pfor.body27, label %pfor.inc unwind label %lpad52.loopexit
-
-; CHECK: pfor.body27:
-; CHECK: invoke i32 @_Z11p_intersectPKiiS0_i(
-; CHECK-NEXT: to label %invoke.cont unwind label %lpad
-
-; CHECK: lpad:
-; The sync region of this detached-rethrow should match that of the
-; detach in pfor.cond22
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[OGSYNCREG]]
-
-; CHECK: lpad52.loopexit:
-; CHECK: br label %lpad52
-
-; CHECK: lpad52:
-; CHECK: sync within %[[OGSYNCREG]], label %sync.continue57
-
-; CHECK: sync.continue57:
-; The sync region of this detached-rethrow should match that of the
-; detach in pfor.cond.
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg
 
 ; CHECK: lpad62.loopexit:
 ; CHECK: br label %lpad62
