@@ -1,5 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-unswitch -S -o - | FileCheck %s
-; XFAIL: *
+; RUN: opt < %s -passes='simple-loop-unswitch<nontrivial>' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -88,17 +87,20 @@ lpad4:                                            ; preds = %invoke.cont7, %pfor
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %5)
           to label %unreachable unwind label %lpad10.loopexit
 
-; CHECK: lpad4:
-; CHECK-NEXT: %call2.i.i.i.i1.i.i.lcssa1 = phi i8*
-; CHECK-NEXT: %.lcssa = phi
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(
+; CHECK: lpad4.us:
+; CHECK-NEXT: %call2.i.i.i.i1.i.i.lcssa1.us = phi ptr
+; CHECK-NEXT: %.lcssa.us = phi
+; CHECK: invoke void @llvm.detached.rethrow.sl_p0i32s(
 ; CHECK: to label %{{.+}} unwind label %[[DRDEST:.+]]
 
 ; CHECK: [[DRDEST]]:
-; CHECK-DAG: phi i8* [ %call2.i.i.i.i1.i.i.lcssa1, %lpad4 ]
+; CHECK-NEXT: phi ptr
+; CHECK-DAG: [ %call2.i.i.i.i1.i.i.lcssa1.us, %lpad4.us ]
+; CHECK-NEXT: landingpad
 
 ; CHECK: _ZNSt6vectorIiSaIiEED2Ev.exit11:
 ; CHECK-NOT: %call2.i.i.i.i1.i.i.lcssa1,
+; CHECK-NOT: %call2.i.i.i.i1.i.i.lcssa1.us,
 ; CHECK: unreachable
 
 lpad10.loopexit:                                  ; preds = %pfor.cond
