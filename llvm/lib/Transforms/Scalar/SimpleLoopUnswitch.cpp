@@ -43,6 +43,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/IR/ProfDataUtils.h"
 #include "llvm/IR/Use.h"
@@ -61,6 +62,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <algorithm>
 #include <cassert>
@@ -3217,13 +3219,36 @@ static bool collectUnswitchCandidatesWithInjections(
   return Found;
 }
 
+static bool
+checkTapirSyncRegionInLoop(const Loop &L,
+                           const SmallPtrSetImpl<BasicBlock *> &TaskExits,
+                           const Instruction &I) {
+  for (const User *Usr : I.users())
+    if (const Instruction *UsrI = dyn_cast<Instruction>(Usr)) {
+      const BasicBlock *Parent = UsrI->getParent();
+      if (!L.contains(Parent) && !TaskExits.contains(Parent))
+        return false;
+    }
+  return true;
+}
+
 static bool isSafeForNoNTrivialUnswitching(Loop &L, LoopInfo &LI) {
   if (!L.isSafeToClone())
     return false;
+  SmallPtrSet<BasicBlock *, 4> TaskExits;
+  L.getTaskExits(TaskExits);
   for (auto *BB : L.blocks())
     for (auto &I : *BB) {
-      if (I.getType()->isTokenTy() && I.isUsedOutsideOfBlock(BB))
+      if (I.getType()->isTokenTy() && I.isUsedOutsideOfBlock(BB)) {
+        if (isTapirIntrinsic(Intrinsic::syncregion_start, &I)) {
+          if (!checkTapirSyncRegionInLoop(L, TaskExits, I))
+            return false;
+          // All uses of this syncregion.start are inside of the loop, so it's
+          // safe for unswitching.
+          continue;
+        }
         return false;
+      }
       if (auto *CB = dyn_cast<CallBase>(&I)) {
         assert(!CB->cannotDuplicate() && "Checked by L.isSafeToClone().");
         if (CB->isConvergent())
