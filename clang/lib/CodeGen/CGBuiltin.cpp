@@ -3223,7 +3223,6 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   case Builtin::BI__builtin_isnan: {
     IsSpawnedScope SpawnedScp(this);
     CodeGenFunction::CGFPOptionsRAII FPOptsRAII(*this, E);
-    IsSpawnedScope SpawnedScp(this);
     Value *V = EmitScalarExpr(E->getArg(0));
     MaybeDetach(this, SpawnedScp);
     if (Value *Result = tryUseTestFPKind(*this, BuiltinID, V))

@@ -2328,8 +2328,7 @@ PassBuilder::buildPostCilkInstrumentationPipeline(OptimizationLevel Level) {
     LPM.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
                          /*AllowSpeculation=*/true));
     LPM.addPass(SimpleLoopUnswitchPass(/* NonTrivial */ Level ==
-                                           OptimizationLevel::O3 &&
-                                       EnableO3NonTrivialUnswitching));
+                                       OptimizationLevel::O3));
     FPM.addPass(
         RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
     FPM.addPass(

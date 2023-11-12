@@ -88,7 +88,7 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 
 ; CHECK: [[EPILINC]]:
 ; CHECK-DAG: %[[EPILNEXT]] = add nuw nsw i64 %[[EPILIV]]
-; CHECK-DAG: %[[ITERNEXT]] = sub nsw i64 %[[EPILITER]]
+; CHECK-DAG: %[[ITERNEXT]] = sub nuw nsw i64 %[[EPILITER]]
 ; CHECK-NEXT: %[[EPILLATCHCMP:.+]] = icmp ne i64 %[[ITERNEXT]], 0
 ; CHECK-NEXT: br i1 %[[EPILLATCHCMP]], label %[[EPILHEAD]], label
 

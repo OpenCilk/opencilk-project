@@ -49,9 +49,9 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
   return TapirTarget;
 }
 
-llvm::Optional<llvm::StringRef>
+std::optional<llvm::StringRef>
 clang::serializeTapirTarget(TapirTargetID Target) {
-  llvm::Optional<llvm::StringRef> TapirTargetStr;
+  std::optional<llvm::StringRef> TapirTargetStr;
   switch (Target) {
   case TapirTargetID::None:
     TapirTargetStr = "none";

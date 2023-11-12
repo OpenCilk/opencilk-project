@@ -38263,7 +38263,7 @@ X86TargetLowering::emitEHSjLjLongJmp(MachineInstr &MI,
       MI.readsRegister(SP, TRI)) {
     Register AddrTmp = MRI.createVirtualRegister(RC);
     unsigned LEA = (PVT == MVT::i64) ? X86::LEA64r : X86::LEA32r;
-    MIB = BuildMI(*thisMBB, MI, DL, TII->get(LEA), AddrTmp);
+    MIB = BuildMI(*thisMBB, MI, MIMD, TII->get(LEA), AddrTmp);
     for (unsigned i = 0; i < X86::AddrNumOperands; ++i) {
       MIB.add(MI.getOperand(i));
     }

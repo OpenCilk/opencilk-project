@@ -308,6 +308,22 @@ static bool blockPrologueInterferes(const MachineBasicBlock *BB,
   return false;
 }
 
+// Helper function to check if MBB contains a terminator that might correspond
+// with EH_SjLj_Setup.
+static bool blockMayContainSetjmpSetup(const MachineBasicBlock *MBB,
+                                       const MachineBasicBlock *Succ) {
+  for (const MachineInstr &MI : MBB->terminators())
+    // It seems hard to check for EH_SjLj_Setup directly, since that instruction
+    // seems to be target-dependent.  Instead we simply check if the terminator
+    // has unmodeled side effects.
+    if (MI.hasUnmodeledSideEffects() &&
+        llvm::any_of(MI.operands(), [&](const MachineOperand &Op) {
+          return Op.isMBB() && Op.getMBB() == Succ;
+        }))
+      return true;
+  return false;
+}
+
 // possiblyHasSetjmpBetween - Check for setjmps along the path from block From
 // to block To.
 bool MachineSinking::possiblyHasSetjmpBetween(MachineBasicBlock *From,
@@ -952,22 +968,6 @@ bool MachineSinking::isProfitableToSinkTo(Register Reg, MachineInstr &MI,
   // if no operand sinking make register pressure set exceed limit, it is
   // profitable to sink MI.
   return true;
-}
-
-// Helper function to check if MBB contains a terminator that might correspond
-// with EH_SjLj_Setup.
-static bool blockMayContainSetjmpSetup(const MachineBasicBlock *MBB,
-                                       const MachineBasicBlock *Succ) {
-  for (const MachineInstr &MI : MBB->terminators())
-    // It seems hard to check for EH_SjLj_Setup directly, since that instruction
-    // seems to be target-dependent.  Instead we simply check if the terminator
-    // has unmodeled side effects.
-    if (MI.hasUnmodeledSideEffects() &&
-        llvm::any_of(MI.operands(), [&](const MachineOperand &Op) {
-          return Op.isMBB() && Op.getMBB() == Succ;
-        }))
-      return true;
-  return false;
 }
 
 /// Get the sorted sequence of successors for this MachineBasicBlock, possibly

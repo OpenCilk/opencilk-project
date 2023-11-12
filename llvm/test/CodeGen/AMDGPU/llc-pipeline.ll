@@ -477,9 +477,6 @@
 ; GCN-O1-OPTS-NEXT:      Dominator Tree Construction
 ; GCN-O1-OPTS-NEXT:      Tapir Task Information
 ; GCN-O1-OPTS-NEXT:      SROA
-; GCN-O1-OPTS-NEXT:      Basic Alias Analysis (stateless AA impl)
-; GCN-O1-OPTS-NEXT:      Function Alias Analysis Results
-; GCN-O1-OPTS-NEXT:      Memory SSA
 ; GCN-O1-OPTS-NEXT:      Natural Loop Information
 ; GCN-O1-OPTS-NEXT:      Split GEPs to a variadic base and a constant offset for better CSE
 ; GCN-O1-OPTS-NEXT:      Scalar Evolution Analysis

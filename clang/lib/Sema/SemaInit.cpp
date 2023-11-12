@@ -9459,7 +9459,7 @@ ExprResult InitializationSequence::Perform(Sema &S,
 
   // Push a spawn back onto the init if necessary.
   if (IsSpawned)
-    return S.ActOnCilkSpawnExpr(SpawnLoc, Init.get());
+    return S.ActOnCilkSpawnExpr(SpawnLoc, Init);
   return Init;
 }
 

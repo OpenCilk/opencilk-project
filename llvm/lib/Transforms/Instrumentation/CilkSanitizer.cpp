@@ -23,6 +23,7 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/CaptureTracking.h"
+#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
@@ -196,9 +197,10 @@ struct CilkSanitizerImpl : public CSIImpl {
   class SimpleInstrumentor {
   public:
     SimpleInstrumentor(CilkSanitizerImpl &CilkSanImpl, TaskInfo &TI,
-                       LoopInfo &LI, DominatorTree *DT,
+                       LoopInfo &LI, DominatorTree &DT,
                        const TargetLibraryInfo *TLI)
-        : CilkSanImpl(CilkSanImpl), TI(TI), LI(LI), DT(DT), TLI(TLI) {}
+        : CilkSanImpl(CilkSanImpl), TI(TI), LI(LI), DT(DT),
+          DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy), TLI(TLI) {}
 
     bool InstrumentSimpleInstructions(
         SmallVectorImpl<Instruction *> &Instructions);
@@ -218,7 +220,8 @@ struct CilkSanitizerImpl : public CSIImpl {
     CilkSanitizerImpl &CilkSanImpl;
     TaskInfo &TI;
     LoopInfo &LI;
-    DominatorTree *DT;
+    DominatorTree &DT;
+    DomTreeUpdater DTU;
     const TargetLibraryInfo *TLI;
 
     SmallPtrSet<DetachInst *, 8> Detaches;
@@ -228,8 +231,9 @@ struct CilkSanitizerImpl : public CSIImpl {
   class Instrumentor {
   public:
     Instrumentor(CilkSanitizerImpl &CilkSanImpl, RaceInfo &RI, TaskInfo &TI,
-                 LoopInfo &LI, DominatorTree *DT, const TargetLibraryInfo *TLI)
-        : CilkSanImpl(CilkSanImpl), RI(RI), TI(TI), LI(LI), DT(DT), TLI(TLI) {}
+                 LoopInfo &LI, DominatorTree &DT, const TargetLibraryInfo *TLI)
+        : CilkSanImpl(CilkSanImpl), RI(RI), TI(TI), LI(LI), DT(DT),
+          DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy), TLI(TLI) {}
 
     void InsertArgMAAPs(Function &F, Value *FuncId);
     bool InstrumentSimpleInstructions(
@@ -291,7 +295,8 @@ struct CilkSanitizerImpl : public CSIImpl {
     RaceInfo &RI;
     TaskInfo &TI;
     LoopInfo &LI;
-    DominatorTree *DT;
+    DominatorTree &DT;
+    DomTreeUpdater DTU;
     const TargetLibraryInfo *TLI;
 
     SmallPtrSet<DetachInst *, 8> Detaches;
@@ -452,11 +457,11 @@ struct CilkSanitizerImpl : public CSIImpl {
                           SmallVectorImpl<Value *> *MAAPVals = nullptr);
   bool suppressCallsite(Instruction *I);
   bool instrumentAllocFnLibCall(Instruction *I, const TargetLibraryInfo *TLI);
-  bool instrumentAllocationFn(Instruction *I, DominatorTree *DT,
+  bool instrumentAllocationFn(Instruction *I, DominatorTree &DT,
                               const TargetLibraryInfo *TLI);
   bool instrumentFree(Instruction *I, const TargetLibraryInfo *TLI);
   bool instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
-                        unsigned NumSyncRegs, DominatorTree *DT, TaskInfo &TI,
+                        unsigned NumSyncRegs, DominatorTree &DT, TaskInfo &TI,
                         LoopInfo &LI);
   bool instrumentSync(SyncInst *SI, unsigned SyncRegNum);
   void instrumentTapirLoop(Loop &L, TaskInfo &TI,
@@ -673,7 +678,7 @@ uint64_t ObjectTable::add(Instruction &I, Value *Obj) {
   // Next, if this is an alloca instruction, look for a llvm.dbg.declare
   // intrinsic.
   if (AllocaInst *AI = dyn_cast<AllocaInst>(Obj)) {
-    TinyPtrVector<DbgVariableIntrinsic *> DbgDeclares = FindDbgAddrUses(AI);
+    TinyPtrVector<DbgDeclareInst *> DbgDeclares = FindDbgDeclareUses(AI);
     if (!DbgDeclares.empty()) {
       auto *LV = DbgDeclares.front()->getVariable();
       add(ID, LV->getLine(), LV->getFilename(), LV->getDirectory(),
@@ -2552,9 +2557,9 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
     if (MAAPChecks) {
       Value *MAAPChk = getMAAPCheck(I, IRB);
       if (MAAPChk != IRB.getFalse()) {
-        Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-            IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
-            /*LI*/ nullptr);
+        Instruction *CheckTerm =
+            SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
+                                      I, false, nullptr, &DTU, &LI);
         IRB.SetInsertPoint(CheckTerm);
       }
     }
@@ -2580,9 +2585,9 @@ bool CilkSanitizerImpl::Instrumentor::PerformDelayedInstrumentation() {
     if (MAAPChecks) {
       Value *MAAPChk = getMAAPCheck(I, IRB, OperandNum);
       if (MAAPChk != IRB.getFalse()) {
-        Instruction *CheckTerm = SplitBlockAndInsertIfThen(
-            IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), I, false, nullptr, DT,
-            /*LI*/ nullptr);
+        Instruction *CheckTerm =
+            SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
+                                      I, false, nullptr, &DTU, &LI);
         IRB.SetInsertPoint(CheckTerm);
       }
     }
@@ -2998,7 +3003,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
       if (MAAPChk != IRB.getFalse()) {
         Instruction *CheckTerm =
             SplitBlockAndInsertIfThen(IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()),
-                                      InsertPt, false, nullptr, DT, &LI);
+                                      InsertPt, false, nullptr, &DTU, &LI);
         IRB.SetInsertPoint(CheckTerm);
       }
     }
@@ -3072,7 +3077,7 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentLoops(
         if (MAAPChk != IRB.getFalse()) {
           Instruction *CheckTerm = SplitBlockAndInsertIfThen(
               IRB.CreateICmpEQ(MAAPChk, IRB.getFalse()), &*InsertPt, false,
-              nullptr, DT, &LI);
+              nullptr, &DTU, &LI);
           IRB.SetInsertPoint(CheckTerm);
         }
       }
@@ -3148,17 +3153,17 @@ bool CilkSanitizerImpl::setupFunction(Function &F, bool NeedToSetupCalls) {
     // code.
     setupCalls(F);
 
-  DominatorTree *DT = &GetDomTree(F);
+  DominatorTree &DT = GetDomTree(F);
   LoopInfo &LI = GetLoopInfo(F);
 
   if (Options.InstrumentLoops)
     // Simplify loops to prepare for loop instrumentation
     for (Loop *L : LI)
-      simplifyLoop(L, DT, &LI, nullptr, nullptr, nullptr,
+      simplifyLoop(L, &DT, &LI, nullptr, nullptr, nullptr,
                    /* PreserveLCSSA */ false);
 
   // Canonicalize the CFG for instrumentation.
-  setupBlocks(F, DT, &LI);
+  setupBlocks(F, &DT, &LI);
 
   return true;
 }
@@ -3212,7 +3217,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
   SmallPtrSet<const Loop *, 8> TapirLoops;
 
   const TargetLibraryInfo *TLI = &GetTLI(F);
-  DominatorTree *DT = &GetDomTree(F);
+  DominatorTree &DT = GetDomTree(F);
   LoopInfo &LI = GetLoopInfo(F);
   TaskInfo &TI = GetTaskInfo(F);
   RaceInfo &RI = GetRaceInfo(F);
@@ -3237,7 +3242,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
       // If the instruction is in a loop and can only race via ancestor, and
       // size < stride, store it.
       if (L && EnableStaticRaceDetection && LoopHoisting &&
-          SafetyInfo.isGuaranteedToExecute(Inst, DT, &TI, L)) {
+          SafetyInfo.isGuaranteedToExecute(Inst, &DT, &TI, L)) {
         // TODO: For now, only look at loads and stores.  Add atomics later.
         //       Need to add any others?
         if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst)) {
@@ -4231,7 +4236,7 @@ static void getTaskExits(
 
 bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
                                          unsigned NumSyncRegs,
-                                         DominatorTree *DT, TaskInfo &TI,
+                                         DominatorTree &DT, TaskInfo &TI,
                                          LoopInfo &LI) {
   // Only insert instrumentation if requested
   if (!(InstrumentationSet & SERIESPARALLEL))
@@ -4333,7 +4338,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
     if (isCriticalContinueEdge(DI, 1))
       ContinueBlock = SplitCriticalEdge(
           DI, 1,
-          CriticalEdgeSplittingOptions(DT, &LI).setSplitDetachContinue());
+          CriticalEdgeSplittingOptions(&DT, &LI).setSplitDetachContinue());
 
     IRBuilder<> IRB(&*ContinueBlock->getFirstInsertionPt());
     uint64_t LocalID = DetachContinueFED.add(*ContinueBlock);
@@ -4624,7 +4629,7 @@ bool CilkSanitizerImpl::instrumentAllocFnLibCall(Instruction *I,
 }
 
 bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
-                                               DominatorTree *DT,
+                                               DominatorTree &DT,
                                                const TargetLibraryInfo *TLI) {
   // Only insert instrumentation if requested
   if (!(InstrumentationSet & SHADOWMEMORY))
@@ -4672,7 +4677,7 @@ bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
     unsigned SuccNum = GetSuccessorNumber(II->getParent(), NormalBB);
     if (isCriticalEdge(II, SuccNum))
       NormalBB = SplitCriticalEdge(II, SuccNum,
-                                   CriticalEdgeSplittingOptions(DT));
+                                   CriticalEdgeSplittingOptions(&DT));
     // Insert hook into normal destination.
     {
       IRB.SetInsertPoint(&*NormalBB->getFirstInsertionPt());

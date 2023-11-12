@@ -96,7 +96,6 @@ public:
     case Intrinsic::dbg_assign:
     case Intrinsic::dbg_declare:
     case Intrinsic::dbg_value:
-    case Intrinsic::dbg_addr:
     case Intrinsic::dbg_label:
     case Intrinsic::invariant_start:
     case Intrinsic::invariant_end:

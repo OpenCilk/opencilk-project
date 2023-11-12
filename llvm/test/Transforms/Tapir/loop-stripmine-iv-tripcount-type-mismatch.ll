@@ -1,8 +1,7 @@
 ; Check that loop stripmining properly handles Tapir loops where the
 ; primary IV and the tripcount have different types.
 ;
-; RUN: opt < %s -enable-new-pm=0 -loop-stripmine -S -o - | FileCheck %s
-; RUN: opt < %s -passes='loop-stripmine' -S -o - | FileCheck %s
+; RUN: opt < %s -passes='loop-stripmine' -S | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
@@ -96,7 +95,7 @@ pfor.inc177:                                      ; preds = %pfor.body163, %pfor
 ; CHECK: %[[EPIL_ITER:.+]] = phi i32
 
 ; CHECK: pfor.inc177.epil:
-; CHECK: %[[EPIL_ITER_SUB:.+]] = sub nsw i32 %[[EPIL_ITER]], 1
+; CHECK: %[[EPIL_ITER_SUB:.+]] = sub nuw nsw i32 %[[EPIL_ITER]], 1
 ; CHECK: icmp ne i32 %[[EPIL_ITER_SUB]], 0
 
 pfor.cond.cleanup180:                             ; preds = %pfor.inc177

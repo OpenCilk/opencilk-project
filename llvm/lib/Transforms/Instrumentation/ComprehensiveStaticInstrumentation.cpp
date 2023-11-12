@@ -18,7 +18,6 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/CaptureTracking.h"
-#include "llvm/Analysis/EHPersonalities.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -30,6 +29,7 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
+#include "llvm/IR/EHPersonalities.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
@@ -2224,7 +2224,7 @@ static GlobalVariable *copyGlobalArray(const char *Array, Module &M) {
       GlobalVariable *NGV = new GlobalVariable(
           Init->getType(), GVA->isConstant(), GVA->getLinkage(), Init, "",
           GVA->getThreadLocalMode());
-      GVA->getParent()->getGlobalList().insert(GVA->getIterator(), NGV);
+      GVA->getParent()->insertGlobalVariable(GVA->getIterator(), NGV);
       return NGV;
     }
   }
@@ -2271,7 +2271,7 @@ static void restoreGlobalArray(const char *Array, Module &M,
       GlobalVariable *GVRepl = new GlobalVariable(
           CARepl->getType(), NewGV->isConstant(), NewGV->getLinkage(), CARepl,
           "", NewGV->getThreadLocalMode());
-      NewGV->getParent()->getGlobalList().insert(NewGV->getIterator(), GVRepl);
+      NewGV->getParent()->insertGlobalVariable(NewGV->getIterator(), GVRepl);
 
       // Replace the global array with the zero-initialized version.
       replaceGlobalArray(Array, M, GVRepl);

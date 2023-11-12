@@ -806,8 +806,8 @@ public:
                                             StringRef Component,
                                             bool AddArch) const;
 
-  virtual Optional<std::string> getOpenCilkBC(const llvm::opt::ArgList &Args,
-                                              StringRef Component) const;
+  virtual std::optional<std::string>
+  getOpenCilkBC(const llvm::opt::ArgList &Args, StringRef Component) const;
 
   virtual std::string getOpenCilkRTBasename(const llvm::opt::ArgList &Args,
                                             StringRef Component, FileType Type,

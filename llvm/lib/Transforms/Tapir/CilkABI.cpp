@@ -13,7 +13,6 @@
 
 #include "llvm/Transforms/Tapir/CilkABI.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopIterator.h"
@@ -27,6 +26,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/ModRef.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
