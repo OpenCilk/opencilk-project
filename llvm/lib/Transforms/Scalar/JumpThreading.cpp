@@ -323,7 +323,7 @@ bool JumpThreadingPass::runImpl(Function &F_, FunctionAnalysisManager *FAM_,
   if (!ThreadAcrossLoopHeaders)
     findLoopHeaders(*F);
 
-  findTapirTasks(F, DT);
+  findTapirTasks(*F, DT);
 
   bool EverChanged = false;
   bool Changed;

@@ -1,7 +1,7 @@
 ; Check that jump threading does not thread a detach-continue edge if
 ; it does not also thread the corresponding reattach-continue edge.
 ;
-; RUN: opt < %s -passes="cgscc(devirt<4>(inline,function<eager-inv>(loop(indvars,loop-unroll-full),gvn<>,instcombine,loop-mssa(licm<allowspeculation>)))),function<eager-inv>(loop-stripmine,jump-threading)" -S | FileCheck %s
+; RUN: opt < %s -passes="cgscc(devirt<4>(inline,function<eager-inv>(loop(indvars,loop-unroll-full),gvn<>,instcombine,loop-mssa(licm<allowspeculation>)))),function<eager-inv>(loop-stripmine,jump-threading)" -unroll-peel-max-count=0 -require-parallel-epilog -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -62,7 +62,8 @@ entry:
   %add.ptr = getelementptr i8, ptr null, i64 %1
   %add.ptr2 = getelementptr i8, ptr %add.ptr, i64 -1
   store i8 0, ptr null, align 4294967296
-  br i1 poison, label %if.then, label %for.cond
+  %cond = trunc i64 %i to i1
+  br i1 %cond, label %if.then, label %for.cond
 
 if.then:                                          ; preds = %entry
   store i1 false, ptr null, align 4294967296

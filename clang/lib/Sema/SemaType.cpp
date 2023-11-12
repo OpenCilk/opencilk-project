@@ -2430,7 +2430,7 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
   CastKind Cast = CK_BitCast;
 
   if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(E)) {
-    if (L->getValue().isNullValue())
+    if (L->getValue().isZero())
       return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
                                       CK_NullToPointer, E,
                                       nullptr, VK_PRValue,

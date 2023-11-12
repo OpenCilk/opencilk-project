@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm-c/Initialization.h"
 #include "llvm-c/Transforms/Tapir.h"
 #include "llvm/Analysis/Passes.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -33,18 +32,4 @@ void llvm::initializeTapirOpts(PassRegistry &Registry) {
   initializeDRFScopedNoAliasWrapperPassPass(Registry);
   initializeLoopStripMinePass(Registry);
   initializeSerializeSmallTasksPass(Registry);
-}
-
-void LLVMInitializeTapirOpts(LLVMPassRegistryRef R) {
-  initializeTapirOpts(*unwrap(R));
-}
-
-void LLVMAddLowerTapirToTargetPass(LLVMPassManagerRef PM)
-{
-  unwrap(PM)->add(createLowerTapirToTargetPass());
-}
-
-void LLVMAddLoopSpawningPass(LLVMPassManagerRef PM)
-{
-  unwrap(PM)->add(createLoopSpawningTIPass());
 }

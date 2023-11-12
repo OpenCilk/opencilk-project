@@ -12,14 +12,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/Outline.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/AliasAnalysis.h"
-#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/AttributeMask.h"
 #include "llvm/IR/DIBuilder.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/ModRef.h"
 #include "llvm/Support/Timer.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 

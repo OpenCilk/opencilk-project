@@ -42,10 +42,8 @@ define i32 @main() {
 ; CHECK-NEXT:    store i32 1, ptr [[N_VAL3_SPILL_ADDR_I]], align 4, !noalias !0
 ; CHECK-NEXT:    [[INPUT_SPILL_ADDR_I:%.*]] = getelementptr inbounds [[F_FRAME]], ptr [[TMP0]], i64 0, i32 2
 ; CHECK-NEXT:    store i32 2, ptr [[INPUT_SPILL_ADDR_I]], align 4, !noalias !0
-; CHECK-NEXT:    [[INPUT_RELOAD_ADDR13_I:%.*]] = getelementptr inbounds [[F_FRAME]], ptr [[TMP0]], i64 0, i32 2
-; CHECK-NEXT:    [[N_VAL3_RELOAD_ADDR11_I:%.*]] = getelementptr inbounds [[F_FRAME]], ptr [[TMP0]], i64 0, i32 1
-; CHECK-NEXT:    store i32 3, ptr [[N_VAL3_RELOAD_ADDR11_I]], align 4, !noalias !3
-; CHECK-NEXT:    store i32 4, ptr [[INPUT_RELOAD_ADDR13_I]], align 4, !noalias !3
+; CHECK-NEXT:    store i32 3, ptr [[N_VAL3_SPILL_ADDR_I]], align 4, !noalias !3
+; CHECK-NEXT:    store i32 4, ptr [[INPUT_SPILL_ADDR_I]], align 4, !noalias !3
 ; CHECK-NEXT:    tail call void @print(i32 7), !noalias !6
 ; CHECK-NEXT:    tail call void @deallocate(ptr nonnull [[TMP0]]), !noalias !6
 ; CHECK-NEXT:    ret i32 0

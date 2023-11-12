@@ -3,7 +3,7 @@
 ; value from the detach and detached.rethrow predecessors.
 ;
 ; RUN: opt < %s -passes='lcssa' -S | FileCheck %s --check-prefixes=CHECK,CHECK-LCSSA
-; RUN: opt < %s -passes='lcssa,require<opt-remark-emit>,loop-mssa(licm)' -S | FileCheck %s
+; RUN: opt < %s -passes='lcssa,require<opt-remark-emit>,loop-mssa(licm)' -S | FileCheck %s --check-prefixes=CHECK,CHECK-LCSSA
 
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -1284,8 +1284,8 @@ lpad2654.loopexit:                                ; preds = %lpad265455, %pfor.c
 
 ; CHECK: lpad2654.loopexit:
 ; CHECK-LCSSA-NEXT: phi ptr
-; CHECK-LCSSA-DAG: [ %38, %lpad265455 ]
-; CHECK-LCSSA-DAG: [ %38, %pfor.cond.i ]
+; CHECK-LCSSA-DAG: [ %[[VAL38:.+]], %lpad265455 ]
+; CHECK-LCSSA-DAG: [ %[[VAL38]], %pfor.cond.i ]
 ; CHECK-NEXT: %lpad.loopexit4 = landingpad
 
 lpad2654.loopexit.split-lp:                       ; preds = %sync.continue.i
@@ -1427,11 +1427,11 @@ lpad53150.loopexit:                               ; preds = %lpad53150151, %pfor
 
 ; CHECK: lpad53150.loopexit:
 ; CHECK-LCSSA-NEXT: phi ptr
-; CHECK-LCSSA-DAG: [ %62, %lpad53150151 ]
-; CHECK-LCSSA-DAG: [ %62, %pfor.cond.i142 ]
+; CHECK-LCSSA-DAG: [ %[[VAL62:.+]], %lpad53150151 ]
+; CHECK-LCSSA-DAG: [ %[[VAL62]], %pfor.cond.i142 ]
 ; CHECK-LCSSA-NEXT: phi ptr
-; CHECK-LCSSA-DAG: [ %38, %lpad53150151 ]
-; CHECK-LCSSA-DAG: [ %38, %pfor.cond.i142 ]
+; CHECK-LCSSA-DAG: [ %[[VAL38]], %lpad53150151 ]
+; CHECK-LCSSA-DAG: [ %[[VAL38]], %pfor.cond.i142 ]
 ; CHECK-NEXT: %lpad.loopexit1 = landingpad
 
 lpad53150.loopexit.split-lp:                      ; preds = %sync.continue.i148
@@ -1663,14 +1663,14 @@ lpad84274.loopexit:                               ; preds = %lpad84274275, %pfor
 
 ; CHECK: lpad84274.loopexit:
 ; CHECK-LCSSA-NEXT: phi ptr
-; CHECK-LCSSA-DAG: [ %99, %lpad84274275 ]
-; CHECK-LCSSA-DAG: [ %99, %pfor.cond.i266 ]
+; CHECK-LCSSA-DAG: [ %[[VAL99:.+]], %lpad84274275 ]
+; CHECK-LCSSA-DAG: [ %[[VAL99]], %pfor.cond.i266 ]
 ; CHECK-LCSSA-NEXT: phi ptr
-; CHECK-LCSSA-DAG: [ %62, %lpad84274275 ]
-; CHECK-LCSSA-DAG: [ %62, %pfor.cond.i266 ]
+; CHECK-LCSSA-DAG: [ %[[VAL62]], %lpad84274275 ]
+; CHECK-LCSSA-DAG: [ %[[VAL62]], %pfor.cond.i266 ]
 ; CHECK-LCSSA-NEXT: phi ptr
-; CHECK-LCSSA-DAG: [ %38, %lpad84274275 ]
-; CHECK-LCSSA-DAG: [ %38, %pfor.cond.i266 ]
+; CHECK-LCSSA-DAG: [ %[[VAL38]], %lpad84274275 ]
+; CHECK-LCSSA-DAG: [ %[[VAL38]], %pfor.cond.i266 ]
 ; CHECK-NEXT: %lpad.loopexit = landingpad
 
 lpad84274.loopexit.split-lp:                      ; preds = %sync.continue.i272

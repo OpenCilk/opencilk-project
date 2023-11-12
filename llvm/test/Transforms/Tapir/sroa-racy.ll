@@ -1,4 +1,7 @@
-; RUN: opt < %s -enable-new-pm=0 -tbaa -inline -sroa -loop-rotate -licm -loop-idiom -loop-unroll -gvn -S | FileCheck %s
+; Check that SROA can properly promote an alloca that is accessed in a
+; racy fashion, i.e., that phi nodes are not introduced at
+; detach-continuation blocks in the process.
+;
 ; RUN: opt < %s -aa-pipeline=basic-aa,tbaa -passes='inline,function(sroa,loop(loop-rotate),loop-mssa(licm,loop-idiom),loop-unroll,gvn)' -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -2655,7 +2658,6 @@ entry:
   br label %forall.cond
 
 ; CHECK: entry:
-; CHECK: %dudx.sroa{{.*}} = alloca double
 
 forall.cond:                                      ; preds = %forall.inc, %entry
   %__index2.0 = phi i64 [ %call2, %entry ], [ %inc, %forall.inc ]
@@ -2731,6 +2733,11 @@ forall.body:                                      ; preds = %forall.detach
   call void @llvm.lifetime.end.p0i8(i64 160, i8* %29) #3
   call void @llvm.lifetime.end.p0i8(i64 8, i8* %22) #3
   br label %forall.reattach
+
+; CHECK: forall.body:
+; Check that SROA processed the dudx variable.
+; CHECK: %dudx.sroa.{{[0-9]+}}
+; CHECK: fmul double %dudx.sroa.{{[0-9]+}}
 
 forall.reattach:                                  ; preds = %forall.body
   reattach within %syncreg, label %forall.inc

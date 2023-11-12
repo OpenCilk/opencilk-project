@@ -1,7 +1,6 @@
 ; Check that indvars transforms Tapir loops to use backedges based on
 ; equality comparions, even if the transformation might be high cost.
 ;
-; RUN: opt < %s -enable-new-pm=0 -indvars -S | FileCheck %s
 ; RUN: opt < %s -passes='indvars' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

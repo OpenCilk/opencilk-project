@@ -118,7 +118,7 @@ static void findDbgIntrinsics(SmallVectorImpl<IntrinsicT *> &Result, Value *V,
     }
   };
 
-  if (auto *L = LocalAsMetadata::getIfExists(V)) {
+  if (auto *L = ValueAsMetadata::getIfExists(V)) {
     AppendUsers(L);
     for (Metadata *AL : L->getAllArgListUsers()) {
       AppendUsers(AL);

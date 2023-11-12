@@ -175,6 +175,7 @@ static const char* GetImplicitConversionName(ImplicitConversionKind Kind) {
     "Lvalue-to-rvalue",
     "Array-to-pointer",
     "Function-to-pointer",
+    "Hyperobject to view",
     "Function pointer conversion",
     "Qualification",
     "Integral promotion",

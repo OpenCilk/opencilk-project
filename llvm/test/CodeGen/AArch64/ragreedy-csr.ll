@@ -66,16 +66,14 @@ define fastcc i32 @prune_match(ptr nocapture readonly %a, ptr nocapture readonly
 ; CHECK-NEXT:  LBB0_3: ; %cond.true.i.i
 ; CHECK-NEXT:    add x8, x14, x8, lsl #2
 ; CHECK-NEXT:    ldr w8, [x8, #60]
-; CHECK-NEXT:    and w8, w8, #0x8000
-; CHECK-NEXT:    cbnz w8, LBB0_6
+; CHECK-NEXT:    tbnz w8, #15, LBB0_6
 ; CHECK-NEXT:  LBB0_4: ; %lor.rhs
 ; CHECK-NEXT:    ldrsb x8, [x10, x11]
 ; CHECK-NEXT:    tbnz x8, #63, LBB0_8
 ; CHECK-NEXT:  ; %bb.5: ; %cond.true.i.i217
 ; CHECK-NEXT:    add x8, x14, x8, lsl #2
 ; CHECK-NEXT:    ldr w8, [x8, #60]
-; CHECK-NEXT:    and w8, w8, #0x8000
-; CHECK-NEXT:    cbz w8, LBB0_9
+; CHECK-NEXT:    tbz w8, #15, LBB0_9
 ; CHECK-NEXT:  LBB0_6: ; %while.body
 ; CHECK-NEXT:    ldrb w8, [x9, x11]
 ; CHECK-NEXT:    ldrb w15, [x10, x11]

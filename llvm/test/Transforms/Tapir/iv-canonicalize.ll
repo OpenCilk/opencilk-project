@@ -1,10 +1,7 @@
 ; Thanks to Valentin Churavy for providing this test case.
 ;
-; RUN: opt %s -enable-new-pm=0 -indvars -S | FileCheck %s -check-prefix=IV
 ; RUN: opt %s -passes='indvars' -S | FileCheck %s -check-prefix=IV
-; RUN: opt %s -enable-new-pm=0 -indvars -instcombine -S | FileCheck %s -check-prefix=IC
 ; RUN: opt %s -passes='loop(indvars),instcombine' -S | FileCheck %s -check-prefix=IC
-; RUN: opt %s -enable-new-pm=0 -indvars -instcombine -loop-spawning-ti -S | FileCheck %s -check-prefix=LS
 ; RUN: opt %s -passes='function(loop(indvars),instcombine),loop-spawning' -S | FileCheck %s -check-prefix=LS
 
 ; ModuleID = 'simple.ll'
