@@ -25,11 +25,6 @@ concurrency:
   group: llvm-project-${{ github.workflow }}-${{ inputs.projects}}${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
-env:
-  # Workaround for https://github.com/actions/virtual-environments/issues/5900.
-  # This should be a no-op for non-mac OSes
-  CPLUS_INCLUDE_PATH: /usr/local/Cellar/llvm@15/15.0.7/include/c++/v1:/usr/local/Cellar/llvm/15.0.7_1/include/c++/v1:/Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/include
-
 jobs:
   lit-tests:
     name: Lit Tests
@@ -51,11 +46,6 @@ jobs:
         uses: llvm/actions/setup-windows@main
         with:
           arch: amd64
-      - name: Check macOS (for debugging)
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          ls /Library/Developer/CommandLineTools/SDKs
-          find /usr/local -name "cmath*"
       # On Windows, starting with win19/20220814.1, cmake choose the 32-bit
       # python3.10.6 libraries instead of the 64-bit libraries when building
       # lldb.  Using this setup-python action to make 3.10 the default

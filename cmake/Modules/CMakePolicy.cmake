@@ -1,5 +1,10 @@
 # CMake policy settings shared between LLVM projects
 
+# CMP0094: Use LOCATION for Find_Python lookup strategy.
+# New in CMake 3.15: https://cmake.org/cmake/help/latest/policy/CMP0094.html
+if(POLICY CMP0094)
+  cmake_policy(SET CMP0094 NEW)
+endif()
 # CMP0114: ExternalProject step targets fully adopt their steps.
 # New in CMake 3.19: https://cmake.org/cmake/help/latest/policy/CMP0114.html
 if(POLICY CMP0114)
