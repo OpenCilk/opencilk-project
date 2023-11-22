@@ -4156,21 +4156,14 @@ def StrandMalloc : InheritableAttr {
 }
 
 def Injective : InheritableAttr {
-  // TODO: Associate this with a single argument, not the function.
   let Spellings = [Clang<"injective">];
-  let Subjects = SubjectList<[Function]>;
+  let Subjects = SubjectList<[ParmVar]>;
   let Documentation = [Undocumented];
 }
 
 def HyperView : InheritableAttr {
   let Spellings = [Clang<"hyper_view">];
-  let Subjects = SubjectList<[FunctionLike]>;
-  let Documentation = [StrandMallocDocs];
-}
-
-def HyperToken : InheritableAttr {
-  let Spellings = [Clang<"hyper_token">];
-  let Subjects = SubjectList<[FunctionLike]>;
+  let Subjects = SubjectList<[ParmVar]>;
   let Documentation = [StrandMallocDocs];
 }
 

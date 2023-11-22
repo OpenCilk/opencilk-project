@@ -7427,6 +7427,15 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
                              TLI.getFrameIndexTy(DAG.getDataLayout()),
                              getValue(I.getArgOperand(0))));
     return;
+  case Intrinsic::hyper_lookup:
+    // Return the second argument.
+    setValue(&I, getValue(I.getArgOperand(1)));
+    return;
+  case Intrinsic::tapir_frame:
+    // Return null.
+    setValue(&I,
+             DAG.getConstant(0, sdl, TLI.getPointerTy(DAG.getDataLayout())));
+    return;
   }
 }
 

@@ -16,20 +16,17 @@ declare token @llvm.syncregion.start() #2
 ; Function Attrs: nofree nosync nounwind readnone speculatable willreturn
 declare double @llvm.fmuladd.f64(double, double, double) #3
 
-; Function Attrs: hyper_view inaccessiblememonly injective nounwind readonly strand_pure willreturn
-declare i8* @llvm.hyper.lookup(i8*) #4
-
 ; Function Attrs: argmemonly nofree nosync nounwind willreturn
 declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #0
 
 ; Function Attrs: argmemonly willreturn
-declare void @llvm.detached.rethrow.sl_p0i8i32s(token, { i8*, i32 }) #5
+declare void @llvm.detached.rethrow.sl_p0i8i32s(token, { i8*, i32 }) #4
 
 ; Function Attrs: argmemonly willreturn
-declare void @llvm.sync.unwind(token) #5
+declare void @llvm.sync.unwind(token) #4
 
 ; Function Attrs: inaccessiblememonly nounwind reducer_unregister willreturn
-declare void @llvm.reducer.unregister(i8*) #6
+declare void @llvm.reducer.unregister(i8*) #5
 
 define i32 @main(i1 %cmp.i) personality i32 (...)* undef {
 entry:
@@ -149,6 +146,5 @@ attributes #0 = { argmemonly nofree nosync nounwind willreturn }
 attributes #1 = { inaccessiblememonly nounwind reducer_register willreturn }
 attributes #2 = { argmemonly nounwind willreturn }
 attributes #3 = { nofree nosync nounwind readnone speculatable willreturn }
-attributes #4 = { hyper_view inaccessiblememonly injective nounwind readonly strand_pure willreturn }
-attributes #5 = { argmemonly willreturn }
-attributes #6 = { inaccessiblememonly nounwind reducer_unregister willreturn }
+attributes #4 = { argmemonly willreturn }
+attributes #5 = { inaccessiblememonly nounwind reducer_unregister willreturn }

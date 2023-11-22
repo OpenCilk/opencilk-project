@@ -137,15 +137,19 @@ private:
   AliasResult aliasCheck(const Value *V1, LocationSize V1Size, const Value *V2,
                          LocationSize V2Size, AAQueryInfo &AAQI,
                          const Instruction *CtxI);
+  AliasResult aliasCheckTapir(const Value *V1,  const Value *V2,
+                              LocationSize Size, AAQueryInfo &AAQI,
+                              const Instruction *CtxI);
 
   AliasResult aliasCheckRecursive(const Value *V1, LocationSize V1Size,
                                   const Value *V2, LocationSize V2Size,
                                   AAQueryInfo &AAQI, const Value *O1,
                                   const Value *O2);
 
-  AliasResult checkInjectiveArguments(const Value *V1, const Value *O1,
-                                      const Value *V2, const Value *O2,
+  const Value *getViewClass(const CallBase *V, AAQueryInfo &AAQI);
+  AliasResult checkInjectiveArguments(const CallBase *C1, const CallBase *C2,
                                       AAQueryInfo &AAQI);
+
 };
 
 /// Analysis pass providing a never-invalidated alias analysis result.

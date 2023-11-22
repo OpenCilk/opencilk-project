@@ -212,13 +212,13 @@ det.achd:                                         ; preds = %pfor.body
   %sum_racy.0.load = load i64, i64* %sum_racy, align 8
   %add5 = add nsw i64 %sum_racy.0.load, %4
   store i64 %add5, i64* %sum_racy, align 8, !tbaa !7
-  %5 = call i8* @llvm.hyper.lookup.i64(i8* nonnull %0, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
+  %5 = call i8* @llvm.hyper.lookup.i64(ptr null, i8* nonnull injective %0, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
   %6 = bitcast i8* %5 to i64*
   %7 = load i64, i64* %6, align 8, !tbaa !7
   %add7 = add nsw i64 %7, %4
   store i64 %add7, i64* %6, align 8, !tbaa !7
   %8 = load i64, i64* %add.ptr.i, align 8, !tbaa !7
-  %9 = call i8* @llvm.hyper.lookup.i64(i8* nonnull %1, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
+  %9 = call i8* @llvm.hyper.lookup.i64(ptr null, i8* nonnull injective %1, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
   %10 = bitcast i8* %9 to i64*
   %11 = load i64, i64* %10, align 8, !tbaa !7
   %sub9 = sub nsw i64 %11, %8
@@ -231,13 +231,13 @@ det.cont:                                         ; preds = %det.achd, %pfor.bod
   %sum_racy.0.load91 = load i64, i64* %sum_racy, align 8
   %add11 = add nsw i64 %sum_racy.0.load91, %12
   store i64 %add11, i64* %sum_racy, align 8, !tbaa !7
-  %13 = call i8* @llvm.hyper.lookup.i64(i8* nonnull %0, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
+  %13 = call i8* @llvm.hyper.lookup.i64(ptr null, i8* nonnull injective %0, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
   %14 = bitcast i8* %13 to i64*
   %15 = load i64, i64* %14, align 8, !tbaa !7
   %add13 = add nsw i64 %15, %12
   store i64 %add13, i64* %14, align 8, !tbaa !7
   %16 = load i64, i64* %add.ptr.i79, align 8, !tbaa !7
-  %17 = call i8* @llvm.hyper.lookup.i64(i8* nonnull %1, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
+  %17 = call i8* @llvm.hyper.lookup.i64(ptr null, i8* nonnull injective %1, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
   %18 = bitcast i8* %17 to i64*
   %19 = load i64, i64* %18, align 8, !tbaa !7
   %sub15 = sub nsw i64 %19, %16
@@ -289,10 +289,10 @@ sync.continue21:                                  ; preds = %pfor.cond.cleanup
           to label %cleanup unwind label %lpad17.loopexit.split-lp
 
 cleanup:                                          ; preds = %sync.continue21, %entry
-  %21 = call i8* @llvm.hyper.lookup.i64(i8* nonnull %0, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
+  %21 = call i8* @llvm.hyper.lookup.i64(ptr null, i8* nonnull injective %0, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
   %22 = bitcast i8* %21 to i64*
   %23 = load i64, i64* %22, align 8, !tbaa !7
-  %24 = call i8* @llvm.hyper.lookup.i64(i8* nonnull %1, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
+  %24 = call i8* @llvm.hyper.lookup.i64(ptr null, i8* nonnull injective %1, i64 8, i8* bitcast (void (i8*)* @_ZN4cilkL4zeroIlEEvPv to i8*), i8* bitcast (void (i8*, i8*)* @_ZN4cilkL4plusIlEEvPvS1_ to i8*))
   %25 = bitcast i8* %24 to i64*
   %26 = load i64, i64* %25, align 8, !tbaa !7
   %sum_racy.0.load92 = load i64, i64* %sum_racy, align 8
@@ -466,8 +466,8 @@ declare void @llvm.reducer.register.i64(i8*, i64, i8*, i8*) #11
 ; Function Attrs: argmemonly mustprogress nounwind willreturn
 declare token @llvm.syncregion.start() #12
 
-; Function Attrs: hyper_view inaccessiblememonly injective mustprogress nofree nounwind readonly strand_pure willreturn
-declare i8* @llvm.hyper.lookup.i64(i8*, i64, i8*, i8*) #13
+; Function Attrs: inaccessiblememonly mustprogress nofree nounwind readonly strand_pure willreturn
+declare i8* @llvm.hyper.lookup.i64(i8*, i8*, i64, i8*, i8*) #13
 
 ; Function Attrs: argmemonly mustprogress willreturn
 declare void @llvm.sync.unwind(token) #14
@@ -503,7 +503,7 @@ attributes #9 = { argmemonly mustprogress nofree norecurse nosync nounwind uwtab
 attributes #10 = { argmemonly mustprogress nofree norecurse nosync nounwind uwtable willreturn "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #11 = { inaccessiblememonly mustprogress nounwind reducer_register willreturn }
 attributes #12 = { argmemonly mustprogress nounwind willreturn }
-attributes #13 = { hyper_view inaccessiblememonly injective mustprogress nofree nounwind readonly strand_pure willreturn }
+attributes #13 = { inaccessiblememonly mustprogress nofree nounwind readonly strand_pure willreturn }
 attributes #14 = { argmemonly mustprogress willreturn }
 attributes #15 = { nofree nounwind "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #16 = { inaccessiblememonly mustprogress nounwind reducer_unregister willreturn }

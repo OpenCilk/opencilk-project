@@ -5,7 +5,8 @@ template<typename T> struct S { T member; };
 S<long> _Hyperobject S_long;
 
 // CHECK-LABEL: @_Z1fv
-// CHECK: %0 = call ptr @llvm.hyper.lookup.i64(ptr @S_long, i64 8, ptr null, ptr null)
+// CHECK: %0 = call ptr @llvm.tapir.frame()
+// CHECK: %1 = call ptr @llvm.hyper.lookup.i64(ptr %0, ptr hyper_view injective @S_long, i64 8, ptr null, ptr null)
 // CHECK-NOT: call ptr @llvm.hyper.lookup
 // CHECK: getelementptr
 // CHECK: %[[RET:.+]] = load i64

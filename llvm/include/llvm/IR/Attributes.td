@@ -107,7 +107,7 @@ def FnRetThunkExtern : EnumAttr<"fn_ret_thunk_extern", [FnAttr]>;
 def InAlloca : TypeAttr<"inalloca", [ParamAttr]>;
 
 /// Distinct arguments to this function yield distinct return values.
-def Injective : EnumAttr<"injective", [FnAttr]>;
+def Injective : EnumAttr<"injective", [ParamAttr]>;
 
 /// Source said inlining was desirable.
 def InlineHint : EnumAttr<"inlinehint", [FnAttr]>;
@@ -216,7 +216,7 @@ def ReadNone : EnumAttr<"readnone", [ParamAttr]>;
 def ReadOnly : EnumAttr<"readonly", [ParamAttr]>;
 
 /// Tapir reducer-related attributes.
-def HyperView : EnumAttr<"hyper_view", [FnAttr]>;
+def HyperView : EnumAttr<"hyper_view", [ParamAttr]>;
 def ReducerRegister : EnumAttr<"reducer_register", [FnAttr]>;
 def ReducerUnregister : EnumAttr<"reducer_unregister", [FnAttr]>;
 

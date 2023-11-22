@@ -5429,15 +5429,27 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
                                                      Str.getPointer(), Zeros);
     return RValue::get(Ptr);
   }
+  case Builtin::BI__tapir_frame: {
+    Function *FF = CGM.getIntrinsic(Intrinsic::tapir_frame);
+    return RValue::get(Builder.CreateCall(FF, {}));
+  }
   case Builtin::BI__hyper_lookup: {
+    Function *TF = CGM.getIntrinsic(Intrinsic::tapir_frame);
+    llvm::Value *Frame = Builder.CreateCall(TF, {});
     llvm::Value *Size = EmitScalarExpr(E->getArg(1));
     Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
     llvm::Value *Ptr = EmitScalarExpr(E->getArg(0));
     llvm::Value *Identity = EmitScalarExpr(E->getArg(2));
     llvm::Value *Reduce = EmitScalarExpr(E->getArg(3));
-    return RValue::get(Builder.CreateCall(
-        F, {Ptr, Size, Builder.CreateBitCast(Identity, VoidPtrTy),
-            Builder.CreateBitCast(Reduce, VoidPtrTy)}));
+    CallInst *Call =
+      Builder.CreateCall(F,
+                         {Frame, Ptr, Size,
+                          Builder.CreateBitCast(Identity, VoidPtrTy),
+                          Builder.CreateBitCast(Reduce, VoidPtrTy)});
+    // TODO: These should be added automatically based on the function type.
+    Call->addParamAttr(1, Attribute::Injective);
+    Call->addParamAttr(1, Attribute::HyperView);
+    return RValue::get(Call);
   }
   }
   IsSpawnedScope SpawnedScp(this);
