@@ -22,7 +22,7 @@ What you expected to happen.
 
 _-OR-_
 
-Built from source: 
+Built from source:
 - `opencilk-project`: `branch` commit# (or tag)
 - `cheetah`: `branch` commit# (or tag)
 - `productivity-tools`: `branch` commit# (or tag)

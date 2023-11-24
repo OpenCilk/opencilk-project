@@ -347,7 +347,7 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   LLVMContext &Ctx = M.getContext();
 
   // We always want to save the floating point state too
-  Triple T(M.getTargetTriple()); 
+  Triple T(M.getTargetTriple());
   if (T.getArch() == Triple::x86 || T.getArch() == Triple::x86_64)
     EmitSaveFloatingPointState(B, SF);
 

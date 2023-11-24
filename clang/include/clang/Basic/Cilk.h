@@ -45,5 +45,5 @@ public:
 };
 
 } // namespace clang
- 
+
 #endif // LLVM_CLANG_BASIC_CILK_H

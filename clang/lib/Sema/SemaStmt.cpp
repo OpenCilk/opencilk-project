@@ -3425,12 +3425,6 @@ StmtResult
 Sema::ActOnBreakStmt(SourceLocation BreakLoc, Scope *CurScope) {
   Scope *S = CurScope->getBreakParent();
   if (!S) {
-    // // Break from a Cilk for loop is not allowed unless the break is
-    // // inside a nested loop or switch statement.
-    // if (isa<CilkForScopeInfo>(getCurFunction())) {
-    //   Diag(BreakLoc, diag::err_cilk_for_cannot_break);
-    //   return StmtError();
-    // }
     // C99 6.8.6.3p1: A break shall appear only in or as a switch/loop body.
     return StmtError(Diag(BreakLoc, diag::err_break_not_in_loop_or_switch));
   }

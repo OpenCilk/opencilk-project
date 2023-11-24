@@ -892,7 +892,7 @@ void down_ne_stride(size_t start, size_t end, size_t stride) {
 
 // CHECK: [[PFORCONDCLEANUP]]:
 // CHECK-NEXT: sync within %[[SYNCREG]]
-				   
+
 void down_ne_stride_flip(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = end; start != i; i -= stride)
     bar(i);

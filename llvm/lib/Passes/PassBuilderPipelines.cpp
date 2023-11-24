@@ -1244,7 +1244,7 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
                                   .needCanonicalLoops(false)
                                   .hoistCommonInsts(true)
                                   .sinkCommonInsts(true)));
- 
+
   if (IsFullLTO) {
     FPM.addPass(SCCPPass());
     FPM.addPass(InstCombinePass());

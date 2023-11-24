@@ -12,7 +12,6 @@ public:
 
   const int &getVal(int i) const { return val[i]; }
   void incVal(int i) { val[i]++; }
-  
 };
 
 int bar(int n);

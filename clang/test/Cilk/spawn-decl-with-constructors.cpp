@@ -35,7 +35,7 @@ typedef long intT;
 template <class floatT> class _point2d;
 
 template <class _floatT> class _vect2d {
-public: 
+public:
   typedef _floatT floatT;
   typedef _point2d<floatT> pointT;
   typedef _vect2d vectT;
@@ -51,18 +51,18 @@ public:
   vectT operator/(floatT s) {return vectT(x / s, y / s);}
   floatT operator[] (int i) {return (i==0) ? x : y;};
   floatT dot(vectT v) {return x * v.x + y * v.y;}
-  floatT cross(vectT v) { return x*v.y - y*v.x; }  
+  floatT cross(vectT v) { return x*v.y - y*v.x; }
   floatT maxDim() {return max(x,y);}
   floatT Length(void) { return sqrt(x*x+y*y);}
   static const int dim = 3;
 };
 
 template <class _floatT> class _point2d {
-public: 
+public:
   typedef _floatT floatT;
   typedef _vect2d<floatT> vectT;
   typedef _point2d pointT;
-  floatT x; floatT y; 
+  floatT x; floatT y;
   int dimension() {return 2;}
   _point2d(floatT xx,floatT yy) : x(xx),y(yy) {}
   _point2d() {x=0;y=0;}
@@ -86,7 +86,7 @@ public:
     floatT yy = y + ((dir & 2) ? offset : -offset);
     return pointT(xx,yy);
   }
-  bool outOfBox(pointT pt, floatT hsize) { 
+  bool outOfBox(pointT pt, floatT hsize) {
     return ((x - hsize > pt.x) || (x + hsize < pt.x) ||
 	    (y - hsize > pt.y) || (y + hsize < pt.y));
   }

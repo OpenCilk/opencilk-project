@@ -2858,8 +2858,7 @@ VarDecl::setInstantiationOfStaticDataMember(VarDecl *VD,
   getASTContext().setInstantiatedFromStaticDataMember(this, VD, TSK);
 }
 
-bool
-VarDecl::isReducer() const {
+bool VarDecl::isReducer() const {
   if (const HyperobjectType *H = getType()->getAs<HyperobjectType>())
     return H->hasCallbacks();
   return false;
