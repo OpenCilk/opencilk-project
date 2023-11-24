@@ -1291,7 +1291,7 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
     ThinLinkOS->keep();
   if (DwoOS)
     DwoOS->keep();
-    }
+}
 
 static void runThinLTOBackend(
     DiagnosticsEngine &Diags, ModuleSummaryIndex *CombinedIndex,

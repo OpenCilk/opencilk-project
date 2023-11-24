@@ -4,7 +4,7 @@
 
 extern __complex__ float _Hyperobject c;
 
-// CHECK-LABEL: get_real 
+// CHECK-LABEL: get_real
 float get_real()
 {
   // CHECK: %[[RAW1:.+]] = call ptr @llvm.hyper.lookup.i64(ptr @c, i64 8, ptr null, ptr null)

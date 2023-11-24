@@ -391,7 +391,7 @@ declare i32 @_ZL8bsr_wordi(i32 %word) #4
 declare zeroext i1 @_ZNV4Lock11lock_sharedEv(%class.Lock* %this) #7
 
 ; Function Attrs: noinline nounwind optnone uwtable
-declare void @_ZNV4Lock13unlock_sharedEv(%class.Lock* %this) #4 
+declare void @_ZNV4Lock13unlock_sharedEv(%class.Lock* %this) #4
 
 declare i32 @__gxx_personality_v0(...)
 

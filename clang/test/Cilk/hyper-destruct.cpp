@@ -9,7 +9,7 @@ public:
   Pennant();
   Pennant(T*);
   ~Pennant();
-  
+
   friend class Bag<T>;
 };
 
@@ -26,7 +26,7 @@ class Bag
 public:
   Bag();
   Bag(Bag<T>*);
-  
+
   ~Bag();
 
   static void identity(void *value);

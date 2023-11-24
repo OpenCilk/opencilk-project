@@ -2416,14 +2416,14 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
     return E;
 
   if (T->isNullPtrType())
-    return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
-                                    CK_NullToPointer, E, nullptr,
-                                    VK_PRValue, FPOptionsOverride());
+    return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
+                                    CK_NullToPointer, E, nullptr, VK_PRValue,
+                                    FPOptionsOverride());
 
   if (T->isFunctionType()) {
     E = ImplicitCastExpr::Create(Context, Context.getPointerType(T),
-                                 CK_FunctionToPointerDecay, E,
-                                 nullptr, VK_PRValue, FPOptionsOverride());
+                                 CK_FunctionToPointerDecay, E, nullptr,
+                                 VK_PRValue, FPOptionsOverride());
     T = E->getType(); // Context.getDecayedType(T);
   }
 
@@ -2432,8 +2432,7 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
   if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(E)) {
     if (L->getValue().isZero())
       return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
-                                      CK_NullToPointer, E,
-                                      nullptr, VK_PRValue,
+                                      CK_NullToPointer, E, nullptr, VK_PRValue,
                                       FPOptionsOverride());
     Cast = CK_IntegralToPointer;
   }
@@ -2451,15 +2450,15 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
   }
   // TODO: Give these types names for better error messages.
   QualType FnTy =
-    BuildFunctionType(Context.VoidTy, ArgTy, E->getExprLoc(),
-                      DeclarationName(), FunctionProtoType::ExtProtoInfo());
+      BuildFunctionType(Context.VoidTy, ArgTy, E->getExprLoc(),
+                        DeclarationName(), FunctionProtoType::ExtProtoInfo());
   FnTy = BuildPointerType(FnTy, E->getExprLoc(), DeclarationName());
 
   if (T == Context.OverloadTy) {
     DeclAccessPair What;
     bool Multiple = false;
-    if (FunctionDecl *F =
-        ResolveAddressOfOverloadedFunction(E, FnTy, true, What, &Multiple)) {
+    if (FunctionDecl *F = ResolveAddressOfOverloadedFunction(E, FnTy, true,
+                                                             What, &Multiple)) {
       T = F->getType();
       E = BuildDeclRefExpr(F, T, VK_LValue, E->getExprLoc());
       T = Context.getPointerType(T);
@@ -2469,19 +2468,18 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
   }
 
   AssignConvertType Mismatch =
-    CheckAssignmentConstraints(E->getExprLoc(), FnTy, T);
+      CheckAssignmentConstraints(E->getExprLoc(), FnTy, T);
 
   if (DiagnoseAssignmentResult(Mismatch, E->getExprLoc(), FnTy, T, E,
                                AA_Passing)) {
-    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy,
-                                            E->getExprLoc());
+    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy, E->getExprLoc());
     Cast = CK_NullToPointer;
   } else if (Mismatch == IntToPointer) {
     Cast = CK_IntegralToPointer;
   }
 
-  return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, Cast, E,
-                                  nullptr, VK_PRValue, FPOptionsOverride());
+  return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, Cast, E, nullptr,
+                                  VK_PRValue, FPOptionsOverride());
 }
 
 QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
@@ -5970,7 +5968,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     }
 
     case DeclaratorChunk::Hyperobject: {
-      T = S.BuildHyperobjectType(T, DeclType.Hyper.Arg[0], 
+      T = S.BuildHyperobjectType(T, DeclType.Hyper.Arg[0],
                                  DeclType.Hyper.Arg[1], DeclType.Loc);
       break;
     }

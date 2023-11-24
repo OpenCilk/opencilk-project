@@ -4,7 +4,7 @@
 struct event {
   float v;
   long p;
-  event(float value, long index, bool type) 
+  event(float value, long index, bool type)
     : v(value), p((index << 1) + type) {}
   event() {}
 };
@@ -25,7 +25,7 @@ struct cutInfo {
   float cutOff;
   long numLeft;
   long numRight;
-cutInfo(float _cost, float _cutOff, long nl, long nr) 
+cutInfo(float _cost, float _cutOff, long nl, long nr)
 : cost(_cost), cutOff(_cutOff), numLeft(nl), numRight(nr) {}
   cutInfo() {}
 };

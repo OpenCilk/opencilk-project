@@ -69,7 +69,7 @@ _ZN6miniFE8copy_boxERK3BoxRS0_.exit:              ; preds = %2
 if.end:                                           ; preds = %_ZN6miniFE8copy_boxERK3BoxRS0_.exit
   ; br label %if.end38
   invoke void undef(%"struct.miniFE::CSRMatrix"* null, i32 0, i32 0)
-          to label %if.end38 unwind label %lpad218  
+          to label %if.end38 unwind label %lpad218
 
 if.end38:                                         ; preds = %if.end
   br label %if.end55.split

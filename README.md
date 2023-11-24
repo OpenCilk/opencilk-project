@@ -3,7 +3,7 @@
 Welcome to the OpenCilk project!
 
 [***OpenCilk***][SchardlLe23] is a state-of-the-art open-source
-implementation of the Cilk task-parallel programming platform. 
+implementation of the Cilk task-parallel programming platform.
 OpenCilk supports writing fast parallel programs using the Cilk
 task-parallel language extensions to C/C++.  In addition, OpenCilk
 provides a platform to develop compilers, runtime systems, and
@@ -226,11 +226,11 @@ For a given Cilk program and input, Cilksan is guaranteed to either detect a
 determinacy race, if one exists, or certify that the program is
 determinacy-race free.  Cilksan is therefore useful for debugging and
 regression-testing race bugs in Cilk programs.
-  
+
 For each race that Cilksan detects, it will produce a race report that
 includes the memory address being raced on and the call stacks of the two
 instructions involved in the race.  Cilksan will avoid reporting races where
-both racing instructions are atomic operations or protected by a common lock.  
+both racing instructions are atomic operations or protected by a common lock.
 
 To use Cilksan, compile and link the Cilk program with the additional
 flag `-fsanitize=cilk`, and then run it normally.  It is also recommended
@@ -285,8 +285,8 @@ scheduling overhead.
 To use Cilkscale, compile and link the Cilk program with the additional
 flag `-fcilktool=cilkscale`, and then run the program normally.
 
-By default,Cilkscale reports these measurements in CSV format.  Here is an
-example of Cilkscale's output.
+By default, Cilkscale reports these measurements in CSV format.  Here
+is an example of Cilkscale's output.
 ```
 tag,work (seconds),span (seconds),parallelism,burdened_span (seconds),burdened_parallelism
 ,2.07768,0.195024,10.6535,0.195386,10.6337
@@ -295,7 +295,7 @@ You can redirect Cilkscale's output to a file by setting the
 `CILKSCALE_OUT` environment variable to that filename.
 
 By default, Cilkscale measures the whole program execution.  Cilkscale also
-provides a library API, similar to `clock_gettime()`, to measure specific 
+provides a library API, similar to `clock_gettime()`, to measure specific
 regions of the program.  To measure a particular region in a Cilk program:
 1. Include the Cilkscale header file, `cilk/cilkscale.h`, in the source
    program.
@@ -368,7 +368,7 @@ int sum_array(int *array, size_t n) {
   cilk_for (size_t i = 0; i < n; ++i)
     sum += array[i];
   return sum;
-}  
+}
 ```
 In this example, the function `zero_i` sets the identity value to be the
 integer `0`, and `plus_i` defines a binary reduction of adding two
@@ -422,7 +422,7 @@ double estimatePi(int64_t n) {
     double x = static_cast<double>(xSample) / maxValue;
     double y = static_cast<double>(ySample) / maxValue;
     double m = (x * x) + (y * y);
-    
+
     // Check if sample is inside of the circle
     if (m <= 1)
       ++inside;
@@ -436,7 +436,7 @@ OpenCilk also supports the
 [pedigree runtime mechanism](https://dl.acm.org/doi/10.1145/2145816.2145841)
 for user-defined DPRNGs, using the same `cilk/cilk_api.h` header and
 `-lopencilk-pedigrees` library.  At any point in a Cilk program, the
-`__cilkrts_get_pedigree()` function returns the current pedigree in the 
+`__cilkrts_get_pedigree()` function returns the current pedigree in the
 form of a singly linked list of `__cilkrts_pedigree` nodes.
 
 ## OpenCilk's system architecture
@@ -575,7 +575,7 @@ Found a bug in OpenCilk?  Please report it on the
 [issue tracker](https://github.com/OpenCilk/opencilk-project/issues).
 
 Have a question or comment?  Start a thread on the
-[Discussions page](https://github.com/orgs/OpenCilk/discussions) or send us 
+[Discussions page](https://github.com/orgs/OpenCilk/discussions) or send us
 an email at [contact@opencilk.org](mailto:contact@opencilk.org).
 
 Want to contribute to the OpenCilk project?  We welcome your

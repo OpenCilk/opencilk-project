@@ -34,7 +34,7 @@ void syncreg_loop(int n) {
   _Cilk_for(int i = 0; i < n; ++i) {
     baz(i);
   }
-}  
+}
 
 // CHECK-LABEL: mixed_spawn_and_loop(
 int mixed_spawn_and_loop(int n) {
