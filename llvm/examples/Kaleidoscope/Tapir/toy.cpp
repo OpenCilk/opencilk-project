@@ -916,7 +916,50 @@ static Value *TaskScopeSyncRegion = nullptr;
 // Flags controlled from the command line.
 static bool Optimize = true;
 static bool RunCilksan = false;
-static bool PrintIR = false;
+enum PrintIRLevel {
+  PrintIR_None = 0,
+  PrintIR_BeforeOpt = 0x1,
+  PrintIR_BeforeTapirLowering = 0x2,
+  PrintIR_AfterTapirLoopSpawning = 0x4,
+  PrintIR_AfterTapirLowering = 0x8,
+};
+static bool PrintIRBeforeOpt(PrintIRLevel Level) {
+  return (static_cast<int>(Level) & static_cast<int>(PrintIR_BeforeOpt)) ==
+         static_cast<int>(PrintIR_BeforeOpt);
+}
+static bool PrintIRBeforeTapirLowering(PrintIRLevel Level) {
+  return (static_cast<int>(Level) &
+          static_cast<int>(PrintIR_BeforeTapirLowering)) ==
+         static_cast<int>(PrintIR_BeforeTapirLowering);
+}
+static bool PrintIRAfterTapirLoopSpawning(PrintIRLevel Level) {
+  return (static_cast<int>(Level) &
+          static_cast<int>(PrintIR_AfterTapirLoopSpawning)) ==
+         static_cast<int>(PrintIR_AfterTapirLoopSpawning);
+}
+static bool PrintIRAfterTapirLowering(PrintIRLevel Level) {
+  return (static_cast<int>(Level) &
+          static_cast<int>(PrintIR_AfterTapirLowering)) ==
+         static_cast<int>(PrintIR_AfterTapirLowering);
+}
+static PrintIRLevel setPrintIRBeforeOpt(PrintIRLevel Level) {
+  return static_cast<PrintIRLevel>(static_cast<int>(Level) |
+                                   static_cast<int>(PrintIR_BeforeOpt));
+}
+static PrintIRLevel setPrintIRBeforeTapirLowering(PrintIRLevel Level) {
+  return static_cast<PrintIRLevel>(
+      static_cast<int>(Level) | static_cast<int>(PrintIR_BeforeTapirLowering));
+}
+static PrintIRLevel setPrintIRAfterTapirLoopSpawning(PrintIRLevel Level) {
+  return static_cast<PrintIRLevel>(
+      static_cast<int>(Level) |
+      static_cast<int>(PrintIR_AfterTapirLoopSpawning));
+}
+static PrintIRLevel setPrintIRAfterTapirLowering(PrintIRLevel Level) {
+  return static_cast<PrintIRLevel>(
+      static_cast<int>(Level) | static_cast<int>(PrintIR_AfterTapirLowering));
+}
+static PrintIRLevel PrintIRLvl = PrintIR_None;
 // Options related to Tapir lowering.
 static TapirTargetID TheTapirTarget;
 static std::string OpenCilkRuntimeBCPath;
@@ -1759,6 +1802,11 @@ Function *FunctionAST::codegen() {
 static void AddTapirLoweringPasses(ModulePassManager &MPM);
 
 static void CreateOptimizationPassPipeline(ModulePassManager &MPM) {
+  if (PrintIRBeforeOpt(PrintIRLvl)) {
+    MPM.addPass(createModuleToFunctionPassAdaptor(
+        PrintFunctionPass(errs(), "IR dump before optimizations")));
+  }
+
   if (Optimize) {
     FunctionPassManager FPM;
     // Promote memory to registers.
@@ -1781,6 +1829,11 @@ static void CreateOptimizationPassPipeline(ModulePassManager &MPM) {
   if (RunCilksan) {
     MPM.addPass(CSISetupPass());
     MPM.addPass(CilkSanitizerPass());
+  }
+
+  if (PrintIRBeforeTapirLowering(PrintIRLvl)) {
+    MPM.addPass(createModuleToFunctionPassAdaptor(
+        PrintFunctionPass(errs(), "IR dump before Tapir lowering")));
   }
 
   // Add Tapir lowering passes.
@@ -1827,6 +1880,10 @@ static void AddTapirLoweringPasses(ModulePassManager &MPM) {
       // The LoopSpawning pass may leave cruft around.  Clean it up.
       MPM.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
     }
+
+    if (PrintIRAfterTapirLoopSpawning(PrintIRLvl)) {
+      MPM.addPass(PrintModulePass(errs(), "IR dump after Tapir loop spawning"));
+    }
   }
 
   // Second, lower Tapir constructs in general to some parallel runtime system,
@@ -1849,6 +1906,10 @@ static void AddTapirLoweringPasses(ModulePassManager &MPM) {
     MPM.addPass(AlwaysInlinerPass(
                         /*InsertLifetimeIntrinsics=*/false));
     MPM.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
+
+    if (PrintIRAfterTapirLowering(PrintIRLvl)) {
+      MPM.addPass(PrintModulePass(errs(), "IR dump after Tapir lowering"));
+    }
   }
 }
 
@@ -1963,7 +2024,7 @@ static int usage(char *argv[]) {
          << " [-h|--help]"
          << " [--lower-tapir-to {cilk|none}]"
          << " [--run-cilksan]"
-         << " [--print-ir]"
+         << " [--print-ir {before-opt|before-tapir-lowering|after-tapir-loop-spawning|after-tapir-lowering|all}]"
          << " [-O[0-3]]"
          << "\n";
   return 1;
@@ -1989,7 +2050,22 @@ int main(int argc, char *argv[]) {
     } else if (std::string(argv[i]) == "--run-cilksan") {
       RunCilksan = true;
     } else if (std::string(argv[i]) == "--print-ir") {
-      PrintIR = true;
+      // PrintIR = true;
+      std::string level = std::string(argv[++i]);
+      if (level == "before-opt" || level == "all") {
+        PrintIRLvl = setPrintIRBeforeOpt(PrintIRLvl);
+      }
+      if (level == "before-tapir-lowering" || level == "all") {
+        PrintIRLvl = setPrintIRBeforeTapirLowering(PrintIRLvl);
+      }
+      if (level == "after-tapir-loop-spawning" || level == "all") {
+        PrintIRLvl = setPrintIRAfterTapirLoopSpawning(PrintIRLvl);
+      }
+      if (level == "after-tapir-lowering" || level == "all") {
+        PrintIRLvl = setPrintIRAfterTapirLowering(PrintIRLvl);
+      }
+      if (PrintIRLvl == PrintIR_None)
+        return usage(argv);
     } else if (std::string(argv[i]) == "-O0") {
       Optimize = false;
     } else if ((std::string(argv[i]) == "-O1") ||
