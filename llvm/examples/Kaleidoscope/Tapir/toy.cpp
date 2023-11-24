@@ -2,7 +2,22 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Analysis/AliasAnalysisEvaluator.h"
+#include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/BasicAliasAnalysis.h"
+#include "llvm/Analysis/BlockFrequencyInfo.h"
+#include "llvm/Analysis/BranchProbabilityInfo.h"
+#include "llvm/Analysis/CallGraph.h"
+#include "llvm/Analysis/DependenceAnalysis.h"
+#include "llvm/Analysis/MemoryDependenceAnalysis.h"
+#include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Analysis/OptimizationRemarkEmitter.h"
+#include "llvm/Analysis/PostDominators.h"
+#include "llvm/Analysis/ProfileSummaryInfo.h"
+#include "llvm/Analysis/TapirRaceDetect.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -12,23 +27,36 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/Support/Host.h"
+#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Instrumentation/CilkSanitizer.h"
+#include "llvm/Transforms/Instrumentation/ComprehensiveStaticInstrumentation.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Scalar/IndVarSimplify.h"
+#include "llvm/Transforms/Scalar/LICM.h"
+#include "llvm/Transforms/Scalar/LoopInstSimplify.h"
+#include "llvm/Transforms/Scalar/LoopPassManager.h"
+#include "llvm/Transforms/Scalar/LoopRotation.h"
+#include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
+#include "llvm/Transforms/Scalar/Reassociate.h"
+#include "llvm/Transforms/Scalar/SROA.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Tapir.h"
+#include "llvm/Transforms/Tapir/LoopSpawningTI.h"
 #include "llvm/Transforms/Tapir/TapirToTarget.h"
+#include "llvm/Transforms/Utils.h"
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -871,8 +899,6 @@ static std::unique_ptr<LLVMContext> TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<IRBuilder<>> Builder;
 static std::map<std::string, Value *> NamedValues;
-static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
-static std::unique_ptr<legacy::PassManager> TheMPM;
 static std::unique_ptr<KaleidoscopeJIT> TheJIT;
 static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
 static ExitOnError ExitOnErr;
@@ -1107,7 +1133,7 @@ Value *IfExprAST::codegen() {
   ThenBB = Builder->GetInsertBlock();
 
   // Emit else block.
-  TheFunction->getBasicBlockList().push_back(ElseBB);
+  TheFunction->insert(TheFunction->end(), ElseBB);
   Builder->SetInsertPoint(ElseBB);
 
   Value *ElseV = Else->codegen();
@@ -1119,7 +1145,7 @@ Value *IfExprAST::codegen() {
   ElseBB = Builder->GetInsertBlock();
 
   // Emit merge block.
-  TheFunction->getBasicBlockList().push_back(MergeBB);
+  TheFunction->insert(TheFunction->end(), MergeBB);
   Builder->SetInsertPoint(MergeBB);
   bool IntegerType = (ThenV->getType()->isIntegerTy() &&
                       ElseV->getType()->isIntegerTy());
@@ -1233,7 +1259,7 @@ Value *ForExprAST::codegen() {
   Builder->CreateBr(CondBB);
 
   // Emit the "after loop" block.
-  TheFunction->getBasicBlockList().push_back(AfterBB);
+  TheFunction->insert(TheFunction->end(), AfterBB);
 
   // Any new code will be inserted in AfterBB.
   Builder->SetInsertPoint(AfterBB);
@@ -1365,7 +1391,7 @@ Value *SpawnExprAST::codegen() {
     Builder->CreateReattach(ContinueBB, SyncRegion);
   }
 
-  TheFunction->getBasicBlockList().push_back(ContinueBB);
+  TheFunction->insert(TheFunction->end(), ContinueBB);
   Builder->SetInsertPoint(ContinueBB);
 
   // Return a default value of 0.0.
@@ -1531,7 +1557,7 @@ Value *ParForExprAST::codegen() {
   }
 
   // Emit the continue block of the detach.
-  TheFunction->getBasicBlockList().push_back(ContinueBB);
+  TheFunction->insert(TheFunction->end(), ContinueBB);
 
   // Set the insertion point to the continue block of the detach.
   Builder->SetInsertPoint(ContinueBB);
@@ -1557,7 +1583,7 @@ Value *ParForExprAST::codegen() {
   // loop.
   std::vector<Metadata *> LoopMetadata = GetTapirLoopMetadata();
   if (!LoopMetadata.empty()) {
-    auto TempNode = MDNode::getTemporary(*TheContext, None);
+    auto TempNode = MDNode::getTemporary(*TheContext, std::nullopt);
     LoopMetadata.insert(LoopMetadata.begin(), TempNode.get());
     auto LoopID = MDNode::get(*TheContext, LoopMetadata);
     LoopID->replaceOperandWith(0, LoopID);
@@ -1568,7 +1594,7 @@ Value *ParForExprAST::codegen() {
   Variable->addIncoming(NextVar, ContinueBB);
 
   // Emit the "after loop" block.
-  TheFunction->getBasicBlockList().push_back(AfterBB);
+  TheFunction->insert(TheFunction->end(), AfterBB);
 
   // Any new code will be inserted in AfterBB.
   Builder->SetInsertPoint(AfterBB);
@@ -1608,6 +1634,64 @@ Function *PrototypeAST::codegen() {
   return F;
 }
 
+static void CreateOptimizationPassPipeline(ModulePassManager &MPM);
+
+static void RunOptimizations() {
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  ModuleAnalysisManager MAM;
+
+  // Create TargetLibraryInfo for setting the target of Tapir lowering.
+  Triple TargetTriple(TheModule->getTargetTriple());
+  TargetLibraryInfoImpl TLII(TargetTriple);
+
+  // Set the target for Tapir lowering to the Cilk runtime system.
+  TLII.setTapirTarget(TheTapirTarget);
+  if (TapirTargetID::OpenCilk == TheTapirTarget)
+    TLII.setTapirTargetOptions(
+        std::make_unique<OpenCilkABIOptions>(OpenCilkRuntimeBCPath));
+
+  // Add the TargetLibraryInfo to the pass manager.
+  FAM.registerPass([&] { return TargetLibraryAnalysis(TLII); });
+  // Register necessary analyses.
+  FAM.registerPass([&] {
+    AAManager AA;
+    AA.registerFunctionAnalysis<BasicAA>();
+    return AA;
+  });
+  FAM.registerPass([&] { return AssumptionAnalysis(); });
+  FAM.registerPass([&] { return BasicAA(); });
+  FAM.registerPass([&] { return BlockFrequencyAnalysis(); });
+  FAM.registerPass([&] { return BranchProbabilityAnalysis(); });
+  FAM.registerPass([&] { return DependenceAnalysis(); });
+  FAM.registerPass([&] { return DominatorTreeAnalysis(); });
+  FAM.registerPass([&] { return LoopAnalysis(); });
+  FAM.registerPass([&] { return MemoryDependenceAnalysis(); });
+  FAM.registerPass([&] { return MemorySSAAnalysis(); });
+  FAM.registerPass([&] { return OptimizationRemarkEmitterAnalysis(); });
+  FAM.registerPass([&] { return PostDominatorTreeAnalysis(); });
+  FAM.registerPass([&] { return ScalarEvolutionAnalysis(); });
+  FAM.registerPass([&] { return TapirRaceDetect(); });
+  FAM.registerPass([&] { return TargetIRAnalysis(); });
+  FAM.registerPass([&] { return TaskAnalysis(); });
+  LAM.registerPass([&] { return PassInstrumentationAnalysis(); });
+  FAM.registerPass([&] { return PassInstrumentationAnalysis(); });
+  MAM.registerPass([&] { return CallGraphAnalysis(); });
+  MAM.registerPass([&] { return PassInstrumentationAnalysis(); });
+  MAM.registerPass([&] { return ProfileSummaryAnalysis(); });
+  // Cross-register analysis proxies.
+  MAM.registerPass([&] { return FunctionAnalysisManagerModuleProxy(FAM); });
+  FAM.registerPass([&] { return ModuleAnalysisManagerFunctionProxy(MAM); });
+  FAM.registerPass([&] { return LoopAnalysisManagerFunctionProxy(LAM); });
+  LAM.registerPass([&] { return FunctionAnalysisManagerLoopProxy(FAM); });
+
+  // Build the optimization pipeline.
+  ModulePassManager MPM;
+  CreateOptimizationPassPipeline(MPM);
+  // Run the optimizer on the function.
+  MPM.run(*TheModule, MAM);
+}
+
 Function *FunctionAST::codegen() {
   // Transfer ownership of the prototype to the FunctionProtos map, but keep a
   // reference to it for use below.
@@ -1645,16 +1729,17 @@ Function *FunctionAST::codegen() {
       RetVal = Builder->CreateSIToFP(RetVal, Type::getDoubleTy(*TheContext));
     Builder->CreateRet(RetVal);
 
-    // Validate the generated code, checking for consistency.
-    verifyFunction(*TheFunction);
+    TheFunction->setDoesNotThrow();
 
     // Mark the function for race-detection
     if (RunCilksan)
       TheFunction->addFnAttr(Attribute::SanitizeCilk);
 
+    // Validate the generated code, checking for consistency.
+    verifyFunction(*TheFunction);
+
     // Run the optimizer on the function.
-    TheFPM->run(*TheFunction);
-    TheMPM->run(*TheModule.get());
+    RunOptimizations();
 
     return TheFunction;
   }
@@ -1671,31 +1756,76 @@ Function *FunctionAST::codegen() {
 // Top-Level parsing and JIT Driver
 //===----------------------------------------------------------------------===//
 
-static void AddTapirLoweringPasses() {
+static void AddTapirLoweringPasses(ModulePassManager &MPM);
+
+static void CreateOptimizationPassPipeline(ModulePassManager &MPM) {
+  if (Optimize) {
+    FunctionPassManager FPM;
+    // Promote memory to registers.
+    FPM.addPass(SROAPass(SROAOptions::ModifyCFG));
+    // Catch trivial redundancies
+    FPM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    FPM.addPass(InstCombinePass());
+    // Reassociate expressions.
+    FPM.addPass(ReassociatePass());
+    // Eliminate Common SubExpressions.
+    FPM.addPass(GVNPass());
+    // Simplify the control flow graph (deleting unreachable blocks, etc).
+    FPM.addPass(SimplifyCFGPass());
+
+    MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+  }
+
+  // If requested, run the CilkSanitizer pass.
+  if (RunCilksan) {
+    MPM.addPass(CSISetupPass());
+    MPM.addPass(CilkSanitizerPass());
+  }
+
+  // Add Tapir lowering passes.
+  AddTapirLoweringPasses(MPM);
+}
+
+static void AddTapirLoweringPasses(ModulePassManager &MPM) {
   // First, handle Tapir loops.  Loops are handled by first canonicalizing their
   // representation and then performing LoopSpawning to ensure that iterations
   // are spawned efficiently in parallel.
-
   if (Optimize) {
+    FunctionPassManager FPM;
+    LoopPassManager LPM1, LPM2;
     // Start by simplifying the loops.
-    TheMPM->add(createLoopInstSimplifyPass());
-    TheMPM->add(createLoopSimplifyCFGPass());
+    LPM1.addPass(LoopInstSimplifyPass());
+    LPM1.addPass(LoopSimplifyCFGPass());
     // Hoist loop invariants
-    TheMPM->add(createLICMPass());
+    LPM1.addPass(LICMPass(/*LicmMssaOptCap*/ 100,
+                          /*LicmMssaNoAccForPromotionCap*/ 250,
+                          /*AllowSpeculation=*/true));
     // Cleanup the CFG and instructions
-    TheMPM->add(createCFGSimplificationPass());
-    TheMPM->add(createInstructionCombiningPass());
+    FPM.addPass(
+        RequireAnalysisPass<OptimizationRemarkEmitterAnalysis, Function>());
+    FPM.addPass(
+        createFunctionToLoopPassAdaptor(std::move(LPM1), /*UseMemorySSA=*/true,
+                                        /*UseBlockFrequencyInfo=*/true));
+    FPM.addPass(SimplifyCFGPass());
+    FPM.addPass(InstCombinePass());
     // Re-rotate loops in all our loop nests.
-    TheMPM->add(createLoopRotatePass(-1));
+    LPM2.addPass(LoopRotatePass(/* Disable header duplication */ true,
+                                /* isLTOPreLink */ false));
     // Simplify the loop induction variables.
-    TheMPM->add(createIndVarSimplifyPass());
+    LPM2.addPass(IndVarSimplifyPass());
+    FPM.addPass(
+        createFunctionToLoopPassAdaptor(std::move(LPM2),
+                                        /*UseMemorySSA=*/false,
+                                        /*UseBlockFrequencyInfo=*/false));
+    MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 
     // Transform Tapir loops to ensure that iterations are spawned efficiently
     // in parallel.
     if (TheTapirTarget != TapirTargetID::None) {
-      TheMPM->add(createLoopSpawningTIPass());
+      MPM.addPass(LoopSpawningPass());
       // The LoopSpawning pass may leave cruft around.  Clean it up.
-      TheMPM->add(createCFGSimplificationPass());
+      MPM.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
     }
   }
 
@@ -1704,23 +1834,25 @@ static void AddTapirLoweringPasses() {
 
   // Add pass to lower Tapir to the target runtime.
   if (TheTapirTarget != TapirTargetID::None) {
-    TheMPM->add(createLowerTapirToTargetPass());
+    MPM.addPass(TapirToTargetPass());
 
     if (Optimize) {
-      TheMPM->add(createSROAPass());
-      TheMPM->add(createEarlyCSEPass());
-      TheMPM->add(createCFGSimplificationPass());
-      TheMPM->add(createInstructionCombiningPass());
-      TheMPM->add(createAlwaysInlinerLegacyPass());
+      FunctionPassManager FPM;
+      FPM.addPass(SROAPass(SROAOptions::ModifyCFG));
+      FPM.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
+      FPM.addPass(SimplifyCFGPass());
+      FPM.addPass(InstCombinePass());
+      MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
     }
 
     // Perform some cleanup after the lowering pass.
-    TheMPM->add(createCFGSimplificationPass());
-    TheMPM->add(createAlwaysInlinerLegacyPass());
+    MPM.addPass(AlwaysInlinerPass(
+                        /*InsertLifetimeIntrinsics=*/false));
+    MPM.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
   }
 }
 
-static void InitializeModuleAndPassManager() {
+static void InitializeModule() {
   // Open a new module.
   TheContext = std::make_unique<LLVMContext>();
   std::string ModuleName;
@@ -1736,48 +1868,6 @@ static void InitializeModuleAndPassManager() {
 
   // Create a new builder for the module.
   Builder = std::make_unique<IRBuilder<>>(*TheContext);
-
-  // Create a new pass manager attached to it.
-  TheMPM = std::make_unique<legacy::PassManager>();
-  TheFPM = std::make_unique<legacy::FunctionPassManager>(TheModule.get());
-
-  // Create TargetLibraryInfo for setting the target of Tapir lowering.
-  Triple TargetTriple(TheModule->getTargetTriple());
-  TargetLibraryInfoImpl TLII(TargetTriple);
-
-  // Set the target for Tapir lowering to the Cilk runtime system.
-  TLII.setTapirTarget(TheTapirTarget);
-  if (TapirTargetID::OpenCilk == TheTapirTarget)
-    TLII.setTapirTargetOptions(
-        std::make_unique<OpenCilkABIOptions>(OpenCilkRuntimeBCPath));
-
-  // Add the TargetLibraryInfo to the pass manager.
-  TheMPM->add(new TargetLibraryInfoWrapperPass(TLII));
-
-  if (Optimize) {
-    // Promote allocas to registers.
-    TheFPM->add(createPromoteMemoryToRegisterPass());
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
-    TheFPM->add(createInstructionCombiningPass());
-    // Reassociate expressions.
-    TheFPM->add(createReassociatePass());
-    // Eliminate Common SubExpressions.
-    TheFPM->add(createGVNPass());
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
-    TheFPM->add(createCFGSimplificationPass());
-
-    TheFPM->doInitialization();
-  }
-
-  // If requested, run the CilkSanitizer pass.
-  if (RunCilksan)
-    TheMPM->add(createCilkSanitizerLegacyPass(/*CallsMayThrow*/false));
-
-  if (PrintIR)
-    TheMPM->add(createPrintFunctionPass(errs(), "IR dump"));
-
-  // Add Tapir lowering passes.
-  AddTapirLoweringPasses();
 }
 
 static void HandleDefinition() {
@@ -1785,7 +1875,7 @@ static void HandleDefinition() {
     if (auto *FnIR = FnAST->codegen()) {
       ExitOnErr(TheJIT->addModule(
           ThreadSafeModule(std::move(TheModule), std::move(TheContext))));
-      InitializeModuleAndPassManager();
+      InitializeModule();
     }
   } else {
     // Skip token for error recovery.
@@ -1814,7 +1904,7 @@ static void HandleTopLevelExpression() {
 
       auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
       ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
-      InitializeModuleAndPassManager();
+      InitializeModule();
 
       // Search the JIT for the __anon_expr symbol.
       auto ExprSymbol = ExitOnErr(TheJIT->lookup("__anon_expr"));
@@ -1826,7 +1916,7 @@ static void HandleTopLevelExpression() {
         std::make_unique<Timer>("__anon_expr", "Top-level expression");
       // Get the symbol's address and cast it to the right type (takes no
       // arguments, returns a double) so we can call it as a native function.
-      double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();
+      double (*FP)() = ExprSymbol.getAddress().toPtr<double (*)()>();
       T->startTimer();
       double Result = FP();
       T->stopTimer();
@@ -1911,11 +2001,17 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  // Get the system architecture name.
+  Triple SysTriple(sys::getDefaultTargetTriple());
+  StringRef ArchName = SysTriple.getArchName();
+
   if (TapirTargetID::OpenCilk == TheTapirTarget) {
     // Set the path to the OpenCilk runtime-ABI bitcode file.
-    Optional<std::string> Path =
-        sys::Process::FindInEnvPath("LIBRARY_PATH", "libopencilk-abi.bc");
-    if (!Path.hasValue()) {
+    std::optional<std::string> Path = sys::Process::FindInEnvPath(
+        "LIBRARY_PATH", ("libopencilk-abi-" + ArchName + ".bc").str());
+    if (!Path.has_value())
+      Path = sys::Process::FindInEnvPath("LIBRARY_PATH", "libopencilk-abi.bc");
+    if (!Path.has_value()) {
       errs() << "Error: Cannot find OpenCilk runtime-ABI bitcode file "
                 "LIBRARY_PATH.\n";
       return 1;
@@ -1942,16 +2038,24 @@ int main(int argc, char *argv[]) {
   TheJIT = ExitOnErr(KaleidoscopeJIT::Create());
 
   if (TapirTargetID::OpenCilk == TheTapirTarget) {
-    Optional<std::string> Path =
-        sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk-personality-c.so");
-    if (!Path.hasValue()) {
+    // Link the OpenCilk runtime library.
+    std::optional<std::string> Path = sys::Process::FindInEnvPath(
+        "LD_LIBRARY_PATH",
+        ("libopencilk-personality-c-" + ArchName + ".so").str());
+    if (!Path.has_value())
+      Path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH",
+                                         "libopencilk-personality-c.so");
+    if (!Path.has_value()) {
       errs() << "Error: Cannot find OpenCilk runtime library in "
                 "LD_LIBRARY_PATH.\n";
       return 1;
     }
     TheJIT->loadLibrary(Path->c_str());
-    Path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk.so");
-    if (!Path.hasValue()) {
+    Path = sys::Process::FindInEnvPath(
+        "LD_LIBRARY_PATH", ("libopencilk-" + ArchName + ".so").str());
+    if (!Path.has_value())
+      Path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk.so");
+    if (!Path.has_value()) {
       errs() << "Error: Cannot find OpenCilk runtime library in "
                 "LD_LIBRARY_PATH.\n";
       return 1;
@@ -1961,9 +2065,12 @@ int main(int argc, char *argv[]) {
 
   if (RunCilksan) {
     // Add the Cilksan runtime library.
-    Optional<std::string> Path = sys::Process::FindInEnvPath(
-        "LD_LIBRARY_PATH", "libclang_rt.cilksan.so");
-    if (!Path.hasValue()) {
+    std::optional<std::string> Path = sys::Process::FindInEnvPath(
+        "LD_LIBRARY_PATH", ("libclang_rt.cilksan-" + ArchName + ".so").str());
+    if (!Path.has_value())
+      Path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH",
+                                         "libclang_rt.cilksan.so");
+    if (!Path.has_value()) {
       errs()
           << "Error: Cannot find Cilksan runtime library in LD_LIBRARY_PATH.\n";
       return 1;
@@ -1971,7 +2078,7 @@ int main(int argc, char *argv[]) {
     TheJIT->loadLibrary(Path->c_str());
   }
 
-  InitializeModuleAndPassManager();
+  InitializeModule();
 
   // Run the main "interpreter loop" now.
   MainLoop();

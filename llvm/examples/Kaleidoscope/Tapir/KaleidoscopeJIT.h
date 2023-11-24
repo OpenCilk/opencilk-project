@@ -23,6 +23,7 @@
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/Orc/Shared/ExecutorSymbolDef.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
@@ -181,20 +182,20 @@ public:
       return LookupResult.takeError();
 
     // Collect the addresses of those symbols.
-    std::vector<JITTargetAddress> Initializers;
+    std::vector<ExecutorAddr> Initializers;
     auto InitsItr = LookupResult->find(&MainJD);
     for (auto &KV : InitsItr->second)
       Initializers.push_back(KV.second.getAddress());
 
     // Run all initializer functions.
     for (auto InitFnAddr : Initializers) {
-      auto *InitFn = jitTargetAddressToFunction<void (*)()>(InitFnAddr);
+      auto *InitFn = InitFnAddr.toPtr<void (*)()>();
       InitFn();
     }
     return Error::success();
   }
 
-  Expected<JITEvaluatedSymbol> lookup(StringRef Name) {
+  Expected<ExecutorSymbolDef> lookup(StringRef Name) {
     return ES->lookup({&MainJD}, Mangle(Name.str()));
   }
 };
