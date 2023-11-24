@@ -1,5 +1,12 @@
-# RUN: Kaleidoscope-Tapir < %s 2>&1 | FileCheck %s
-# NOREQUIRES: default_triple
+# FIXME: Enhance this test to lower Tapir to a parallel runtime
+# system, to test Tapir lowering.
+# FIXME: Enhance this test to run the code using Cilksan.
+#
+# Due to standing limitations with OrcJIT, both of these changes
+# require a runtime system that uses emulated TLS for any TLS.
+
+# RUN: Kaleidoscope-Tapir -O1 --lower-tapir-to none --print-ir before-tapir-lowering < %s 2>&1 | FileCheck %s
+# REQUIRES: default_triple
 
 # Sequence operator and iterative fibonacci function to test user defined vars.
 def binary : 1 (x y) y;
@@ -10,8 +17,41 @@ def fib(n)
   else
     var x, y in (spawn x = fib(n-1)) : y = fib(n-2) : sync : (x+y);
 
+# CHECK-LABEL: define double @fib(
+# CHECK: %x = alloca double
+# CHECK: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[CONTINUE:.+]]
+# CHECK: [[DETACHED]]:
+# CHECK: %[[CALL1:.+]] = call double @fib(
+# CHECK: store double %[[CALL1]], ptr %x
+# CHECK: reattach within %[[SYNCREG]], label %[[CONTINUE]]
+# CHECK: [[CONTINUE]]:
+# CHECK: %[[CALL2:.+]] = call double @fib(
+# CHECK: sync within %[[SYNCREG]], label %[[SYNC_CONTINUE:.+]]
+# CHECK: [[SYNC_CONTINUE]]:
+# CHECK: %[[X_LOAD:.+]] = load double, ptr %x
+# CHECK: fadd double %[[CALL2]], %[[X_LOAD]]
+
 def fibloop(n)
   parfor i = 1, i < n in
+    fib(i);
+
+# CHECK-LABEL: define double @fibloop(double %n)
+# CHECK: %i = phi i64
+# CHECK: %[[CONV:.+]] = fptosi double %n to i64
+# CHECK: %[[CMP:.+]] = icmp slt i64 %i, %[[CONV]]
+# CHECK: br i1 %[[CMP]], label %[[PLOOP:.+]], label %[[AFTERLOOP:.+]]
+# CHECK: [[PLOOP]]:
+# CHECK: detach within %[[SYNCREG:.+]], label %[[PLOOP_BODY:.+]], label %[[PLOOP_CONTINUE:.+]]
+# CHECK: [[PLOOP_BODY]]:
+# CHECK: call double @fib(
+# CHECK: reattach within %[[SYNCREG]], label %[[PLOOP_CONTINUE]]
+# CHECK: [[PLOOP_CONTINUE]]:
+# CHECK: add i64 %i, 1
+# CHECK: br label %{{.+}}, !llvm.loop !{{[0-9]+}}
+# CHECK: [[AFTERLOOP]]:
+# CHECK: sync within %[[SYNCREG]], label %{{.+}}
 
 fib(10);
 # CHECK: Evaluated to 55.000000
+fibloop(30);
+# CHECK: Evaluated to 0.000000
