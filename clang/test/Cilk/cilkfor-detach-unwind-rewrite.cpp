@@ -19,7 +19,34 @@ int main() {
   return total_red.get();
 }
 
-// CHECK: define {{.*}}i32 @main()
+int stride_test() {
+  Reducer_sum<long> total_red(__cilkrts_get_nworkers());
+  _Cilk_for(long i = 0; i < 100; i += 5) { total_red.add(5); }
+  return total_red.get();
+}
+
+// CHECK-LABEL: define {{.*}}i32 @main()
+// CHECK: br i1 %{{.*}}, label %[[PFOR_PH:.+]], label %[[PFOR_END:[a-z0-9._]+]]
+
+// CHECK: [[PFOR_PH]]:
+// CHECK: call void @__ubsan_handle_sub_overflow
+
+// Check contents of the detach block
+// CHECK: load i64, ptr %[[INIT:.+]]
+// CHECK: load i64, ptr %[[BEGIN:.+]]
+// CHECK: call { i64, i1 } @llvm.sadd.with.overflow.i64(
+// CHECK: br i1 %{{.*}}, label %[[CONT5:.+]], label %[[HANDLE_ADD_OVERFLOW:[a-z0-9._]+]],
+
+// CHECK: [[HANDLE_ADD_OVERFLOW]]:
+// CHECK: call void @__ubsan_handle_add_overflow
+
+// Check that the detach ends up after the loop-variable init expression.
+
+// CHECK: [[CONT5]]:
+// CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[PFOR_BODY_ENTRY:.+]], label %[[PFOR_INC:.+]] unwind label %[[LPAD9:.+]]
+
+
+// CHECK-LABEL: define {{.*}}i32 @_Z11stride_testv()
 // CHECK: br i1 %{{.*}}, label %[[PFOR_PH:.+]], label %[[PFOR_END:[a-z0-9._]+]]
 
 // CHECK: [[PFOR_PH]]:

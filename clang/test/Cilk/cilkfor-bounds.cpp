@@ -26,15 +26,11 @@ void up(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDLIMIT]], %[[ENDINIT]]
-// CHECK-NEXT: %[[ENDSUB1:.+]] = sub i64 %[[ENDSUB]], 1
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB1]], 1
-// CHECK-NEXT: %[[ENDADD:.+]] = add i64 %[[ENDDIV]], 1
-// CHECK-NEXT: store i64 %[[ENDADD]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -74,13 +70,11 @@ void up_leq(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDLIMIT]], %[[ENDINIT]]
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB]], 1
-// CHECK-NEXT: store i64 %[[ENDDIV]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -120,15 +114,11 @@ void up_flip(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDLIMIT]], %[[ENDINIT]]
-// CHECK-NEXT: %[[ENDSUB1:.+]] = sub i64 %[[ENDSUB]], 1
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB1]], 1
-// CHECK-NEXT: %[[ENDADD:.+]] = add i64 %[[ENDDIV]], 1
-// CHECK-NEXT: store i64 %[[ENDADD]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -168,13 +158,11 @@ void up_flip_geq(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDLIMIT]], %[[ENDINIT]]
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB]], 1
-// CHECK-NEXT: store i64 %[[ENDDIV]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = add i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -506,15 +494,11 @@ void down(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDINIT]], %[[ENDLIMIT]]
-// CHECK-NEXT: %[[ENDSUB1:.+]] = sub i64 %[[ENDSUB]], 1
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB1]], 1
-// CHECK-NEXT: %[[ENDADD:.+]] = add i64 %[[ENDDIV]], 1
-// CHECK-NEXT: store i64 %[[ENDADD]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -554,13 +538,11 @@ void down_geq(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDINIT]], %[[ENDLIMIT]]
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB]], 1
-// CHECK-NEXT: store i64 %[[ENDDIV]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -600,15 +582,11 @@ void down_flip(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDINIT]], %[[ENDLIMIT]]
-// CHECK-NEXT: %[[ENDSUB1:.+]] = sub i64 %[[ENDSUB]], 1
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB1]], 1
-// CHECK-NEXT: %[[ENDADD:.+]] = add i64 %[[ENDDIV]], 1
-// CHECK-NEXT: store i64 %[[ENDADD]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
@@ -648,13 +626,11 @@ void down_flip_leq(size_t start, size_t end) {
 // CHECK-NEXT: %[[ENDINIT:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[ENDLIMIT:.+]] = load i64, ptr %[[LIMIT]]
 // CHECK-NEXT: %[[ENDSUB:.+]] = sub i64 %[[ENDINIT]], %[[ENDLIMIT]]
-// CHECK-NEXT: %[[ENDDIV:.+]] = udiv i64 %[[ENDSUB]], 1
-// CHECK-NEXT: store i64 %[[ENDDIV]], ptr %[[END:.+]], align 8
+// CHECK-NEXT: store i64 %[[ENDSUB]], ptr %[[END:.+]], align 8
 
 // CHECK: %[[INITITER:.+]] = load i64, ptr %[[INIT]]
 // CHECK-NEXT: %[[BEGINITER:.+]] = load i64, ptr %[[BEGIN]]
-// CHECK-NEXT: %[[ITERMUL:.+]] = mul i64 %[[BEGINITER]], 1
-// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[ITERMUL]]
+// CHECK-NEXT: %[[ITERADD:.+]] = sub i64 %[[INITITER]], %[[BEGINITER]]
 // CHECK-NEXT: detach within %[[SYNCREG:.+]], label %[[DETACHED:.+]], label %[[PFORINC:.+]]
 
 // CHECK: [[DETACHED]]:
