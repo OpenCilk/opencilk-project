@@ -3509,10 +3509,7 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
   case TapirTargetID::OpenCilk: {
     bool StaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk);
     bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
-
     auto RLO = RLO_AlwaysLink;
-    if (!StaticOpenCilk)
-      RLO = RuntimeLinkOptions(RLO | RLO_AddRPath);
 
     // If pedigrees are enabled, link the OpenCilk pedigree library.
     if (Args.hasArg(options::OPT_fopencilk_enable_pedigrees))
@@ -3532,6 +3529,11 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
                              UseAsan ? "opencilk-asan-personality-c"
                                      : "opencilk-personality-c",
                              RLO, !StaticOpenCilk);
+
+    if (!StaticOpenCilk)
+      // Add rpath flag for linking the final Tapir runtime library, to avoid
+      // warnings about ignoring duplicate rpaths.
+      RLO = RuntimeLinkOptions(RLO | RLO_AddRPath);
 
     // Link the opencilk runtime.  We do this after linking the personality
     // function, to ensure that symbols are resolved correctly when using static
