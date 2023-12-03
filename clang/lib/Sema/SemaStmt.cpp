@@ -3540,6 +3540,15 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   VarDecl *LoopVar = dyn_cast<VarDecl>(LoopVarDS->getSingleDecl());
   if (!LoopVar)
     return StmtEmpty();
+  QualType LoopVarTy = LoopVar->getType();
+
+  if (LoopVarTy->isDependentType()) {
+    // Delay handling this loop until LoopVarTy is derived, so that difference
+    // types can be properly derived.
+    return new (Context)
+        CilkForStmt(First, nullptr, nullptr, nullptr, nullptr, Condition,
+                    Increment, nullptr, Body, CilkForLoc, LParenLoc, RParenLoc);
+  }
 
   // Get the loop variable initialization.
   Expr *LoopVarInit = LoopVar->getInit();
@@ -3550,7 +3559,7 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   }
 
   // Get the loop-limit expression, which the loop variable is compared against.
-  // TODO: Generlize this logic to handle complex conditions, e.g., class
+  // TODO: Generalize this logic to handle complex conditions, e.g., class
   // methods instead of integer binary operators.
   BinaryOperator *Cond = dyn_cast_or_null<BinaryOperator>(Condition);
   if (!Cond || !Cond->isComparisonOp())
@@ -3623,7 +3632,6 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
 
   // Create a declaration for the initialization of this loop, to ensure its
   // evaluated just once.
-  QualType LoopVarTy = LoopVar->getType();
   SourceLocation InitLoc = LoopVarInit->getBeginLoc();
   // Add declaration to store the old loop var initialization.
   VarDecl *InitVar = BuildForRangeVarDecl(*this, InitLoc,
