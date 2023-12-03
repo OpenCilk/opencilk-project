@@ -965,23 +965,23 @@ void down_ne_stride_flip(size_t start, size_t end, size_t stride) {
 // CHECK: [[PFORCONDCLEANUP]]:
 // CHECK-NEXT: sync within %[[SYNCREG]]
 
-// CHECK: ![[LOOPMD]] = distinct !{![[LOOPMD]], ![[SPAWNSTRATEGY:.+]]}
+// CHECK: ![[LOOPMD]] = distinct !{![[LOOPMD]], ![[MUSTPROGRESS:[0-9]+]], ![[SPAWNSTRATEGY:[0-9]+]]}
 // CHECK: ![[SPAWNSTRATEGY]] = !{!"tapir.loop.spawn.strategy", i32 1}
-// CHECK: ![[LOOPMD2]] = distinct !{![[LOOPMD2]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD3]] = distinct !{![[LOOPMD3]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD4]] = distinct !{![[LOOPMD4]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD5]] = distinct !{![[LOOPMD5]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD6]] = distinct !{![[LOOPMD6]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD7]] = distinct !{![[LOOPMD7]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD8]] = distinct !{![[LOOPMD8]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD9]] = distinct !{![[LOOPMD9]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD10]] = distinct !{![[LOOPMD10]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD11]] = distinct !{![[LOOPMD11]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD12]] = distinct !{![[LOOPMD12]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD13]] = distinct !{![[LOOPMD13]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD14]] = distinct !{![[LOOPMD14]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD15]] = distinct !{![[LOOPMD15]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD16]] = distinct !{![[LOOPMD16]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD17]] = distinct !{![[LOOPMD17]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD18]] = distinct !{![[LOOPMD18]], ![[SPAWNSTRATEGY]]}
-// CHECK: ![[LOOPMD19]] = distinct !{![[LOOPMD19]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD2]] = distinct !{![[LOOPMD2]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD3]] = distinct !{![[LOOPMD3]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD4]] = distinct !{![[LOOPMD4]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD5]] = distinct !{![[LOOPMD5]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD6]] = distinct !{![[LOOPMD6]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD7]] = distinct !{![[LOOPMD7]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD8]] = distinct !{![[LOOPMD8]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD9]] = distinct !{![[LOOPMD9]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD10]] = distinct !{![[LOOPMD10]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD11]] = distinct !{![[LOOPMD11]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD12]] = distinct !{![[LOOPMD12]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD13]] = distinct !{![[LOOPMD13]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD14]] = distinct !{![[LOOPMD14]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD15]] = distinct !{![[LOOPMD15]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD16]] = distinct !{![[LOOPMD16]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD17]] = distinct !{![[LOOPMD17]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD18]] = distinct !{![[LOOPMD18]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
+// CHECK: ![[LOOPMD19]] = distinct !{![[LOOPMD19]], ![[MUSTPROGRESS]], ![[SPAWNSTRATEGY]]}
