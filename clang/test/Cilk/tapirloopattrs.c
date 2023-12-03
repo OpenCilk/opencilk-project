@@ -26,14 +26,15 @@ void parfor_unroll_vec(double *restrict y, double *restrict x, double a, int n) 
 // CHECK: !llvm.loop [[LOOPID2:![0-9]+]]
 // CHECK: !llvm.loop [[LOOPID3:![0-9]+]]
 
-// CHECK: [[LOOPID1]] = distinct !{[[LOOPID1]], [[TAPIR_SPAWN_STRATEGY:![0-9]+]], [[NOVEC:![0-9]+]]}
+// CHECK: [[LOOPID1]] = distinct !{[[LOOPID1]], [[MUSTPROGRESS:![0-9]+]], [[TAPIR_SPAWN_STRATEGY:![0-9]+]], [[NOVEC:![0-9]+]]}
+// CHECK: [[MUSTPROGRESS]] = !{!"llvm.loop.mustprogress"}
 // CHECK: [[TAPIR_SPAWN_STRATEGY]] = !{!"tapir.loop.spawn.strategy", i32 1}
 // CHECK: [[NOVEC]] = !{!"llvm.loop.vectorize.width", i32 1}
 
-// CHECK: [[LOOPID2]] = distinct !{[[LOOPID2]], [[MUSTPROGRESS:![0-9]+]], [[VECATTRS:!.+]], [[VECFOLLOWALL1:![0-9]+]]}
+// CHECK: [[LOOPID2]] = distinct !{[[LOOPID2]], [[MUSTPROGRESS]], [[VECATTRS:!.+]], [[VECFOLLOWALL1:![0-9]+]]}
 // CHECK: [[VECFOLLOWALL1]] = !{!"llvm.loop.vectorize.followup_all", [[VECFOLLOW1:![0-9]+]]}
 // CHECK: [[VECFOLLOW1]] = distinct !{[[VECFOLLOW1]], [[MUSTPROGRESS]], [[VECFOLLOWATTRS:!.+]]}
 
-// CHECK: [[LOOPID3]] = distinct !{[[LOOPID3]], [[TAPIR_SPAWN_STRATEGY]], [[VECATTRS]], [[VECFOLLOWALL2:![0-9]+]]}
+// CHECK: [[LOOPID3]] = distinct !{[[LOOPID3]], [[MUSTPROGRESS]], [[TAPIR_SPAWN_STRATEGY]], [[VECATTRS]], [[VECFOLLOWALL2:![0-9]+]]}
 // CHECK: [[VECFOLLOWALL2]] = !{!"llvm.loop.vectorize.followup_all", [[VECFOLLOW2:![0-9]+]]}
-// CHECK: [[VECFOLLOW2]] = distinct !{[[VECFOLLOW2]], [[TAPIR_SPAWN_STRATEGY]], [[VECFOLLOWATTRS]]}
+// CHECK: [[VECFOLLOW2]] = distinct !{[[VECFOLLOW2]], [[MUSTPROGRESS]], [[TAPIR_SPAWN_STRATEGY]], [[VECFOLLOWATTRS]]}
