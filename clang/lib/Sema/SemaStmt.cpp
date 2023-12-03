@@ -3568,29 +3568,27 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   Expr *LimitExpr = nullptr;
   if (DeclUseInLHS)
     LimitExpr = Cond->getRHS();
-  else // if (DeclUseInRHS)
+  else // DeclUseInRHS
     LimitExpr = Cond->getLHS();
   if (!LimitExpr)
     return StmtEmpty();
 
   // Get the loop stride.
+  if (!Increment)
+    return StmtEmpty();
   Expr *Stride = nullptr;
+  bool StrideIsUnit = false;
   bool StrideIsNegative = false;
   if (const UnaryOperator *UO =
       dyn_cast_or_null<UnaryOperator>(Increment)) {
-    if (UO->isIncrementOp())
-      Stride = ActOnIntegerConstant(Increment->getExprLoc(), 1).get();
-    else if (UO->isDecrementOp()) {
-      Stride = ActOnIntegerConstant(Increment->getExprLoc(), 1).get();
+    StrideIsUnit = true;
+    if (UO->isDecrementOp())
       StrideIsNegative = true;
-    }
   } else {
     auto StrideWithSign = GetCilkForStride(*this, Decls, Increment);
     StrideIsNegative = StrideWithSign.second;
     Stride = StrideWithSign.first;
   }
-  if (!Stride)
-    return StmtEmpty();
 
   // Determine the type of comparison.
   //
@@ -3624,8 +3622,7 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   // evaluated just once.
   SourceLocation InitLoc = LoopVarInit->getBeginLoc();
   // Add declaration to store the old loop var initialization.
-  VarDecl *InitVar = BuildForRangeVarDecl(*this, InitLoc,
-                                          LoopVarTy, "__init");
+  VarDecl *InitVar = BuildForRangeVarDecl(*this, InitLoc, LoopVarTy, "__init");
   AddInitializerToDecl(InitVar, LoopVarInit, /*DirectInit=*/false);
   FinalizeDeclaration(InitVar);
   CurContext->addHiddenDecl(InitVar);
@@ -3633,8 +3630,8 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   // Create a declaration for the limit of this loop, to ensure its evaluated
   // just once.
   SourceLocation LimitLoc = LimitExpr->getBeginLoc();
-  VarDecl *LimitVar = BuildForRangeVarDecl(*this, LimitLoc,
-                                           LoopVarTy, "__limit");
+  VarDecl *LimitVar =
+      BuildForRangeVarDecl(*this, LimitLoc, LoopVarTy, "__limit");
   AddInitializerToDecl(LimitVar, LimitExpr, /*DirectInit=*/false);
   FinalizeDeclaration(LimitVar);
   CurContext->addHiddenDecl(LimitVar);
@@ -3651,17 +3648,11 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   if (LimitDecl.isInvalid())
     return StmtError();
 
-  ExprResult InitRef = BuildDeclRefExpr(InitVar, LoopVarTy, VK_LValue,
-                                        InitLoc);
-  ExprResult LimitRef = BuildDeclRefExpr(LimitVar, LimitVar->getType(),
-                                         VK_LValue, LimitLoc);
+  ExprResult InitRef = BuildDeclRefExpr(InitVar, LoopVarTy, VK_LValue, InitLoc);
+  ExprResult LimitRef =
+      BuildDeclRefExpr(LimitVar, LoopVarTy, VK_LValue, LimitLoc);
 
-  // LimitVar should have the correct type, because it's derived from the
-  // original condition.  Hence we only need to cast InitRef.
-  ExprResult CastInit = ImplicitCastExpr::Create(
-      Context, LimitVar->getType(), CK_IntegralCast, InitRef.get(), nullptr,
-      VK_XValue, FPOptionsOverride());
-
+  ExprResult CastInit = InitRef;
   // Compute a check that this _Cilk_for loop executes at all.
   SourceLocation CondLoc = Cond->getExprLoc();
   ExprResult InitCond;
@@ -3691,15 +3682,17 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
   // Now rewrite the loop control.
 
   // If the comparison is not inclusive, reduce the Range by 1.
-  if (!CompareInclusive)
+  if (!CompareInclusive && !StrideIsUnit)
     Range = BuildBinOp(S, CondLoc, BO_Sub, Range.get(),
                        ActOnIntegerConstant(CilkForLoc, 1).get());
 
-  // Build Range/Stride.
-  ExprResult NewLimit = BuildBinOp(S, CondLoc, BO_Div, Range.get(), Stride);
+  ExprResult NewLimit = Range;
+  if (!StrideIsUnit)
+    // Build Range/Stride.
+    NewLimit = BuildBinOp(S, CondLoc, BO_Div, Range.get(), Stride);
 
   // If the comparison is not an equality, build Range/Stride + 1
-  if (!CompareInclusive)
+  if (!CompareInclusive && !StrideIsUnit)
     NewLimit = BuildBinOp(S, CondLoc, BO_Add, NewLimit.get(),
                           ActOnIntegerConstant(CilkForLoc, 1).get());
 
@@ -3709,8 +3702,7 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
 
   // Create new declarations for replacement loop control variables.
   // Declaration for new beginning loop control variable.
-  VarDecl *BeginVar = BuildForRangeVarDecl(*this, CondLoc, CountTy,
-                                           "__begin");
+  VarDecl *BeginVar = BuildForRangeVarDecl(*this, CondLoc, CountTy, "__begin");
   AddInitializerToDecl(BeginVar, ActOnIntegerConstant(CondLoc, 0).get(),
                        /*DirectInit=*/false);
   FinalizeDeclaration(BeginVar);
@@ -3767,20 +3759,18 @@ StmtResult Sema::HandleSimpleCilkForStmt(SourceLocation CilkForLoc,
     }
   } else if (const UnaryOperator *UO =
              dyn_cast_or_null<UnaryOperator>(Increment)) {
-    if (UO->isIncrementOp())
-      NewInc = BuildUnaryOp(S, IncLoc, UO_PreInc, BeginRef.get());
-    else if (UO->isDecrementOp())
-      NewInc = BuildUnaryOp(S, IncLoc, UO_PreInc, BeginRef.get());
+    NewInc = BuildUnaryOp(S, IncLoc, UO_PreInc, BeginRef.get());
   }
   if (NewInc.isInvalid())
     return StmtError();
 
   // Return a new statement for initializing the old loop variable.
   SourceLocation LoopVarLoc = LoopVar->getBeginLoc();
-  ExprResult NewLoopVarInit =
-    BuildBinOp(S, LoopVarLoc, StrideIsNegative ? BO_Sub : BO_Add, InitRef.get(),
-               BuildBinOp(S, LoopVarLoc, BO_Mul,
-                          BeginRef.get(), Stride).get());
+  ExprResult NewLoopVarInit = BuildBinOp(
+      S, LoopVarLoc, StrideIsNegative ? BO_Sub : BO_Add, InitRef.get(),
+      StrideIsUnit
+          ? BeginRef.get()
+          : BuildBinOp(S, LoopVarLoc, BO_Mul, BeginRef.get(), Stride).get());
   if (!NewLoopVarInit.isInvalid())
     AddInitializerToDecl(LoopVar, NewLoopVarInit.get(), /*DirectInit=*/false);
 
