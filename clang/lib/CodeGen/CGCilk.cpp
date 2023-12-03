@@ -598,10 +598,13 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
     // C99 6.8.5p2/p4: The first substatement is executed if the expression
     // compares unequal to 0.  The condition must be a scalar type.
     llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getInitCond());
-    Builder.CreateCondBr(
-        BoolCondVal, PForPH, ExitBlock,
-        createProfileWeightsForLoop(S.getInitCond(),
-                                    getProfileCount(S.getBody())));
+    llvm::MDNode *Weights = createProfileWeightsForLoop(
+        S.getInitCond(), getProfileCount(S.getBody()));
+    if (!Weights && CGM.getCodeGenOpts().OptimizationLevel)
+      BoolCondVal = emitCondLikelihoodViaExpectIntrinsic(
+          BoolCondVal, Stmt::getLikelihood(S.getBody()));
+
+    Builder.CreateCondBr(BoolCondVal, PForPH, ExitBlock, Weights);
 
     if (ExitBlock != LoopExit.getBlock()) {
       EmitBlock(ExitBlock);
@@ -623,11 +626,15 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   llvm::BasicBlock *CondBlock = Continue.getBlock();
   EmitBlock(CondBlock);
 
+  Expr::EvalResult Result;
+  bool CondIsConstInt = S.getCond()->EvaluateAsInt(Result, getContext());
+
   LoopStack.setSpawnStrategy(LoopAttributes::DAC);
   const SourceRange &R = S.getSourceRange();
   LoopStack.push(CondBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
-                 SourceLocToDebugLoc(R.getEnd()));
+                 SourceLocToDebugLoc(R.getEnd()),
+                 checkIfLoopMustProgress(CondIsConstInt));
 
   const Expr *Inc = S.getInc();
   assert(Inc && "_Cilk_for loop has no increment");
@@ -845,9 +852,13 @@ void CodeGenFunction::EmitCilkForStmt(const CilkForStmt &S,
   // C99 6.8.5p2/p4: The first substatement is executed if the expression
   // compares unequal to 0.  The condition must be a scalar type.
   llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
-  Builder.CreateCondBr(
-      BoolCondVal, CondBlock, ExitBlock,
-      createProfileWeightsForLoop(S.getCond(), getProfileCount(S.getBody())));
+  llvm::MDNode *Weights =
+      createProfileWeightsForLoop(S.getCond(), getProfileCount(S.getBody()));
+  if (!Weights && CGM.getCodeGenOpts().OptimizationLevel)
+    BoolCondVal = emitCondLikelihoodViaExpectIntrinsic(
+        BoolCondVal, Stmt::getLikelihood(S.getBody()));
+
+  Builder.CreateCondBr(BoolCondVal, CondBlock, ExitBlock, Weights);
 
   if (ExitBlock != LoopExit.getBlock()) {
     EmitBlock(ExitBlock);
