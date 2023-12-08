@@ -1298,35 +1298,6 @@ static std::optional<unsigned> ContainsHyperobject(QualType Outer) {
     break;
   case Type::Record: {
     const RecordDecl *Decl = cast<RecordType>(T)->getDecl();
-    // TODO: There must be a better way to do this.
-    // A hyperobject might sneak in without being explicitly
-    // declared in the template.
-    if (auto Spec = dyn_cast<ClassTemplateSpecializationDecl>(Decl)) {
-      if (ClassTemplateDecl *Inner = Spec->getSpecializedTemplate())
-        if (auto O = DeclContainsHyperobject(Inner->getTemplatedDecl()))
-          return O;
-      const TemplateArgumentList &Args = Spec->getTemplateArgs();
-      for (unsigned I = 0; I < Args.size(); ++I) {
-        const TemplateArgument &Arg = Args.get(I);
-        switch (Arg.getKind()) {
-        case TemplateArgument::Declaration:
-          if (auto O = ContainsHyperobject(Arg.getAsDecl()->getType()))
-            return O;
-          break;
-        case TemplateArgument::Type:
-          if (auto O = ContainsHyperobject(Arg.getAsType()))
-            return O;
-          break;
-        case TemplateArgument::Integral:
-        case TemplateArgument::NullPtr:
-        case TemplateArgument::Null:
-          break;
-        default:
-          return diag::confusing_hyperobject;
-        }
-      }
-      return std::optional<unsigned>();
-    }
     if (const RecordDecl *Def = Decl->getDefinition())
       return DeclContainsHyperobject(Def);
     return diag::confusing_hyperobject;
@@ -1366,6 +1337,8 @@ static std::optional<unsigned> ContainsHyperobject(QualType Outer) {
 }
 
 static std::optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl) {
+  if (Decl->isInvalidDecl())
+    return std::optional<unsigned>();
   for (const FieldDecl *FD : Decl->fields())
     if (std::optional<unsigned> O = ContainsHyperobject(FD->getType()))
       return O;
