@@ -2473,20 +2473,22 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
 
 QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
                                     Expr *Reduce, SourceLocation Loc) {
-  QualType Result = Element;
+  // This function must return a HyperobjectType with the given
+  // element type, otherwise the rest of the front end will get angry.
+  // Template instantiation is quite strict about preserving structure.
+  // The compiler will also get angry if the element type is incomplete
+  // and the HyperobjectType is not marked as containing an error.
   if (!RequireCompleteType(Loc, Element, CompleteTypeKind::Normal,
                            diag::incomplete_hyperobject)) {
-    if (std::optional<unsigned> Code = ContainsHyperobject(Result))
-      Diag(Loc, *Code) << Result;
+    if (std::optional<unsigned> Code = ContainsHyperobject(Element))
+      Diag(Loc, *Code) << Element;
   }
 
   Identity = ValidateReducerCallback(Identity, 1, Loc);
   Reduce = ValidateReducerCallback(Reduce, 2, Loc);
 
-  // The result of this function must be HyperobjectType if it is called
-  // from C++ template instantiation when rebuilding an existing hyperobject
-  // type.
-  return Context.getHyperobjectType(Result, Identity, Reduce);
+  // The result will be marked erroneous if Element is incomplete.
+  return Context.getHyperobjectType(Element, Identity, Reduce);
 }
 
 /// Build a Read-only Pipe type.
