@@ -3208,6 +3208,9 @@ HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
     IdentityID(ifn), ReduceID(rfn) {
   if (Element->isIncompleteType()) // diagnosed in caller
     addDependence(TypeDependence::Error);
+  addDependence(Element->getDependence());
+  addDependence(toTypeDependence(i->getDependence()));
+  addDependence(toTypeDependence(r->getDependence()));
 }
 
 bool HyperobjectType::hasCallbacks() const {
