@@ -1442,10 +1442,10 @@ BasicAAResult::getViewClass(const CallBase *Call, AAQueryInfo &AAQI) {
 }
 
 // This matches llvm.tapir.frame.
-static bool isStrandPureNullary(const CallBase *Call) {
-  if (Call->getNumOperands() != 0)
+static bool isTapirFrame(const CallBase *Call) {
+  if (!isa<IntrinsicInst>(Call))
     return false;
-  return Call->getAttributes().hasFnAttr(Attribute::StrandPure);
+  return cast<IntrinsicInst>(Call)->getIntrinsicID() == Intrinsic::tapir_frame;
 }
 
 // Find an argument with the Injective property.
@@ -1490,10 +1490,8 @@ BasicAAResult::checkInjectiveArguments(const CallBase *C1,
     if (isa<UndefValue>(A1) || isa<UndefValue>(A2))
       continue;
     // Calls to llvm.tapir.frame are equivalent.
-    if (isa<CallBase>(A1) && isa<CallBase>(A2) &&
-        (cast<CallBase>(A1)->getCalledOperand() ==
-         cast<CallBase>(A2)->getCalledOperand()) &&
-        isStrandPureNullary(cast<CallBase>(A1)))
+    if (isa<CallBase>(A1) && isTapirFrame(cast<CallBase>(A1)) &&
+        isa<CallBase>(A2) && isTapirFrame(cast<CallBase>(A2)))
       continue;
     Equal = AliasResult::MayAlias;
   }

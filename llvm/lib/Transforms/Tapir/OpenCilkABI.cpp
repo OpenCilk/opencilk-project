@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -1121,10 +1122,11 @@ LoopOutlineProcessor *OpenCilkABI::getLoopOutlineProcessor(
 Value *OpenCilkABI::getValidFrame(CallBase *FrameCall, DominatorTree &DT) {
   Function *F = FrameCall->getFunction();
   if (Value *Frame = DetachCtxToStackFrame.lookup(F)) {
-    // Make sure a call to enter_frame dominates this reference
-    // and no call to leave_frame does.  Otherwise return a null
-    // pointer value to mean unknown.  This is correct in most
-    // functions and conservative in complicated functions.
+    // Make sure a call to enter_frame dominates this get_frame call
+    // and no call to leave_frame has potentially been executed.
+    // Otherwise return a null pointer value to mean unknown.
+    // This is correct in most functions and conservative in
+    // complicated functions.
     bool Initialized = false;
     Value *Enter1 = CILKRTS_FUNC(enter_frame_helper).getCallee();
     Value *Enter2 = CILKRTS_FUNC(enter_frame).getCallee();
@@ -1134,13 +1136,19 @@ Value *OpenCilkABI::getValidFrame(CallBase *FrameCall, DominatorTree &DT) {
     Value *Leave4 = CilkParentEpilogue.getCallee();
     for (User *U : Frame->users()) {
       if (CallBase *C = dyn_cast<CallBase>(U)) {
-        if (DT.dominates(C, FrameCall)) {
-          if (Function *Fn = C->getCalledFunction()) {
-            if (Fn == Leave1 || Fn == Leave2 | Fn == Leave3 | Fn == Leave4)
-              return Constant::getNullValue(FrameCall->getType());
-            if (Fn == Enter1 || Fn == Enter2)
-              Initialized = true;
-          }
+        Function *Fn = C->getCalledFunction();
+        if (Fn == nullptr) // indirect function call
+          continue;
+        if (Fn == Enter1 || Fn == Enter2) {
+          if (!Initialized && DT.dominates(C, FrameCall))
+            Initialized = true;
+          continue;
+        }
+        if (Fn == Leave1 || Fn == Leave2 | Fn == Leave3 | Fn == Leave4) {
+          // TODO: ...unless an enter_frame call definitely intervenes.
+          if (isPotentiallyReachable(C, FrameCall, nullptr, &DT, nullptr))
+            return Constant::getNullValue(FrameCall->getType());
+          continue;
         }
       }
     }
