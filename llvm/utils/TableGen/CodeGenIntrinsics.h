@@ -115,7 +115,6 @@ struct CodeGenIntrinsic {
   // Tapir reducer-related attributes
   bool isStrandPure;
   bool isHyperView;
-  bool isHyperToken;
   bool isReducerRegister;
   bool isReducerUnregister;
 

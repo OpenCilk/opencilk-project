@@ -692,7 +692,6 @@ CodeGenIntrinsic::CodeGenIntrinsic(Record *R,
   isInjective = false;
   isStrandPure = false;
   isHyperView = false;
-  isHyperToken = false;
   isReducerRegister = false;
   isReducerUnregister = false;
 
@@ -906,8 +905,6 @@ void CodeGenIntrinsic::setProperty(Record *R) {
     isReducerRegister = true;
   else if (R->getName() == "IntrHyperView")
     isHyperView = true;
-  else if (R->getName() == "IntrHyperToken")
-    isHyperToken = true;
   else if (R->getName() == "IntrReducerUnregister")
     isReducerUnregister = true;
   else if (R->isSubClassOf("NoCapture")) {

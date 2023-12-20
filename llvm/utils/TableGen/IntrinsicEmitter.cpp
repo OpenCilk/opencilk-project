@@ -655,9 +655,6 @@ std::optional<bool> compareFnAttributes(const CodeGenIntrinsic *L,
   if (L->isHyperView != R->isHyperView)
     return R->isHyperView;
 
-  if (L->isHyperToken != R->isHyperToken)
-    return R->isHyperToken;
-
   // Try to order by readonly/readnone attribute.
   uint32_t LK = L->ME.toIntValue();
   uint32_t RK = R->ME.toIntValue();
@@ -798,8 +795,6 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
       OS << "      Attribute::get(C, Attribute::ReducerUnregister),\n";
     if (Intrinsic.isHyperView)
       OS << "      Attribute::get(C, Attribute::HyperView),\n";
-    if (Intrinsic.isHyperToken)
-      OS << "      Attribute::get(C, Attribute::HyperToken),\n";
 
     MemoryEffects ME = Intrinsic.ME;
     // TODO: IntrHasSideEffects should affect not only readnone intrinsics.
@@ -875,7 +870,7 @@ void IntrinsicEmitter::EmitAttributes(const CodeGenIntrinsicTable &Ints,
         Intrinsic.isConvergent || Intrinsic.isSpeculatable ||
         Intrinsic.isInjective || Intrinsic.isStrandPure ||
         Intrinsic.isReducerRegister || Intrinsic.isReducerUnregister ||
-        Intrinsic.isHyperView || Intrinsic.isHyperToken) {
+        Intrinsic.isHyperView) {
       unsigned ID = UniqFnAttributes.find(&Intrinsic)->second;
       OS << "      AS[" << numAttrs++ << "] = {AttributeList::FunctionIndex, "
          << "getIntrinsicFnAttributeSet(C, " << ID << ")};\n";
