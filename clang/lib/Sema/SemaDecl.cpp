@@ -19234,11 +19234,12 @@ void Sema::ActOnFields(Scope *S, SourceLocation RecLoc, Decl *EnclosingDecl,
       continue;
     }
 
-    if (!FDTy->isDependentType()) {
+    // In C++ a constructor and destructor will be synthesized
+    // to register hyperobjects.
+    if (!CXXRecord && !FDTy->isDependentType()) {
       if (const HyperobjectType *HT = FDTy->getAs<HyperobjectType>()) {
-        if (HT->hasCallbacks())
-          Diag(FD->getLocation(), diag::reducer_callbacks_not_allowed)
-            << FD->getDeclName();
+        Diag(FD->getLocation(), diag::reducer_registration_not_implemented)
+          << FD->getDeclName();
       }
     }
 
