@@ -1,6 +1,5 @@
-// RUN: %clang_cc1 %s -fopencilk -verify -fsyntax-only -Werror=incompatible-function-pointer-types -Werror=int-conversion
+// RUN: %clang_cc1 %s -x c++ -fopencilk -verify -fsyntax-only
 struct C { int _Hyperobject c; };
-// expected-warning@-1{{reducer registration not implemented for structure members}}
 struct C _Hyperobject c; // expected-error{{type 'struct C', which contains a hyperobject, may not be a hyperobject}}
 long _Hyperobject d; // expected-note{{previous definition}}
 void f() {
@@ -17,7 +16,6 @@ extern void reduce(void *, void *), identity(void *);
 
 struct D {
   int _Hyperobject(identity, reduce) field;
-  // expected-warning@-1{{reducer registration not implemented for structure members}}
 };
 
 int _Hyperobject(reduce, identity) h;
