@@ -1083,6 +1083,12 @@ void CXXRecordDecl::addedMember(Decl *D) {
         data().DefaultedCopyConstructorIsDeleted = true;
     }
 
+    if (T->isHyperobjectType()) {
+      data().HasIrrelevantDestructor = false;
+      data().HasTrivialSpecialMembers &= ~SMF_Destructor;
+      data().HasTrivialSpecialMembersForCall &= ~SMF_Destructor;
+    }
+
     if (!Field->hasInClassInitializer() && !Field->isMutable()) {
       if (CXXRecordDecl *FieldType = T->getAsCXXRecordDecl()) {
         if (FieldType->hasDefinition() && !FieldType->allowConstDefaultInit())
