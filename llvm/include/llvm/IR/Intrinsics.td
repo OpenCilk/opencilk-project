@@ -49,6 +49,8 @@ def IntrArgMemOnly : IntrinsicProperty;
 // accessible by the module being compiled. This is a weaker form of IntrNoMem.
 def IntrInaccessibleMemOnly : IntrinsicProperty;
 
+def IntrReadInaccessibleMemOnly : IntrinsicProperty;
+
 // IntrInaccessibleMemOrArgMemOnly -- This intrinsic only accesses memory that
 // its pointer-typed arguments point to or memory that is not accessible
 // by the module being compiled. This is a weaker form of IntrArgMemOnly.
@@ -60,18 +62,10 @@ def Commutative : IntrinsicProperty;
 // Throws - This intrinsic can throw.
 def Throws : IntrinsicProperty;
 
-// Injective - This intrinsic returns different values given different
-// arguments.
-def IntrInjective : IntrinsicProperty;
 // Strand pure - (Tapir) This intrinsic has no visible side effects and
 // returns the same result given the same argument, but only within a
 // single strand of execution.
 def IntrStrandPure : IntrinsicProperty;
-// HyperView - (Tapir) This intrinsic lowers to a runtime call to
-// find the address of the current view of a hyperobject.  It does not
-// return the address of anything in the current frame other than its
-// argument.
-def IntrHyperView : IntrinsicProperty;
 // ReducerRegister / ReducerUnregister - (Tapir) This intrinsic registers
 // or unregisters a reducer.  These calls have no side effects on visible
 // memory but can not be moved past other reducer and hyperobject calls
@@ -90,6 +84,22 @@ class ArgIndex<int argNo> : AttrIndex<!add(argNo, 1)>;
 // NoCapture - The specified argument pointer is not captured by the intrinsic.
 class NoCapture<AttrIndex idx> : IntrinsicProperty {
   int ArgNo = idx.Value;
+}
+
+// Injective - This intrinsic returns different values given different
+// arguments.
+class IntrInjective<AttrIndex idx> : IntrinsicProperty {
+  int ArgNo = idx.Value;
+  int Bytes = 1; // why is this needed?
+}
+
+// HyperView - (Tapir) This intrinsic lowers to a runtime call to
+// find the address of the current view of a hyperobject.  It does not
+// return the address of anything in the current frame other than its
+// argument.
+class IntrHyperView<AttrIndex idx> : IntrinsicProperty {
+  int ArgNo = idx.Value;
+  int Bytes = 1; // why is this needed?
 }
 
 // NoAlias - The specified argument pointer is not aliasing other "noalias" pointer
@@ -1693,10 +1703,10 @@ def int_syncregion_start
     : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly, IntrWillReturn]>;
 
 def int_tapir_runtime_start
-    : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly, IntrWillReturn]>;
+    : Intrinsic<[llvm_token_ty], [], [IntrInaccessibleMemOnly, IntrWillReturn]>;
 
 def int_tapir_runtime_end
-    : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly, IntrWillReturn]>;
+    : Intrinsic<[], [llvm_token_ty], [IntrInaccessibleMemOnly, IntrWillReturn]>;
 
 // Intrinsics for taskframes.
 
@@ -1743,25 +1753,33 @@ def int_tapir_loop_grainsize
 // lowering transforms this intrinsic into ordinary frameaddress
 // intrinsics.
 def int_task_frameaddress
-    : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty], [IntrWillReturn]>;
+    : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty],
+    [IntrWillReturn,IntrStrandPure]>;
+
+// Return the stack_frame in an OpenCilk function, otherwise null.
+def int_tapir_frame
+    : Intrinsic<[llvm_ptr_ty], [], [IntrWillReturn,IntrReadInaccessibleMemOnly]>;
 
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.
 def int_hyper_lookup
     : Intrinsic<[llvm_ptr_ty],
-                [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty], [
-                  IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
-                  IntrStrandPure, IntrHyperView, IntrInjective
-                ]>;
+                [llvm_ptr_ty, llvm_ptr_ty, llvm_anyint_ty,
+                llvm_ptr_ty, llvm_ptr_ty], [
+                  NonNull<RetIndex>, NonNull<ArgIndex<1>>,
+                  IntrWillReturn, IntrReadMem, IntrReadInaccessibleMemOnly,
+                  IntrStrandPure, IntrHyperView<ArgIndex<1>>,
+                  IntrInjective<ArgIndex<1>>]>; // Dereferenceable,
 
 // TODO: Change tablegen to allow function pointer types in intrinsics.
 def int_reducer_register
     : Intrinsic<[], [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty],
-     [IntrWillReturn, IntrInaccessibleMemOnly, IntrReducerRegister]>;
+        [NonNull<ArgIndex<0>>, IntrWillReturn, IntrInaccessibleMemOnly,
+         IntrReducerRegister]>;
 
 def int_reducer_unregister
-    : Intrinsic<[], [llvm_ptr_ty], [IntrWillReturn, IntrInaccessibleMemOnly,
-     IntrReducerUnregister]>;
+    : Intrinsic<[], [llvm_ptr_ty], [NonNull<ArgIndex<0>>, IntrWillReturn,
+      IntrInaccessibleMemOnly, IntrReducerUnregister]>;
 
 ///===-------------------------- Other Intrinsics --------------------------===//
 //
