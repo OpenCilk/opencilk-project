@@ -245,6 +245,9 @@ public:
   /// Lower a Tapir sync instruction SI.
   virtual void lowerSync(SyncInst &SI) = 0;
 
+  virtual void lowerFrameCall(CallBase *Call, DominatorTree &DT) {
+  }
+
   virtual void lowerReducerOperation(CallBase *Call) {
   }
 

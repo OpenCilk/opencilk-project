@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -226,8 +227,8 @@ void OpenCilkABI::prepareModule() {
   FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
   FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
   FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
-  FunctionType *LookupTy = FunctionType::get(
-      VoidPtrTy, {VoidPtrTy, Int64Ty, VoidPtrTy, VoidPtrTy}, false);
+  FunctionType *LookupTy = FunctionType::get(VoidPtrTy,
+      {StackFramePtrTy, VoidPtrTy, Int64Ty, VoidPtrTy, VoidPtrTy}, false);
   FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
   FunctionType *Reg32Ty =
       FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
@@ -262,7 +263,7 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
-      {"__cilkrts_reducer_lookup", LookupTy, CilkRTSReducerLookup},
+      {"__cilkrts_reducer_lookup_in_frame", LookupTy, CilkRTSReducerLookup},
       {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
       {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
       {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
@@ -441,8 +442,8 @@ Value *OpenCilkABI::CreateStackFrame(Function &F) {
 }
 
 Value* OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
-  if (DetachCtxToStackFrame.count(&F))
-    return DetachCtxToStackFrame[&F];
+  if (Value *Frame = DetachCtxToStackFrame.lookup(&F))
+    return Frame;
 
   Value *SF = CreateStackFrame(F);
   DetachCtxToStackFrame[&F] = SF;
@@ -641,8 +642,8 @@ Value *OpenCilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
 BasicBlock *OpenCilkABI::GetDefaultSyncLandingpad(Function &F, Value *SF,
                                                   DebugLoc Loc) {
   // Return an existing default sync landingpad, if there is one.
-  if (DefaultSyncLandingpad.count(&F))
-    return cast<BasicBlock>(DefaultSyncLandingpad[&F]);
+  if (Value *Sync = DefaultSyncLandingpad.lookup(&F))
+    return cast<BasicBlock>(Sync);
 
   // Create a default cleanup landingpad block.
   LLVMContext &C = F.getContext();
@@ -1116,6 +1117,52 @@ LoopOutlineProcessor *OpenCilkABI::getLoopOutlineProcessor(
   if (UseRuntimeCilkFor)
     return new RuntimeCilkFor(M);
   return nullptr;
+}
+
+Value *OpenCilkABI::getValidFrame(CallBase *FrameCall, DominatorTree &DT) {
+  Function *F = FrameCall->getFunction();
+  if (Value *Frame = DetachCtxToStackFrame.lookup(F)) {
+    // Make sure a call to enter_frame dominates this get_frame call
+    // and no call to leave_frame has potentially been executed.
+    // Otherwise return a null pointer value to mean unknown.
+    // This is correct in most functions and conservative in
+    // complicated functions.
+    bool Initialized = false;
+    Value *Enter1 = CILKRTS_FUNC(enter_frame_helper).getCallee();
+    Value *Enter2 = CILKRTS_FUNC(enter_frame).getCallee();
+    Value *Leave1 = CILKRTS_FUNC(leave_frame_helper).getCallee();
+    Value *Leave2 = CILKRTS_FUNC(leave_frame).getCallee();
+    Value *Leave3 = CilkHelperEpilogue.getCallee();
+    Value *Leave4 = CilkParentEpilogue.getCallee();
+    for (User *U : Frame->users()) {
+      if (CallBase *C = dyn_cast<CallBase>(U)) {
+        Function *Fn = C->getCalledFunction();
+        if (Fn == nullptr) // indirect function call
+          continue;
+        if (Fn == Enter1 || Fn == Enter2) {
+          if (!Initialized && DT.dominates(C, FrameCall))
+            Initialized = true;
+          continue;
+        }
+        if (Fn == Leave1 || Fn == Leave2 | Fn == Leave3 | Fn == Leave4) {
+          // TODO: ...unless an enter_frame call definitely intervenes.
+          if (isPotentiallyReachable(C, FrameCall, nullptr, &DT, nullptr))
+            return Constant::getNullValue(FrameCall->getType());
+          continue;
+        }
+      }
+    }
+    if (Initialized)
+      return Frame;
+  }
+  return Constant::getNullValue(FrameCall->getType());
+}
+
+void OpenCilkABI::lowerFrameCall(CallBase *FrameCall, DominatorTree &DT) {
+  assert(FrameCall->data_operands_size() == 0);
+  Value *Frame = getValidFrame(FrameCall, DT);
+  FrameCall->replaceAllUsesWith(Frame);
+  FrameCall->eraseFromParent();
 }
 
 void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
