@@ -2393,8 +2393,12 @@ QualType Sema::BuildReferenceType(QualType T, bool SpelledAsLValue,
 // Return value is always non-null.
 Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
                                     SourceLocation Loc) {
-  if (!E)
+  if (E) {
+    if (!E->getType()->isDependentType() && isa<DeclRefExpr>(E))
+      cast<DeclRefExpr>(E)->getDecl()->markUsed(Context);
+  } else {
     E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy, Loc);
+  }
 
   QualType T = E->getType();
 
