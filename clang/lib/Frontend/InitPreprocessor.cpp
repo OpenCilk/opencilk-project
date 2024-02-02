@@ -1340,6 +1340,9 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
     Builder.defineMacro("__cilkscale__");
     break;
+  case LangOptions::CilktoolKind::Cilktool_Cilkgraph:
+    Builder.defineMacro("__cilkgraph__");
+    break;
   default: break;
   }
 
