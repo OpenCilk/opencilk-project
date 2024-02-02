@@ -1314,6 +1314,7 @@ parseCilktoolKind(StringRef FlagName, ArgList &Args, DiagnosticsEngine &Diags) {
                   LangOptions::Cilktool_Cilkscale_InstructionCount)
             .Case("cilkscale-benchmark",
                   LangOptions::Cilktool_Cilkscale_Benchmark)
+            .Case("cilkgraph", LangOptions::Cilktool_Cilkgraph)
             .Default(LangOptions::Cilktool_None);
     if (ParsedCilktool == LangOptions::Cilktool_None)
       Diags.Report(diag::err_drv_invalid_value) << FlagName << Val;
@@ -1335,6 +1336,9 @@ serializeCilktoolKind(LangOptions::CilktoolKind K) {
     break;
   case LangOptions::Cilktool_Cilkscale_Benchmark:
     CilktoolStr = "cilkscale-benchmark";
+    break;
+  case LangOptions::Cilktool_Cilkgraph:
+    CilktoolStr = "cilkgraph";
     break;
   case LangOptions::Cilktool_None:
     break;
