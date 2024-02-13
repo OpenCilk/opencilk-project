@@ -1107,6 +1107,7 @@ void ASTDeclWriter::VisitVarDecl(VarDecl *D) {
     VarDeclBits.addBit(D->isPreviousDeclInSameBlockScope());
 
     VarDeclBits.addBit(D->isEscapingByref());
+    VarDeclBits.addBit(D->isSimpleCilkForLVDecl());
     HasDeducedType = D->getType()->getContainedDeducedType();
     VarDeclBits.addBit(HasDeducedType);
 
@@ -1157,7 +1158,8 @@ void ASTDeclWriter::VisitVarDecl(VarDecl *D) {
       !D->isEscapingByref() && !HasDeducedType &&
       D->getStorageDuration() != SD_Static && !D->getDescribedVarTemplate() &&
       !D->getMemberSpecializationInfo() && !D->isObjCForDecl() &&
-      !isa<ImplicitParamDecl>(D) && !D->isEscapingByref())
+      !isa<ImplicitParamDecl>(D) && !D->isEscapingByref() &&
+      !D->isSimpleCilkForLVDecl())
     AbbrevToUse = Writer.getDeclVarAbbrev();
 
   Code = serialization::DECL_VAR;
@@ -2427,13 +2429,14 @@ void ASTWriter::WriteDeclAbbrevs() {
   // VarDecl
   Abv->Add(BitCodeAbbrevOp(
       BitCodeAbbrevOp::Fixed,
-      21)); // Packed Var Decl bits:  Linkage, ModulesCodegen,
+      22)); // Packed Var Decl bits:  Linkage, ModulesCodegen,
             // SClass, TSCSpec, InitStyle,
             // isARCPseudoStrong, IsThisDeclarationADemotedDefinition,
             // isExceptionVariable, isNRVOVariable, isCXXForRangeDecl,
             // isInline, isInlineSpecified, isConstexpr,
             // isInitCapture, isPrevDeclInSameScope,
-            // EscapingByref, HasDeducedType, ImplicitParamKind, isObjCForDecl
+            // EscapingByref, isSimpleCilkForLVDecl, HasDeducedType,
+            // ImplicitParamKind, isObjCForDecl
   Abv->Add(BitCodeAbbrevOp(0));                         // VarKind (local enum)
   // Type Source Info
   Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Array));
