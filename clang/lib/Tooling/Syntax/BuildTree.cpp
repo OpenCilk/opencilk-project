@@ -850,6 +850,28 @@ public:
     return Result;
   }
 
+  bool TraverseCilkForStmt(CilkForStmt *S) {
+    // We override to traverse simple loop variable as VarDecl.
+    bool Result = [&, this]() {
+      if (S->getLoopVarStmt()) {
+        if (S->getLoopVariable() && !TraverseDecl(S->getLoopVariable()))
+          return false;
+        if (S->getOriginalInit() && !TraverseStmt(S->getOriginalInit()))
+          return false;
+        if (S->getOriginalCond() && !TraverseStmt(S->getOriginalCond()))
+          return false;
+        if (S->getOriginalInc() && !TraverseStmt(S->getOriginalInc()))
+          return false;
+        if (S->getBody() && !TraverseStmt(S->getBody()))
+          return false;
+        return true;
+      }
+      return TraverseStmt(S);
+    }();
+    WalkUpFromCilkForStmt(S);
+    return Result;
+  }
+
   bool TraverseStmt(Stmt *S) {
     if (auto *DS = dyn_cast_or_null<DeclStmt>(S)) {
       // We want to consume the semicolon, make sure SimpleDeclaration does not.
@@ -1520,6 +1542,14 @@ public:
     Builder.markStmtChild(S->getBody(), syntax::NodeRole::BodyStatement);
     Builder.foldNode(Builder.getStmtRange(S),
                      new (allocator()) syntax::RangeBasedForStatement, S);
+    return true;
+  }
+
+  bool WalkUpFromCilkForStmt(CilkForStmt *S) {
+    Builder.markChildToken(S->getCilkForLoc(), syntax::NodeRole::IntroducerKeyword);
+    Builder.markStmtChild(S->getBody(), syntax::NodeRole::BodyStatement);
+    Builder.foldNode(Builder.getStmtRange(S),
+                     new (allocator()) syntax::CilkForStatement, S);
     return true;
   }
 

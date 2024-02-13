@@ -232,6 +232,7 @@ def ContinueStatement : External<Statement> {}
 def BreakStatement : External<Statement> {}
 def ReturnStatement : External<Statement> {}
 def RangeBasedForStatement : External<Statement> {}
+def CilkForStatement : External<Statement> {}
 def ExpressionStatement : External<Statement> {}
 def CompoundStatement : External<Statement> {}
 
