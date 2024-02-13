@@ -2291,7 +2291,8 @@ bool RecursiveASTVisitor<Derived>::TraverseVarHelper(VarDecl *D) {
   TRY_TO(TraverseDeclaratorHelper(D));
   // Default params are taken care of when we traverse the ParmVarDecl.
   if (!isa<ParmVarDecl>(D) &&
-      (!D->isCXXForRangeDecl() || getDerived().shouldVisitImplicitCode()))
+      ((!D->isCXXForRangeDecl() && !D->isSimpleCilkForLVDecl()) ||
+       getDerived().shouldVisitImplicitCode()))
     TRY_TO(TraverseStmt(D->getInit()));
   return true;
 }
@@ -2867,7 +2868,18 @@ DEF_TRAVERSE_STMT(CUDAKernelCallExpr, {})
 DEF_TRAVERSE_STMT(CilkSpawnStmt, {})
 DEF_TRAVERSE_STMT(CilkSpawnExpr, {})
 DEF_TRAVERSE_STMT(CilkSyncStmt, {})
-DEF_TRAVERSE_STMT(CilkForStmt, {})
+DEF_TRAVERSE_STMT(CilkForStmt, {
+  if (!getDerived().shouldVisitImplicitCode() && S->getLoopVarStmt()) {
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getLoopVarStmt());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getOriginalInit());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getOriginalCond());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getOriginalInc());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getBody());
+    // Visit everything else only if shouldVisitImplicitCode() or
+    // if this loop doesn't have a custom loop-variable statement.
+    ShouldVisitChildren = false;
+  }
+})
 DEF_TRAVERSE_STMT(CilkScopeStmt, {})
 
 // These operators (all of them) do not need any action except
