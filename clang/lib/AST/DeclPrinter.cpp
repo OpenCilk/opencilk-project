@@ -896,7 +896,7 @@ void DeclPrinter::VisitVarDecl(VarDecl *D) {
   Expr *Init = D->getInit();
   if (!Policy.SuppressInitializers && Init) {
     bool ImplicitInit = false;
-    if (D->isCXXForRangeDecl()) {
+    if (D->isCXXForRangeDecl() || D->isSimpleCilkForLVDecl()) {
       // FIXME: We should print the range expression instead.
       ImplicitInit = true;
     } else if (CXXConstructExpr *Construct =

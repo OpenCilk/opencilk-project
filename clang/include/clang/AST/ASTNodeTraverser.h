@@ -20,6 +20,7 @@
 #include "clang/AST/CommentVisitor.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/LocInfoType.h"
+#include "clang/AST/StmtCilk.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
 #include "clang/AST/Type.h"
@@ -150,6 +151,10 @@ public:
       if (Traversal == TK_IgnoreUnlessSpelledInSource &&
           isa<LambdaExpr, CXXForRangeStmt, CallExpr,
               CXXRewrittenBinaryOperator>(S))
+        return;
+
+      if (Traversal == TK_IgnoreUnlessSpelledInSource && isa<CilkForStmt>(S) &&
+          cast<CilkForStmt>(S)->getLoopVarStmt())
         return;
 
       for (const Stmt *SubStmt : S->children())
@@ -457,7 +462,8 @@ public:
   }
 
   void VisitVarDecl(const VarDecl *D) {
-    if (Traversal == TK_IgnoreUnlessSpelledInSource && D->isCXXForRangeDecl())
+    if (Traversal == TK_IgnoreUnlessSpelledInSource &&
+        (D->isCXXForRangeDecl() || D->isSimpleCilkForLVDecl()))
       return;
 
     if (D->hasInit())
@@ -804,6 +810,17 @@ public:
       Visit(Node->getLoopVariable());
       Visit(Node->getRangeInit());
       Visit(Node->getBody());
+    }
+  }
+
+  void VisitCilkForStmt(const CilkForStmt *Node) {
+    if (Traversal == TK_IgnoreUnlessSpelledInSource) {
+      assert(Node->getLoopVarStmt() &&
+             "Custom visit method called on non-simple CilkForStmt");
+      Visit(Node->getLoopVariable());
+      Visit(Node->getOriginalInit());
+      Visit(Node->getOriginalCond());
+      Visit(Node->getOriginalInc());
     }
   }
 
