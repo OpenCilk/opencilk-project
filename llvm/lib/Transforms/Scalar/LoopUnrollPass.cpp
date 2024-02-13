@@ -1633,6 +1633,12 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
   if (!Changed)
     return PreservedAnalyses::all();
 
+  // Update TaskInfo manually using the updated DT.
+  //
+  // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+  // Optimize this routine in the future.
+  TI.recalculate(*DT.getRoot()->getParent(), DT);
+
   return getLoopPassPreservedAnalyses();
 }
 
