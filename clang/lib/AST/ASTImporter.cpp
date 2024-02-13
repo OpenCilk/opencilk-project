@@ -6986,15 +6986,18 @@ ExpectedStmt ASTNodeImporter::VisitCilkForStmt(CilkForStmt *S) {
   auto ToInc = importChecked(Err, S->getInc());
   auto ToLoopVarStmt = importChecked(Err, S->getLoopVarStmt());
   auto ToBody = importChecked(Err, S->getBody());
+  auto ToOgCond = importChecked(Err, S->getOriginalCond());
+  auto ToOgInc = importChecked(Err, S->getOriginalInc());
   auto ToCilkForLoc = importChecked(Err, S->getCilkForLoc());
   auto ToLParenLoc = importChecked(Err, S->getLParenLoc());
   auto ToRParenLoc = importChecked(Err, S->getRParenLoc());
   if (Err)
     return std::move(Err);
 
-  return new (Importer.getToContext()) CilkForStmt(
-      ToInit, ToLimitStmt, ToInitCond, ToBeginStmt, ToEndStmt, ToCond, ToInc,
-      ToLoopVarStmt, ToBody, ToCilkForLoc, ToLParenLoc, ToRParenLoc);
+  return new (Importer.getToContext())
+      CilkForStmt(ToInit, ToLimitStmt, ToInitCond, ToBeginStmt, ToEndStmt,
+                  ToCond, ToInc, ToLoopVarStmt, ToBody, ToOgCond, ToOgInc,
+                  ToCilkForLoc, ToLParenLoc, ToRParenLoc);
 }
 
 ExpectedStmt ASTNodeImporter::VisitCilkScopeStmt(CilkScopeStmt *S) {
