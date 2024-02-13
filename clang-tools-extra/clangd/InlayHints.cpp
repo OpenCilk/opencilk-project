@@ -560,6 +560,23 @@ public:
     return true;
   }
 
+  bool VisitCilkForStmt(CilkForStmt *S) {
+    if (Cfg.InlayHints.BlockEnd) {
+      std::string Name;
+      // Common case: cilk_for (int I = 0; I < N; I++). Use "I" as the name.
+      if (auto *DS = llvm::dyn_cast_or_null<DeclStmt>(S->getLoopVarStmt());
+          DS && DS->isSingleDecl())
+        Name = getSimpleName(llvm::cast<NamedDecl>(*DS->getSingleDecl()));
+      else if (auto *DS = llvm::dyn_cast_or_null<DeclStmt>(S->getInit());
+          DS && DS->isSingleDecl())
+        Name = getSimpleName(llvm::cast<NamedDecl>(*DS->getSingleDecl()));
+      else
+        Name = summarizeExpr(S->getCond());
+      markBlockEnd(S->getBody(), "cilk_for", Name);
+    }
+    return true;
+  }
+
   bool VisitCXXForRangeStmt(CXXForRangeStmt *S) {
     if (Cfg.InlayHints.BlockEnd)
       markBlockEnd(S->getBody(), "for", getSimpleName(*S->getLoopVariable()));

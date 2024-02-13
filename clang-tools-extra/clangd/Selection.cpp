@@ -703,6 +703,22 @@ public:
              TraverseStmt(S->getRangeInit()) && TraverseStmt(S->getBody());
     });
   }
+  // Simple _Cilk_for loops are processed in a special way, so traverse
+  // specific substatements to determine the selection.
+  bool TraverseCilkForStmt(CilkForStmt *S) {
+    return traverseNode(S, [&] {
+      if (S->getLoopVarStmt())
+        return TraverseStmt(S->getOriginalInit()) &&
+               TraverseDecl(S->getLoopVariable()) &&
+               TraverseStmt(S->getOriginalCond()) &&
+               TraverseStmt(S->getOriginalInc()) && TraverseStmt(S->getBody());
+      else
+        return TraverseStmt(S->getInit()) &&
+               TraverseStmt(reinterpret_cast<Stmt *>(S->getCond())) &&
+               TraverseStmt(reinterpret_cast<Stmt *>(S->getInc())) &&
+               TraverseStmt(S->getBody());
+    });
+  }
   // OpaqueValueExpr blocks traversal, we must explicitly traverse it.
   bool TraverseOpaqueValueExpr(OpaqueValueExpr *E) {
     return traverseNode(E, [&] { return TraverseStmt(E->getSourceExpr()); });
