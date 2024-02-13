@@ -1606,6 +1606,7 @@ ASTDeclReader::RedeclarableResult ASTDeclReader::VisitVarDeclImpl(VarDecl *VD) {
     VD->NonParmVarDeclBits.PreviousDeclInSameBlockScope = Record.readInt();
     VD->NonParmVarDeclBits.ImplicitParamKind = Record.readInt();
     VD->NonParmVarDeclBits.EscapingByref = Record.readInt();
+    VD->NonParmVarDeclBits.SimpleCilkForLVDecl = Record.readInt();
     HasDeducedType = Record.readInt();
   }
 

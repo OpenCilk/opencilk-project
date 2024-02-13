@@ -1073,6 +1073,7 @@ void ASTDeclWriter::VisitVarDecl(VarDecl *D) {
     else
       Record.push_back(0);
     Record.push_back(D->isEscapingByref());
+    Record.push_back(D->isSimpleCilkForLVDecl());
     HasDeducedType = D->getType()->getContainedDeducedType();
     Record.push_back(HasDeducedType);
   }
@@ -2332,6 +2333,7 @@ void ASTWriter::WriteDeclAbbrevs() {
   Abv->Add(BitCodeAbbrevOp(0));                         // isPrevDeclInSameScope
   Abv->Add(BitCodeAbbrevOp(0));                         // ImplicitParamKind
   Abv->Add(BitCodeAbbrevOp(0));                         // EscapingByref
+  Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1)); // isSimpleCilkForLVDecl
   Abv->Add(BitCodeAbbrevOp(0));                         // HasDeducedType
   Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 3)); // Linkage
   Abv->Add(BitCodeAbbrevOp(0));                         // ModulesCodeGen
