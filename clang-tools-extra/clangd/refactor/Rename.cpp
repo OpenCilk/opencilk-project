@@ -23,6 +23,7 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/ParentMapContext.h"
 #include "clang/AST/Stmt.h"
+#include "clang/AST/StmtCilk.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/SourceLocation.h"
@@ -372,6 +373,10 @@ const NamedDecl *lookupSiblingWithinEnclosingScope(ASTContext &Ctx,
       if (const auto *Result = CheckDeclStmt(
               dyn_cast_or_null<DeclStmt>(For->getInit()), NewName))
         return Result;
+    if (const auto *For = ScopeParent->get<CilkForStmt>())
+      if (const auto *Result = CheckDeclStmt(
+              dyn_cast_or_null<DeclStmt>(For->getInit()), NewName))
+        return Result;
     // Also check if there is a name collision with function arguments.
     if (const auto *Function = ScopeParent->get<FunctionDecl>())
       for (const auto *Parameter : Function->parameters())
@@ -390,6 +395,14 @@ const NamedDecl *lookupSiblingWithinEnclosingScope(ASTContext &Ctx,
   if (const auto *EnclosingWhile = Parent->get<WhileStmt>())
     return CheckCompoundStmt(EnclosingWhile->getBody(), NewName);
   if (const auto *EnclosingFor = Parent->get<ForStmt>()) {
+    // Check for conflicts with other declarations within initialization
+    // statement.
+    if (const auto *Result = CheckDeclStmt(
+            dyn_cast_or_null<DeclStmt>(EnclosingFor->getInit()), NewName))
+      return Result;
+    return CheckCompoundStmt(EnclosingFor->getBody(), NewName);
+  }
+  if (const auto *EnclosingFor = Parent->get<CilkForStmt>()) {
     // Check for conflicts with other declarations within initialization
     // statement.
     if (const auto *Result = CheckDeclStmt(

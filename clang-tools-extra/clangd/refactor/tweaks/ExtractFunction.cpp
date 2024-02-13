@@ -566,7 +566,7 @@ void CapturedZoneInfo::DeclInformation::markOccurence(
 
 bool isLoop(const Stmt *S) {
   return isa<ForStmt>(S) || isa<DoStmt>(S) || isa<WhileStmt>(S) ||
-         isa<CXXForRangeStmt>(S);
+         isa<CXXForRangeStmt>(S) || isa<CilkForStmt>(S);
 }
 
 // Captures information from Extraction Zone
