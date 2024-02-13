@@ -989,6 +989,8 @@ const Stmt *getLoopBody(DynTypedNode N) {
     return LS->getBody();
   if (const auto *LS = N.get<DoStmt>())
     return LS->getBody();
+  if (const auto *LS = N.get<CilkForStmt>())
+    return LS->getBody();
   return nullptr;
 }
 
@@ -1004,7 +1006,9 @@ class FindControlFlow : public RecursiveASTVisitor<FindControlFlow> {
     Case = 8,
     Throw = 16,
     Goto = 32,
-    All = Break | Continue | Return | Case | Throw | Goto,
+    CilkSpawn = 64,
+    CilkSync = 128,
+    All = Break | Continue | Return | Case | Throw | Goto | CilkSpawn | CilkSync,
   };
   int Ignore = 0;     // bitmask of Target - what are we *not* highlighting?
   SourceRange Bounds; // Half-open, restricts reported targets.
@@ -1023,6 +1027,8 @@ class FindControlFlow : public RecursiveASTVisitor<FindControlFlow> {
       Ignore |= Continue | Break;
     else if (D.get<SwitchStmt>())
       Ignore |= Break | Case;
+    else if (D.get<CilkScopeStmt>())
+      Ignore |= CilkSpawn | CilkSync;
     // Prune tree if we're not looking for anything.
     return (Ignore == All) ? true : Delegate();
   }
@@ -1084,6 +1090,18 @@ public:
     }
     return true;
   }
+  bool VisitCilkSpawnStmt(CilkSpawnStmt *S) {
+    found(CilkSpawn, S->getSpawnLoc());
+    return true;
+  }
+  bool VisitCilkSpawnExpr(CilkSpawnExpr *S) {
+    found(CilkSpawn, S->getSpawnLoc());
+    return true;
+  }
+  bool VisitCilkSyncStmt(CilkSyncStmt *Y) {
+    found(CilkSync, Y->getSyncLoc());
+    return true;
+  }
 };
 
 // Given a location within a switch statement, return the half-open range that
@@ -1133,7 +1151,8 @@ std::vector<SourceLocation> relatedControlFlow(const SelectionTree::Node &N) {
   std::vector<SourceLocation> Result;
 
   // First, check if we're at a node that can resolve to a root.
-  enum class Cur { None, Break, Continue, Return, Case, Throw } Cursor;
+  enum class Cur { None, Break, Continue, Return, Case, Throw, CilkSpawn,
+                   CilkSync } Cursor;
   if (N.ASTNode.get<BreakStmt>()) {
     Cursor = Cur::Break;
   } else if (N.ASTNode.get<ContinueStmt>()) {
@@ -1150,6 +1169,10 @@ std::vector<SourceLocation> relatedControlFlow(const SelectionTree::Node &N) {
     if (const auto *LD = GS->getLabel())
       Result.push_back(LD->getLocation());
     Cursor = Cur::None;
+  } else if (N.ASTNode.get<CilkSpawnStmt>() || N.ASTNode.get<CilkSpawnExpr>()) {
+    Cursor = Cur::CilkSpawn;
+  } else if (N.ASTNode.get<CilkSyncStmt>()) {
+    Cursor = Cur::CilkSync;
   } else {
     Cursor = Cur::None;
   }
@@ -1160,7 +1183,8 @@ std::vector<SourceLocation> relatedControlFlow(const SelectionTree::Node &N) {
   for (const auto *P = &N; P; P = P->Parent) {
     // return associates with enclosing function
     if (const Stmt *FunctionBody = getFunctionBody(P->ASTNode)) {
-      if (Cursor == Cur::Return || Cursor == Cur::Throw) {
+      if (Cursor == Cur::Return || Cursor == Cur::Throw ||
+          Cursor == Cur::CilkSpawn || Cursor == Cur::CilkSync) {
         Root = FunctionBody;
       }
       break; // other leaves don't cross functions.
@@ -1185,6 +1209,14 @@ std::vector<SourceLocation> relatedControlFlow(const SelectionTree::Node &N) {
         Root = SS->getBody();
         // Limit to enclosing case, if there is one.
         Bounds = findCaseBounds(*SS, N.ASTNode.getSourceRange().getBegin(), SM);
+        break;
+      }
+    }
+    if (const auto *CilkScope = P->ASTNode.get<CilkScopeStmt>()) {
+      if (Cursor == Cur::CilkSpawn || Cursor == Cur::CilkSync) {
+        Root = CilkScope->getBody();
+        // Highlight the cilk_scope keyword.
+        Result.push_back(CilkScope->getScopeLoc());
         break;
       }
     }
