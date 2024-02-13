@@ -1443,8 +1443,8 @@ bool CapturedStmt::capturesVariable(const VarDecl *Var) const {
 // CilkForStmt
 CilkForStmt::CilkForStmt(Stmt *Init, DeclStmt *Limit, Expr *InitCond,
                          DeclStmt *BeginStmt, DeclStmt *EndStmt, Expr *Cond,
-                         Expr *Inc, DeclStmt *LoopVar, Stmt *Body,
-                         SourceLocation CFL, SourceLocation LP,
+                         Expr *Inc, DeclStmt *LoopVar, Stmt *Body, Stmt *OgCond,
+                         Stmt *OgInc, SourceLocation CFL, SourceLocation LP,
                          SourceLocation RP)
     : Stmt(CilkForStmtClass), CilkForLoc(CFL), LParenLoc(LP), RParenLoc(RP) {
   SubExprs[INIT] = Init;
@@ -1456,4 +1456,27 @@ CilkForStmt::CilkForStmt(Stmt *Init, DeclStmt *Limit, Expr *InitCond,
   SubExprs[INC] = Inc;
   SubExprs[LOOPVAR] = LoopVar;
   SubExprs[BODY] = Body;
+  SubExprs[OGCOND] = OgCond;
+  SubExprs[OGINC] = OgInc;
+}
+
+VarDecl *CilkForStmt::getLoopVariable() {
+  Decl *LV = cast<DeclStmt>(getLoopVarStmt())->getSingleDecl();
+  assert(LV && "No simple loop variable in CilkForStmt");
+  return cast<VarDecl>(LV);
+}
+
+const VarDecl *CilkForStmt::getLoopVariable() const {
+  return const_cast<CilkForStmt *>(this)->getLoopVariable();
+}
+
+Stmt *CilkForStmt::getOriginalInit() {
+  Decl *IV = cast<DeclStmt>(getInit())->getSingleDecl();
+  if (!IV)
+    return getInit();
+  return cast<VarDecl>(IV)->getInit();
+}
+
+const Stmt *CilkForStmt::getOriginalInit() const {
+  return const_cast<CilkForStmt *>(this)->getOriginalInit();
 }

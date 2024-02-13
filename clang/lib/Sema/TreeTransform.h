@@ -1462,13 +1462,14 @@ public:
   StmtResult RebuildCilkForStmt(SourceLocation ForLoc, SourceLocation LParenLoc,
                                 Stmt *Init, Stmt *Limit,
                                 Sema::ConditionResult InitCond, Stmt *Begin,
-                                Stmt *End,  Sema::ConditionResult Cond,
+                                Stmt *End, Sema::ConditionResult Cond,
                                 Sema::FullExprArg Inc, SourceLocation RParenLoc,
-                                Stmt *LoopVar, Stmt *Body) {
+                                Stmt *LoopVar, Stmt *Body, Stmt *OgCond,
+                                Stmt *OgInc) {
     return getSema().ActOnCilkForStmt(
         ForLoc, LParenLoc, Init, cast_or_null<DeclStmt>(Limit), InitCond,
         cast_or_null<DeclStmt>(Begin), cast_or_null<DeclStmt>(End), Cond, Inc,
-        RParenLoc, Body, cast_or_null<DeclStmt>(LoopVar));
+        RParenLoc, Body, cast_or_null<DeclStmt>(LoopVar), OgCond, OgInc);
   }
 
   /// Build a new goto statement.
@@ -15535,6 +15536,14 @@ TreeTransform<Derived>::TransformCilkForStmt(CilkForStmt *S) {
       return StmtError();
   }
 
+  // Transform the original init, condition, and increment statements
+  StmtResult OgCond = getDerived().TransformStmt(S->getOriginalCond());
+  if (OgCond.isInvalid())
+    return StmtError();
+  StmtResult OgInc = getDerived().TransformStmt(S->getOriginalInc());
+  if (OgInc.isInvalid())
+    return StmtError();
+
   // Transform loop body
   StmtResult Body = getDerived().TransformStmt(S->getBody());
   if (Body.isInvalid())
@@ -15550,13 +15559,15 @@ TreeTransform<Derived>::TransformCilkForStmt(CilkForStmt *S) {
       Cond.get() == std::make_pair((clang::VarDecl*)nullptr, S->getCond()) &&
       Inc.get() == S->getInc() &&
       LoopVar.get() == S->getLoopVarStmt() &&
-      Body.get() == S->getBody())
+      Body.get() == S->getBody() &&
+      OgCond.get() == S->getOriginalCond() &&
+      OgInc.get() == S->getOriginalInc())
     return S;
 
   return getDerived().RebuildCilkForStmt(
-      S->getCilkForLoc(), S->getLParenLoc(), Init.get(), Limit.get(),
-      InitCond, Begin.get(), End.get(), Cond, FullInc, S->getRParenLoc(),
-      LoopVar.get(), Body.get());
+      S->getCilkForLoc(), S->getLParenLoc(), Init.get(), Limit.get(), InitCond,
+      Begin.get(), End.get(), Cond, FullInc, S->getRParenLoc(), LoopVar.get(),
+      Body.get(), OgCond.get(), OgInc.get());
 }
 
 } // end namespace clang
