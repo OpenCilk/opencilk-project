@@ -5330,7 +5330,8 @@ public:
                               DeclStmt *Begin, DeclStmt *End,
                               ConditionResult second, FullExprArg third,
                               SourceLocation RParenLoc, Stmt *Body,
-                              DeclStmt *LoopVar = nullptr);
+                              DeclStmt *LoopVar = nullptr,
+                              Stmt *OgCond = nullptr, Stmt *OgInc = nullptr);
 
   StmtResult BuildCilkForStmt(SourceLocation CilkForLoc,
                               SourceLocation LParenLoc,
