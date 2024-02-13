@@ -138,6 +138,8 @@ syntax::Tree *allocateTree(syntax::Arena &A, syntax::NodeKind Kind) {
     return new (A.getAllocator()) syntax::ReturnStatement;
   case syntax::NodeKind::RangeBasedForStatement:
     return new (A.getAllocator()) syntax::RangeBasedForStatement;
+  case syntax::NodeKind::CilkForStatement:
+    return new (A.getAllocator()) syntax::CilkForStatement;
   case syntax::NodeKind::ExpressionStatement:
     return new (A.getAllocator()) syntax::ExpressionStatement;
   case syntax::NodeKind::CompoundStatement:

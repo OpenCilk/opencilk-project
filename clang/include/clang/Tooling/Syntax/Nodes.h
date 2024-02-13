@@ -327,6 +327,15 @@ public:
   Statement *getBody();
 };
 
+/// cilk_for (<init>; <cond>; <increment>) <body>
+class CilkForStatement final : public Statement {
+public:
+  CilkForStatement() : Statement(NodeKind::CilkForStatement) {}
+  static bool classof(const Node *N);
+  Leaf *getForKeyword();
+  Statement *getBody();
+};
+
 /// Expression in a statement position, e.g. functions calls inside compound
 /// statements or inside a loop body.
 class ExpressionStatement final : public Statement {
