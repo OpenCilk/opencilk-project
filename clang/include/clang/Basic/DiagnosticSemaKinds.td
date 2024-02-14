@@ -10669,8 +10669,8 @@ def incomplete_hyperobject : Error<
 def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
 
-def reducer_callbacks_not_allowed: Warning<
-   "reducer callbacks not implemented for structure members">,
+def reducer_registration_not_implemented: Warning<
+   "reducer registration not implemented for structure members">,
     InGroup<CilkIgnored>;
 
 def err_invalid_reducer_callback : Error<

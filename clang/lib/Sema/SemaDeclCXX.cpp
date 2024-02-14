@@ -5775,7 +5775,7 @@ Sema::MarkBaseAndMemberDestructorsReferenced(SourceLocation Location,
 
     QualType FieldType = Context.getBaseElementType(Field->getType());
 
-    const RecordType* RT = FieldType->getAs<RecordType>();
+    const RecordType* RT = FieldType.stripHyperobject()->getAs<RecordType>();
     if (!RT)
       continue;
 
