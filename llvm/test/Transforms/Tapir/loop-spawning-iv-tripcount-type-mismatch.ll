@@ -212,8 +212,8 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
 ; CHECK: _Z10initializePdS_S_S_S_mm.exit.ls1:
 ; CHECK: %[[SYNCREG:.+]] = {{.*}}call token @llvm.syncregion.start()
 
-; CHECK: _Z10initializePdS_S_S_S_mm.exit.ls1.split:
-; CHECK-NEXT: %[[DACIV:.+]] = phi i64 [ %indvars.iv376.start.ls1, %_Z10initializePdS_S_S_S_mm.exit.ls1 ], [ %[[DACIVINC:.+]], %.split.split ]
+; CHECK: _Z10initializePdS_S_S_S_mm.exit.ls1.dac.head:
+; CHECK-NEXT: %[[DACIV:.+]] = phi i64 [ %indvars.iv376.start.ls1, %_Z10initializePdS_S_S_S_mm.exit.ls1 ], [ %[[DACIVINC:.+]], %_Z10initializePdS_S_S_S_mm.exit.ls1.dac.cont ]
 ; CHECK: %[[DACIVSTART:.+]] = trunc i64 %[[DACIV]] to i32
 ; CHECK: %[[ITERCOUNT:.+]] = sub i32 %[[END]], %[[DACIVSTART]]
 ; CHECK: %[[CMP:.+]] = icmp ugt i32 %[[ITERCOUNT]], %[[GRAINSIZE]]
@@ -230,7 +230,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
 
 ; CHECK: [[CONTIN]]:
 ; CHECK: %[[DACIVINC]] = zext i32 %[[MIDITER]] to i64
-; CHECK: br label %_Z10initializePdS_S_S_S_mm.exit.ls1.split
+; CHECK: br label %_Z10initializePdS_S_S_S_mm.exit.ls1.dac.head
 
 declare dso_local double @sqrt(double) local_unnamed_addr #0
 

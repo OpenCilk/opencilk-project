@@ -432,7 +432,10 @@ public:
   /// a common post-processing step for outlined helper functions.
   void addSyncToOutlineReturns(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                                ValueToValueMapTy &VMap);
-
+  /// Enclose the task of the Tapir loop in a taskframe, if the Tapir loop
+  /// contains nested spawns.
+  void maybeEncloseInTaskFrame(TapirLoopInfo &TL, TaskOutlineInfo &Out,
+                               ValueToValueMapTy &VMap);
   /// Move Cilksan instrumentation out of cloned loop.
   void moveCilksanInstrumentation(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                                   ValueToValueMapTy &VMap);

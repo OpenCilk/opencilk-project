@@ -3209,7 +3209,7 @@ pfor.preattach.3:                                 ; preds = %if.then.3, %pfor.pr
 ; CHECK-DAG: <8 x i32> %broadcast.splat1309.ls3
 ; CHECK: ) unnamed_addr #[[ATTRIBUTES:[0-9]+]]
 
-; CHECK-LABEL: define {{.*}}void @_Z19suffixArrayInternalPhl.outline_pfor.cond284.strpm.outer.ls3.outline_.split.otd1(
+; CHECK-LABEL: define {{.*}}void @_Z19suffixArrayInternalPhl.outline_pfor.cond284.strpm.outer.ls3.outline_pfor.cond284.strpm.detachloop.entry.ls3.dac.detach.otd1(
 ; CHECK-DAG: <8 x i64> %broadcast.splat1311.ls3.otd1
 ; CHECK-DAG: <8 x i32> %broadcast.splat1309.ls3.otd1
 ; CHECK: ) unnamed_addr #[[ATTRIBUTES2:[0-9]+]]
