@@ -1083,8 +1083,8 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 
 ; CHECK-LABEL: define internal fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach29.ls2(i64
 ; CHECK: %[[SYNCREG:.+]] = call token @llvm.syncregion.start()
-; CHECK: detach within %[[SYNCREG]], label %.split, label %{{.+}} unwind label %[[DUNWIND:.+]]
-; CHECK: {{^.split}}:
+; CHECK: detach within %[[SYNCREG]], label %pfor.detach29.preheader.ls2.dac.detach, label %{{.+}} unwind label %[[DUNWIND:.+]]
+; CHECK: {{^pfor.detach29.preheader.ls2.dac.detach}}:
 ; CHECK-NEXT: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach29.ls2(i64
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LSUNWIND:.+]]
 ; CHECK: sync within %[[SYNCREG]]
@@ -1100,8 +1100,8 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 
 ; CHECK-LABEL: define internal fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(i64
 ; CHECK: %[[SYNCREG:.+]] = tail call token @llvm.syncregion.start()
-; CHECK: detach within %[[SYNCREG]], label %.split, label %{{.+}} unwind label %[[DUNWIND:.+]]
-; CHECK: {{^.split:}}
+; CHECK: detach within %[[SYNCREG]], label %pfor.detach.lr.ph.ls1.dac.detach, label %{{.+}} unwind label %[[DUNWIND:.+]]
+; CHECK: {{^pfor.detach.lr.ph.ls1.dac.detach:}}
 ; CHECK-NEXT: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(i64
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LSUNWIND:.+]]
 ; CHECK: {{^pfor.detach29.preheader.ls1:}}

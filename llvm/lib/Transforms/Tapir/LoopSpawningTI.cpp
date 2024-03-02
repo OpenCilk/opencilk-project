@@ -14,8 +14,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
@@ -25,15 +25,13 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/PatternMatch.h"
 #include "llvm/IR/Type.h"
-#include "llvm/IR/ValueMap.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
@@ -43,7 +41,6 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/IndVarSimplify.h"
-#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
 #include "llvm/Transforms/Tapir.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
@@ -53,14 +50,14 @@
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
-#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
+
 #include <utility>
 
 using namespace llvm;
 
-#define LS_NAME "loop-spawning-ti"
+#define LS_NAME "loop-spawning"
 #define DEBUG_TYPE LS_NAME
 
 STATISTIC(TapirLoopsFound,
@@ -91,6 +88,7 @@ public:
   void postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                           ValueToValueMapTy &VMap) override final {
     LoopOutlineProcessor::postProcessOutline(TL, Out, VMap);
+    maybeEncloseInTaskFrame(TL, Out, VMap);
     implementDACIterSpawnOnHelper(TL, Out, VMap);
     ++LoopsConvertedToDAC;
 
@@ -110,7 +108,7 @@ static bool isSRetInput(const Value *V, const Function &F) {
   if (!isa<Argument>(V))
     return false;
 
-  auto ArgIter = F.arg_begin();
+  const auto *ArgIter = F.arg_begin();
   if (F.hasParamAttribute(0, Attribute::StructRet) && V == &*ArgIter)
     return true;
   ++ArgIter;
@@ -186,7 +184,9 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
       continue;
 
     BasicBlock *Exit = AtExit->GetInsertBlock();
-    BasicBlock *NewExit = SplitBlock(Exit, Exit->getTerminator());
+    BasicBlock *NewExit =
+        SplitBlock(Exit, Exit->getTerminator(), (DomTreeUpdater *)nullptr,
+                   nullptr, nullptr, Exit->getName() + ".synced");
     SyncInst *NewSync = SyncInst::Create(NewExit, SyncRegion);
     ReplaceInstWithInst(Exit->getTerminator(), NewSync);
 
@@ -203,6 +203,77 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
     if (TL.getUnwindDest())
       changeToInvokeAndSplitBasicBlock(
           SyncUnwind, cast<BasicBlock>(VMap[TL.getUnwindDest()]));
+  }
+}
+
+void LoopOutlineProcessor::maybeEncloseInTaskFrame(TapirLoopInfo &TL,
+                                                   TaskOutlineInfo &Out,
+                                                   ValueToValueMapTy &VMap) {
+  Task *T = TL.getTask();
+  if (T->subtasks().empty())
+    return;
+
+  BasicBlock &Entry = Out.Outline->getEntryBlock();
+
+  // Get the taskframe intrinsics.
+  Function *TFCreateFn =
+      Intrinsic::getDeclaration(&M, Intrinsic::taskframe_create);
+  Function *TFEndFn =
+      Intrinsic::getDeclaration(&M, Intrinsic::taskframe_end);
+
+  // Insert the taskframe.create.
+  Instruction *TFCreate =
+      IRBuilder<>(&Entry, Entry.begin()).CreateCall(TFCreateFn, {}, "ls.tf");
+  TFCreate->setDebugLoc(Entry.getTerminator()->getDebugLoc());
+  BasicBlock *UnreachableBlk = nullptr;
+  BasicBlock *NewResume = nullptr;
+  EscapeEnumerator EE(*Out.Outline, "ls.tfend", false);
+  SmallVector<ResumeInst *, 1> Resumes;
+  while (IRBuilder<> *AtExit = EE.Next()) {
+    if (isa<ReturnInst>(*AtExit->GetInsertPoint())) {
+      AtExit->CreateCall(TFEndFn, TFCreate);
+      continue;
+    }
+
+    BasicBlock *Exit = AtExit->GetInsertBlock();
+    if (TL.getUnwindDest() &&
+        Exit == cast<BasicBlock>(VMap[TL.getUnwindDest()]))
+      continue;
+    if (Exit == NewResume)
+      continue;
+
+    if (!UnreachableBlk) {
+      // Create the placeholder unreachable block, now that it's needed.
+      UnreachableBlk = BasicBlock::Create(
+          M.getContext(), Exit->getName() + ".unreachable", Out.Outline);
+      { // Add an unreachable instruction to the end of UnreachableBlk.
+        IRBuilder<> Builder(UnreachableBlk);
+        Builder.CreateUnreachable();
+      }
+    }
+
+    // Create a new resume block.
+    if (!NewResume) {
+      NewResume = BasicBlock::Create(
+          M.getContext(), Exit->getName() + ".tfunwind", Out.Outline);
+      IRBuilder<> Builder(NewResume);
+      Builder.SetCurrentDebugLocation(Exit->getTerminator()->getDebugLoc());
+      LandingPadInst *LPad = Builder.CreateLandingPad(
+          cast<ResumeInst>(Exit->getTerminator())->getValue()->getType(), 0);
+      LPad->setCleanup(true);
+      Builder.CreateResume(LPad);
+    }
+
+    Resumes.push_back(cast<ResumeInst>(Exit->getTerminator()));
+  }
+
+  for (ResumeInst *R : Resumes) {
+    Value *Exn = R->getValue();
+    Function *TFResumeFn = Intrinsic::getDeclaration(
+        &M, Intrinsic::taskframe_resume, {Exn->getType()});
+    InvokeInst *TFResume = InvokeInst::Create(TFResumeFn, UnreachableBlk,
+                                              NewResume, {TFCreate, Exn});
+    ReplaceInstWithInst(R, TFResume);
   }
 }
 
@@ -303,18 +374,15 @@ void LoopOutlineProcessor::moveCilksanInstrumentation(TapirLoopInfo &TL,
   }
 
   // Move __csan_detach and __csan_task to the Preheader.
-  moveInstrumentation("__csan_detach", *Header, *Preheader,
-                      Preheader->getTerminator());
-  moveInstrumentation("__csan_task", *TaskEntry, *Preheader,
-                      Preheader->getTerminator());
+  moveInstrumentation("__csan_task", *TaskEntry, *Preheader);
+  moveInstrumentation("__csan_detach", *Header, *Preheader);
 
-  // Move __csan_detach_continue and __csan_task_exit on the normal exit path to
-  // LatchExit.
-  moveInstrumentation("__csan_detach_continue", *Latch, *LatchExit);
+  // Move __csan_task_exit on the normal exit path to LatchExit.
   if (TaskExit)
     // There's only one block with __csan_task_exit instrumentation to move, so
     // move it from that block.
-    moveInstrumentation("__csan_task_exit", *TaskExit, *LatchExit);
+    moveInstrumentation("__csan_task_exit", *TaskExit, *LatchExit,
+                        LatchExit->getTerminator());
   else {
     // We need to create PHI nodes for the arguments of a new instrumentation
     // call in LatchExit.
@@ -364,12 +432,15 @@ void LoopOutlineProcessor::moveCilksanInstrumentation(TapirLoopInfo &TL,
 
     // Insert new instrumentation call at the start of LatchExit.
     CallInst::Create(InstrFunc->getFunctionType(), InstrFunc, InstrArgs, "",
-                     &*LatchExit->getFirstInsertionPt());
+                     LatchExit->getTerminator());
 
     // Remove old instrumentation calls from predecessors
     for (BasicBlock *Pred : predecessors(Latch))
       Instrumentation[Pred]->eraseFromParent();
   }
+  // Move __csan_detach_continue on the normal exit path to LatchExit.
+  moveInstrumentation("__csan_detach_continue", *Latch, *LatchExit,
+                      LatchExit->getTerminator());
 }
 
 namespace {
@@ -598,7 +669,7 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   // Get end and grainsize arguments
   Argument *End, *Grainsize;
   {
-    auto OutlineArgsIter = Helper->arg_begin();
+    auto *OutlineArgsIter = Helper->arg_begin();
     if (Helper->hasParamAttribute(0, Attribute::StructRet))
       ++OutlineArgsIter;
     // End argument is second LC input.
@@ -611,7 +682,9 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   if (&(Helper->getEntryBlock()) == Preheader) {
     // Split the entry block.  We'll want to create a backedge into
     // the split block later.
-    DACHead = SplitBlock(Preheader, &Preheader->front());
+    DACHead =
+        SplitBlock(Preheader, &Preheader->front(), (DomTreeUpdater *)nullptr,
+                   nullptr, nullptr, Preheader->getName() + ".dac.head");
 
     // Move any syncregion_start's in DACHead into Preheader.
     BasicBlock::iterator InsertPoint = Preheader->begin();
@@ -690,8 +763,12 @@ void DACSpawning::implementDACIterSpawnOnHelper(
                                 /*BranchWeights=*/nullptr);
     RecurHead = RecurTerm->getParent();
     // Create RecurHead, RecurDet, and RecurCont, with appropriate branches.
-    RecurDet = SplitBlock(RecurHead, RecurHead->getTerminator());
-    RecurCont = SplitBlock(RecurDet, RecurDet->getTerminator());
+    RecurDet = SplitBlock(RecurHead, RecurHead->getTerminator(),
+                          (DomTreeUpdater *)nullptr, nullptr, nullptr,
+                          Preheader->getName() + ".dac.detach");
+    RecurCont = SplitBlock(RecurDet, RecurDet->getTerminator(),
+                           (DomTreeUpdater *)nullptr, nullptr, nullptr,
+                           Preheader->getName() + ".dac.cont");
     RecurCont->getTerminator()->replaceUsesOfWith(RecurTerm->getSuccessor(0),
                                                   DACHead);
   }
@@ -758,7 +835,9 @@ void DACSpawning::implementDACIterSpawnOnHelper(
         RecurCall->setDoesNotThrow();
     } else {
       InvokeInst *RecurCall;
-      BasicBlock *CallDest = SplitBlock(RecurDet, RecurDet->getTerminator());
+      BasicBlock *CallDest = SplitBlock(RecurDet, RecurDet->getTerminator(),
+                                        (DomTreeUpdater *)nullptr, nullptr,
+                                        nullptr, RecurDet->getName() + ".noexc");
       BasicBlock *CallUnwind =
         createTaskUnwind(Helper, UnwindDest, SyncRegion,
                          RecurDet->getName()+".unwind");
@@ -866,7 +945,9 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
       emitMissedWarning(L, Hints, &ORE);
     }
     return nullptr;
-  } else if (!isa<BranchInst>(Preheader->getTerminator())) {
+  }
+
+  if (!isa<BranchInst>(Preheader->getTerminator())) {
     LLVM_DEBUG(dbgs() << "Loop preheader is not terminated by a branch.\n");
     if (hintsDemandOutlining(Hints)) {
       ORE.emit(TapirLoopInfo::createMissedAnalysis(LS_NAME, "ComplexPreheader",
@@ -1251,7 +1332,7 @@ public:
     return OutlineMaterializer::materialize(V);
   }
 };
-}
+} // namespace
 
 /// Outline Tapir loop \p TL into a helper function.  The \p Args set specified
 /// the arguments to that helper function.  The map \p VMap will store the
@@ -1428,9 +1509,9 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
   for (Task *T : post_order(TI.getRootTask())) {
     if (TapirLoopInfo *TL = getTapirLoop(T)) {
       PredicatedScalarEvolution PSE(SE, *TL->getLoop());
-      bool canOutline = TL->prepareForOutlining(DT, LI, TI, PSE, AC, LS_NAME,
+      bool CanOutline = TL->prepareForOutlining(DT, LI, TI, PSE, AC, LS_NAME,
                                                 ORE, TTI);
-      if (!canOutline) {
+      if (!CanOutline) {
         const Loop *L = TL->getLoop();
         TapirLoopHints Hints(L);
         emitMissedWarning(L, Hints, &ORE);
@@ -1743,10 +1824,10 @@ struct LoopSpawningTI : public FunctionPass {
     AU.addRequired<OptimizationRemarkEmitterWrapperPass>();
   }
 };
-}
+} // namespace
 
 char LoopSpawningTI::ID = 0;
-static const char ls_name[] = "Loop Spawning with Task Info";
+static const char LsName[] = "Loop Spawning with Task Info";
 INITIALIZE_PASS_BEGIN(LoopSpawningTI, LS_NAME, ls_name, false, false)
 INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
 INITIALIZE_PASS_DEPENDENCY(LoopSimplify)
@@ -1758,10 +1839,10 @@ INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(OptimizationRemarkEmitterWrapperPass)
-INITIALIZE_PASS_END(LoopSpawningTI, LS_NAME, ls_name, false, false)
+INITIALIZE_PASS_END(LoopSpawningTI, LS_NAME, LsName, false, false)
 
 namespace llvm {
 Pass *createLoopSpawningTIPass() {
   return new LoopSpawningTI();
 }
-}
+} // namespace llvm

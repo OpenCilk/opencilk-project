@@ -800,7 +800,7 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 
 ; LS-LABEL: define internal fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(ptr noalias sret(%"class.std::vector.0") align 8 %agg.result.ls1,
 ; LS: [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.*}}%[[GRAINSIZE:.+]],
-; LS: {{^.split:}}
+; LS: {{^pfor.detach.lr.ph.ls1.dac.detach:}}
 ; LS-NEXT: call fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach.ls1(ptr %agg.result.ls1, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.+}}, [[IVTYPE]] {{.*}}[[GRAINSIZE]],
 
 ; TT-LABEL: define internal fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.body.otd1(ptr {{.*}}sret(%"class.std::vector.0") {{.*}}%agg.result.otd1,
