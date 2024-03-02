@@ -4476,9 +4476,14 @@ bool CilkSanitizerImpl::instrumentAlloca(Instruction *I, TaskInfo &TI) {
     return true;
 
   IRBuilder<> IRB(I);
-  bool AllocaInEntryBlock = isEntryBlock(*I->getParent(), TI);
-  if (AllocaInEntryBlock)
-    IRB.SetInsertPoint(getEntryBBInsertPt(*I->getParent()));
+  bool InsertingAtAlloca = true;
+  if (isEntryBlock(*I->getParent(), TI)) {
+    Instruction *EntryBBInsertPt = getEntryBBInsertPt(*I->getParent());
+    if (I->comesBefore(EntryBBInsertPt)) {
+      IRB.SetInsertPoint(EntryBBInsertPt);
+      InsertingAtAlloca = false;
+    }
+  }
   AllocaInst *AI = cast<AllocaInst>(I);
 
   uint64_t LocalId = AllocaFED.add(*I);
@@ -4500,7 +4505,7 @@ bool CilkSanitizerImpl::instrumentAlloca(Instruction *I, TaskInfo &TI) {
                                                     IRB.getInt64Ty()));
 
   BasicBlock::iterator Iter(I);
-  if (!AllocaInEntryBlock) {
+  if (InsertingAtAlloca) {
     Iter++;
     IRB.SetInsertPoint(&*Iter);
   } else {
