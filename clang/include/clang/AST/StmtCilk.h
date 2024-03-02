@@ -103,11 +103,11 @@ class CilkForStmt : public Stmt {
 public:
   CilkForStmt(Stmt *Init, DeclStmt *Limit, Expr *InitCond, DeclStmt *Begin,
               DeclStmt *End, Expr *Cond, Expr *Inc, DeclStmt *LoopVar,
-              Stmt *Body, Stmt *OgCond, Stmt *OgInc, SourceLocation CFL,
+              Stmt *Body, Expr *OgCond, Expr *OgInc, SourceLocation CFL,
               SourceLocation LP, SourceLocation RP);
 
   /// Build an empty _Cilk_for statement.
-  explicit CilkForStmt(EmptyShell Empty) : Stmt(CilkForStmtClass, Empty) { }
+  explicit CilkForStmt(EmptyShell Empty) : Stmt(CilkForStmtClass, Empty) {}
 
   Stmt *getInit() { return SubExprs[INIT]; }
 
@@ -130,24 +130,22 @@ public:
   //   return reinterpret_cast<DeclStmt*>(SubExprs[CONDVAR]);
   // }
 
-  DeclStmt *getLimitStmt() {
-    return cast_or_null<DeclStmt>(SubExprs[LIMIT]);
-  }
+  DeclStmt *getLimitStmt() { return cast_or_null<DeclStmt>(SubExprs[LIMIT]); }
   Expr *getInitCond() { return cast_or_null<Expr>(SubExprs[INITCOND]); }
   DeclStmt *getBeginStmt() {
     return cast_or_null<DeclStmt>(SubExprs[BEGINSTMT]);
   }
   DeclStmt *getEndStmt() { return cast_or_null<DeclStmt>(SubExprs[ENDSTMT]); }
-  Expr *getCond() { return reinterpret_cast<Expr*>(SubExprs[COND]); }
-  Expr *getInc()  { return reinterpret_cast<Expr*>(SubExprs[INC]); }
+  Expr *getCond() { return reinterpret_cast<Expr *>(SubExprs[COND]); }
+  Expr *getInc() { return reinterpret_cast<Expr *>(SubExprs[INC]); }
   DeclStmt *getLoopVarStmt() {
     return cast_or_null<DeclStmt>(SubExprs[LOOPVAR]);
   }
   Stmt *getBody() { return SubExprs[BODY]; }
 
   Stmt *getOriginalInit();
-  Stmt *getOriginalCond() { return SubExprs[OGCOND]; }
-  Stmt *getOriginalInc() { return SubExprs[OGINC]; }
+  Expr *getOriginalCond() { return reinterpret_cast<Expr *>(SubExprs[OGCOND]); }
+  Expr *getOriginalInc() { return reinterpret_cast<Expr *>(SubExprs[OGINC]); }
 
   const Stmt *getInit() const { return SubExprs[INIT]; }
   const VarDecl *getLoopVariable() const;
@@ -163,24 +161,32 @@ public:
   const DeclStmt *getEndStmt() const {
     return cast_or_null<DeclStmt>(SubExprs[ENDSTMT]);
   }
-  const Expr *getCond() const { return reinterpret_cast<Expr*>(SubExprs[COND]);}
-  const Expr *getInc()  const { return reinterpret_cast<Expr*>(SubExprs[INC]); }
+  const Expr *getCond() const {
+    return reinterpret_cast<Expr *>(SubExprs[COND]);
+  }
+  const Expr *getInc() const { return reinterpret_cast<Expr *>(SubExprs[INC]); }
   const DeclStmt *getLoopVarStmt() const {
     return cast_or_null<DeclStmt>(SubExprs[LOOPVAR]);
   }
   const Stmt *getBody() const { return SubExprs[BODY]; }
 
   const Stmt *getOriginalInit() const;
-  const Stmt *getOriginalCond() const { return SubExprs[OGCOND]; }
-  const Stmt *getOriginalInc() const { return SubExprs[OGINC]; }
+  const Expr *getOriginalCond() const {
+    return reinterpret_cast<Expr *>(SubExprs[OGCOND]);
+  }
+  const Expr *getOriginalInc() const {
+    return reinterpret_cast<Expr *>(SubExprs[OGINC]);
+  }
 
   void setInit(Stmt *S) { SubExprs[INIT] = S; }
   void setLimitStmt(Stmt *S) { SubExprs[LIMIT] = S; }
-  void setInitCond(Expr *E) { SubExprs[INITCOND] = reinterpret_cast<Stmt*>(E); }
+  void setInitCond(Expr *E) {
+    SubExprs[INITCOND] = reinterpret_cast<Stmt *>(E);
+  }
   void setBeginStmt(Stmt *S) { SubExprs[BEGINSTMT] = S; }
   void setEndStmt(Stmt *S) { SubExprs[ENDSTMT] = S; }
-  void setCond(Expr *E) { SubExprs[COND] = reinterpret_cast<Stmt*>(E); }
-  void setInc(Expr *E) { SubExprs[INC] = reinterpret_cast<Stmt*>(E); }
+  void setCond(Expr *E) { SubExprs[COND] = reinterpret_cast<Stmt *>(E); }
+  void setInc(Expr *E) { SubExprs[INC] = reinterpret_cast<Stmt *>(E); }
   void setLoopVarStmt(Stmt *S) { SubExprs[LOOPVAR] = S; }
   void setBody(Stmt *S) { SubExprs[BODY] = S; }
 
@@ -204,9 +210,7 @@ public:
   }
 
   // Iterators
-  child_range children() {
-    return child_range(&SubExprs[0], &SubExprs[END]);
-  }
+  child_range children() { return child_range(&SubExprs[0], &SubExprs[END]); }
 
   const_child_range children() const {
     return const_child_range(&SubExprs[0], &SubExprs[END]);

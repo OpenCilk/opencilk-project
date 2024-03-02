@@ -3931,7 +3931,7 @@ Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
                        Stmt *First, DeclStmt *Limit, ConditionResult InitCond,
                        DeclStmt *Begin, DeclStmt *End, ConditionResult Second,
                        FullExprArg Third, SourceLocation RParenLoc, Stmt *Body,
-                       DeclStmt *LoopVar, Stmt *OgCond, Stmt *OgInc) {
+                       DeclStmt *LoopVar, Expr *OgCond, Expr *OgInc) {
   if (CheckCilkForInit(*this, CilkForLoc, First))
     return StmtResult();
 

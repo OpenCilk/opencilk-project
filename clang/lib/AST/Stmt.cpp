@@ -1443,8 +1443,8 @@ bool CapturedStmt::capturesVariable(const VarDecl *Var) const {
 // CilkForStmt
 CilkForStmt::CilkForStmt(Stmt *Init, DeclStmt *Limit, Expr *InitCond,
                          DeclStmt *BeginStmt, DeclStmt *EndStmt, Expr *Cond,
-                         Expr *Inc, DeclStmt *LoopVar, Stmt *Body, Stmt *OgCond,
-                         Stmt *OgInc, SourceLocation CFL, SourceLocation LP,
+                         Expr *Inc, DeclStmt *LoopVar, Stmt *Body, Expr *OgCond,
+                         Expr *OgInc, SourceLocation CFL, SourceLocation LP,
                          SourceLocation RP)
     : Stmt(CilkForStmtClass), CilkForLoc(CFL), LParenLoc(LP), RParenLoc(RP) {
   SubExprs[INIT] = Init;
