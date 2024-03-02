@@ -307,7 +307,7 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks,
       continue;
 
     // Skip spindles in nested taskframes.
-    if (S != TF && S->getTaskFrameParent() != TF)
+    if (S != TF && S->getTaskFrameParent() && S->getTaskFrameParent() != TF)
       continue;
 
     // Filter the task list of S to exclude tasks in parallel with the entry.
