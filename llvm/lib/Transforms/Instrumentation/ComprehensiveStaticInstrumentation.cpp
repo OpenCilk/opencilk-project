@@ -13,7 +13,6 @@
 
 #include "llvm/Transforms/Instrumentation/ComprehensiveStaticInstrumentation.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/CallGraph.h"
@@ -1575,9 +1574,14 @@ void CSIImpl::instrumentSync(SyncInst *SI, unsigned SyncRegNum) {
 
 void CSIImpl::instrumentAlloca(Instruction *I, TaskInfo &TI) {
   IRBuilder<> IRB(I);
-  bool AllocaInEntryBlock = isEntryBlock(*I->getParent(), TI);
-  if (AllocaInEntryBlock)
-    IRB.SetInsertPoint(getEntryBBInsertPt(*I->getParent()));
+  bool InsertingAtAlloca = true;
+  if (isEntryBlock(*I->getParent(), TI)) {
+    Instruction *EntryBBInsertPt = getEntryBBInsertPt(*I->getParent());
+    if (I->comesBefore(EntryBBInsertPt)) {
+      IRB.SetInsertPoint(EntryBBInsertPt);
+      InsertingAtAlloca = false;
+    }
+  }
   AllocaInst *AI = cast<AllocaInst>(I);
 
   uint64_t LocalId = AllocaFED.add(*I);
@@ -1596,7 +1600,7 @@ void CSIImpl::instrumentAlloca(Instruction *I, TaskInfo &TI) {
                                                     IRB.getInt64Ty()));
 
   BasicBlock::iterator Iter(I);
-  if (!AllocaInEntryBlock) {
+  if (InsertingAtAlloca) {
     Iter++;
     IRB.SetInsertPoint(&*Iter);
   } else {
