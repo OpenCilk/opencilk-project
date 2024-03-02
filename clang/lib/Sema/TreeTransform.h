@@ -1464,8 +1464,8 @@ public:
                                 Sema::ConditionResult InitCond, Stmt *Begin,
                                 Stmt *End, Sema::ConditionResult Cond,
                                 Sema::FullExprArg Inc, SourceLocation RParenLoc,
-                                Stmt *LoopVar, Stmt *Body, Stmt *OgCond,
-                                Stmt *OgInc) {
+                                Stmt *LoopVar, Stmt *Body, Expr *OgCond,
+                                Expr *OgInc) {
     return getSema().ActOnCilkForStmt(
         ForLoc, LParenLoc, Init, cast_or_null<DeclStmt>(Limit), InitCond,
         cast_or_null<DeclStmt>(Begin), cast_or_null<DeclStmt>(End), Cond, Inc,
@@ -15537,10 +15537,10 @@ TreeTransform<Derived>::TransformCilkForStmt(CilkForStmt *S) {
   }
 
   // Transform the original init, condition, and increment statements
-  StmtResult OgCond = getDerived().TransformStmt(S->getOriginalCond());
+  ExprResult OgCond = getDerived().TransformExpr(S->getOriginalCond());
   if (OgCond.isInvalid())
     return StmtError();
-  StmtResult OgInc = getDerived().TransformStmt(S->getOriginalInc());
+  ExprResult OgInc = getDerived().TransformExpr(S->getOriginalInc());
   if (OgInc.isInvalid())
     return StmtError();
 
