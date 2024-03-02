@@ -652,7 +652,7 @@ ExprResult Sema::DefaultLvalueConversion(Expr *E) {
   //   converted to a prvalue.
   if (!E->isGLValue()) return E;
 
-  QualType T = E->getType();
+  QualType T = E->getType().stripHyperobject();
   assert(!T.isNull() && "r-value conversion on typeless expression?");
 
   // lvalue-to-rvalue conversion cannot be applied to function or array types.
@@ -687,7 +687,7 @@ ExprResult Sema::DefaultLvalueConversion(Expr *E) {
   CheckForNullPointerDereference(*this, E);
 
   E = BuildHyperobjectLookup(E);
-  T = E->getType();
+  assert(T == E->getType() && "Unexpected Type from hyperobject lookup.");
 
   if (const ObjCIsaExpr *OISA = dyn_cast<ObjCIsaExpr>(E->IgnoreParenCasts())) {
     NamedDecl *ObjectGetClass = LookupSingleName(TUScope,
