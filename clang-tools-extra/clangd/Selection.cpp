@@ -715,10 +715,16 @@ public:
   bool TraverseCilkForStmt(CilkForStmt *S) {
     return traverseNode(S, [&] {
       if (S->getLoopVarStmt())
+        // Traverse the original init, condition, and increment, as these best
+        // reflect the syntax of the cilk_for loop.  We traverse these
+        // statements before the loop-variable declaration itself because, for
+        // simple cilk_for loops with compound-assignment increment statements,
+        // the loop-variable declaration will appear to cover these statements
+        // as well.
         return TraverseStmt(S->getOriginalInit()) &&
-               TraverseDecl(S->getLoopVariable()) &&
                TraverseStmt(S->getOriginalCond()) &&
-               TraverseStmt(S->getOriginalInc()) && TraverseStmt(S->getBody());
+               TraverseStmt(S->getOriginalInc()) &&
+               TraverseDecl(S->getLoopVariable()) && TraverseStmt(S->getBody());
       else
         return TraverseStmt(S->getInit()) &&
                TraverseStmt(reinterpret_cast<Stmt *>(S->getCond())) &&
