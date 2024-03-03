@@ -2951,7 +2951,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
   if (InlinedFunctionInfo.ContainsDetach &&
       (InlinedFunctionInfo.ContainsDynamicAllocas || MayBeUnsyncedAtCall)) {
     Module *M = Caller->getParent();
-    // Get the two intrinsics we care about.
+    // Get the taskframe.create intrinsic.
     Function *TFCreateFn =
         Intrinsic::getDeclaration(M, Intrinsic::taskframe_create);
 

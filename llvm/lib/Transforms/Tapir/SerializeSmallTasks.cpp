@@ -115,7 +115,7 @@ struct SerializeSmallTasks : public FunctionPass {
     AU.addPreserved<GlobalsAAWrapperPass>();
   }
 };
-}
+} // namespace
 
 char SerializeSmallTasks::ID = 0;
 INITIALIZE_PASS_BEGIN(SerializeSmallTasks, "serialize-small-tasks",

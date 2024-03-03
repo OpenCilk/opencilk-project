@@ -562,8 +562,8 @@ Value *llvm::emitTransformedIndex(
     const InductionDescriptor &ID) {
 
   SCEVExpander Exp(*SE, DL, "induction");
-  auto Step = ID.getStep();
-  auto StartValue = ID.getStartValue();
+  const auto *Step = ID.getStep();
+  auto *StartValue = ID.getStartValue();
   assert(Index->getType() == Step->getType() &&
          "Index type does not match StepValue type");
 
@@ -615,7 +615,7 @@ Value *llvm::emitTransformedIndex(
   }
   case InductionDescriptor::IK_FpInduction: {
     assert(Step->getType()->isFloatingPointTy() && "Expected FP Step value");
-    auto InductionBinOp = ID.getInductionBinOp();
+    auto *InductionBinOp = ID.getInductionBinOp();
     assert(InductionBinOp &&
            (InductionBinOp->getOpcode() == Instruction::FAdd ||
             InductionBinOp->getOpcode() == Instruction::FSub) &&

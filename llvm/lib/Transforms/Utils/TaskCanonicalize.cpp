@@ -33,7 +33,7 @@ struct TaskCanonicalize : public FunctionPass {
     AU.addPreserved<GlobalsAAWrapperPass>();
   }
 };
-}
+} // namespace
 
 char TaskCanonicalize::ID = 0;
 INITIALIZE_PASS_BEGIN(TaskCanonicalize, "task-canonicalize",
