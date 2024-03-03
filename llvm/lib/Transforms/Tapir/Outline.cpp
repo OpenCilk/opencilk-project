@@ -17,8 +17,6 @@
 #include "llvm/IR/AttributeMask.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/Support/ModRef.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -291,28 +289,28 @@ Function *llvm::CreateHelper(
   if (Type::getVoidTy(Header->getContext()) == RetTy)
     VoidRet = true;
 
-  std::vector<Type *> paramTy;
+  std::vector<Type *> ParamTy;
 
   // Add the types of the input values to the function's argument list
-  for (Value *value : Inputs) {
-    LLVM_DEBUG(dbgs() << "value used in func: " << *value << "\n");
-    paramTy.push_back(value->getType());
+  for (Value *Value : Inputs) {
+    LLVM_DEBUG(dbgs() << "value used in func: " << *Value << "\n");
+    ParamTy.push_back(Value->getType());
   }
 
   // Add the types of the output values to the function's argument list.
-  for (Value *output : Outputs) {
-    LLVM_DEBUG(dbgs() << "instr used in func: " << *output << "\n");
-    paramTy.push_back(PointerType::getUnqual(output->getType()));
+  for (Value *Output : Outputs) {
+    LLVM_DEBUG(dbgs() << "instr used in func: " << *Output << "\n");
+    ParamTy.push_back(PointerType::getUnqual(Output->getType()));
   }
 
   LLVM_DEBUG({
     dbgs() << "Function type: " << *RetTy << " f(";
-    for (Type *i : paramTy)
+    for (Type *i : ParamTy)
       dbgs() << *i << ", ";
     dbgs() << ")\n";
   });
 
-  FunctionType *FTy = FunctionType::get(RetTy, paramTy, false);
+  FunctionType *FTy = FunctionType::get(RetTy, ParamTy, false);
 
   // Create the new function
   Function *NewFunc = Function::Create(

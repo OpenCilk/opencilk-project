@@ -23,9 +23,9 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Timer.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Tapir.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 
 #define DEBUG_TYPE "tapir2target"
