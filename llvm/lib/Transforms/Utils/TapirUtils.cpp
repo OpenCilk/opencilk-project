@@ -1212,8 +1212,7 @@ const BasicBlock *llvm::GetDetachedCtx(const BasicBlock *BB) {
           // Return the current block, which is the entry of this detached
           // sub-CFG.
           return CurrBB;
-        else if (const Value *SubTaskFrame =
-                 getTaskFrameUsed(DI->getDetached()))
+        if (const Value *SubTaskFrame = getTaskFrameUsed(DI->getDetached()))
           // Ignore this tasks's taskframe, if it has one.
           TaskFramesToIgnore.insert(SubTaskFrame);
       }
@@ -1374,7 +1373,8 @@ void llvm::GetDetachedCFG(const DetachInst &DI, const DominatorTree &DT,
              "Reattach terminating detached CFG has nonmatching sync region.");
       TaskReturns.insert(BB);
       continue;
-    } else if (DetachInst *NestedDI = dyn_cast<DetachInst>(Term)) {
+    }
+    if (DetachInst *NestedDI = dyn_cast<DetachInst>(Term)) {
       assert(NestedDI != &DI && "Found recursive Detach");
       // Add the successors of the nested detach instruction for searching.
       Todo.push_back(NestedDI->getDetached());
@@ -1382,15 +1382,17 @@ void llvm::GetDetachedCFG(const DetachInst &DI, const DominatorTree &DT,
       if (NestedDI->hasUnwindDest())
         Todo.push_back(NestedDI->getUnwindDest());
       continue;
-    } else if (SyncInst *SI = dyn_cast<SyncInst>(Term)) {
+    }
+    if (SyncInst *SI = dyn_cast<SyncInst>(Term)) {
       // A sync instruction should only apply to nested detaches within this
       // task.  Hence it can be treated like a branch.
       assert(SI->getSyncRegion() != SyncRegion &&
              "Sync in detached task applies to parent parallel context.");
       Todo.push_back(SI->getSuccessor(0));
       continue;
-    } else if (isa<BranchInst>(Term) || isa<SwitchInst>(Term) ||
-               isa<InvokeInst>(Term)) {
+    }
+    if (isa<BranchInst>(Term) || isa<SwitchInst>(Term) ||
+        isa<InvokeInst>(Term)) {
       if (isDetachedRethrow(Term, SyncRegion)) {
         // A detached rethrow terminates this task and is included in the set of
         // exception-handling blocks that might not be unique to this task.
@@ -1414,14 +1416,14 @@ void llvm::GetDetachedCFG(const DetachInst &DI, const DominatorTree &DT,
         }
       }
       continue;
-    } else if (isa<UnreachableInst>(Term)) {
+    }
+    if (isa<UnreachableInst>(Term)) {
       // We don't bother cloning unreachable exits from the detached CFG at this
       // point.  We're cloning the entire detached CFG anyway when we outline
       // the function.
       continue;
-    } else {
-      llvm_unreachable("Detached task does not absolutely terminate in reattach");
     }
+    llvm_unreachable("Detached task does not absolutely terminate in reattach");
   }
 
   // Find the exception-handling exit blocks.
@@ -1974,7 +1976,7 @@ BasicBlock *llvm::CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
   return NewUnwindEdge;
 }
 
-static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
+static BasicBlock *maybePromoteCallInBlock(BasicBlock *BB,
                                            BasicBlock *UnwindEdge,
                                            const Value *TaskFrame) {
   for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E;) {
@@ -2018,7 +2020,7 @@ static BasicBlock *MaybePromoteCallInBlock(BasicBlock *BB,
   return nullptr;
 }
 
-static Instruction *GetTaskFrameInstructionInBlock(BasicBlock *BB,
+static Instruction *getTaskFrameInstructionInBlock(BasicBlock *BB,
                                                    const Value *TaskFrame) {
   for (BasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E;) {
     Instruction *I = &*BBI++;
@@ -2041,7 +2043,7 @@ static Instruction *GetTaskFrameInstructionInBlock(BasicBlock *BB,
 }
 
 // Recursively handle inlined tasks.
-static void PromoteCallsInTasksHelper(
+static void promoteCallsInTasksHelper(
     BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
     BasicBlock *Unreachable, Value *CurrentTaskFrame,
     SmallVectorImpl<BasicBlock *> *ParentWorklist,
@@ -2060,10 +2062,10 @@ static void PromoteCallsInTasksHelper(
 
     // Promote any calls in the block to invokes.
     while (BasicBlock *NewBB =
-           MaybePromoteCallInBlock(BB, UnwindEdge, CurrentTaskFrame))
+           maybePromoteCallInBlock(BB, UnwindEdge, CurrentTaskFrame))
       BB = cast<InvokeInst>(NewBB->getTerminator())->getNormalDest();
 
-    Instruction *TFI = GetTaskFrameInstructionInBlock(BB, CurrentTaskFrame);
+    Instruction *TFI = getTaskFrameInstructionInBlock(BB, CurrentTaskFrame);
     if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI)) {
       Processed.insert(BB);
       Instruction *TFCreate = TFI;
@@ -2081,7 +2083,7 @@ static void PromoteCallsInTasksHelper(
             Unreachable, TFCreate);
 
         // Recursively check all blocks
-        PromoteCallsInTasksHelper(NewBB, TaskFrameUnwindEdge, Unreachable,
+        promoteCallsInTasksHelper(NewBB, TaskFrameUnwindEdge, Unreachable,
                                   TFCreate, &Worklist, Processed);
 
         // Remove the unwind edge for the taskframe if it is not needed.
@@ -2137,7 +2139,7 @@ static void PromoteCallsInTasksHelper(
             Intrinsic::detached_rethrow, DI->getSyncRegion(), UnwindEdge,
             Unreachable, DI);
         // Recursively check all blocks in the detached task.
-        PromoteCallsInTasksHelper(DI->getDetached(), SubTaskUnwindEdge,
+        promoteCallsInTasksHelper(DI->getDetached(), SubTaskUnwindEdge,
                                   Unreachable, CurrentTaskFrame, &Worklist,
                                   Processed);
         // If the new unwind edge is not used, remove it.
@@ -2197,7 +2199,7 @@ void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
   SmallVector<BasicBlock *, 8> ToProcess;
   ToProcess.push_back(&F.getEntryBlock());
   for (BasicBlock &BB : F) {
-    Instruction *TFI = GetTaskFrameInstructionInBlock(&BB, nullptr);
+    Instruction *TFI = getTaskFrameInstructionInBlock(&BB, nullptr);
     if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI))
       ToProcess.push_back(&BB);
 
@@ -2222,7 +2224,7 @@ void llvm::promoteCallsInTasksToInvokes(Function &F, const Twine Name) {
   SmallPtrSet<BasicBlock *, 8> Processed;
   for (BasicBlock *BB : ToProcess) {
     if (!Processed.contains(BB))
-      PromoteCallsInTasksHelper(BB, CleanupBB, UnreachableBlk, nullptr, nullptr,
+      promoteCallsInTasksHelper(BB, CleanupBB, UnreachableBlk, nullptr, nullptr,
                                 Processed);
   }
 
@@ -2320,7 +2322,7 @@ void llvm::TapirLoopHints::setHint(StringRef Name, Metadata *Arg) {
   unsigned Val = C->getZExtValue();
 
   Hint *Hints[] = {&Strategy, &Grainsize};
-  for (auto H : Hints) {
+  for (auto *H : Hints) {
     if (Name == H->Name) {
       if (H->validate(Val))
         H->Value = Val;

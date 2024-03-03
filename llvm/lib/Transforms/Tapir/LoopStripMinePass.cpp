@@ -26,7 +26,6 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -89,7 +88,7 @@ createMissedAnalysis(StringRef RemarkName, const Loop *TheLoop,
 
 /// Approximate the work of the body of the loop L.  Returns several relevant
 /// properties of loop L via by-reference arguments.
-static InstructionCost ApproximateLoopCost(
+static InstructionCost approximateLoopCost(
     const Loop *L, unsigned &NumCalls, bool &NotDuplicatable,
     bool &Convergent, bool &IsRecursive, bool &UnknownSize,
     const TargetTransformInfo &TTI, LoopInfo *LI, ScalarEvolution &SE,
@@ -148,14 +147,14 @@ static bool tryToStripMineLoop(
   CodeMetrics::collectEphemeralValues(L, &AC, EphValues);
 
   InstructionCost LoopCost =
-      ApproximateLoopCost(L, NumCalls, NotDuplicatable, Convergent, IsRecursive,
+      approximateLoopCost(L, NumCalls, NotDuplicatable, Convergent, IsRecursive,
                           UnknownSize, TTI, LI, SE, EphValues, TLI);
   // Determine the iteration count of the eventual stripmined the loop.
-  bool explicitCount = computeStripMineCount(L, TTI, LoopCost, SMP);
+  bool ExplicitCount = computeStripMineCount(L, TTI, LoopCost, SMP);
 
   // If the loop size is unknown, then we cannot compute a stripmining count for
   // it.
-  if (!explicitCount && UnknownSize) {
+  if (!ExplicitCount && UnknownSize) {
     LLVM_DEBUG(dbgs() << "  Not stripmining loop with unknown size.\n");
     ORE.emit(createMissedAnalysis("UnknownSize", L)
              << "Cannot stripmine loop with unknown size.");
@@ -165,7 +164,7 @@ static bool tryToStripMineLoop(
   // If the loop size is enormous, then we might want to use a stripmining count
   // of 1 for it.
   LLVM_DEBUG(dbgs() << "  Loop Cost = " << LoopCost << "\n");
-  if (!explicitCount && InstructionCost::getMax() == LoopCost) {
+  if (!ExplicitCount && InstructionCost::getMax() == LoopCost) {
     LLVM_DEBUG(dbgs() << "  Not stripmining loop with very large size.\n");
     if (Hints.getGrainsize() == 1)
       return false;
@@ -179,7 +178,7 @@ static bool tryToStripMineLoop(
   }
 
   // If the loop is recursive, set the stripmine factor to be 1.
-  if (!explicitCount && IsRecursive) {
+  if (!ExplicitCount && IsRecursive) {
     LLVM_DEBUG(dbgs() << "  Not stripmining loop that recursively calls the "
                       << "containing function.\n");
     if (Hints.getGrainsize() == 1)
@@ -215,7 +214,7 @@ static bool tryToStripMineLoop(
 
   // If the loop contains potentially expensive function calls, then we don't
   // want to stripmine it.
-  if (NumCalls > 0 && !explicitCount && !StripMiningRequested) {
+  if (NumCalls > 0 && !ExplicitCount && !StripMiningRequested) {
     LLVM_DEBUG(dbgs() << "  Skipping loop with expensive function calls.\n");
     ORE.emit(createMissedAnalysis("ExpensiveCalls", L)
              << "Not stripmining loop with potentially expensive calls.");

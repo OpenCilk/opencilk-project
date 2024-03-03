@@ -19,11 +19,9 @@
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
-#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -31,6 +29,7 @@
 #include "llvm/Transforms/Tapir/TapirLoopInfo.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
@@ -59,10 +58,10 @@ static cl::opt<bool> StripMineUnrollRemainder(
 namespace StripMineConstants {
 /// Default coarsening factor for strpimined Tapir loops.
 const unsigned DefaultCoarseningFactor = 2048;
-}
+} // namespace StripMineConstants
 
 /// The function chooses which type of stripmine (epilog or prolog) is more
-/// profitabale.
+/// profitable.
 /// Epilog stripmine is more profitable when there is PHI that starts from
 /// constant.  In this case epilog will leave PHI start from constant,
 /// but prolog will convert it to non-constant.
@@ -169,7 +168,7 @@ TargetTransformInfo::StripMiningPreferences llvm::gatherStripMiningPreferences(
 
 // If loop has an grainsize pragma return the (necessarily positive) value from
 // the pragma for stripmining.  Otherwise return 0.
-static unsigned StripMineCountPragmaValue(const Loop *L) {
+static unsigned stripMineCountPragmaValue(const Loop *L) {
   TapirLoopHints Hints(L);
   return Hints.getGrainsize();
 }
@@ -189,7 +188,7 @@ bool llvm::computeStripMineCount(
   }
 
   // 2nd priority is stripmine count set by pragma.
-  unsigned PragmaCount = StripMineCountPragmaValue(L);
+  unsigned PragmaCount = stripMineCountPragmaValue(L);
   if (PragmaCount > 0) {
     SMP.Count = PragmaCount;
     SMP.AllowExpensiveTripCount = true;
@@ -346,11 +345,11 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
 /// 'extra' iterations if the run-time trip count modulo the
 /// stripmine count is non-zero.
 ///
-/// This function performs the following:
+/// This function does the following:
 /// - Update PHI operands in the epilog loop by the new PHI nodes
 /// - Branch around the epilog loop if extra iters (ModVal) is zero.
 ///
-static void ConnectEpilog(TapirLoopInfo &TL, Value *EpilStartIter,
+static void connectEpilog(TapirLoopInfo &TL, Value *EpilStartIter,
                           Value *ModVal, BasicBlock *LoopDet,
                           BasicBlock *LoopEnd, BasicBlock *NewExit,
                           BasicBlock *Exit, BasicBlock *Preheader,
@@ -416,7 +415,7 @@ static void ConnectEpilog(TapirLoopInfo &TL, Value *EpilStartIter,
 /// new loop exit.
 /// Return the new cloned loop that is created when CreateRemainderLoop is true.
 static Loop *
-CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
+cloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
                 const bool UseEpilogRemainder, const bool UnrollRemainder,
                 BasicBlock *InsertTop, BasicBlock *InsertBot,
                 BasicBlock *Preheader, std::vector<BasicBlock *> &NewBlocks,
@@ -424,7 +423,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
                 SmallVectorImpl<BasicBlock *> &ExtraTaskBlocks,
                 SmallVectorImpl<BasicBlock *> &SharedEHTaskBlocks,
                 ValueToValueMapTy &VMap, DominatorTree *DT, LoopInfo *LI) {
-  StringRef suffix = UseEpilogRemainder ? "epil" : "prol";
+  StringRef Suffix = UseEpilogRemainder ? "epil" : "prol";
   BasicBlock *Header = L->getHeader();
   BasicBlock *Latch = L->getLoopLatch();
   Function *F = Header->getParent();
@@ -439,7 +438,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
   // For each block in the original loop, create a new copy,
   // and update the value map with the newly created values.
   for (LoopBlocksDFS::RPOIterator BB = BlockBegin; BB != BlockEnd; ++BB) {
-    BasicBlock *NewBB = CloneBasicBlock(*BB, VMap, "." + suffix, F);
+    BasicBlock *NewBB = CloneBasicBlock(*BB, VMap, "." + Suffix, F);
     NewBlocks.push_back(NewBB);
 
     // Add the cloned block to loop info.
@@ -474,7 +473,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
         Builder.CreateBr(InsertBot);
       } else {
         PHINode *NewIdx = PHINode::Create(NewIter->getType(), 2,
-                                          suffix + ".iter",
+                                          Suffix + ".iter",
                                           FirstLoopBB->getFirstNonPHI());
         Value *IdxSub =
             Builder.CreateSub(NewIdx, ConstantInt::get(NewIdx->getType(), 1),
@@ -493,7 +492,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
   // Create new copies of the EH blocks to clone.  We can handle these blocks
   // more simply than the loop blocks.
   for (BasicBlock *BB : ExtraTaskBlocks) {
-    BasicBlock *NewBB = CloneBasicBlock(BB, VMap, "." + suffix, F);
+    BasicBlock *NewBB = CloneBasicBlock(BB, VMap, "." + Suffix, F);
     NewBlocks.push_back(NewBB);
 
     // Add the cloned block to loop info.
@@ -564,22 +563,22 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
     PHINode *NewPHI = cast<PHINode>(VMap[&*I]);
     if (!CreateRemainderLoop) {
       if (UseEpilogRemainder) {
-        unsigned idx = NewPHI->getBasicBlockIndex(Preheader);
-        NewPHI->setIncomingBlock(idx, InsertTop);
+        unsigned Idx = NewPHI->getBasicBlockIndex(Preheader);
+        NewPHI->setIncomingBlock(Idx, InsertTop);
         NewPHI->removeIncomingValue(Latch, false);
       } else {
         VMap[&*I] = NewPHI->getIncomingValueForBlock(Preheader);
         NewPHI->eraseFromParent();
       }
     } else {
-      unsigned idx = NewPHI->getBasicBlockIndex(Preheader);
-      NewPHI->setIncomingBlock(idx, InsertTop);
+      unsigned Idx = NewPHI->getBasicBlockIndex(Preheader);
+      NewPHI->setIncomingBlock(Idx, InsertTop);
       BasicBlock *NewLatch = cast<BasicBlock>(VMap[Latch]);
-      idx = NewPHI->getBasicBlockIndex(Latch);
-      Value *InVal = NewPHI->getIncomingValue(idx);
-      NewPHI->setIncomingBlock(idx, NewLatch);
+      Idx = NewPHI->getBasicBlockIndex(Latch);
+      Value *InVal = NewPHI->getIncomingValue(Idx);
+      NewPHI->setIncomingBlock(Idx, NewLatch);
       if (Value *V = VMap.lookup(InVal))
-        NewPHI->setIncomingValue(idx, V);
+        NewPHI->setIncomingValue(Idx, V);
     }
   }
 
@@ -608,8 +607,7 @@ CloneLoopBlocks(Loop *L, Value *NewIter, const bool CreateRemainderLoop,
     // NewLoop->setLoopAlreadyUnrolled();
     return NewLoop;
   }
-  else
-    return nullptr;
+  return nullptr;
 }
 
 // Helper function to get the basic-block predecessors of the given exceptional
@@ -647,7 +645,7 @@ static void getEHContPredecessors(BasicBlock *BB, Task *T,
 
 // Helper method to nest the exception-handling code of a task with exceptional
 // continuation EHCont within a new parent task.
-static BasicBlock *NestDetachUnwindPredecessors(
+static BasicBlock *nestDetachUnwindPredecessors(
     BasicBlock *EHCont, Value *EHContLPad, ArrayRef<BasicBlock *> Preds,
     BasicBlock *NewDetachBB, const char *Suffix1, const char *Suffix2,
     LandingPadInst *OrigLPad, Value *SyncReg, Module *M, DominatorTree *DT,
@@ -957,12 +955,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // Branch to either remainder (extra iterations) loop or stripmined loop.
   B.CreateCondBr(BranchVal, RemainderLoopBB, StripminedLoopBB);
   PreheaderBR->eraseFromParent();
-  if (DT) {
-    // if (UseEpilogRemainder)
-      DT->changeImmediateDominator(NewExit, Preheader);
-    // else
-    //   DT->changeImmediateDominator(PrologExit, Preheader);
-  }
+  if (DT)
+    DT->changeImmediateDominator(NewExit, Preheader);
+
   Function *F = Header->getParent();
   // Get an ordered list of blocks in the loop to help with the ordering of the
   // cloned blocks in the prolog/epilog code
@@ -1040,7 +1035,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   BasicBlock *InsertBot = LatchExit;
   BasicBlock *InsertTop = EpilogPreheader;
   *RemainderLoop =
-      CloneLoopBlocks(L, ModVal, CreateRemainderLoop, true, UnrollRemainder,
+      cloneLoopBlocks(L, ModVal, CreateRemainderLoop, true, UnrollRemainder,
                       InsertTop, InsertBot, NewPreheader, NewBlocks, LoopBlocks,
                       ExtraTaskBlocks, SharedEHTaskBlocks, VMap, DT, LI);
 
@@ -1161,7 +1156,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
         PN.addIncoming(UndefValue::get(PN.getType()), LoopDetach);
 
       // Nest the exceptional code in the original task into the new task.
-      /* BasicBlock *OuterUD = */ NestDetachUnwindPredecessors(
+      /* BasicBlock *OuterUD = */ nestDetachUnwindPredecessors(
           EHCont, EHContLPadVal, UDPreds, LoopDetach, ".strpm",
           ".strpm.detachloop.unwind", DI->getUnwindDest()->getLandingPadInst(),
           SyncReg, M, DT, LI, nullptr, PreserveLCSSA);
@@ -1509,7 +1504,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
                  ConstantInt::get(TripCount->getType(), Count));
   if (Instruction *ESIInst = dyn_cast<Instruction>(EpilStartIter))
     ESIInst->copyIRFlags(PrimaryInc);
-  ConnectEpilog(TL, EpilStartIter, ModVal, EpilogPred, LoopReattach, NewExit,
+  connectEpilog(TL, EpilStartIter, ModVal, EpilogPred, LoopReattach, NewExit,
                 LatchExit, Preheader, EpilogPreheader, VMap, DT, LI, SE, DL,
                 PreserveLCSSA);
 
