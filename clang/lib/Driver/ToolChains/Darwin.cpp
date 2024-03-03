@@ -3426,6 +3426,8 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
                                            : "libopencilk-abi");
   BitcodeFilename += "_";
   BitcodeFilename += getOSLibraryNameSuffix();
+  BitcodeFilename += "-";
+  BitcodeFilename += getMachOArchName(Args);
   BitcodeFilename += ".bc";
 
   for (auto RuntimePath : getOpenCilkRuntimePaths(Args)) {
