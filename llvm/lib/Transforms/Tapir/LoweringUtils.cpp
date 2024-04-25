@@ -14,6 +14,7 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
@@ -554,6 +555,7 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
                          SmallPtrSetImpl<BasicBlock *> &ReattachBlocks,
                          SmallPtrSetImpl<BasicBlock *> &TaskResumeBlocks,
                          SmallPtrSetImpl<BasicBlock *> &SharedEHEntries,
+                         SmallPtrSetImpl<BasicBlock *> &UnreachableExits,
                          const DominatorTree *DT) {
   NamedRegionTimer NRT("getTaskBlocks", "Get task blocks", TimerGroupName,
                        TimerGroupDescription, TimePassesIsEnabled);
@@ -639,8 +641,12 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
       // Record the blocks terminated by reattaches and detached rethrows.
       if (isa<ReattachInst>(B->getTerminator()))
         ReattachBlocks.insert(B);
-      if (isDetachedRethrow(B->getTerminator()))
+      else if (isDetachedRethrow(B->getTerminator()))
         TaskResumeBlocks.insert(B);
+      else if (S->isSpindleExiting(B))
+        for (BasicBlock *Succ : successors(B))
+          if (isa<UnreachableInst>(Succ->getFirstNonPHIOrDbg()))
+            UnreachableExits.insert(Succ);
     }
   }
 }
@@ -658,11 +664,12 @@ Function *llvm::createHelperForTask(
   // handling.
   SmallPtrSet<BasicBlock *, 4> ReattachBlocks;
   SmallPtrSet<BasicBlock *, 4> TaskResumeBlocks;
+  SmallPtrSet<BasicBlock *, 4> UnreachableExits;
   // Entry blocks of shared-EH spindles may contain PHI nodes that need to be
   // rewritten in the cloned helper.
   SmallPtrSet<BasicBlock *, 4> SharedEHEntries;
   getTaskBlocks(T, TaskBlocks, ReattachBlocks, TaskResumeBlocks,
-                SharedEHEntries, &OA.DT);
+                SharedEHEntries, UnreachableExits, &OA.DT);
 
   SmallVector<ReturnInst *, 4> Returns;  // Ignore returns cloned.
   ValueSet Outputs;
@@ -687,8 +694,8 @@ Function *llvm::createHelperForTask(
     Helper = CreateHelper(
         Args, Outputs, TaskBlocks, Header, Entry, DI->getContinue(), VMap,
         DestM, F.getSubprogram() != nullptr, Returns, NameSuffix.str(),
-        &ReattachBlocks, &TaskResumeBlocks, &SharedEHEntries, nullptr, nullptr,
-        ReturnType, nullptr, nullptr, Mat.get());
+        &ReattachBlocks, &TaskResumeBlocks, &SharedEHEntries, nullptr,
+        &UnreachableExits, ReturnType, nullptr, nullptr, Mat.get());
   }
   assert(Returns.empty() && "Returns cloned when cloning detached CFG.");
 
@@ -760,7 +767,7 @@ static void unlinkTaskEHFromParent(Task *T) {
   getDetachUnwindPHIUses(DI, UnwindPHIs);
 
   SmallVector<Instruction *, 8> ToRemove;
-  // Look through PHI's that use the landing pad of the detach's unwind, and
+  // Look through PHI's that use the landingpad of the detach's unwind, and
   // update those PHI's to not refer to task T.
   for (BasicBlock *BB : UnwindPHIs) {
     for (BasicBlock *Pred : predecessors(BB)) {

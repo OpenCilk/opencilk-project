@@ -14,7 +14,6 @@
 #define LOWERING_UTILS_H_
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Instructions.h"
@@ -506,6 +505,7 @@ void getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
                    SmallPtrSetImpl<BasicBlock *> &ReattachBlocks,
                    SmallPtrSetImpl<BasicBlock *> &TaskResumeBlocks,
                    SmallPtrSetImpl<BasicBlock *> &SharedEHEntries,
+                   SmallPtrSetImpl<BasicBlock *> &UnreachableExits,
                    const DominatorTree *DT);
 
 /// Outlines the content of task \p T in function \p F into a new helper
@@ -563,6 +563,6 @@ Instruction *replaceLoopWithCallToOutline(
     TapirLoopInfo *TL, TaskOutlineInfo &Out,
     SmallVectorImpl<Value *> &OutlineInputs);
 
-}  // end namepsace llvm
+} // namespace llvm
 
 #endif
