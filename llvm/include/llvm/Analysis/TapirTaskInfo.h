@@ -859,7 +859,11 @@ public:
   /// Returns true if this task encloses basic block BB simply, that is, without
   /// checking any shared EH exits of this task.
   bool simplyEncloses(const BasicBlock *BB) const {
-    return DomTree.dominates(getEntry(), BB);
+    // DomTree.dominates(getEntry(), BB) will return true if BB is not reachable
+    // and getEntry() is reachable.  This method should return that BB is not
+    // simply enclosed in that case.
+    return DomTree.isReachableFromEntry(BB) &&
+           DomTree.dominates(getEntry(), BB);
   }
 
   /// Return true if specified task encloses basic block BB.
