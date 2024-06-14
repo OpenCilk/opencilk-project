@@ -78,7 +78,6 @@ CodeGenIntrinsic::CodeGenIntrinsic(Record *R,
   isInjective = false;
   isStrandPure = false;
   isHyperView = false;
-  isHyperToken = false;
   isReducerRegister = false;
   isReducerUnregister = false;
 
@@ -182,6 +181,8 @@ void CodeGenIntrinsic::setProperty(Record *R) {
     ME &= MemoryEffects::argMemOnly();
   else if (R->getName() == "IntrInaccessibleMemOnly")
     ME &= MemoryEffects::inaccessibleMemOnly();
+  else if (R->getName() == "IntrReadInaccessibleMemOnly")
+    ME &= MemoryEffects::inaccessibleMemOnly(ModRefInfo::Ref);
   else if (R->getName() == "IntrInaccessibleMemOrArgMemOnly")
     ME &= MemoryEffects::inaccessibleOrArgMemOnly();
   else if (R->getName() == "Commutative")
@@ -220,8 +221,6 @@ void CodeGenIntrinsic::setProperty(Record *R) {
     isReducerRegister = true;
   else if (R->getName() == "IntrHyperView")
     isHyperView = true;
-  else if (R->getName() == "IntrHyperToken")
-    isHyperToken = true;
   else if (R->getName() == "IntrReducerUnregister")
     isReducerUnregister = true;
   else if (R->isSubClassOf("NoCapture")) {
