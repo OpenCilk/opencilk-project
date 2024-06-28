@@ -290,6 +290,20 @@ static CSIOptions getCSIOptionsForCilkscaleBenchmark() {
   return Options;
 }
 
+static CSIOptions getCSIOptionsForCilkgraph() {
+  CSIOptions Options;
+  // Disable CSI hooks that Cilkgraph doesn't need.
+  Options.InstrumentLoops = false;
+//  Options.InstrumentBasicBlocks = false;
+  Options.InstrumentMemoryAccesses = false;
+  Options.InstrumentCalls = false;
+  Options.InstrumentAtomics = false;
+  Options.InstrumentMemIntrinsics = false;
+  Options.InstrumentAllocas = false;
+  Options.InstrumentAllocFns = false;
+  return Options;
+}
+
 static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
                                          const CodeGenOptions &CodeGenOpts) {
   TargetLibraryInfoImpl *TLII = new TargetLibraryInfoImpl(TargetTriple);
@@ -1093,6 +1107,15 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
               MPM.addPass(CSISetupPass(getCSIOptionsForCilkscaleBenchmark()));
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscaleBenchmark()));
+              MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
+            });
+        break;
+      case LangOptions::CilktoolKind::Cilktool_Cilkgraph:
+          PB.registerTapirLoopEndEPCallback(
+            [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
+              MPM.addPass(CSISetupPass(getCSIOptionsForCilkgraph()));
+              MPM.addPass(ComprehensiveStaticInstrumentationPass(
+                  getCSIOptionsForCilkgraph()));
               MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
             });
         break;
