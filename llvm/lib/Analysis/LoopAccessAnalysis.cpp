@@ -1944,7 +1944,7 @@ getDependenceDistanceStrideAndSize(
     const AccessAnalysis::MemAccessInfo &B, Instruction *BInst,
     const DenseMap<Value *, const SCEV *> &Strides,
     const DenseMap<Value *, SmallVector<const Value *, 16>> &UnderlyingObjects,
-    PredicatedScalarEvolution &PSE, const Loop *InnermostLoop) {
+    PredicatedScalarEvolution &PSE, TaskInfo *TI, const Loop *InnermostLoop) {
   auto &DL = InnermostLoop->getHeader()->getModule()->getDataLayout();
   auto &SE = *PSE.getSE();
   auto [APtr, AIsWrite] = A;
@@ -1960,7 +1960,7 @@ getDependenceDistanceStrideAndSize(
   // Under certain assumptions, Tapir can guarantee that there are no
   // loop-carried dependencies.
   if (EnableDRFAA && isLogicallyParallelViaTapir(InnermostLoop, TI))
-    return Dependence::NoDep;
+    return MemoryDepChecker::Dependence::NoDep;
 
   // We cannot check pointers in different address spaces.
   if (APtr->getType()->getPointerAddressSpace() !=
@@ -2025,7 +2025,7 @@ MemoryDepChecker::Dependence::DepType MemoryDepChecker::isDependent(
   // Get the dependence distance, stride, type size and what access writes for
   // the dependence between A and B.
   auto Res = getDependenceDistanceStrideAndSize(
-      A, InstMap[AIdx], B, InstMap[BIdx], Strides, UnderlyingObjects, PSE,
+      A, InstMap[AIdx], B, InstMap[BIdx], Strides, UnderlyingObjects, PSE, TI,
       InnermostLoop);
   if (std::holds_alternative<Dependence::DepType>(Res))
     return std::get<Dependence::DepType>(Res);

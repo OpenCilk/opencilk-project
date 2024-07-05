@@ -533,9 +533,9 @@ static bool checkInstructionForRace(const Instruction *I,
         return false;
 
       // Ignore CSI and Cilksan functions
-      if (Called->hasName() && (Called->getName().startswith("__csi") ||
-                                Called->getName().startswith("__csan") ||
-                                Called->getName().startswith("__cilksan")))
+      if (Called->hasName() && (Called->getName().starts_with("__csi") ||
+                                Called->getName().starts_with("__csan") ||
+                                Called->getName().starts_with("__cilksan")))
         return false;
     }
 

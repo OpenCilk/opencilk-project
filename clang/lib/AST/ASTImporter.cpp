@@ -1149,6 +1149,21 @@ ExpectedType ASTNodeImporter::VisitDecayedType(const DecayedType *T) {
   return Importer.getToContext().getDecayedType(*ToOriginalTypeOrErr);
 }
 
+ExpectedType ASTNodeImporter::VisitHyperobjectType(const HyperobjectType *T) {
+  ExpectedType ToElementTypeOrErr = import(T->getElementType());
+  if (!ToElementTypeOrErr)
+    return ToElementTypeOrErr.takeError();
+  ExpectedExpr ToIdentityOrErr = import(T->getIdentity());
+  if (!ToIdentityOrErr)
+    return ToIdentityOrErr.takeError();
+  ExpectedExpr ToReduceOrErr = import(T->getReduce());
+  if (!ToReduceOrErr)
+    return ToReduceOrErr.takeError();
+
+  return Importer.getToContext().getHyperobjectType(
+      *ToElementTypeOrErr, *ToReduceOrErr, *ToIdentityOrErr);
+}
+
 ExpectedType ASTNodeImporter::VisitComplexType(const ComplexType *T) {
   ExpectedType ToElementTypeOrErr = import(T->getElementType());
   if (!ToElementTypeOrErr)

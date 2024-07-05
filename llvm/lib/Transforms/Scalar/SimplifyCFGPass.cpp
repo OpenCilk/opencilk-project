@@ -246,7 +246,7 @@ static bool removeUselessSyncs(Function &F, DomTreeUpdater *DTU) {
           if (DetachInst *DI = dyn_cast<DetachInst>(PT)) {
             if (DI->getDetached() == PBB)
               continue;
-            else if (DI->getSyncRegion() == Sync->getSyncRegion())
+            if (DI->getSyncRegion() == Sync->getSyncRegion())
               // This detach reaches the sync through the continuation edge.
               ReachingDetach = true;
           }

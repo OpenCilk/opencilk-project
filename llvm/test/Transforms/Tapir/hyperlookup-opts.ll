@@ -189,9 +189,6 @@ _ZN4cilk7reducerINS_6op_addIxLb1EEEED2Ev.exit:    ; preds = %cond.end.i.i
 
 ; CHECK: [[DETACHED]]:
 ; CHECK: %[[VIEW:.+]] = call strand_noalias ptr @__cilkrts_hyper_lookup(
-; CHECK: br label %[[VECTOR_PH:.+]]
-
-; CHECK: [[VECTOR_PH]]:
 ; CHECK: br label %[[VECTOR_BODY:.+]]
 
 ; CHECK: [[VECTOR_BODY]]:

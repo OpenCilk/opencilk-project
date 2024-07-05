@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
@@ -653,10 +654,11 @@ static BasicBlock *nestDetachUnwindPredecessors(
   BasicBlock *InnerUD, *OuterUD;
   Value *InnerUDLPad;
   Type *OrigLPadTy = OrigLPad->getType();
+  DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
   if (EHCont->isLandingPad()) {
     SmallVector<BasicBlock *, 2> NewBBs;
-    SplitLandingPadPredecessors(EHCont, Preds, Suffix1, Suffix2, NewBBs, DT, LI,
-                                MSSAU, PreserveLCSSA);
+    SplitLandingPadPredecessors(EHCont, Preds, Suffix1, Suffix2, NewBBs, &DTU,
+                                LI, MSSAU, PreserveLCSSA);
     InnerUD = NewBBs[0];
     OuterUD = NewBBs[1];
     InnerUDLPad = InnerUD->getLandingPadInst();
@@ -666,10 +668,10 @@ static BasicBlock *nestDetachUnwindPredecessors(
       PN.removeIncomingValue(InnerUD);
   } else {
     // Split the given Task predecessors of EHCont, which are given in Preds.
-    InnerUD = SplitBlockPredecessors(EHCont, Preds, Suffix1, DT, LI, MSSAU,
+    InnerUD = SplitBlockPredecessors(EHCont, Preds, Suffix1, &DTU, LI, MSSAU,
                                      PreserveLCSSA);
     // Split the NewDetachBB predecessor of EHCont.
-    OuterUD = SplitBlockPredecessors(EHCont, {NewDetachBB}, Suffix2, DT, LI,
+    OuterUD = SplitBlockPredecessors(EHCont, {NewDetachBB}, Suffix2, &DTU, LI,
                                      MSSAU, PreserveLCSSA);
 
     // Create a new landing pad for the outer detach by cloning the landing pad
@@ -732,8 +734,7 @@ static BasicBlock *nestDetachUnwindPredecessors(
   NewUnreachable->getTerminator()->eraseFromParent();
 
   // Inform the dominator tree of the deleted edge
-  if (DT)
-    DT->deleteEdge(NewUnreachable, EHCont);
+  DTU.applyUpdatesPermissive({{DominatorTree::Delete, NewUnreachable, EHCont}});
 
   return OuterUD;
 }

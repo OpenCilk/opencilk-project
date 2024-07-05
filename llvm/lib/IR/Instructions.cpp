@@ -13,6 +13,7 @@
 
 #include "llvm/IR/Instructions.h"
 #include "LLVMContextImpl.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
@@ -1536,6 +1537,41 @@ bool AllocaInst::isArrayAllocation() const {
   return true;
 }
 
+/// Check if this basic block is the entry block of the function, a spawned
+/// task, or a taskframe.
+static bool isFunctionOrTaskEntry(const BasicBlock *BB, const AllocaInst *AI) {
+  // Check if BB is the entry block of the function.
+  if (BB->isEntryBlock())
+    return true;
+
+  // Check if BB is a detached block.
+  if (const BasicBlock *Pred = BB->getSinglePredecessor())
+    if (const DetachInst *DI = dyn_cast<DetachInst>(Pred->getTerminator()))
+      if (DI->getDetached() == BB)
+        return true;
+
+  for (BasicBlock::const_iterator BBI = BB->begin(); &*BBI != AI; ++BBI) {
+    if (const CallInst *CI = dyn_cast<CallInst>(&*BBI)) {
+      if (const Function *Called = CI->getCalledFunction()) {
+        if (Intrinsic::taskframe_create == Called->getIntrinsicID()) {
+          // We found a taskframe.create in BB.  If all of its uses follow AI, then
+          // AI belongs to the entry block of this taskframe.
+          if (llvm::all_of(CI->users(), [BB, AI](const User *U) {
+                if (const Instruction *I = dyn_cast<Instruction>(U))
+                  if (I->getParent() != BB || AI->comesBefore(I))
+                    return true;
+                return false;
+              }))
+            return true;
+          // Otherwise, keep searching this block for taskframe.create's.
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 /// isStaticAlloca - Return true if this alloca is in the entry block of the
 /// function and is a constant size.  If so, the code generator will fold it
 /// into the prolog/epilog code, so it is basically free.
@@ -1545,7 +1581,7 @@ bool AllocaInst::isStaticAlloca() const {
 
   // Must be in the entry block.
   const BasicBlock *Parent = getParent();
-  return Parent->isEntryBlock() && !isUsedWithInAlloca();
+  return isFunctionOrTaskEntry(Parent, this) && !isUsedWithInAlloca();
 }
 
 //===----------------------------------------------------------------------===//

@@ -427,21 +427,16 @@ bool llvm::simplifyTaskFrames(TaskInfo &TI, DominatorTree &DT) {
   // Now delete any taskframes we don't need.
   for (Instruction *TFCreate : TaskFramesToConvert) {
     LLVM_DEBUG(dbgs() << "Converting taskframe " << *TFCreate << "\n");
-    Module *M = TFCreate->getModule();
-    Function *StackSave = Intrinsic::getDeclaration(M, Intrinsic::stacksave);
-    Function *StackRestore =
-        Intrinsic::getDeclaration(M, Intrinsic::stackrestore);
-
     // Save the stack at the point of the taskframe.create.
     CallInst *SavedPtr =
-        IRBuilder<>(TFCreate).CreateCall(StackSave, {}, "savedstack.ts");
+        IRBuilder<>(TFCreate).CreateStackSave("savedstack.ts");
 
     for (User *U : TFCreate->users()) {
       if (Instruction *UI = dyn_cast<Instruction>(U)) {
         // Restore the stack at each end of the taskframe.
         if (isTapirIntrinsic(Intrinsic::taskframe_end, UI) ||
             isTapirIntrinsic(Intrinsic::taskframe_resume, UI))
-          IRBuilder<>(UI).CreateCall(StackRestore, SavedPtr);
+          IRBuilder<>(UI).CreateStackRestore(SavedPtr);
       }
     }
     // Remove the taskframe.

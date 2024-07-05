@@ -13,6 +13,7 @@
 
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/ModRef.h"
@@ -43,7 +44,7 @@ FunctionCallee RuntimeCilkFor::Get__cilkrts_cilk_for_32() {
 
   LLVMContext &C = M.getContext();
   Type *VoidTy = Type::getVoidTy(C);
-  Type *VoidPtrTy = Type::getInt8PtrTy(C);
+  Type *VoidPtrTy = PointerType::getUnqual(C);
   Type *CountTy = Type::getInt32Ty(C);
   FunctionType *BodyTy = FunctionType::get(VoidTy,
                                            {VoidPtrTy, CountTy, CountTy},
@@ -63,7 +64,7 @@ FunctionCallee RuntimeCilkFor::Get__cilkrts_cilk_for_64() {
 
   LLVMContext &C = M.getContext();
   Type *VoidTy = Type::getVoidTy(C);
-  Type *VoidPtrTy = Type::getInt8PtrTy(C);
+  Type *VoidPtrTy = PointerType::getUnqual(C);
   Type *CountTy = Type::getInt64Ty(C);
   FunctionType *BodyTy = FunctionType::get(VoidTy,
                                            {VoidPtrTy, CountTy, CountTy},
@@ -174,12 +175,12 @@ void RuntimeCilkFor::processOutlinedLoopCall(TapirLoopInfo &TL,
   IRBuilder<> B(ReplCall);
   Type *FPtrTy = PointerType::getUnqual(
       FunctionType::get(Type::getVoidTy(C),
-                        { Type::getInt8PtrTy(C), PrimaryIVTy, PrimaryIVTy },
+                        { PointerType::getUnqual(C), PrimaryIVTy, PrimaryIVTy },
                         false));
   Value *OutlinedFnPtr = B.CreatePointerBitCastOrAddrSpaceCast(Outlined,
                                                                FPtrTy);
   AllocaInst *ArgStruct = cast<AllocaInst>(CB->getArgOperand(0));
-  Value *ArgStructPtr = B.CreateBitCast(ArgStruct, Type::getInt8PtrTy(C));
+  Value *ArgStructPtr = B.CreateBitCast(ArgStruct, PointerType::getUnqual(C));
   if (UnwindDest) {
     InvokeInst *Invoke = InvokeInst::Create(CilkForABI, CallCont, UnwindDest,
                                             { OutlinedFnPtr, ArgStructPtr,

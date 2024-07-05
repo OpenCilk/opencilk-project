@@ -44,19 +44,19 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i1 immarg) 
 ; Function Attrs: sanitize_cilk
 define internal fastcc void @_ZN8pybind11L7type_idIN3c107variantIJNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEdxbEEEEES9_v() #4 personality i32 (...)* undef {
 if.end9.i.i.i.i:
-  call void @llvm.dbg.value(metadata i8* inttoptr (i64 and (i64 add (i64 ptrtoint ([86 x i8]* @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to i8*), metadata !82956, metadata !DIExpression())
+  call void @llvm.dbg.value(metadata i8* inttoptr (i64 add (i64 ptrtoint ([86 x i8]* @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808) to i8*), metadata !82956, metadata !DIExpression())
   br label %cond.false.i.i.i.i.i
 
 cond.false.i.i.i.i.i:                             ; preds = %if.end9.i.i.i.i
-  tail call void @llvm.memcpy.p0i8.p0i8.i64(i8* null, i8* inttoptr (i64 and (i64 add (i64 ptrtoint ([86 x i8]* @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to i8*), i64 0, i1 false)
+  tail call void @llvm.memcpy.p0i8.p0i8.i64(i8* null, i8* inttoptr (i64 add (i64 ptrtoint ([86 x i8]* @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808) to i8*), i64 0, i1 false)
   ret void
 }
 
 ; CHECK: define internal fastcc void @_ZN8pybind11L7type_idIN3c107variantIJNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEdxbEEEEES9_v(
 ; CHECK: cond.false.i.i.i.i.i:
 ; CHECK: call void @__csan_large_load(
-; CHECK: ptr inttoptr (i64 and (i64 add (i64 ptrtoint (ptr @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to ptr),
-; CHECK: tail call void @llvm.memcpy.p0.p0.i64(ptr null, ptr inttoptr (i64 and (i64 add (i64 ptrtoint (ptr @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808), i64 9223372036854775807) to ptr), i64 0, i1 false)
+; CHECK: ptr inttoptr (i64 add (i64 ptrtoint (ptr @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808) to ptr),
+; CHECK: tail call void @llvm.memcpy.p0.p0.i64(ptr null, ptr inttoptr (i64 add (i64 ptrtoint (ptr @_ZTSN3c107variantIJNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEEdxbEEE to i64), i64 -9223372036854775808) to ptr), i64 0, i1 false)
 ; CHECK: ret void
 
 ; Function Attrs: nofree nosync nounwind readnone speculatable willreturn

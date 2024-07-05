@@ -83,7 +83,8 @@ pfor.body.us:                                     ; preds = %pfor.detach.us
   br i1 true, label %if.then.i.us-lcssa.us, label %if.end.i.us
 
 ; SC: pfor.body.us:
-; SC: br label %if.then.i
+; SC: invoke dereferenceable(272) ptr @_ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l(
+; SC-NEXT: to label %call.i5.noexc.us unwind label %lpad.loopexit20.us-lcssa.us
 
 if.end.i.us:                                      ; preds = %pfor.body.us
   %k.i.us = getelementptr inbounds %"struct.kNearestNeighbor<vertex<_point2d<double>, 1>, 1>::kNN", %"struct.kNearestNeighbor<vertex<_point2d<double>, 1>, 1>::kNN"* %nn.i.us, i64 0, i32 4

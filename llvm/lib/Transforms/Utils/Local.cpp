@@ -1111,7 +1111,7 @@ static void redirectValuesFromPredecessorsToPhi(BasicBlock *BB,
   replaceUndefValuesInPhi(PN, IncomingValues);
 }
 
-static bool BlockIsEntryOfTask(const BasicBlock *BB) {
+static bool blockIsEntryOfTask(const BasicBlock *BB) {
   if (const BasicBlock *PredBB = BB->getSinglePredecessor())
     if (const DetachInst *DI = dyn_cast<DetachInst>(PredBB->getTerminator()))
       if (DI->getDetached() == BB)
@@ -1164,7 +1164,7 @@ bool llvm::TryToSimplifyUncondBranchFromEmptyBlock(BasicBlock *BB,
   if (!Succ->getSinglePredecessor()) {
     // If Succ has multiple predecessors and BB is the entry of a detached task,
     // we can't fold it BB into Succ.
-    if (BlockIsEntryOfTask(BB))
+    if (blockIsEntryOfTask(BB))
       return false;
     BasicBlock::iterator BBI = BB->begin();
     while (isa<PHINode>(*BBI)) {

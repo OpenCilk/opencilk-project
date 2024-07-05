@@ -1261,7 +1261,7 @@ void TapirTarget::lowerTaskFrameAddrCall(CallInst *TaskFrameAddrCall) {
   // By default, replace calls to task_frameaddress with ordinary calls to the
   // frameaddress intrinsic.
   TaskFrameAddrCall->setCalledFunction(Intrinsic::getDeclaration(
-      &M, Intrinsic::frameaddress, PointerType::getInt8PtrTy(M.getContext())));
+      &M, Intrinsic::frameaddress, PointerType::getUnqual(M.getContext())));
 }
 
 void TapirTarget::lowerTapirRTCalls(SmallVectorImpl<CallInst *> &TapirRTCalls,

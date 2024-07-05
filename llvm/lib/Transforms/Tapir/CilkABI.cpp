@@ -15,14 +15,11 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
-#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/ModRef.h"
 #include "llvm/Support/Timer.h"
@@ -32,7 +29,6 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
-#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
@@ -115,7 +111,7 @@ CilkABI::CilkABI(Module &M) : TapirTarget(M) {}
 
 void CilkABI::prepareModule() {
   LLVMContext &C = M.getContext();
-  Type *VoidPtrTy = Type::getInt8PtrTy(C);
+  Type *VoidPtrTy = PointerType::getUnqual(C);
   Type *Int64Ty = Type::getInt64Ty(C);
   Type *Int32Ty = Type::getInt32Ty(C);
   Type *Int16Ty = Type::getInt16Ty(C);
@@ -352,7 +348,7 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
     EmitSaveFloatingPointState(B, SF);
 
   Type *Int32Ty = Type::getInt32Ty(Ctx);
-  Type *Int8PtrTy = Type::getInt8PtrTy(Ctx);
+  Type *Int8PtrTy = PointerType::getUnqual(Ctx);
 
   // Get the buffer to store program state
   // Buffer is a void**.
@@ -369,8 +365,7 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   B.CreateStore(FrameAddr, FrameSaveSlot, /*isVolatile=*/true);
 
   // Store stack pointer in the 2nd slot
-  Value *StackAddr = B.CreateCall(
-      Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
+  Value *StackAddr = B.CreateStackSave();
 
   Value *StackSaveSlot = GEP(B, Buf, BufTy, 2);
   B.CreateStore(StackAddr, StackSaveSlot, /*isVolatile=*/true);

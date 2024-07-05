@@ -29,7 +29,7 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       return TapirTargetID::Cilk;
     if (Args.hasArg(options::OPT_fopencilk))
       return TapirTargetID::OpenCilk;
-    return TapirTargetID::None;
+    return TapirTargetID::Last_TapirTargetID;
   }
 
   // Otherwise use the runtime specified by -ftapir.

@@ -312,7 +312,7 @@ pfor.detach:                                      ; preds = %pfor.inc, %pfor.det
 
 pfor.body:                                        ; preds = %pfor.detach
   %B = alloca [7 x double], align 16
-  %0 = call i8* @llvm.stacksave(), !dbg !49
+  %0 = call i8* @llvm.stacksave.p0(), !dbg !49
   %vla = alloca double, i64 %indvars.iv, align 16, !dbg !49
   %1 = bitcast [7 x double]* %B to i8*, !dbg !49
   call void @llvm.lifetime.start.p0i8(i64 56, i8* nonnull %1) #4, !dbg !49
@@ -321,7 +321,7 @@ pfor.body:                                        ; preds = %pfor.detach
   %arraydecay = getelementptr inbounds [7 x double], [7 x double]* %B, i64 0, i64 0, !dbg !51
   %call3 = call i32 @foo(double* nonnull %arraydecay, i32 7) #4, !dbg !52
   call void @llvm.lifetime.end.p0i8(i64 56, i8* nonnull %1) #4, !dbg !53
-  call void @llvm.stackrestore(i8* %0), !dbg !53
+  call void @llvm.stackrestore.p0(i8* %0), !dbg !53
   reattach within %syncreg, label %pfor.inc, !dbg !53
 
 pfor.inc:                                         ; preds = %pfor.body, %pfor.detach
@@ -334,10 +334,10 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 }
 
 ; Function Attrs: nounwind
-declare i8* @llvm.stacksave() #4
+declare i8* @llvm.stacksave.p0() #4
 
 ; Function Attrs: nounwind
-declare void @llvm.stackrestore(i8*) #4
+declare void @llvm.stackrestore.p0(i8*) #4
 
 declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 
@@ -371,11 +371,11 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK: br label %[[EPILBODY:.+]], !dbg !51
 
 ; CHECK: [[EPILBODY]]:
-; CHECK-NEXT: call ptr @llvm.stacksave()
+; CHECK-NEXT: call ptr @llvm.stacksave.p0()
 ; CHECK: alloca double
 ; CHECK: call void @llvm.lifetime.start
 ; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.stackrestore(
+; CHECK: call void @llvm.stackrestore.p0(
 
 ; CHECK: [[STRPLOOPDETACHENTRY]]:
 ; CHECK: %[[NEWSYNCREG:.+]] = call token @llvm.syncregion.start()
@@ -392,11 +392,11 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPINNERBODY]]:
-; CHECK: call ptr @llvm.stacksave()
+; CHECK: call ptr @llvm.stacksave.p0()
 ; CHECK: alloca double
 ; CHECK: call void @llvm.lifetime.start
 ; CHECK: call void @llvm.lifetime.end
-; CHECK: call void @llvm.stackrestore(
+; CHECK: call void @llvm.stackrestore.p0(
 
 attributes #0 = { argmemonly nounwind uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind }

@@ -14,7 +14,6 @@
 #ifndef LLVM_TRANSFORMS_CSI_H
 #define LLVM_TRANSFORMS_CSI_H
 
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -22,7 +21,6 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/ValueMap.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/SurgicalInstrumentationConfig.h"
 

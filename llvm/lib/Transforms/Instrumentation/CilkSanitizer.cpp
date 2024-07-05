@@ -17,6 +17,7 @@
 #include "llvm/Transforms/Instrumentation/CilkSanitizer.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
@@ -678,7 +679,7 @@ uint64_t ObjectTable::add(Instruction &I, Value *Obj) {
   // Next, if this is an alloca instruction, look for a llvm.dbg.declare
   // intrinsic.
   if (AllocaInst *AI = dyn_cast<AllocaInst>(Obj)) {
-    TinyPtrVector<DbgDeclareInst *> DbgDeclares = FindDbgDeclareUses(AI);
+    TinyPtrVector<DbgDeclareInst *> DbgDeclares = findDbgDeclares(AI);
     if (!DbgDeclares.empty()) {
       auto *LV = DbgDeclares.front()->getVariable();
       add(ID, LV->getLine(), LV->getFilename(), LV->getDirectory(),
@@ -872,7 +873,7 @@ CallInst *CilkSanitizerImpl::createRTUnitInitCall(IRBuilder<> &IRB) {
       getUnitObjTableType(C, ObjectTable::getPointerType(C));
 
   // Lookup __csanrt_unit_init
-  SmallVector<Type *, 4> InitArgTypes({IRB.getInt8PtrTy(),
+  SmallVector<Type *, 4> InitArgTypes({PointerType::getUnqual(C),
                                        PointerType::get(UnitFedTableType, 0),
                                        PointerType::get(UnitObjTableType, 0),
                                        InitCallsiteToFunction->getType()});
@@ -925,7 +926,7 @@ void CilkSanitizerImpl::initializeCsanHooks() {
   Type *DetachPropertyTy = CsiDetachProperty::getType(C);
   Type *DetContPropertyTy = CsiDetachContinueProperty::getType(C);
   Type *RetType = IRB.getVoidTy();
-  Type *AddrType = IRB.getInt8PtrTy();
+  Type *AddrType = IRB.getPtrTy();
   Type *NumBytesType = IRB.getInt32Ty();
   Type *LargeNumBytesType = IntptrTy;
   Type *IDType = IRB.getInt64Ty();
@@ -1092,16 +1093,16 @@ void CilkSanitizerImpl::initializeCsanHooks() {
 }
 
 static BasicBlock *splitOffPreds(
-    BasicBlock *BB, SmallVectorImpl<BasicBlock *> &Preds, DominatorTree *DT,
+    BasicBlock *BB, SmallVectorImpl<BasicBlock *> &Preds, DomTreeUpdater *DTU,
     LoopInfo *LI) {
   if (BB->isLandingPad()) {
     SmallVector<BasicBlock *, 2> NewBBs;
     SplitLandingPadPredecessors(BB, Preds, ".csi-split-lp", ".csi-split",
-                                NewBBs, DT, LI);
+                                NewBBs, DTU, LI);
     return NewBBs[1];
   }
 
-  BasicBlock *NewBB = SplitBlockPredecessors(BB, Preds, ".csi-split", DT, LI);
+  BasicBlock *NewBB = SplitBlockPredecessors(BB, Preds, ".csi-split", DTU, LI);
   if (isa<UnreachableInst>(BB->getFirstNonPHIOrDbg())) {
     // If the block being split is simply contains an unreachable, then replace
     // the terminator of the new block with an unreachable.  This helps preserve
@@ -1109,8 +1110,8 @@ static BasicBlock *splitOffPreds(
     // detached.rethrow and taskframe.resume terminators.
     ReplaceInstWithInst(NewBB->getTerminator(),
                         new UnreachableInst(BB->getContext()));
-    if (DT) {
-      DT->deleteEdge(NewBB, BB);
+    if (DTU) {
+      DTU->applyUpdatesPermissive({{DominatorTree::Delete, NewBB, BB}});
     }
   }
   return BB;
@@ -1118,7 +1119,7 @@ static BasicBlock *splitOffPreds(
 
 // Setup each block such that all of its predecessors belong to the same CSI ID
 // space.
-static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
+static void setupBlock(BasicBlock *BB, DomTreeUpdater *DTU, LoopInfo *LI,
                        const TargetLibraryInfo *TLI) {
   if (BB->isLandingPad()) {
     LandingPadInst *LPad = BB->getLandingPadInst();
@@ -1186,42 +1187,42 @@ static void setupBlock(BasicBlock *BB, DominatorTree *DT, LoopInfo *LI,
   BasicBlock *BBToSplit = BB;
   // Split off the predecessors of each type.
   if (!SyncPreds.empty() && NumPredTypes > NumPredTypesRequired) {
-    BBToSplit = splitOffPreds(BBToSplit, SyncPreds, DT, LI);
+    BBToSplit = splitOffPreds(BBToSplit, SyncPreds, DTU, LI);
     NumPredTypes--;
   }
   if (!SyncUnwindPreds.empty() && NumPredTypes > NumPredTypesRequired) {
-    BBToSplit = splitOffPreds(BBToSplit, SyncUnwindPreds, DT, LI);
+    BBToSplit = splitOffPreds(BBToSplit, SyncUnwindPreds, DTU, LI);
     NumPredTypes--;
   }
   if (!AllocFnPreds.empty() && NumPredTypes > NumPredTypesRequired) {
-    BBToSplit = splitOffPreds(BBToSplit, AllocFnPreds, DT, LI);
+    BBToSplit = splitOffPreds(BBToSplit, AllocFnPreds, DTU, LI);
     NumPredTypes--;
   }
   if (!FreeFnPreds.empty() && NumPredTypes > NumPredTypesRequired) {
-    BBToSplit = splitOffPreds(BBToSplit, FreeFnPreds, DT, LI);
+    BBToSplit = splitOffPreds(BBToSplit, FreeFnPreds, DTU, LI);
     NumPredTypes--;
   }
   if (!LibCallPreds.empty() && NumPredTypes > NumPredTypesRequired) {
     for (auto KeyVal : LibCallPreds) {
       if (NumPredTypes > NumPredTypesRequired) {
-        BBToSplit = splitOffPreds(BBToSplit, KeyVal.second, DT, LI);
+        BBToSplit = splitOffPreds(BBToSplit, KeyVal.second, DTU, LI);
         NumPredTypes--;
       }
     }
   }
   if (!InvokePreds.empty() && NumPredTypes > NumPredTypesRequired) {
-    BBToSplit = splitOffPreds(BBToSplit, InvokePreds, DT, LI);
+    BBToSplit = splitOffPreds(BBToSplit, InvokePreds, DTU, LI);
     NumPredTypes--;
   }
   if (!TFResumePreds.empty() && NumPredTypes > NumPredTypesRequired) {
-    BBToSplit = splitOffPreds(BBToSplit, TFResumePreds, DT, LI);
+    BBToSplit = splitOffPreds(BBToSplit, TFResumePreds, DTU, LI);
     NumPredTypes--;
   }
   // We handle detach and detached.rethrow predecessors at the end to preserve
   // invariants on the CFG structure about the deadness of basic blocks after
   // detached-rethrows.
   if (!DetachPreds.empty() && NumPredTypes > NumPredTypesRequired) {
-    BBToSplit = splitOffPreds(BBToSplit, DetachPreds, DT, LI);
+    BBToSplit = splitOffPreds(BBToSplit, DetachPreds, DTU, LI);
     NumPredTypes--;
   }
 }
@@ -1242,8 +1243,9 @@ void CilkSanitizerImpl::setupBlocks(Function &F, DominatorTree *DT,
       BlocksToSetup.insert(SI->getSuccessor(0));
   }
 
+  DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy);
   for (BasicBlock *BB : BlocksToSetup)
-    setupBlock(BB, DT, LI, &GetTLI(F));
+    setupBlock(BB, &DTU, LI, &GetTLI(F));
 }
 
 // Do not instrument known races/"benign races" that come from compiler
@@ -1257,15 +1259,15 @@ static bool shouldInstrumentReadWriteFromAddress(const Module *M, Value *Addr) {
       StringRef SectionName = GV->getSection();
       // Check if the global is in the PGO counters section.
       auto OF = Triple(M->getTargetTriple()).getObjectFormat();
-      if (SectionName.endswith(
+      if (SectionName.ends_with(
               getInstrProfSectionName(IPSK_cnts, OF,
                                       /*AddSegmentInfo*/ false)))
         return false;
     }
 
     // Check if the global is private gcov data.
-    if (GV->getName().startswith("__llvm_gcov") ||
-        GV->getName().startswith("__llvm_gcda"))
+    if (GV->getName().starts_with("__llvm_gcov") ||
+        GV->getName().starts_with("__llvm_gcda"))
       return false;
   }
 
@@ -1529,9 +1531,9 @@ bool CilkSanitizerImpl::simpleCallCannotRace(const Instruction &I) {
 bool CilkSanitizerImpl::shouldIgnoreCall(const Instruction &I) {
   if (const CallBase *Call = dyn_cast<CallBase>(&I))
     if (const Function *Called = Call->getCalledFunction())
-      if (Called->hasName() && (Called->getName().startswith("__csi") ||
-                                Called->getName().startswith("__csan") ||
-                                Called->getName().startswith("__cilksan")))
+      if (Called->hasName() && (Called->getName().starts_with("__csi") ||
+                                Called->getName().starts_with("__csan") ||
+                                Called->getName().starts_with("__cilksan")))
         return true;
   return false;
 }
@@ -2851,7 +2853,7 @@ bool CilkSanitizerImpl::Instrumentor::instrumentLoops(
     SCEVExpander Expander(*SE, DL, "cilksan");
 
     Value *AddrVal =
-        Expander.expandCodeFor(Addr, Type::getInt8PtrTy(Ctx), InsertPt);
+        Expander.expandCodeFor(Addr, PointerType::getUnqual(Ctx), InsertPt);
     Value *RangeVal =
         Expander.expandCodeFor(RangeExpr, Type::getInt64Ty(Ctx), InsertPt);
     HoistedHookArgs[I] = std::make_pair(AddrVal, RangeVal);
@@ -2937,7 +2939,7 @@ bool CilkSanitizerImpl::Instrumentor::instrumentLoops(
           getLoopBlockInsertPt(ExitBB, CilkSanImpl.CsanAfterLoop,
                                /*AfterHook*/ true);
       Value *AddrVal =
-          Expander.expandCodeFor(Addr, Type::getInt8PtrTy(Ctx), InsertPt);
+          Expander.expandCodeFor(Addr, PointerType::getUnqual(Ctx), InsertPt);
       Value *RangeVal =
           Expander.expandCodeFor(RangeExpr, Type::getInt64Ty(Ctx), InsertPt);
 
@@ -3475,10 +3477,9 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
       // pointer.
       Value *FrameAddr =
           IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::frameaddress,
-                                                   IRB.getInt8PtrTy()),
+                                                   IRB.getPtrTy()),
                          {IRB.getInt32(0)});
-      Value *StackSave =
-          IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
+      Value *StackSave = IRB.CreateStackSave();
       CallInst *EntryCall =
           IRB.CreateCall(CsanFuncEntry, {FuncId, FrameAddr, StackSave,
                                          FuncEntryProp.getValue(IRB)});
@@ -3595,7 +3596,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
            "Store received different ID's in FED and object tables.");
     Value *CsiId = StoreFED.localToGlobalId(LocalId, IRB);
     Value *Args[] = {CsiId,
-                     IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+                     IRB.CreatePointerCast(Addr, IRB.getPtrTy()),
                      IRB.getInt32(NumBytesAccessed),
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanWrite, Args);
@@ -3609,7 +3610,7 @@ bool CilkSanitizerImpl::instrumentLoadOrStore(Instruction *I,
            "Load received different ID's in FED and object tables.");
     Value *CsiId = LoadFED.localToGlobalId(LocalId, IRB);
     Value *Args[] = {CsiId,
-                     IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+                     IRB.CreatePointerCast(Addr, IRB.getPtrTy()),
                      IRB.getInt32(NumBytesAccessed),
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanRead, Args);
@@ -3656,7 +3657,7 @@ bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
          "Store received different ID's in FED and object tables.");
   Value *CsiId = StoreFED.localToGlobalId(LocalId, IRB);
   Value *Args[] = {CsiId,
-                   IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+                   IRB.CreatePointerCast(Addr, IRB.getPtrTy()),
                    IRB.getInt32(NumBytesAccessed),
                    Prop.getValue(IRB)};
   Instruction *Call = IRB.CreateCall(CsanWrite, Args);
@@ -3776,8 +3777,7 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
 
       // Save the stack pointer, if we haven't already
       if (!SavedStack)
-        SavedStack =
-            IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
+        SavedStack = IRB.CreateStackSave();
 
       // Spill the argument onto the stack
       AllocaInst *ArgSpill = IRB.CreateAlloca(ArgTy);
@@ -3797,8 +3797,7 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
 
     // If we previously saved the stack pointer, restore it
     if (SavedStack)
-      IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stackrestore),
-                     {SavedStack});
+      IRB.CreateStackRestore(SavedStack);
     return true;
   }
 
@@ -3832,8 +3831,7 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
 
       // Save the stack pointer, if we haven't already
       if (!SavedStack)
-        SavedStack =
-            IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
+        SavedStack = IRB.CreateStackSave();
 
       // Spill the return value onto the stack
       AllocaInst *RetSpill = IRB.CreateAlloca(RetTy);
@@ -3856,8 +3854,7 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
 
     // Save the stack pointer, if we haven't already
     if (!SavedStack)
-      SavedStack =
-          IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
+      SavedStack = IRB.CreateStackSave();
 
     // Spill the argument onto the stack
     AllocaInst *ArgSpill = IRB.CreateAlloca(ArgTy);
@@ -3873,7 +3870,7 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
   switch (II->getIntrinsicID()) {
   case Intrinsic::hyper_lookup: {
     FunctionType *AfterHookTy =
-        FunctionType::get(IRB.getInt8PtrTy(), AfterHookParamTys, Called->isVarArg());
+        FunctionType::get(IRB.getPtrTy(), AfterHookParamTys, Called->isVarArg());
     FunctionCallee AfterIntrinCallHook =
         getOrInsertSynthesizedHook(("__csan_" + Buf).str(), AfterHookTy);
     CallInst *HookCall =
@@ -3893,10 +3890,9 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
   // Insert the hook call
   insertHookCall(&*Iter, AfterIntrinCallHook, AfterHookParamVals);
 
-  if (SavedStack) {
-    IRB.CreateCall(Intrinsic::getDeclaration(&M, Intrinsic::stackrestore),
-                   {SavedStack});
-  }
+  if (SavedStack)
+    IRB.CreateStackRestore(SavedStack);
+
   return true;
 }
 
@@ -4132,7 +4128,7 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
              "Store received different ID's in FED and object tables.");
 
       Value *CsiId = StoreFED.localToGlobalId(StoreId, IRB);
-      Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+      Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getPtrTy()),
                        IRB.CreateIntCast(M->getLength(), IntptrTy, false),
                        Prop.getValue(IRB)};
       Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
@@ -4158,7 +4154,7 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
              "Load received different ID's in FED and object tables.");
 
       Value *CsiId = LoadFED.localToGlobalId(LoadId, IRB);
-      Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+      Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getPtrTy()),
                        IRB.CreateIntCast(M->getLength(), IntptrTy, false),
                        Prop.getValue(IRB)};
       Instruction *Call = IRB.CreateCall(CsanLargeRead, Args);
@@ -4184,7 +4180,7 @@ bool CilkSanitizerImpl::instrumentAnyMemIntrinAcc(Instruction *I,
            "Store received different ID's in FED and object tables.");
 
     Value *CsiId = StoreFED.localToGlobalId(LocalId, IRB);
-    Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+    Value *Args[] = {CsiId, IRB.CreatePointerCast(Addr, IRB.getPtrTy()),
                      IRB.CreateIntCast(M->getLength(), IntptrTy, false),
                      Prop.getValue(IRB)};
     Instruction *Call = IRB.CreateCall(CsanLargeWrite, Args);
@@ -4283,8 +4279,7 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
     Value *FrameAddr = IRB.CreateCall(
         Intrinsic::getDeclaration(&M, Intrinsic::task_frameaddress),
         {IRB.getInt32(0)});
-    Value *StackSave = IRB.CreateCall(
-        Intrinsic::getDeclaration(&M, Intrinsic::stacksave));
+    Value *StackSave = IRB.CreateStackSave();
     Instruction *Call = IRB.CreateCall(CsanTaskEntry,
                                        {TaskID, DetachID, FrameAddr,
                                         StackSave, Prop.getValue(IRB)});
@@ -4512,7 +4507,7 @@ bool CilkSanitizerImpl::instrumentAlloca(Instruction *I, TaskInfo &TI) {
     Iter = IRB.GetInsertPoint();
   }
 
-  Type *AddrType = IRB.getInt8PtrTy();
+  Type *AddrType = IRB.getPtrTy();
   Value *Addr = IRB.CreatePointerCast(I, AddrType);
   insertHookCall(&*Iter, CsiAfterAlloca, {CsiId, Addr, SizeVal, PropVal});
 
@@ -4648,14 +4643,14 @@ bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
 
   IRBuilder<> IRB(I);
   SmallVector<Value *, 4> AllocFnArgs;
-  if (!getAllocFnArgs(I, AllocFnArgs, IntptrTy, IRB.getInt8PtrTy(), *TLI)) {
+  if (!getAllocFnArgs(I, AllocFnArgs, IntptrTy, IRB.getPtrTy(), *TLI)) {
     return instrumentAllocFnLibCall(I, TLI);
   }
   SmallVector<Value *, 4> DefaultAllocFnArgs(
       {/* Allocated size */ Constant::getNullValue(IntptrTy),
        /* Number of elements */ Constant::getNullValue(IntptrTy),
        /* Alignment */ Constant::getNullValue(IntptrTy),
-       /* Old pointer */ Constant::getNullValue(IRB.getInt8PtrTy()),});
+       /* Old pointer */ Constant::getNullValue(IRB.getPtrTy()),});
 
   Value *DefaultID = getDefaultID(IRB);
   uint64_t LocalId = AllocFnFED.add(*I);
@@ -4688,7 +4683,7 @@ bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
       IRB.SetInsertPoint(&*NormalBB->getFirstInsertionPt());
       SmallVector<Value *, 4> AfterAllocFnArgs;
       AfterAllocFnArgs.push_back(AllocFnId);
-      AfterAllocFnArgs.push_back(IRB.CreatePointerCast(I, IRB.getInt8PtrTy()));
+      AfterAllocFnArgs.push_back(IRB.CreatePointerCast(I, IRB.getPtrTy()));
       AfterAllocFnArgs.append(AllocFnArgs.begin(), AllocFnArgs.end());
       insertHookCall(&*IRB.GetInsertPoint(), CsanAfterAllocFn,
                      AfterAllocFnArgs);
@@ -4699,11 +4694,11 @@ bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
       // destination.
       SmallVector<Value *, 4> AfterAllocFnArgs, DefaultAfterAllocFnArgs;
       AfterAllocFnArgs.push_back(AllocFnId);
-      AfterAllocFnArgs.push_back(Constant::getNullValue(IRB.getInt8PtrTy()));
+      AfterAllocFnArgs.push_back(Constant::getNullValue(IRB.getPtrTy()));
       AfterAllocFnArgs.append(AllocFnArgs.begin(), AllocFnArgs.end());
       DefaultAfterAllocFnArgs.push_back(DefaultID);
       DefaultAfterAllocFnArgs.push_back(
-          Constant::getNullValue(IRB.getInt8PtrTy()));
+          Constant::getNullValue(IRB.getPtrTy()));
       DefaultAfterAllocFnArgs.append(DefaultAllocFnArgs.begin(),
                                      DefaultAllocFnArgs.end());
       insertHookCallInSuccessorBB(
@@ -4716,7 +4711,7 @@ bool CilkSanitizerImpl::instrumentAllocationFn(Instruction *I,
     IRB.SetInsertPoint(&*Iter);
     SmallVector<Value *, 4> AfterAllocFnArgs;
     AfterAllocFnArgs.push_back(AllocFnId);
-    AfterAllocFnArgs.push_back(IRB.CreatePointerCast(I, IRB.getInt8PtrTy()));
+    AfterAllocFnArgs.push_back(IRB.CreatePointerCast(I, IRB.getPtrTy()));
     AfterAllocFnArgs.append(AllocFnArgs.begin(), AllocFnArgs.end());
     insertHookCall(&*Iter, CsanAfterAllocFn, AfterAllocFnArgs);
   }

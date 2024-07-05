@@ -1581,7 +1581,8 @@ ToolChain::getOpenCilkRuntimePaths(const ArgList &Args) const {
   path_list Paths;
 
   if (!Args.hasArg(options::OPT_opencilk_resource_dir_EQ)) {
-    Paths = getRuntimePaths();
+    if (std::optional<std::string> Path = getRuntimePath())
+      Paths.push_back(*Path);
     Paths.push_back(getCompilerRTPath());
     return Paths;
   }

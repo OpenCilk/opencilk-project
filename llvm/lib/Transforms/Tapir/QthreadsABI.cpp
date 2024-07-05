@@ -17,7 +17,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 
@@ -53,9 +52,9 @@ FunctionCallee QthreadsABI::get_qthread_fork_copyargs() {
   FunctionType *FTy = FunctionType::get(
       Type::getInt32Ty(C),
       { QthreadFTy,            // qthread_f f
-        Type::getInt8PtrTy(C), // const void *arg
+        PointerType::getUnqual(C), // const void *arg
         DL.getIntPtrType(C),   // size_t arg_size
-        Type::getInt64PtrTy(C) // aligned_t *ret
+        PointerType::getUnqual(C) // aligned_t *ret
       }, false);
   
   QthreadForkCopyargs = M.getOrInsertFunction("qthread_fork_copyargs", FTy, AL);
@@ -85,10 +84,10 @@ FunctionCallee QthreadsABI::get_qt_sinc_create() {
   AttributeList AL;
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
-      Type::getInt8PtrTy(C),
+      PointerType::getUnqual(C),
       { DL.getIntPtrType(C),   // size_t size
-        Type::getInt8PtrTy(C), // void *initval
-        Type::getInt8PtrTy(C), // void *op
+        PointerType::getUnqual(C), // void *initval
+        PointerType::getUnqual(C), // void *op
         DL.getIntPtrType(C)    // size_t expect
       },
       false);
@@ -107,7 +106,7 @@ FunctionCallee QthreadsABI::get_qt_sinc_expect() {
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
       Type::getVoidTy(C),
-      { Type::getInt8PtrTy(C), // sync_t *s
+      { PointerType::getUnqual(C), // sync_t *s
         DL.getIntPtrType(C)    // size_t incr
       },
       false);
@@ -125,8 +124,8 @@ FunctionCallee QthreadsABI::get_qt_sinc_submit() {
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
       Type::getVoidTy(C),
-      { Type::getInt8PtrTy(C), // sync_t *s
-        Type::getInt8PtrTy(C)  // void *val
+      { PointerType::getUnqual(C), // sync_t *s
+        PointerType::getUnqual(C)  // void *val
       },
       false);
   
@@ -143,8 +142,8 @@ FunctionCallee QthreadsABI::get_qt_sinc_wait() {
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
       Type::getVoidTy(C),
-      { Type::getInt8PtrTy(C), // sync_t *s
-        Type::getInt8PtrTy(C)  // void *target
+      { PointerType::getUnqual(C), // sync_t *s
+        PointerType::getUnqual(C)  // void *target
       },
       false);
   
@@ -161,7 +160,7 @@ FunctionCallee QthreadsABI::get_qt_sinc_destroy() {
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
       Type::getVoidTy(C),
-      { Type::getInt8PtrTy(C), // sync_t *s
+      { PointerType::getUnqual(C), // sync_t *s
       },
       false);
   
@@ -175,7 +174,7 @@ QthreadsABI::QthreadsABI(Module &M) : TapirTarget(M) {
   LLVMContext &C = M.getContext();
   // Initialize any types we need for lowering.
   QthreadFTy = PointerType::getUnqual(
-      FunctionType::get(Type::getInt64Ty(C), { Type::getInt8PtrTy(C) }, false));
+      FunctionType::get(Type::getInt64Ty(C), { PointerType::getUnqual(C) }, false));
 }
 
 /// Lower a call to get the grainsize of this Tapir loop.
@@ -217,7 +216,7 @@ Value *QthreadsABI::getOrCreateSinc(Value *SyncRegion, Function *F) {
     return sinc;
   else {
     Value* zero = ConstantInt::get(Type::getInt64Ty(C), 0);
-    Value* null = Constant::getNullValue(Type::getInt8PtrTy(C));
+    Value* null = Constant::getNullValue(PointerType::getUnqual(C));
     std::vector<Value*> createArgs = {zero, null, null, zero};
     sinc = CallInst::Create(QTHREAD_FUNC(qt_sinc_create), createArgs, "",
                             F->getEntryBlock().getTerminator());
@@ -239,7 +238,7 @@ void QthreadsABI::lowerSync(SyncInst &SI) {
   IRBuilder<> builder(&SI); 
   auto F = SI.getParent()->getParent(); 
   auto& C = M.getContext(); 
-  auto null = Constant::getNullValue(Type::getInt8PtrTy(C)); 
+  auto null = Constant::getNullValue(PointerType::getUnqual(C)); 
   Value* SR = SI.getSyncRegion(); 
   auto sinc = getOrCreateSinc(SR, F); 
   std::vector<Value *> args = {sinc, null}; 
@@ -271,8 +270,8 @@ void QthreadsABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   AllocaInst *CallerArgStruct = cast<AllocaInst>(ReplCall->getArgOperand(0));
   Type *ArgsTy = CallerArgStruct->getAllocatedType();
   Value *ArgStructPtr = CallerIRBuilder.CreateBitCast(CallerArgStruct,
-                                                      Type::getInt8PtrTy(C));
-  Constant *Null = Constant::getNullValue(Type::getInt64PtrTy(C));
+                                                      PointerType::getUnqual(C));
+  Constant *Null = Constant::getNullValue(PointerType::getUnqual(C));
   ConstantInt *ArgSize = ConstantInt::get(DL.getIntPtrType(C),
                                           DL.getTypeAllocSize(ArgsTy));
   CallInst *Call = CallerIRBuilder.CreateCall(
@@ -330,7 +329,7 @@ bool QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
     // task, which is not necessarily the end of the task.  I kept the code I
     // found, but I'm not sure if it is correct.
     IRBuilder<> footerB(Spawned->getTerminator());
-    Value* null = Constant::getNullValue(Type::getInt8PtrTy(C));
+    Value* null = Constant::getNullValue(PointerType::getUnqual(C));
     std::vector<Value*> submitArgs = {sinc, null};
     footerB.CreateCall(QTHREAD_FUNC(qt_sinc_submit), submitArgs);
   }

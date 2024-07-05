@@ -472,7 +472,7 @@ void findAllTaskFrameInputs(TFValueSetMap &TFInputs,
 /// its header block is also considered a valid load point.
 std::pair<AllocaInst *, Instruction *>
 createTaskArgsStruct(const ValueSet &Inputs, Task *T, Instruction *StorePt,
-                     Instruction *LoadPt, bool staticStruct,
+                     Instruction *LoadPt, bool StaticStruct,
                      ValueToValueMapTy &InputsMap,
                      Loop *TapirL = nullptr);
 
@@ -487,7 +487,7 @@ void fixupInputSet(Function &F, const ValueSet &Inputs, ValueSet &Fixed);
 Instruction *fixupHelperInputs(Function &F, Task *T, ValueSet &TaskInputs,
                                ValueSet &HelperInputs, Instruction *StorePt,
                                Instruction *LoadPt,
-                               TapirTarget::ArgStructMode useArgStruct,
+                               TapirTarget::ArgStructMode UseArgStruct,
                                ValueToValueMapTy &InputsMap,
                                Loop *TapirL = nullptr);
 
@@ -536,7 +536,7 @@ Instruction *replaceTaskFrameWithCallToOutline(
 TaskOutlineInfo outlineTask(
     Task *T, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
     Module *DestM, ValueToValueMapTy &VMap,
-    TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
+    TapirTarget::ArgStructMode UseArgStruct, Type *ReturnType,
     ValueToValueMapTy &InputMap, OutlineAnalysis &OA);
 
 /// Outlines a taskframe \p TF into a helper function that accepts the inputs \p
@@ -546,7 +546,7 @@ TaskOutlineInfo outlineTask(
 TaskOutlineInfo outlineTaskFrame(
     Spindle *TF, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
     Module *DestM, ValueToValueMapTy &VMap,
-    TapirTarget::ArgStructMode useArgStruct, Type *ReturnType,
+    TapirTarget::ArgStructMode UseArgStruct, Type *ReturnType,
     ValueToValueMapTy &InputMap, OutlineAnalysis &OA);
 
 //----------------------------------------------------------------------------//

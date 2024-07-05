@@ -18,19 +18,16 @@ for.cond86:                                       ; preds = %for.cond86, %entry
           to label %for.cond86 unwind label %lpad90
 
 ; CHECK: for.cond86:
-; CHECK: br label %for.cond86.tf
-
-; CHECK: for.cond86.tf:
-; CHECK-NEXT: %[[TF_I:.+]] = call token @llvm.taskframe.create()
-; CHECK-NEXT: %syncreg19.i = call token @llvm.syncregion.start()
 ; CHECK: br i1 {{.+}}, label %[[IF_THEN_I:.+]], label %[[IF_ELSE_I:.+]]
 
 ; CHECK: [[IF_ELSE_I]]:
-; CHECK-NEXT: detach within %syncreg19.i, label %det.achd.i, label
+; CHECK-NEXT: %[[TF_I:.+]] = call token @llvm.taskframe.create()
+; CHECK-NEXT: %syncreg19.i.i3 = call token @llvm.syncregion.start()
+; CHECK-NEXT: detach within %syncreg19.i.i3, label %det.achd.i.i, label
 ; CHECK-NOT: unwind label
 
-; CHECK: det.achd.i:
-; CHECK-NEXT: reattach within %syncreg19.i, label
+; CHECK: det.achd.i.i:
+; CHECK-NEXT: reattach within %syncreg19.i.i3, label
 
 lpad90:                                           ; preds = %for.cond86
   %0 = landingpad { ptr, i32 }
@@ -90,7 +87,7 @@ det.cont:                                         ; preds = %det.achd, %if.else
 
 define linkonce_odr void @_ZZN4gbbs9vertexMapINS_16vertexSubsetDataINS_5emptyEEENS_2bc37SSBetweennessCentrality_Back_Vertex_FIN6parlay8sequenceIbSaIbELb0EEENS7_IdSaIdELb0EEEEELi0EEEvRT_T0_mENKUlmE0_clEm() {
 entry:
-  %ref.tmp = alloca i32, i32 0, align 4
+  %ref.tmp = alloca i32, i32 1, align 4
   %call = call ptr null(ptr null, ptr %ref.tmp)
   ret void
 }

@@ -109,7 +109,7 @@ define <4 x float> @vselect(ptr%p, <4 x i32> %q) {
 ; X64-NEXT:    testl %r8d, %r8d
 ; X64-NEXT:    jne .LBB1_8
 ; X64-NEXT:  .LBB1_7:
-; X64-NEXT:    movss {{.*#+}} xmm3 = mem[0],zero,zero,zero
+; X64-NEXT:    movss {{.*#+}} xmm3 = [4.0E+0,0.0E+0,0.0E+0,0.0E+0]
 ; X64-NEXT:    unpcklps {{.*#+}} xmm2 = xmm2[0],xmm3[0],xmm2[1],xmm3[1]
 ; X64-NEXT:    testl %esi, %esi
 ; X64-NEXT:    jne .LBB1_11

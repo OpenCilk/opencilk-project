@@ -140,16 +140,16 @@ for.body14.i.i:                                   ; preds = %for.body14.i.i, %fo
   br i1 %cmp13.not.i.i, label %for.end44.i.loopexit.i, label %for.body14.i.i, !llvm.loop !18
 
 ; CHECK: %vld1xN.i.i.i.i.i = tail call { <4 x float>, <4 x float> } @llvm.aarch64.neon.ld1x2.v4f32.p0(ptr %[[ARG:.+]])
-; CHECK-NEXT: %[[STACKSAVE:.+]] = call ptr @llvm.stacksave()
+; CHECK-NEXT: %[[STACKSAVE:.+]] = call ptr @llvm.stacksave.p0()
 ; CHECK-NEXT: %[[SPILL:.+]] = alloca { <4 x float>, <4 x float> }
 ; CHECK-NEXT: store { <4 x float>, <4 x float> } %vld1xN.i.i.i.i.i, ptr %[[SPILL]]
 ; CHECK-NEXT: call void @__csan_llvm_aarch64_neon_ld1x2_v4f32_p0(
 ; CHECK: ptr %[[SPILL]],
 ; CHECK: ptr %[[ARG]])
-; CHECK-NEXT: call void @llvm.stackrestore(ptr %[[STACKSAVE]])
+; CHECK-NEXT: call void @llvm.stackrestore.p0(ptr %[[STACKSAVE]])
 
 ; CHECK: tail call void @llvm.aarch64.neon.st1x2.v4f32.p0(<4 x float> %vrndz1.i.i.i.i.i.i.i, <4 x float> %vrndz1.i9.i.i.i.i.i.i, ptr %[[ARG2:.+]])
-; CHECK-NEXT: %[[STACKSAVE2:.+]] = call ptr @llvm.stacksave()
+; CHECK-NEXT: %[[STACKSAVE2:.+]] = call ptr @llvm.stacksave.p0()
 ; CHECK-NEXT: %[[SPILL2A:.+]] = alloca <4 x float>
 ; CHECK-NEXT: store <4 x float> %vrndz1.i.i.i.i.i.i.i, ptr %[[SPILL2A]]
 ; CHECK-NEXT: %[[SPILL2B:.+]] = alloca <4 x float>
@@ -158,7 +158,7 @@ for.body14.i.i:                                   ; preds = %for.body14.i.i, %fo
 ; CHECK: ptr %[[SPILL2A]],
 ; CHECK: ptr %[[SPILL2B]],
 ; CHECK: ptr %[[ARG2]])
-; CHECK-NEXT: call void @llvm.stackrestore(ptr %[[STACKSAVE2]])
+; CHECK-NEXT: call void @llvm.stackrestore.p0(ptr %[[STACKSAVE2]])
 
 for.end44.i.loopexit.i:                           ; preds = %for.body14.i.i
   %cmp45.i.i = icmp slt i64 %add43.i.i, %params3

@@ -6452,10 +6452,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       case llvm::Triple::armeb:
       case llvm::Triple::aarch64:
       case llvm::Triple::aarch64_be:
-	break;
+        break;
       default:
-	D.Diag(diag::err_drv_cilk_unsupported);
-	break;
+        D.Diag(diag::err_drv_cilk_unsupported);
+        break;
       }
 
       // If an OpenCilk resource directory is specified, check that it is valid.

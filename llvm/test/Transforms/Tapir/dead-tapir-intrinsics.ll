@@ -36,9 +36,9 @@ define dso_local void @_Z6parentl(i64 %x) #1 personality i8* bitcast (i32 (...)*
 ; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
 ; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
 ; CHECK-NOTFSIMPLIFY: call token @llvm.taskframe.create()
-; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave()
-; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave()
-; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave()
+; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave.p0()
+; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave.p0()
+; CHECK-TFSIMPLIFY: call ptr @llvm.stacksave.p0()
 ; CHECK-TFSIMPLIFY-NOT: call token @llvm.taskframe.create()
 ; CHECK: call token @llvm.taskframe.create()
 ; CHECK detach within %[[SYNCREG]]
@@ -136,7 +136,7 @@ for.body.split:                                   ; preds = %for.body
   %exn.slot = alloca i8*
   %ehselector.slot = alloca i32
   %agg.tmp3 = alloca %class.object, align 1
-  %savedstack = call i8* @llvm.stacksave()
+  %savedstack = call i8* @llvm.stacksave.p0()
   store %class.object* %agg.tmp, %class.object** %this.addr.i, align 8
   store %class.object* %obj, %class.object** %other.addr.i, align 8
   %this1.i = load %class.object*, %class.object** %this.addr.i, align 8
@@ -186,7 +186,7 @@ det.achd.i:                                       ; preds = %invoke.cont.i.split
   %exn.slot5.i = alloca i8*
   %ehselector.slot6.i = alloca i32
   call void @llvm.taskframe.use(token %2)
-  %savedstack.i = call i8* @llvm.stacksave()
+  %savedstack.i = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp.i, %class.object.0** %this.addr.i.i, align 8
   store %class.object.0* %a3.i, %class.object.0** %other.addr.i.i, align 8
   %this1.i.i = load %class.object.0*, %class.object.0** %this.addr.i.i, align 8
@@ -230,7 +230,7 @@ det.achd.i.i:                                     ; preds = %invoke.cont.i.i.spl
   %exn.slot5.i.i = alloca i8*
   %ehselector.slot6.i.i = alloca i32
   call void @llvm.taskframe.use(token %4)
-  %savedstack.i.i = call i8* @llvm.stacksave()
+  %savedstack.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i.i, %class.object.1** %this.addr.i.i.i, align 8
   store %class.object.1* %a3.i.i, %class.object.1** %other.addr.i.i.i, align 8
   %this1.i.i.i = load %class.object.1*, %class.object.1** %this.addr.i.i.i, align 8
@@ -376,7 +376,7 @@ unreachable.i.i.i:                                ; preds = %lpad11.i.i.i, %ehcl
 
 _ZN6objectILi1EEC2ERKS0_.exit.i.i:                ; preds = %sync.continue.i.i.i
   call void @llvm.stackrestore(i8* %savedstack.i.i)
-  %savedstack61.i.i = call i8* @llvm.stacksave()
+  %savedstack61.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i.i, %class.object.1** %this.addr.i36.i.i, align 8
   %this1.i40.i.i = load %class.object.1*, %class.object.1** %this.addr.i36.i.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit.i.i.split
@@ -475,7 +475,7 @@ unreachable.i60.i.i:                              ; preds = %lpad4.i58.i.i, %lpa
 det.cont.i.i:                                     ; preds = %invoke.cont.i.i.split
   %40 = load %class.object.0*, %class.object.0** %other.addr.i.i, align 8
   %b21.i.i = getelementptr inbounds %class.object.0, %class.object.0* %40, i32 0, i32 1
-  %savedstack116.i.i = call i8* @llvm.stacksave()
+  %savedstack116.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i.i, %class.object.1** %this.addr.i65.i.i, align 8
   store %class.object.1* %b21.i.i, %class.object.1** %other.addr.i66.i.i, align 8
   %this1.i71.i.i = load %class.object.1*, %class.object.1** %this.addr.i65.i.i, align 8
@@ -622,7 +622,7 @@ unreachable.i115.i.i:                             ; preds = %lpad11.i101.i.i, %e
 _ZN6objectILi1EEC2ERKS0_.exit121.i.i:             ; preds = %sync.continue.i92.i.i
   call void @llvm.stackrestore(i8* %savedstack116.i.i)
   %b23.i.i = getelementptr inbounds %class.object.0, %class.object.0* %this1.i.i, i32 0, i32 1
-  %savedstack161.i.i = call i8* @llvm.stacksave()
+  %savedstack161.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i.i, %class.object.1** %this.addr.i122.i.i, align 8
   %this1.i127.i.i = load %class.object.1*, %class.object.1** %this.addr.i122.i.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i.i.split
@@ -821,7 +821,7 @@ unreachable.i.i:                                  ; preds = %lpad11.i.i, %ehclea
 det.cont.i:                                       ; preds = %invoke.cont.i.split
   %93 = load %class.object*, %class.object** %other.addr.i, align 8
   %b21.i = getelementptr inbounds %class.object, %class.object* %93, i32 0, i32 1
-  %savedstack373.i = call i8* @llvm.stacksave()
+  %savedstack373.i = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp20.i, %class.object.0** %this.addr.i147.i, align 8
   store %class.object.0* %b21.i, %class.object.0** %other.addr.i148.i, align 8
   %this1.i153.i = load %class.object.0*, %class.object.0** %this.addr.i147.i, align 8
@@ -865,7 +865,7 @@ det.achd.i181.i:                                  ; preds = %invoke.cont.i156.i.
   %exn.slot5.i176.i = alloca i8*
   %ehselector.slot6.i177.i = alloca i32
   call void @llvm.taskframe.use(token %94)
-  %savedstack.i178.i = call i8* @llvm.stacksave()
+  %savedstack.i178.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i157.i, %class.object.1** %this.addr.i.i170.i, align 8
   store %class.object.1* %a3.i161.i, %class.object.1** %other.addr.i.i171.i, align 8
   %this1.i.i179.i = load %class.object.1*, %class.object.1** %this.addr.i.i170.i, align 8
@@ -1011,7 +1011,7 @@ unreachable.i.i224.i:                             ; preds = %lpad11.i.i215.i, %e
 
 _ZN6objectILi1EEC2ERKS0_.exit.i225.i:             ; preds = %sync.continue.i.i202.i
   call void @llvm.stackrestore(i8* %savedstack.i178.i)
-  %savedstack61.i226.i = call i8* @llvm.stacksave()
+  %savedstack61.i226.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i160.i, %class.object.1** %this.addr.i36.i162.i, align 8
   %this1.i40.i227.i = load %class.object.1*, %class.object.1** %this.addr.i36.i162.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit.i225.i.split
@@ -1110,7 +1110,7 @@ unreachable.i60.i258.i:                           ; preds = %lpad4.i58.i250.i, %
 det.cont.i263.i:                                  ; preds = %invoke.cont.i156.i.split
   %130 = load %class.object.0*, %class.object.0** %other.addr.i148.i, align 8
   %b21.i259.i = getelementptr inbounds %class.object.0, %class.object.0* %130, i32 0, i32 1
-  %savedstack116.i260.i = call i8* @llvm.stacksave()
+  %savedstack116.i260.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i152.i, %class.object.1** %this.addr.i65.i141.i, align 8
   store %class.object.1* %b21.i259.i, %class.object.1** %other.addr.i66.i142.i, align 8
   %this1.i71.i261.i = load %class.object.1*, %class.object.1** %this.addr.i65.i141.i, align 8
@@ -1257,7 +1257,7 @@ unreachable.i115.i306.i:                          ; preds = %lpad11.i101.i297.i,
 _ZN6objectILi1EEC2ERKS0_.exit121.i307.i:          ; preds = %sync.continue.i92.i284.i
   call void @llvm.stackrestore(i8* %savedstack116.i260.i)
   %b23.i308.i = getelementptr inbounds %class.object.0, %class.object.0* %this1.i153.i, i32 0, i32 1
-  %savedstack161.i309.i = call i8* @llvm.stacksave()
+  %savedstack161.i309.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i308.i, %class.object.1** %this.addr.i122.i133.i, align 8
   %this1.i127.i310.i = load %class.object.1*, %class.object.1** %this.addr.i122.i133.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i307.i.split
@@ -1532,7 +1532,7 @@ invoke.cont:                                      ; preds = %_ZN6objectILi3EEC2E
           to label %invoke.cont2 unwind label %lpad1
 
 invoke.cont2:                                     ; preds = %invoke.cont
-  %savedstack559 = call i8* @llvm.stacksave()
+  %savedstack559 = call i8* @llvm.stacksave.p0()
   store %class.object* %agg.tmp3, %class.object** %this.addr.i55, align 8
   store %class.object* %obj, %class.object** %other.addr.i56, align 8
   %this1.i61 = load %class.object*, %class.object** %this.addr.i55, align 8
@@ -1579,7 +1579,7 @@ det.achd.i95:                                     ; preds = %invoke.cont.i64
   %exn.slot5.i90 = alloca i8*
   %ehselector.slot6.i91 = alloca i32
   call void @llvm.taskframe.use(token %199)
-  %savedstack.i92 = call i8* @llvm.stacksave()
+  %savedstack.i92 = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp.i65, %class.object.0** %this.addr.i.i82, align 8
   store %class.object.0* %a3.i69, %class.object.0** %other.addr.i.i83, align 8
   %this1.i.i93 = load %class.object.0*, %class.object.0** %this.addr.i.i82, align 8
@@ -1620,7 +1620,7 @@ det.achd.i.i123:                                  ; preds = %invoke.cont.i.i98
   %exn.slot5.i.i118 = alloca i8*
   %ehselector.slot6.i.i119 = alloca i32
   call void @llvm.taskframe.use(token %201)
-  %savedstack.i.i120 = call i8* @llvm.stacksave()
+  %savedstack.i.i120 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i.i99, %class.object.1** %this.addr.i.i.i112, align 8
   store %class.object.1* %a3.i.i103, %class.object.1** %other.addr.i.i.i113, align 8
   %this1.i.i.i121 = load %class.object.1*, %class.object.1** %this.addr.i.i.i112, align 8
@@ -1763,7 +1763,7 @@ unreachable.i.i.i166:                             ; preds = %lpad11.i.i.i157, %e
 
 _ZN6objectILi1EEC2ERKS0_.exit.i.i169:             ; preds = %sync.continue.i.i.i144
   call void @llvm.stackrestore(i8* %savedstack.i.i120)
-  %savedstack61.i.i167 = call i8* @llvm.stacksave()
+  %savedstack61.i.i167 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i.i102, %class.object.1** %this.addr.i36.i.i104, align 8
   %this1.i40.i.i168 = load %class.object.1*, %class.object.1** %this.addr.i36.i.i104, align 8
   %224 = call token @llvm.taskframe.create()
@@ -1859,7 +1859,7 @@ unreachable.i60.i.i200:                           ; preds = %lpad4.i58.i.i192, %
 det.cont.i.i205:                                  ; preds = %invoke.cont.i.i98
   %237 = load %class.object.0*, %class.object.0** %other.addr.i.i83, align 8
   %b21.i.i201 = getelementptr inbounds %class.object.0, %class.object.0* %237, i32 0, i32 1
-  %savedstack116.i.i202 = call i8* @llvm.stacksave()
+  %savedstack116.i.i202 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i.i86, %class.object.1** %this.addr.i65.i.i77, align 8
   store %class.object.1* %b21.i.i201, %class.object.1** %other.addr.i66.i.i78, align 8
   %this1.i71.i.i203 = load %class.object.1*, %class.object.1** %this.addr.i65.i.i77, align 8
@@ -2003,7 +2003,7 @@ unreachable.i115.i.i248:                          ; preds = %lpad11.i101.i.i239,
 _ZN6objectILi1EEC2ERKS0_.exit121.i.i252:          ; preds = %sync.continue.i92.i.i226
   call void @llvm.stackrestore(i8* %savedstack116.i.i202)
   %b23.i.i249 = getelementptr inbounds %class.object.0, %class.object.0* %this1.i.i93, i32 0, i32 1
-  %savedstack161.i.i250 = call i8* @llvm.stacksave()
+  %savedstack161.i.i250 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i.i249, %class.object.1** %this.addr.i122.i.i70, align 8
   %this1.i127.i.i251 = load %class.object.1*, %class.object.1** %this.addr.i122.i.i70, align 8
   %259 = call token @llvm.taskframe.create()
@@ -2199,7 +2199,7 @@ unreachable.i.i313:                               ; preds = %lpad11.i.i300, %ehc
 det.cont.i318:                                    ; preds = %invoke.cont.i64
   %290 = load %class.object*, %class.object** %other.addr.i56, align 8
   %b21.i314 = getelementptr inbounds %class.object, %class.object* %290, i32 0, i32 1
-  %savedstack373.i315 = call i8* @llvm.stacksave()
+  %savedstack373.i315 = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp20.i60, %class.object.0** %this.addr.i147.i44, align 8
   store %class.object.0* %b21.i314, %class.object.0** %other.addr.i148.i45, align 8
   %this1.i153.i316 = load %class.object.0*, %class.object.0** %this.addr.i147.i44, align 8
@@ -2240,7 +2240,7 @@ det.achd.i181.i346:                               ; preds = %invoke.cont.i156.i3
   %exn.slot5.i176.i341 = alloca i8*
   %ehselector.slot6.i177.i342 = alloca i32
   call void @llvm.taskframe.use(token %291)
-  %savedstack.i178.i343 = call i8* @llvm.stacksave()
+  %savedstack.i178.i343 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i157.i322, %class.object.1** %this.addr.i.i170.i335, align 8
   store %class.object.1* %a3.i161.i326, %class.object.1** %other.addr.i.i171.i336, align 8
   %this1.i.i179.i344 = load %class.object.1*, %class.object.1** %this.addr.i.i170.i335, align 8
@@ -2383,7 +2383,7 @@ unreachable.i.i224.i389:                          ; preds = %lpad11.i.i215.i380,
 
 _ZN6objectILi1EEC2ERKS0_.exit.i225.i392:          ; preds = %sync.continue.i.i202.i367
   call void @llvm.stackrestore(i8* %savedstack.i178.i343)
-  %savedstack61.i226.i390 = call i8* @llvm.stacksave()
+  %savedstack61.i226.i390 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i160.i325, %class.object.1** %this.addr.i36.i162.i327, align 8
   %this1.i40.i227.i391 = load %class.object.1*, %class.object.1** %this.addr.i36.i162.i327, align 8
   %314 = call token @llvm.taskframe.create()
@@ -2479,7 +2479,7 @@ unreachable.i60.i258.i423:                        ; preds = %lpad4.i58.i250.i415
 det.cont.i263.i428:                               ; preds = %invoke.cont.i156.i321
   %327 = load %class.object.0*, %class.object.0** %other.addr.i148.i45, align 8
   %b21.i259.i424 = getelementptr inbounds %class.object.0, %class.object.0* %327, i32 0, i32 1
-  %savedstack116.i260.i425 = call i8* @llvm.stacksave()
+  %savedstack116.i260.i425 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i152.i48, %class.object.1** %this.addr.i65.i141.i39, align 8
   store %class.object.1* %b21.i259.i424, %class.object.1** %other.addr.i66.i142.i40, align 8
   %this1.i71.i261.i426 = load %class.object.1*, %class.object.1** %this.addr.i65.i141.i39, align 8
@@ -2623,7 +2623,7 @@ unreachable.i115.i306.i471:                       ; preds = %lpad11.i101.i297.i4
 _ZN6objectILi1EEC2ERKS0_.exit121.i307.i475:       ; preds = %sync.continue.i92.i284.i449
   call void @llvm.stackrestore(i8* %savedstack116.i260.i425)
   %b23.i308.i472 = getelementptr inbounds %class.object.0, %class.object.0* %this1.i153.i316, i32 0, i32 1
-  %savedstack161.i309.i473 = call i8* @llvm.stacksave()
+  %savedstack161.i309.i473 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i308.i472, %class.object.1** %this.addr.i122.i133.i32, align 8
   %this1.i127.i310.i474 = load %class.object.1*, %class.object.1** %this.addr.i122.i133.i32, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i307.i475.split
@@ -3178,7 +3178,7 @@ for.cond:                                         ; preds = %for.inc, %entry
   br i1 %cmp, label %for.body, label %for.end
 
 for.body:                                         ; preds = %for.cond
-  %savedstack = call i8* @llvm.stacksave()
+  %savedstack = call i8* @llvm.stacksave.p0()
   store %class.object.3* %agg.tmp, %class.object.3** %this.addr.i, align 8
   store %class.object.3* %obj, %class.object.3** %other.addr.i, align 8
   %this1.i = load %class.object.3*, %class.object.3** %this.addr.i, align 8
@@ -3240,7 +3240,7 @@ det.achd.i:                                       ; preds = %invoke.cont.i.split
   %exn.slot5.i = alloca i8*
   %ehselector.slot6.i = alloca i32
   call void @llvm.taskframe.use(token %1)
-  %savedstack.i = call i8* @llvm.stacksave()
+  %savedstack.i = call i8* @llvm.stacksave.p0()
   store %class.object* %agg.tmp.i, %class.object** %this.addr.i.i, align 8
   store %class.object* %a3.i, %class.object** %other.addr.i.i, align 8
   %this1.i.i = load %class.object*, %class.object** %this.addr.i.i, align 8
@@ -3290,7 +3290,7 @@ det.achd.i.i:                                     ; preds = %invoke.cont.i.i.spl
   %exn.slot5.i.i = alloca i8*
   %ehselector.slot6.i.i = alloca i32
   call void @llvm.taskframe.use(token %3)
-  %savedstack.i.i = call i8* @llvm.stacksave()
+  %savedstack.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp.i.i, %class.object.0** %this.addr.i.i.i, align 8
   store %class.object.0* %a3.i.i, %class.object.0** %other.addr.i.i.i, align 8
   %this1.i.i.i = load %class.object.0*, %class.object.0** %this.addr.i.i.i, align 8
@@ -3334,7 +3334,7 @@ det.achd.i.i.i:                                   ; preds = %invoke.cont.i.i.i.s
   %exn.slot5.i.i.i = alloca i8*
   %ehselector.slot6.i.i.i = alloca i32
   call void @llvm.taskframe.use(token %5)
-  %savedstack.i.i.i = call i8* @llvm.stacksave()
+  %savedstack.i.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i.i.i, %class.object.1** %this.addr.i.i.i.i, align 8
   store %class.object.1* %a3.i.i.i, %class.object.1** %other.addr.i.i.i.i, align 8
   %this1.i.i.i.i = load %class.object.1*, %class.object.1** %this.addr.i.i.i.i, align 8
@@ -3480,7 +3480,7 @@ unreachable.i.i.i.i:                              ; preds = %lpad11.i.i.i.i, %eh
 
 _ZN6objectILi1EEC2ERKS0_.exit.i.i.i:              ; preds = %sync.continue.i.i.i.i
   call void @llvm.stackrestore(i8* %savedstack.i.i.i)
-  %savedstack61.i.i.i = call i8* @llvm.stacksave()
+  %savedstack61.i.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i.i.i, %class.object.1** %this.addr.i36.i.i.i, align 8
   %this1.i40.i.i.i = load %class.object.1*, %class.object.1** %this.addr.i36.i.i.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit.i.i.i.split
@@ -3579,7 +3579,7 @@ unreachable.i60.i.i.i:                            ; preds = %lpad4.i58.i.i.i, %l
 det.cont.i.i.i:                                   ; preds = %invoke.cont.i.i.i.split
   %41 = load %class.object.0*, %class.object.0** %other.addr.i.i.i, align 8
   %b21.i.i.i = getelementptr inbounds %class.object.0, %class.object.0* %41, i32 0, i32 1
-  %savedstack116.i.i.i = call i8* @llvm.stacksave()
+  %savedstack116.i.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i.i.i, %class.object.1** %this.addr.i65.i.i.i, align 8
   store %class.object.1* %b21.i.i.i, %class.object.1** %other.addr.i66.i.i.i, align 8
   %this1.i71.i.i.i = load %class.object.1*, %class.object.1** %this.addr.i65.i.i.i, align 8
@@ -3726,7 +3726,7 @@ unreachable.i115.i.i.i:                           ; preds = %lpad11.i101.i.i.i, 
 _ZN6objectILi1EEC2ERKS0_.exit121.i.i.i:           ; preds = %sync.continue.i92.i.i.i
   call void @llvm.stackrestore(i8* %savedstack116.i.i.i)
   %b23.i.i.i = getelementptr inbounds %class.object.0, %class.object.0* %this1.i.i.i, i32 0, i32 1
-  %savedstack161.i.i.i = call i8* @llvm.stacksave()
+  %savedstack161.i.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i.i.i, %class.object.1** %this.addr.i122.i.i.i, align 8
   %this1.i127.i.i.i = load %class.object.1*, %class.object.1** %this.addr.i122.i.i.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i.i.i.split
@@ -3925,7 +3925,7 @@ unreachable.i.i.i:                                ; preds = %lpad11.i.i.i, %ehcl
 det.cont.i.i:                                     ; preds = %invoke.cont.i.i.split
   %94 = load %class.object*, %class.object** %other.addr.i.i, align 8
   %b21.i.i = getelementptr inbounds %class.object, %class.object* %94, i32 0, i32 1
-  %savedstack373.i.i = call i8* @llvm.stacksave()
+  %savedstack373.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp20.i.i, %class.object.0** %this.addr.i147.i.i, align 8
   store %class.object.0* %b21.i.i, %class.object.0** %other.addr.i148.i.i, align 8
   %this1.i153.i.i = load %class.object.0*, %class.object.0** %this.addr.i147.i.i, align 8
@@ -3969,7 +3969,7 @@ det.achd.i181.i.i:                                ; preds = %invoke.cont.i156.i.
   %exn.slot5.i176.i.i = alloca i8*
   %ehselector.slot6.i177.i.i = alloca i32
   call void @llvm.taskframe.use(token %95)
-  %savedstack.i178.i.i = call i8* @llvm.stacksave()
+  %savedstack.i178.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i157.i.i, %class.object.1** %this.addr.i.i170.i.i, align 8
   store %class.object.1* %a3.i161.i.i, %class.object.1** %other.addr.i.i171.i.i, align 8
   %this1.i.i179.i.i = load %class.object.1*, %class.object.1** %this.addr.i.i170.i.i, align 8
@@ -4115,7 +4115,7 @@ unreachable.i.i224.i.i:                           ; preds = %lpad11.i.i215.i.i, 
 
 _ZN6objectILi1EEC2ERKS0_.exit.i225.i.i:           ; preds = %sync.continue.i.i202.i.i
   call void @llvm.stackrestore(i8* %savedstack.i178.i.i)
-  %savedstack61.i226.i.i = call i8* @llvm.stacksave()
+  %savedstack61.i226.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i160.i.i, %class.object.1** %this.addr.i36.i162.i.i, align 8
   %this1.i40.i227.i.i = load %class.object.1*, %class.object.1** %this.addr.i36.i162.i.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit.i225.i.i.split
@@ -4214,7 +4214,7 @@ unreachable.i60.i258.i.i:                         ; preds = %lpad4.i58.i250.i.i,
 det.cont.i263.i.i:                                ; preds = %invoke.cont.i156.i.i.split
   %131 = load %class.object.0*, %class.object.0** %other.addr.i148.i.i, align 8
   %b21.i259.i.i = getelementptr inbounds %class.object.0, %class.object.0* %131, i32 0, i32 1
-  %savedstack116.i260.i.i = call i8* @llvm.stacksave()
+  %savedstack116.i260.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i152.i.i, %class.object.1** %this.addr.i65.i141.i.i, align 8
   store %class.object.1* %b21.i259.i.i, %class.object.1** %other.addr.i66.i142.i.i, align 8
   %this1.i71.i261.i.i = load %class.object.1*, %class.object.1** %this.addr.i65.i141.i.i, align 8
@@ -4361,7 +4361,7 @@ unreachable.i115.i306.i.i:                        ; preds = %lpad11.i101.i297.i.
 _ZN6objectILi1EEC2ERKS0_.exit121.i307.i.i:        ; preds = %sync.continue.i92.i284.i.i
   call void @llvm.stackrestore(i8* %savedstack116.i260.i.i)
   %b23.i308.i.i = getelementptr inbounds %class.object.0, %class.object.0* %this1.i153.i.i, i32 0, i32 1
-  %savedstack161.i309.i.i = call i8* @llvm.stacksave()
+  %savedstack161.i309.i.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i308.i.i, %class.object.1** %this.addr.i122.i133.i.i, align 8
   %this1.i127.i310.i.i = load %class.object.1*, %class.object.1** %this.addr.i122.i133.i.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i307.i.i.split
@@ -4626,7 +4626,7 @@ unreachable.i.i:                                  ; preds = %lpad11.i.i, %lpad4.
 det.cont.i:                                       ; preds = %invoke.cont.i.split
   %196 = load %class.object.3*, %class.object.3** %other.addr.i, align 8
   %b21.i = getelementptr inbounds %class.object.3, %class.object.3* %196, i32 0, i32 1
-  %savedstack832.i = call i8* @llvm.stacksave()
+  %savedstack832.i = call i8* @llvm.stacksave.p0()
   store %class.object* %agg.tmp20.i, %class.object** %this.addr.i328.i, align 8
   store %class.object* %b21.i, %class.object** %other.addr.i329.i, align 8
   %this1.i334.i = load %class.object*, %class.object** %this.addr.i328.i, align 8
@@ -4676,7 +4676,7 @@ det.achd.i368.i:                                  ; preds = %invoke.cont.i337.i.
   %exn.slot5.i363.i = alloca i8*
   %ehselector.slot6.i364.i = alloca i32
   call void @llvm.taskframe.use(token %197)
-  %savedstack.i365.i = call i8* @llvm.stacksave()
+  %savedstack.i365.i = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp.i338.i, %class.object.0** %this.addr.i.i355.i, align 8
   store %class.object.0* %a3.i342.i, %class.object.0** %other.addr.i.i356.i, align 8
   %this1.i.i366.i = load %class.object.0*, %class.object.0** %this.addr.i.i355.i, align 8
@@ -4720,7 +4720,7 @@ det.achd.i.i396.i:                                ; preds = %invoke.cont.i.i371.
   %exn.slot5.i.i391.i = alloca i8*
   %ehselector.slot6.i.i392.i = alloca i32
   call void @llvm.taskframe.use(token %199)
-  %savedstack.i.i393.i = call i8* @llvm.stacksave()
+  %savedstack.i.i393.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i.i372.i, %class.object.1** %this.addr.i.i.i385.i, align 8
   store %class.object.1* %a3.i.i376.i, %class.object.1** %other.addr.i.i.i386.i, align 8
   %this1.i.i.i394.i = load %class.object.1*, %class.object.1** %this.addr.i.i.i385.i, align 8
@@ -4866,7 +4866,7 @@ unreachable.i.i.i439.i:                           ; preds = %lpad11.i.i.i430.i, 
 
 _ZN6objectILi1EEC2ERKS0_.exit.i.i442.i:           ; preds = %sync.continue.i.i.i417.i
   call void @llvm.stackrestore(i8* %savedstack.i.i393.i)
-  %savedstack61.i.i440.i = call i8* @llvm.stacksave()
+  %savedstack61.i.i440.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i.i375.i, %class.object.1** %this.addr.i36.i.i377.i, align 8
   %this1.i40.i.i441.i = load %class.object.1*, %class.object.1** %this.addr.i36.i.i377.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit.i.i442.i.split
@@ -4965,7 +4965,7 @@ unreachable.i60.i.i473.i:                         ; preds = %lpad4.i58.i.i465.i,
 det.cont.i.i478.i:                                ; preds = %invoke.cont.i.i371.i.split
   %235 = load %class.object.0*, %class.object.0** %other.addr.i.i356.i, align 8
   %b21.i.i474.i = getelementptr inbounds %class.object.0, %class.object.0* %235, i32 0, i32 1
-  %savedstack116.i.i475.i = call i8* @llvm.stacksave()
+  %savedstack116.i.i475.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i.i359.i, %class.object.1** %this.addr.i65.i.i350.i, align 8
   store %class.object.1* %b21.i.i474.i, %class.object.1** %other.addr.i66.i.i351.i, align 8
   %this1.i71.i.i476.i = load %class.object.1*, %class.object.1** %this.addr.i65.i.i350.i, align 8
@@ -5112,7 +5112,7 @@ unreachable.i115.i.i521.i:                        ; preds = %lpad11.i101.i.i512.
 _ZN6objectILi1EEC2ERKS0_.exit121.i.i525.i:        ; preds = %sync.continue.i92.i.i499.i
   call void @llvm.stackrestore(i8* %savedstack116.i.i475.i)
   %b23.i.i522.i = getelementptr inbounds %class.object.0, %class.object.0* %this1.i.i366.i, i32 0, i32 1
-  %savedstack161.i.i523.i = call i8* @llvm.stacksave()
+  %savedstack161.i.i523.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i.i522.i, %class.object.1** %this.addr.i122.i.i343.i, align 8
   %this1.i127.i.i524.i = load %class.object.1*, %class.object.1** %this.addr.i122.i.i343.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i.i525.i.split
@@ -5311,7 +5311,7 @@ unreachable.i.i586.i:                             ; preds = %lpad11.i.i573.i, %e
 det.cont.i591.i:                                  ; preds = %invoke.cont.i337.i.split
   %288 = load %class.object*, %class.object** %other.addr.i329.i, align 8
   %b21.i587.i = getelementptr inbounds %class.object, %class.object* %288, i32 0, i32 1
-  %savedstack373.i588.i = call i8* @llvm.stacksave()
+  %savedstack373.i588.i = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp20.i333.i, %class.object.0** %this.addr.i147.i317.i, align 8
   store %class.object.0* %b21.i587.i, %class.object.0** %other.addr.i148.i318.i, align 8
   %this1.i153.i589.i = load %class.object.0*, %class.object.0** %this.addr.i147.i317.i, align 8
@@ -5355,7 +5355,7 @@ det.achd.i181.i619.i:                             ; preds = %invoke.cont.i156.i5
   %exn.slot5.i176.i614.i = alloca i8*
   %ehselector.slot6.i177.i615.i = alloca i32
   call void @llvm.taskframe.use(token %289)
-  %savedstack.i178.i616.i = call i8* @llvm.stacksave()
+  %savedstack.i178.i616.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i157.i595.i, %class.object.1** %this.addr.i.i170.i608.i, align 8
   store %class.object.1* %a3.i161.i599.i, %class.object.1** %other.addr.i.i171.i609.i, align 8
   %this1.i.i179.i617.i = load %class.object.1*, %class.object.1** %this.addr.i.i170.i608.i, align 8
@@ -5501,7 +5501,7 @@ unreachable.i.i224.i662.i:                        ; preds = %lpad11.i.i215.i653.
 
 _ZN6objectILi1EEC2ERKS0_.exit.i225.i665.i:        ; preds = %sync.continue.i.i202.i640.i
   call void @llvm.stackrestore(i8* %savedstack.i178.i616.i)
-  %savedstack61.i226.i663.i = call i8* @llvm.stacksave()
+  %savedstack61.i226.i663.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i160.i598.i, %class.object.1** %this.addr.i36.i162.i600.i, align 8
   %this1.i40.i227.i664.i = load %class.object.1*, %class.object.1** %this.addr.i36.i162.i600.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit.i225.i665.i.split
@@ -5600,7 +5600,7 @@ unreachable.i60.i258.i696.i:                      ; preds = %lpad4.i58.i250.i688
 det.cont.i263.i701.i:                             ; preds = %invoke.cont.i156.i594.i.split
   %325 = load %class.object.0*, %class.object.0** %other.addr.i148.i318.i, align 8
   %b21.i259.i697.i = getelementptr inbounds %class.object.0, %class.object.0* %325, i32 0, i32 1
-  %savedstack116.i260.i698.i = call i8* @llvm.stacksave()
+  %savedstack116.i260.i698.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i152.i321.i, %class.object.1** %this.addr.i65.i141.i312.i, align 8
   store %class.object.1* %b21.i259.i697.i, %class.object.1** %other.addr.i66.i142.i313.i, align 8
   %this1.i71.i261.i699.i = load %class.object.1*, %class.object.1** %this.addr.i65.i141.i312.i, align 8
@@ -5747,7 +5747,7 @@ unreachable.i115.i306.i744.i:                     ; preds = %lpad11.i101.i297.i7
 _ZN6objectILi1EEC2ERKS0_.exit121.i307.i748.i:     ; preds = %sync.continue.i92.i284.i722.i
   call void @llvm.stackrestore(i8* %savedstack116.i260.i698.i)
   %b23.i308.i745.i = getelementptr inbounds %class.object.0, %class.object.0* %this1.i153.i589.i, i32 0, i32 1
-  %savedstack161.i309.i746.i = call i8* @llvm.stacksave()
+  %savedstack161.i309.i746.i = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i308.i745.i, %class.object.1** %this.addr.i122.i133.i305.i, align 8
   %this1.i127.i310.i747.i = load %class.object.1*, %class.object.1** %this.addr.i122.i133.i305.i, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i307.i748.i.split
@@ -6088,7 +6088,7 @@ invoke.cont:                                      ; preds = %_ZN6objectILi4EEC2E
           to label %invoke.cont2 unwind label %lpad1
 
 invoke.cont2:                                     ; preds = %invoke.cont
-  %savedstack1143 = call i8* @llvm.stacksave()
+  %savedstack1143 = call i8* @llvm.stacksave.p0()
   store %class.object.3* %agg.tmp3, %class.object.3** %this.addr.i69, align 8
   store %class.object.3* %obj, %class.object.3** %other.addr.i70, align 8
   %this1.i75 = load %class.object.3*, %class.object.3** %this.addr.i69, align 8
@@ -6147,7 +6147,7 @@ det.achd.i121:                                    ; preds = %invoke.cont.i78
   %exn.slot5.i116 = alloca i8*
   %ehselector.slot6.i117 = alloca i32
   call void @llvm.taskframe.use(token %406)
-  %savedstack.i118 = call i8* @llvm.stacksave()
+  %savedstack.i118 = call i8* @llvm.stacksave.p0()
   store %class.object* %agg.tmp.i79, %class.object** %this.addr.i.i101, align 8
   store %class.object* %a3.i83, %class.object** %other.addr.i.i102, align 8
   %this1.i.i119 = load %class.object*, %class.object** %this.addr.i.i101, align 8
@@ -6194,7 +6194,7 @@ det.achd.i.i155:                                  ; preds = %invoke.cont.i.i124
   %exn.slot5.i.i150 = alloca i8*
   %ehselector.slot6.i.i151 = alloca i32
   call void @llvm.taskframe.use(token %408)
-  %savedstack.i.i152 = call i8* @llvm.stacksave()
+  %savedstack.i.i152 = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp.i.i125, %class.object.0** %this.addr.i.i.i142, align 8
   store %class.object.0* %a3.i.i129, %class.object.0** %other.addr.i.i.i143, align 8
   %this1.i.i.i153 = load %class.object.0*, %class.object.0** %this.addr.i.i.i142, align 8
@@ -6235,7 +6235,7 @@ det.achd.i.i.i183:                                ; preds = %invoke.cont.i.i.i15
   %exn.slot5.i.i.i178 = alloca i8*
   %ehselector.slot6.i.i.i179 = alloca i32
   call void @llvm.taskframe.use(token %410)
-  %savedstack.i.i.i180 = call i8* @llvm.stacksave()
+  %savedstack.i.i.i180 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i.i.i159, %class.object.1** %this.addr.i.i.i.i172, align 8
   store %class.object.1* %a3.i.i.i163, %class.object.1** %other.addr.i.i.i.i173, align 8
   %this1.i.i.i.i181 = load %class.object.1*, %class.object.1** %this.addr.i.i.i.i172, align 8
@@ -6378,7 +6378,7 @@ unreachable.i.i.i.i226:                           ; preds = %lpad11.i.i.i.i217, 
 
 _ZN6objectILi1EEC2ERKS0_.exit.i.i.i229:           ; preds = %sync.continue.i.i.i.i204
   call void @llvm.stackrestore(i8* %savedstack.i.i.i180)
-  %savedstack61.i.i.i227 = call i8* @llvm.stacksave()
+  %savedstack61.i.i.i227 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i.i.i162, %class.object.1** %this.addr.i36.i.i.i164, align 8
   %this1.i40.i.i.i228 = load %class.object.1*, %class.object.1** %this.addr.i36.i.i.i164, align 8
   %433 = call token @llvm.taskframe.create()
@@ -6474,7 +6474,7 @@ unreachable.i60.i.i.i260:                         ; preds = %lpad4.i58.i.i.i252,
 det.cont.i.i.i265:                                ; preds = %invoke.cont.i.i.i158
   %446 = load %class.object.0*, %class.object.0** %other.addr.i.i.i143, align 8
   %b21.i.i.i261 = getelementptr inbounds %class.object.0, %class.object.0* %446, i32 0, i32 1
-  %savedstack116.i.i.i262 = call i8* @llvm.stacksave()
+  %savedstack116.i.i.i262 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i.i.i146, %class.object.1** %this.addr.i65.i.i.i137, align 8
   store %class.object.1* %b21.i.i.i261, %class.object.1** %other.addr.i66.i.i.i138, align 8
   %this1.i71.i.i.i263 = load %class.object.1*, %class.object.1** %this.addr.i65.i.i.i137, align 8
@@ -6618,7 +6618,7 @@ unreachable.i115.i.i.i308:                        ; preds = %lpad11.i101.i.i.i29
 _ZN6objectILi1EEC2ERKS0_.exit121.i.i.i312:        ; preds = %sync.continue.i92.i.i.i286
   call void @llvm.stackrestore(i8* %savedstack116.i.i.i262)
   %b23.i.i.i309 = getelementptr inbounds %class.object.0, %class.object.0* %this1.i.i.i153, i32 0, i32 1
-  %savedstack161.i.i.i310 = call i8* @llvm.stacksave()
+  %savedstack161.i.i.i310 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i.i.i309, %class.object.1** %this.addr.i122.i.i.i130, align 8
   %this1.i127.i.i.i311 = load %class.object.1*, %class.object.1** %this.addr.i122.i.i.i130, align 8
   %468 = call token @llvm.taskframe.create()
@@ -6814,7 +6814,7 @@ unreachable.i.i.i373:                             ; preds = %lpad11.i.i.i360, %e
 det.cont.i.i378:                                  ; preds = %invoke.cont.i.i124
   %499 = load %class.object*, %class.object** %other.addr.i.i102, align 8
   %b21.i.i374 = getelementptr inbounds %class.object, %class.object* %499, i32 0, i32 1
-  %savedstack373.i.i375 = call i8* @llvm.stacksave()
+  %savedstack373.i.i375 = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp20.i.i105, %class.object.0** %this.addr.i147.i.i96, align 8
   store %class.object.0* %b21.i.i374, %class.object.0** %other.addr.i148.i.i97, align 8
   %this1.i153.i.i376 = load %class.object.0*, %class.object.0** %this.addr.i147.i.i96, align 8
@@ -6855,7 +6855,7 @@ det.achd.i181.i.i406:                             ; preds = %invoke.cont.i156.i.
   %exn.slot5.i176.i.i401 = alloca i8*
   %ehselector.slot6.i177.i.i402 = alloca i32
   call void @llvm.taskframe.use(token %500)
-  %savedstack.i178.i.i403 = call i8* @llvm.stacksave()
+  %savedstack.i178.i.i403 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i157.i.i382, %class.object.1** %this.addr.i.i170.i.i395, align 8
   store %class.object.1* %a3.i161.i.i386, %class.object.1** %other.addr.i.i171.i.i396, align 8
   %this1.i.i179.i.i404 = load %class.object.1*, %class.object.1** %this.addr.i.i170.i.i395, align 8
@@ -6998,7 +6998,7 @@ unreachable.i.i224.i.i449:                        ; preds = %lpad11.i.i215.i.i44
 
 _ZN6objectILi1EEC2ERKS0_.exit.i225.i.i452:        ; preds = %sync.continue.i.i202.i.i427
   call void @llvm.stackrestore(i8* %savedstack.i178.i.i403)
-  %savedstack61.i226.i.i450 = call i8* @llvm.stacksave()
+  %savedstack61.i226.i.i450 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i160.i.i385, %class.object.1** %this.addr.i36.i162.i.i387, align 8
   %this1.i40.i227.i.i451 = load %class.object.1*, %class.object.1** %this.addr.i36.i162.i.i387, align 8
   %523 = call token @llvm.taskframe.create()
@@ -7094,7 +7094,7 @@ unreachable.i60.i258.i.i483:                      ; preds = %lpad4.i58.i250.i.i4
 det.cont.i263.i.i488:                             ; preds = %invoke.cont.i156.i.i381
   %536 = load %class.object.0*, %class.object.0** %other.addr.i148.i.i97, align 8
   %b21.i259.i.i484 = getelementptr inbounds %class.object.0, %class.object.0* %536, i32 0, i32 1
-  %savedstack116.i260.i.i485 = call i8* @llvm.stacksave()
+  %savedstack116.i260.i.i485 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i152.i.i100, %class.object.1** %this.addr.i65.i141.i.i91, align 8
   store %class.object.1* %b21.i259.i.i484, %class.object.1** %other.addr.i66.i142.i.i92, align 8
   %this1.i71.i261.i.i486 = load %class.object.1*, %class.object.1** %this.addr.i65.i141.i.i91, align 8
@@ -7238,7 +7238,7 @@ unreachable.i115.i306.i.i531:                     ; preds = %lpad11.i101.i297.i.
 _ZN6objectILi1EEC2ERKS0_.exit121.i307.i.i535:     ; preds = %sync.continue.i92.i284.i.i509
   call void @llvm.stackrestore(i8* %savedstack116.i260.i.i485)
   %b23.i308.i.i532 = getelementptr inbounds %class.object.0, %class.object.0* %this1.i153.i.i376, i32 0, i32 1
-  %savedstack161.i309.i.i533 = call i8* @llvm.stacksave()
+  %savedstack161.i309.i.i533 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i308.i.i532, %class.object.1** %this.addr.i122.i133.i.i84, align 8
   %this1.i127.i310.i.i534 = load %class.object.1*, %class.object.1** %this.addr.i122.i133.i.i84, align 8
   %558 = call token @llvm.taskframe.create()
@@ -7500,7 +7500,7 @@ unreachable.i.i618:                               ; preds = %lpad11.i.i609, %lpa
 det.cont.i623:                                    ; preds = %invoke.cont.i78
   %601 = load %class.object.3*, %class.object.3** %other.addr.i70, align 8
   %b21.i619 = getelementptr inbounds %class.object.3, %class.object.3* %601, i32 0, i32 1
-  %savedstack832.i620 = call i8* @llvm.stacksave()
+  %savedstack832.i620 = call i8* @llvm.stacksave.p0()
   store %class.object* %agg.tmp20.i74, %class.object** %this.addr.i328.i44, align 8
   store %class.object* %b21.i619, %class.object** %other.addr.i329.i45, align 8
   %this1.i334.i621 = load %class.object*, %class.object** %this.addr.i328.i44, align 8
@@ -7547,7 +7547,7 @@ det.achd.i368.i657:                               ; preds = %invoke.cont.i337.i6
   %exn.slot5.i363.i652 = alloca i8*
   %ehselector.slot6.i364.i653 = alloca i32
   call void @llvm.taskframe.use(token %602)
-  %savedstack.i365.i654 = call i8* @llvm.stacksave()
+  %savedstack.i365.i654 = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp.i338.i627, %class.object.0** %this.addr.i.i355.i644, align 8
   store %class.object.0* %a3.i342.i631, %class.object.0** %other.addr.i.i356.i645, align 8
   %this1.i.i366.i655 = load %class.object.0*, %class.object.0** %this.addr.i.i355.i644, align 8
@@ -7588,7 +7588,7 @@ det.achd.i.i396.i685:                             ; preds = %invoke.cont.i.i371.
   %exn.slot5.i.i391.i680 = alloca i8*
   %ehselector.slot6.i.i392.i681 = alloca i32
   call void @llvm.taskframe.use(token %604)
-  %savedstack.i.i393.i682 = call i8* @llvm.stacksave()
+  %savedstack.i.i393.i682 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i.i372.i661, %class.object.1** %this.addr.i.i.i385.i674, align 8
   store %class.object.1* %a3.i.i376.i665, %class.object.1** %other.addr.i.i.i386.i675, align 8
   %this1.i.i.i394.i683 = load %class.object.1*, %class.object.1** %this.addr.i.i.i385.i674, align 8
@@ -7731,7 +7731,7 @@ unreachable.i.i.i439.i728:                        ; preds = %lpad11.i.i.i430.i71
 
 _ZN6objectILi1EEC2ERKS0_.exit.i.i442.i731:        ; preds = %sync.continue.i.i.i417.i706
   call void @llvm.stackrestore(i8* %savedstack.i.i393.i682)
-  %savedstack61.i.i440.i729 = call i8* @llvm.stacksave()
+  %savedstack61.i.i440.i729 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i.i375.i664, %class.object.1** %this.addr.i36.i.i377.i666, align 8
   %this1.i40.i.i441.i730 = load %class.object.1*, %class.object.1** %this.addr.i36.i.i377.i666, align 8
   %627 = call token @llvm.taskframe.create()
@@ -7827,7 +7827,7 @@ unreachable.i60.i.i473.i762:                      ; preds = %lpad4.i58.i.i465.i7
 det.cont.i.i478.i767:                             ; preds = %invoke.cont.i.i371.i660
   %640 = load %class.object.0*, %class.object.0** %other.addr.i.i356.i645, align 8
   %b21.i.i474.i763 = getelementptr inbounds %class.object.0, %class.object.0* %640, i32 0, i32 1
-  %savedstack116.i.i475.i764 = call i8* @llvm.stacksave()
+  %savedstack116.i.i475.i764 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i.i359.i648, %class.object.1** %this.addr.i65.i.i350.i639, align 8
   store %class.object.1* %b21.i.i474.i763, %class.object.1** %other.addr.i66.i.i351.i640, align 8
   %this1.i71.i.i476.i765 = load %class.object.1*, %class.object.1** %this.addr.i65.i.i350.i639, align 8
@@ -7971,7 +7971,7 @@ unreachable.i115.i.i521.i810:                     ; preds = %lpad11.i101.i.i512.
 _ZN6objectILi1EEC2ERKS0_.exit121.i.i525.i814:     ; preds = %sync.continue.i92.i.i499.i788
   call void @llvm.stackrestore(i8* %savedstack116.i.i475.i764)
   %b23.i.i522.i811 = getelementptr inbounds %class.object.0, %class.object.0* %this1.i.i366.i655, i32 0, i32 1
-  %savedstack161.i.i523.i812 = call i8* @llvm.stacksave()
+  %savedstack161.i.i523.i812 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i.i522.i811, %class.object.1** %this.addr.i122.i.i343.i632, align 8
   %this1.i127.i.i524.i813 = load %class.object.1*, %class.object.1** %this.addr.i122.i.i343.i632, align 8
   %662 = call token @llvm.taskframe.create()
@@ -8167,7 +8167,7 @@ unreachable.i.i586.i875:                          ; preds = %lpad11.i.i573.i862,
 det.cont.i591.i880:                               ; preds = %invoke.cont.i337.i626
   %693 = load %class.object*, %class.object** %other.addr.i329.i45, align 8
   %b21.i587.i876 = getelementptr inbounds %class.object, %class.object* %693, i32 0, i32 1
-  %savedstack373.i588.i877 = call i8* @llvm.stacksave()
+  %savedstack373.i588.i877 = call i8* @llvm.stacksave.p0()
   store %class.object.0* %agg.tmp20.i333.i48, %class.object.0** %this.addr.i147.i317.i39, align 8
   store %class.object.0* %b21.i587.i876, %class.object.0** %other.addr.i148.i318.i40, align 8
   %this1.i153.i589.i878 = load %class.object.0*, %class.object.0** %this.addr.i147.i317.i39, align 8
@@ -8208,7 +8208,7 @@ det.achd.i181.i619.i908:                          ; preds = %invoke.cont.i156.i5
   %exn.slot5.i176.i614.i903 = alloca i8*
   %ehselector.slot6.i177.i615.i904 = alloca i32
   call void @llvm.taskframe.use(token %694)
-  %savedstack.i178.i616.i905 = call i8* @llvm.stacksave()
+  %savedstack.i178.i616.i905 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp.i157.i595.i884, %class.object.1** %this.addr.i.i170.i608.i897, align 8
   store %class.object.1* %a3.i161.i599.i888, %class.object.1** %other.addr.i.i171.i609.i898, align 8
   %this1.i.i179.i617.i906 = load %class.object.1*, %class.object.1** %this.addr.i.i170.i608.i897, align 8
@@ -8351,7 +8351,7 @@ unreachable.i.i224.i662.i951:                     ; preds = %lpad11.i.i215.i653.
 
 _ZN6objectILi1EEC2ERKS0_.exit.i225.i665.i954:     ; preds = %sync.continue.i.i202.i640.i929
   call void @llvm.stackrestore(i8* %savedstack.i178.i616.i905)
-  %savedstack61.i226.i663.i952 = call i8* @llvm.stacksave()
+  %savedstack61.i226.i663.i952 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %a2.i160.i598.i887, %class.object.1** %this.addr.i36.i162.i600.i889, align 8
   %this1.i40.i227.i664.i953 = load %class.object.1*, %class.object.1** %this.addr.i36.i162.i600.i889, align 8
   %717 = call token @llvm.taskframe.create()
@@ -8447,7 +8447,7 @@ unreachable.i60.i258.i696.i985:                   ; preds = %lpad4.i58.i250.i688
 det.cont.i263.i701.i990:                          ; preds = %invoke.cont.i156.i594.i883
   %730 = load %class.object.0*, %class.object.0** %other.addr.i148.i318.i40, align 8
   %b21.i259.i697.i986 = getelementptr inbounds %class.object.0, %class.object.0* %730, i32 0, i32 1
-  %savedstack116.i260.i698.i987 = call i8* @llvm.stacksave()
+  %savedstack116.i260.i698.i987 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %agg.tmp20.i152.i321.i43, %class.object.1** %this.addr.i65.i141.i312.i34, align 8
   store %class.object.1* %b21.i259.i697.i986, %class.object.1** %other.addr.i66.i142.i313.i35, align 8
   %this1.i71.i261.i699.i988 = load %class.object.1*, %class.object.1** %this.addr.i65.i141.i312.i34, align 8
@@ -8591,7 +8591,7 @@ unreachable.i115.i306.i744.i1033:                 ; preds = %lpad11.i101.i297.i7
 _ZN6objectILi1EEC2ERKS0_.exit121.i307.i748.i1037: ; preds = %sync.continue.i92.i284.i722.i1011
   call void @llvm.stackrestore(i8* %savedstack116.i260.i698.i987)
   %b23.i308.i745.i1034 = getelementptr inbounds %class.object.0, %class.object.0* %this1.i153.i589.i878, i32 0, i32 1
-  %savedstack161.i309.i746.i1035 = call i8* @llvm.stacksave()
+  %savedstack161.i309.i746.i1035 = call i8* @llvm.stacksave.p0()
   store %class.object.1* %b23.i308.i745.i1034, %class.object.1** %this.addr.i122.i133.i305.i27, align 8
   %this1.i127.i310.i747.i1036 = load %class.object.1*, %class.object.1** %this.addr.i122.i133.i305.i27, align 8
   br label %_ZN6objectILi1EEC2ERKS0_.exit121.i307.i748.i1037.split
@@ -9040,7 +9040,7 @@ declare dso_local void @_ZN6objectILi0EEC1Ev(%class.object.2*) unnamed_addr #2
 declare dso_local void @_ZN6objectILi1EEC1Ev(%class.object.1*) unnamed_addr #2
 
 ; Function Attrs: nounwind
-declare i8* @llvm.stacksave() #7
+declare i8* @llvm.stacksave.p0() #7
 
 ; Function Attrs: nounwind
 declare void @llvm.stackrestore(i8*) #7
