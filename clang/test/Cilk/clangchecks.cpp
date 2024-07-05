@@ -24,13 +24,13 @@ int illegal_spawn_uses(int n) {
 
   Bar Arrb[4] = _Cilk_spawn { Bar(), Bar(), Bar(), Bar() }; // expected-error{{expected expression}}
 
-  if (int i = _Cilk_spawn bar(n)) // expected-error{{'_Cilk_spawn' not allowed in this scope}}
+  if (int i = _Cilk_spawn bar(n)) // expected-error{{'cilk_spawn' not allowed in this scope}}
     bar(i);
 
-  if ((_Cilk_spawn bar(n))) // expected-error{{'_Cilk_spawn' not allowed in this scope}}
+  if ((_Cilk_spawn bar(n))) // expected-error{{'cilk_spawn' not allowed in this scope}}
     bar(n);
 
-  for (int i = _Cilk_spawn bar(n); i < n; ++i) { // expected-error{{'_Cilk_spawn' not allowed in this scope}}
+  for (int i = _Cilk_spawn bar(n); i < n; ++i) { // expected-error{{'cilk_spawn' not allowed in this scope}}
     bar(i);
   }
 
@@ -41,18 +41,18 @@ int illegal_spawn_uses(int n) {
     _Cilk_spawn break; // expected-error{{'break' statement not in loop or switch statement}}
   }
 
-  return _Cilk_spawn bar(n); // expected-warning{{no parallelism from a '_Cilk_spawn' in a return statement}}
+  return _Cilk_spawn bar(n); // expected-warning{{no parallelism from a 'cilk_spawn' in a return statement}}
 }
 
 void bad_jumps_spawn(int n) {
  label3: bar(n);
   goto label2; // expected-error{{cannot jump from this goto statement to its label}}
 
-  _Cilk_spawn { // expected-note{{jump bypasses '_Cilk_spawn'}}
+  _Cilk_spawn { // expected-note{{jump bypasses 'cilk_spawn'}}
   label1: bar(n);
   label2: bar(n);
     goto label1;
-    goto label3; // expected-error{{cannot jump out of '_Cilk_spawn' statement}}
+    goto label3; // expected-error{{cannot jump out of 'cilk_spawn' statement}}
   };
 
   _Cilk_spawn goto label1; // expected-error{{use of undeclared label}}
@@ -63,8 +63,8 @@ void bad_jumps_cilk_for(int n) {
  label3: bar(n);
   goto label2; // expected-error{{cannot jump from this goto statement to its label}}
 
-  _Cilk_for(int i = 0; i < n; ++i) { // expected-note{{jump bypasses '_Cilk_for'}} expected-note{{jump bypasses variable initialization}}
+  _Cilk_for(int i = 0; i < n; ++i) { // expected-note{{jump bypasses 'cilk_for'}} expected-note{{jump bypasses variable initialization}}
   label2: bar(i);
-    goto label3; // expected-error{{cannot jump out of '_Cilk_for' statement}}
+    goto label3; // expected-error{{cannot jump out of 'cilk_for' statement}}
   }
 }

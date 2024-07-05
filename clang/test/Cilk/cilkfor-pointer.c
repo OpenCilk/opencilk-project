@@ -4,6 +4,6 @@
 long cilk_for_pointer_type(const long *begin, const long *end)
 {
   _Cilk_for (const long *p = begin; p != end; ++p)
-    ; // expected-warning@-1{{Cilk for loop has empty body}}
+    ; // expected-warning@-1{{'cilk_for' loop has empty body}}
   return 0;
 }
