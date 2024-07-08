@@ -127,7 +127,7 @@ public:
                           DominatorTree &DT) override final;
 
   LoopOutlineProcessor *
-  getLoopOutlineProcessor(const TapirLoopInfo *TL) const override final;
+  getLoopOutlineProcessor(const TapirLoopInfo *TL) override final;
 };
 } // namespace llvm
 

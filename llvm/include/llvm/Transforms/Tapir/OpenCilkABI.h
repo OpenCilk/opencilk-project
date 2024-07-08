@@ -140,11 +140,10 @@ class OpenCilkABI final : public TapirTarget {
   Value *CreateStackFrame(Function &F);
   Value *GetOrCreateCilkStackFrame(Function &F);
 
-  CallInst *InsertStackFramePush(Function &F,
-                                 Instruction *TaskFrameCreate = nullptr,
-                                 bool Helper = false);
+  CallInst *InsertStackFramePush(Function &F, Instruction *TaskFrameCreate,
+                                 bool Helper, bool Spawner);
   void InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
-                           bool InsertPauseFrame, bool Helper);
+                           bool InsertPauseFrame, bool Helper, bool Spawner);
 
   void InsertDetach(Function &F, Instruction *DetachPt);
 
@@ -166,6 +165,9 @@ public:
   ArgStructMode getArgStructMode() const override final {
     return ArgStructMode::None;
   }
+  void setupTaskOutlineArgs(Function &F, ValueSet &HelperArgs,
+                            SmallVectorImpl<Value *> &HelperInputs,
+                            const ValueSet &TaskHelperArgs) override final;
   void addHelperAttributes(Function &F) override final;
 
   void remapAfterOutlining(BasicBlock *TFEntry,
@@ -190,7 +192,7 @@ public:
   bool processOrdinaryFunction(Function &F, BasicBlock *TFEntry) override final;
 
   LoopOutlineProcessor *
-  getLoopOutlineProcessor(const TapirLoopInfo *TL) const override final;
+  getLoopOutlineProcessor(const TapirLoopInfo *TL) override final;
 };
 } // namespace llvm
 

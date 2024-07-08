@@ -241,11 +241,10 @@ public:
   /// for the containing function, i.e., after the task has been outlined.
   virtual void lowerTaskFrameAddrCall(CallInst *TaskFrameAddrCall);
 
-  /// Lower a Tapir sync instruction SI.
+  /// Lower a Tapir sync instruction \p SI.
   virtual void lowerSync(SyncInst &SI) = 0;
 
-  virtual void lowerReducerOperation(CallBase *Call) {
-  }
+  virtual void lowerReducerOperation(CallBase *Call) {}
 
   /// Lower calls to the tapir.runtime.{start,end} intrinsics.  Only
   /// tapir.runtime.start intrinsics are stored; uses of those intrinsics
@@ -258,16 +257,29 @@ public:
   /// Returns true if Function F should be processed.
   virtual bool shouldProcessFunction(const Function &F) const;
 
-  /// Returns true if tasks in Function F should be outlined into their own
+  /// Returns true if tasks in Function \p F should be outlined into their own
   /// functions.  Such outlining is a common step for many Tapir backends.
   virtual bool shouldDoOutlining(const Function &F) const { return true; }
 
-  /// Process Function F before any function outlining is performed.  This
+  /// Process Function \p F before any function outlining is performed.  This
   /// routine should not modify the CFG structure, unless it processes all Tapir
-  /// instructions in F itself.  Returns true if it modifies the CFG, false
+  /// instructions in \p F itself.  Returns true if it modifies the CFG, false
   /// otherwise.
   virtual bool preProcessFunction(Function &F, TaskInfo &TI,
                                   bool ProcessingTapirLoops = false) = 0;
+
+  /// Prepares the set \p HelperArgs of function arguments for the outlined
+  /// helper function.  Also prepares the list \p HelperInputs of input values
+  /// passed to a call to Helper.
+  virtual void setupTaskOutlineArgs(Function &F, ValueSet &HelperArgs,
+                                    SmallVectorImpl<Value *> &HelperInputs,
+                                    const ValueSet &TaskHelperArgs) {
+    // By default, simply copy the helper arguments into HelperInputs in order.
+    for (Value *V : TaskHelperArgs) {
+      HelperArgs.insert(V);
+      HelperInputs.push_back(V);
+    }
+  }
 
   /// Returns an ArgStructMode enum value describing how inputs to a task should
   /// be passed to the task, e.g., directly as arguments to the outlined
@@ -282,51 +294,51 @@ public:
   /// Get the Module where outlined Helper will be placed.
   Module &getDestinationModule() const { return DestM; }
 
-  // Add attributes to the Function Helper produced from outlining a task.
+  /// Add attributes to the Function \p Helper produced from outlining a task.
   virtual void addHelperAttributes(Function &Helper) {}
 
-  // Remap any Target-local structures after taskframe starting at TFEntry is
-  // outlined.
+  /// Remap any Target-local structures after taskframe starting at \p TFEntry
+  /// is outlined.
   virtual void remapAfterOutlining(BasicBlock *TFEntry,
                                    ValueToValueMapTy &VMap) {}
 
-  // Pre-process the Function F that has just been outlined from a task.  This
-  // routine is executed on each outlined function by traversing in post-order
-  // the tasks in the original function.
+  /// Pre-process the Function \p F that has just been outlined from a task.
+  /// This routine is executed on each outlined function by traversing in
+  /// post-order the tasks in the original function.
   virtual void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                       Instruction *TaskFrameCreate,
                                       bool IsSpawner, BasicBlock *TFEntry) = 0;
 
-  // Post-process the Function F that has just been outlined from a task.  This
-  // routine is executed on each outlined function by traversing in post-order
-  // the tasks in the original function.
+  /// Post-process the Function \p F that has just been outlined from a task.
+  /// This routine is executed on each outlined function by traversing in
+  /// post-order the tasks in the original function.
   virtual void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                        Instruction *TaskFrameCreate,
                                        bool IsSpawner, BasicBlock *TFEntry) = 0;
 
-  // Pre-process the root Function F as a function that can spawn subtasks.
+  /// Pre-process the root Function \p F as a function that can spawn subtasks.
   virtual void preProcessRootSpawner(Function &F, BasicBlock *TFEntry) = 0;
 
-  // Post-process the root Function F as a function that can spawn subtasks.
+  /// Post-process the root Function \p F as a function that can spawn subtasks.
   virtual void postProcessRootSpawner(Function &F, BasicBlock *TFEntry) = 0;
 
-  // Process the invocation of a task for an outlined function.  This routine is
-  // invoked after processSpawner once for each child subtask.
+  /// Process the invocation of a task for an outlined function.  This routine
+  /// is invoked after processSpawner once for each child subtask.
   virtual void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) = 0;
 
-  // Process Function F at the end of the lowering process.
+  /// Process Function \p F at the end of the lowering process.
   virtual void postProcessFunction(Function &F,
                                    bool ProcessingTapirLoops = false) = 0;
 
-  // Process a generated helper Function F produced via outlining, at the end of
-  // the lowering process.
+  /// Process a generated helper Function \p F produced via outlining, at the
+  /// end of the lowering process.
   virtual void postProcessHelper(Function &F) = 0;
 
   virtual bool processOrdinaryFunction(Function &F, BasicBlock *TFEntry);
 
-  // Get the LoopOutlineProcessor associated with this Tapir target.
+  /// Get the LoopOutlineProcessor associated with this Tapir target.
   virtual LoopOutlineProcessor *
-  getLoopOutlineProcessor(const TapirLoopInfo *TL) const {
+  getLoopOutlineProcessor(const TapirLoopInfo *TL) {
     return nullptr;
   }
 };
@@ -395,12 +407,12 @@ public:
     return ArgStructMode::None;
   }
 
-  /// Prepares the set HelperArgs of function arguments for the outlined helper
-  /// function Helper for a Tapir loop.  Also prepares the list HelperInputs of
-  /// input values passed to a call to Helper.  HelperArgs and HelperInputs are
-  /// derived from the loop-control arguments LCArgs and loop-control inputs
-  /// LCInputs for the Tapir loop, as well the set TLInputsFixed of arguments to
-  /// the task underlying the Tapir loop.
+  /// Prepares the set \p HelperArgs of function arguments for the outlined
+  /// helper function Helper for a Tapir loop.  Also prepares the list \p
+  /// HelperInputs of input values passed to a call to Helper.  \p HelperArgs
+  /// and \p HelperInputs are derived from the loop-control arguments \p LCArgs
+  /// and loop-control inputs \p LCInputs for the Tapir loop, as well the set
+  /// \p TLInputsFixed of arguments to the task underlying the Tapir loop.
   virtual void setupLoopOutlineArgs(
       Function &F, ValueSet &HelperArgs, SmallVectorImpl<Value *> &HelperInputs,
       ValueSet &InputSet, const SmallVectorImpl<Value *> &LCArgs,
@@ -415,7 +427,7 @@ public:
   virtual unsigned getIVArgIndex(const Function &F, const ValueSet &Args) const;
 
   /// Returns an integer identifying the index of the helper-function argument
-  /// in Args that specifies the ending iteration number.  This return value
+  /// in \p Args that specifies the ending iteration number.  This return value
   /// must complement the behavior of setupLoopOutlineArgs().
   virtual unsigned getLimitArgIndex(const Function &F,
                                     const ValueSet &Args) const {
@@ -529,25 +541,27 @@ Function *createHelperForTaskFrame(
 Instruction *replaceTaskFrameWithCallToOutline(
     Spindle *TF, TaskOutlineInfo &Out, SmallVectorImpl<Value *> &OutlineInputs);
 
-/// Outlines a task \p T into a helper function that accepts the inputs \p
-/// Inputs.  The map \p VMap is updated with the mapping of instructions in \p T
-/// to instructions in the new helper function.  Information about the helper
-/// function is returned as a TaskOutlineInfo structure.
-TaskOutlineInfo outlineTask(
-    Task *T, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
-    Module *DestM, ValueToValueMapTy &VMap,
-    TapirTarget::ArgStructMode UseArgStruct, Type *ReturnType,
-    ValueToValueMapTy &InputMap, OutlineAnalysis &OA);
+/// Outlines a task \p T into a helper function that accepts the inputs
+/// \p Inputs.  The map \p VMap is updated with the mapping of instructions in
+/// \p T to instructions in the new helper function.  Information about the
+/// helper function is returned as a TaskOutlineInfo structure.
+TaskOutlineInfo outlineTask(Task *T, ValueSet &Inputs,
+                            SmallVectorImpl<Value *> &HelperInputs,
+                            Module *DestM, ValueToValueMapTy &VMap,
+                            TapirTarget::ArgStructMode UseArgStruct,
+                            Type *ReturnType, ValueToValueMapTy &InputMap,
+                            OutlineAnalysis &OA, TapirTarget *Target);
 
-/// Outlines a taskframe \p TF into a helper function that accepts the inputs \p
-/// Inputs.  The map \p VMap is updated with the mapping of instructions in \p
-/// TF to instructions in the new helper function.  Information about the helper
-/// function is returned as a TaskOutlineInfo structure.
-TaskOutlineInfo outlineTaskFrame(
-    Spindle *TF, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
-    Module *DestM, ValueToValueMapTy &VMap,
-    TapirTarget::ArgStructMode UseArgStruct, Type *ReturnType,
-    ValueToValueMapTy &InputMap, OutlineAnalysis &OA);
+/// Outlines a taskframe \p TF into a helper function that accepts the inputs
+/// \p Inputs.  The map \p VMap is updated with the mapping of instructions in
+/// \p TF to instructions in the new helper function.  Information about the
+/// helper function is returned as a TaskOutlineInfo structure.
+TaskOutlineInfo outlineTaskFrame(Spindle *TF, ValueSet &Inputs,
+                                 SmallVectorImpl<Value *> &HelperInputs,
+                                 Module *DestM, ValueToValueMapTy &VMap,
+                                 TapirTarget::ArgStructMode UseArgStruct,
+                                 Type *ReturnType, ValueToValueMapTy &InputMap,
+                                 OutlineAnalysis &OA);
 
 //----------------------------------------------------------------------------//
 // Methods for lowering Tapir loops
@@ -555,7 +569,6 @@ TaskOutlineInfo outlineTaskFrame(
 /// Given a Tapir loop \p TL and the set of inputs to the task inside that loop,
 /// returns the set of inputs for the Tapir loop itself.
 ValueSet getTapirLoopInputs(TapirLoopInfo *TL, ValueSet &TaskInputs);
-
 
 /// Replaces the Tapir loop \p TL, with associated TaskOutlineInfo \p Out, with
 /// a call or invoke to the outlined helper function created for \p TL.
