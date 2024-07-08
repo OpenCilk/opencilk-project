@@ -975,9 +975,8 @@ TaskOutlineInfo llvm::outlineTaskFrame(
     Module *DestM, ValueToValueMapTy &VMap,
     TapirTarget::ArgStructMode UseArgStruct, Type *ReturnType,
     ValueToValueMapTy &InputMap, OutlineAnalysis &OA) {
-  if (Task *T = TF->getTaskFromTaskFrame())
-    return outlineTask(T, Inputs, HelperInputs, DestM, VMap, UseArgStruct,
-                       ReturnType, InputMap, OA);
+  assert(!TF->getTaskFromTaskFrame() &&
+         "outlineTaskFrame called to outline task.");
 
   Function &F = *TF->getEntry()->getParent();
   BasicBlock *Entry = TF->getEntry();
@@ -1062,15 +1061,16 @@ Instruction *llvm::replaceTaskFrameWithCallToOutline(
   return TopCall;
 }
 
-/// Outlines a task \p T into a helper function that accepts the inputs \p
-/// Inputs.  The map \p VMap is updated with the mapping of instructions in \p T
-/// to instructions in the new helper function.  Information about the helper
-/// function is returned as a TaskOutlineInfo structure.
-TaskOutlineInfo llvm::outlineTask(
-    Task *T, ValueSet &Inputs, SmallVectorImpl<Value *> &HelperInputs,
-    Module *DestM, ValueToValueMapTy &VMap,
-    TapirTarget::ArgStructMode UseArgStruct, Type *ReturnType,
-    ValueToValueMapTy &InputMap, OutlineAnalysis &OA) {
+/// Outlines a task \p T into a helper function that accepts the inputs
+/// \p Inputs.  The map \p VMap is updated with the mapping of instructions in
+/// \p T to instructions in the new helper function.  Information about the
+/// helper function is returned as a TaskOutlineInfo structure.
+TaskOutlineInfo llvm::outlineTask(Task *T, ValueSet &Inputs,
+                                  SmallVectorImpl<Value *> &HelperInputs,
+                                  Module *DestM, ValueToValueMapTy &VMap,
+                                  TapirTarget::ArgStructMode UseArgStruct,
+                                  Type *ReturnType, ValueToValueMapTy &InputMap,
+                                  OutlineAnalysis &OA, TapirTarget *Target) {
   assert(!T->isRootTask() && "Cannot outline the root task.");
   Function &F = *T->getEntry()->getParent();
   DetachInst *DI = T->getDetach();
@@ -1094,11 +1094,11 @@ TaskOutlineInfo llvm::outlineTask(
   }
 
   // Convert the inputs of the task to inputs to the helper.
-  ValueSet HelperArgs;
-  Instruction *ArgsStart = fixupHelperInputs(F, T, Inputs, HelperArgs, StorePt,
+  ValueSet TaskHelperArgs;
+  Instruction *ArgsStart = fixupHelperInputs(F, T, Inputs, TaskHelperArgs, StorePt,
                                              LoadPt, UseArgStruct, InputMap);
-  for (Value *V : HelperArgs)
-    HelperInputs.push_back(V);
+  ValueSet HelperArgs;
+  Target->setupTaskOutlineArgs(F, HelperArgs, HelperInputs, TaskHelperArgs);
 
   // Clone the blocks into a helper function.
   Function *Helper = createHelperForTask(F, T, HelperArgs, DestM, VMap,
