@@ -325,7 +325,11 @@ Function *llvm::CreateHelper(
   for (Value *I : Inputs) {
     if (VMap.count(I) == 0) {       // Is this argument preserved?
       DestI->setName(I->getName()+NameSuffix); // Copy the name over...
-      VMap[I] = &*DestI++;          // Add mapping to VMap
+      if (isa<Constant>(I))
+        // Don't add this constant input to the VMap, so it won't get remapped
+        DestI++;
+      else
+        VMap[I] = &*DestI++;          // Add mapping to VMap
     }
     // Check for any vector arguments, and record the maximum width of any
     // vector argument we find.
@@ -550,6 +554,8 @@ void llvm::AddAlignmentAssumptions(
   for (Value *ArgVal : Args) {
     // Ignore arguments to non-pointer types
     if (!ArgVal->getType()->isPointerTy()) continue;
+    // Ignore constant pointer arguments
+    if (isa<Constant>(ArgVal)) continue;
     Argument *Arg = cast<Argument>(VMap[ArgVal]);
     // Ignore arguments to non-pointer types
     if (!Arg->getType()->isPointerTy()) continue;
