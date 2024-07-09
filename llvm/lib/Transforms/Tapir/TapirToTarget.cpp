@@ -102,7 +102,7 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
   DenseMap<Spindle *, SmallVector<Value *, 8>> HelperInputs;
 
   for (Spindle *TF : AllTaskFrames) {
-    // At this point, all subtaskframess of TF must have been processed.
+    // At this point, all subtaskframes of TF must have been processed.
     // Replace the tasks with calls to their outlined helper functions.
     for (Spindle *SubTF : TF->subtaskframes())
       TFToOutline[SubTF].replaceReplCall(
