@@ -33,10 +33,10 @@ unreachable:                                      ; preds = %entry.unreachable_c
 
 ; CHECK: define void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiRNSt3__13mapIiNS1_6vectorIiNS1_9allocatorIiEEEENS1_4lessIiEENS4_INS1_4pairIKiS6_EEEEEESE_RNS2_IiiS8_NS4_INS9_ISA_iEEEEEESI_PPdSK_()
 ; CHECK: pfor.detach:
-; CHECK: invoke fastcc void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiRNSt3__13mapIiNS1_6vectorIiNS1_9allocatorIiEEEENS1_4lessIiEENS4_INS1_4pairIKiS6_EEEEEESE_RNS2_IiiS8_NS4_INS9_ISA_iEEEEEESI_PPdSK_.outline_pfor.body.otd1()
+; CHECK: invoke fastcc void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiRNSt3__13mapIiNS1_6vectorIiNS1_9allocatorIiEEEENS1_4lessIiEENS4_INS1_4pairIKiS6_EEEEEESE_RNS2_IiiS8_NS4_INS9_ISA_iEEEEEESI_PPdSK_.outline_pfor.body.otd1(ptr {{.*}}%{{.+}})
 ; CHECK: to label %pfor.detach unwind label %lpad714.loopexit
 
-; CHECK: define internal fastcc void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiRNSt3__13mapIiNS1_6vectorIiNS1_9allocatorIiEEEENS1_4lessIiEENS4_INS1_4pairIKiS6_EEEEEESE_RNS2_IiiS8_NS4_INS9_ISA_iEEEEEESI_PPdSK_.outline_pfor.body.otd1()
+; CHECK: define internal fastcc void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiRNSt3__13mapIiNS1_6vectorIiNS1_9allocatorIiEEEENS1_4lessIiEENS4_INS1_4pairIKiS6_EEEEEESE_RNS2_IiiS8_NS4_INS9_ISA_iEEEEEESI_PPdSK_.outline_pfor.body.otd1(ptr {{.*}}%{{.+}})
 ; CHECK: pfor.detach.otd1:
 ; CHECK: br label %pfor.body.otd1
 

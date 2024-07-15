@@ -35,7 +35,7 @@ det.cont192:                                      ; preds = %det.achd190, %entry
 
 ; CHECK: define internal fastcc void @_Z12generateNodePP5rangePP5eventS0_ii.outline_det.achd190.otd1(ptr {{.*}}%boxes.otd1, ptr
 ; CHECK-NOT: readnone
-; CHECK: %leftEvents.otd1)
+; CHECK: %leftEvents.otd1
 
 ; Function Attrs: nounwind willreturn memory(argmem: readwrite)
 declare token @llvm.taskframe.create() #0
