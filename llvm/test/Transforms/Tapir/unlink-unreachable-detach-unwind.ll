@@ -68,7 +68,7 @@ pfor.inc907:                                      ; preds = %pfor.inc907, %pfor.
 
 ; CHECK: pfor.detach470:
 ; CHECK-NOT: detach within
-; CHECK: invoke fastcc void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiPNSt3__16vectorIiNS1_9allocatorIiEEEES6_PiS7_PPdS9_.outline_pfor.body.entry472.otd1()
+; CHECK: invoke fastcc void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiPNSt3__16vectorIiNS1_9allocatorIiEEEES6_PiS7_PPdS9_.outline_pfor.body.entry472.otd1(ptr %{{.+}})
 ; CHECK-NEXT: to label %pfor.detach470 unwind label %lpad651
 
 ; Function Attrs: nounwind willreturn memory(argmem: readwrite)

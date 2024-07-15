@@ -116,7 +116,7 @@ cleanup:                                          ; preds = %sync.continue, %pfo
 ; CHECK-NEXT: br i1 %{{.+}}, label %[[CLEANUP_SPLIT:.+]], label %det.cont
 
 ; CHECK: [[CLEANUP_SPLIT]]:
-; CHECK-NEXT: call {{.*}}void @main.outline_pfor.end.otd1(ptr %x), !dbg ![[DBGMD:[0-9]+]]
+; CHECK-NEXT: call {{.*}}void @main.outline_pfor.end.otd1(ptr %x, ptr %{{.+}}), !dbg ![[DBGMD:[0-9]+]]
 
 ; CHECK: pfor.end:
 ; CHECK: detach within %syncreg6, label %det.achd, label %det.cont, !dbg ![[DBGMD]]
