@@ -471,7 +471,7 @@ llvm::createTaskArgsStruct(const ValueSet &Inputs, Task *T,
 /// Organize the set \p Inputs of values in \p F into a set \p Fixed of values
 /// that can be used as inputs to a helper function.
 void llvm::fixupInputSet(Function &F, const ValueSet &Inputs, ValueSet &Fixed) {
-  // Scan for any sret parameters in TaskInputs and add them first.  These
+  // Scan for any sret parameters in Inputs and add them first.  These
   // parameters must appear first or second in the prototype of the Helper
   // function.
   Value *SRetInput = nullptr;
@@ -497,17 +497,19 @@ void llvm::fixupInputSet(Function &F, const ValueSet &Inputs, ValueSet &Fixed) {
   for (Value *V : Inputs)
     if (V != SRetInput)
       InputsToSort.push_back(V);
-  LLVM_DEBUG({
-    dbgs() << "After sorting:\n";
-    for (Value *V : InputsToSort)
-      dbgs() << "\t" << *V << "\n";
-  });
+
   const DataLayout &DL = F.getParent()->getDataLayout();
   std::sort(InputsToSort.begin(), InputsToSort.end(),
             [&DL](const Value *A, const Value *B) {
               return DL.getTypeSizeInBits(A->getType()) >
-                DL.getTypeSizeInBits(B->getType());
+                     DL.getTypeSizeInBits(B->getType());
             });
+
+  LLVM_DEBUG({
+    dbgs() << "inputs after fixup:\n";
+    for (Value *V : InputsToSort)
+      dbgs() << "\t" << *V << "\n";
+  });
 
   // Add the remaining inputs.
   for (Value *V : InputsToSort)
