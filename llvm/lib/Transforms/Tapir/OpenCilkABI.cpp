@@ -27,6 +27,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
@@ -346,45 +347,18 @@ void OpenCilkABI::prepareModule() {
   }
 }
 
-static bool isSRetInput(const Value *V, const Function &F) {
-  if (!isa<Argument>(V))
-    return false;
-
-  const auto *ArgIter = F.arg_begin();
-  if (F.hasParamAttribute(0, Attribute::StructRet) && V == &*ArgIter)
-    return true;
-  ++ArgIter;
-  if (F.hasParamAttribute(1, Attribute::StructRet) && V == &*ArgIter)
-    return true;
-
-  return false;
-}
-
 void OpenCilkABI::setupTaskOutlineArgs(Function &F, ValueSet &HelperArgs,
-                          SmallVectorImpl<Value *> &HelperInputs,
-                          const ValueSet &TaskHelperArgs) {
-  PointerType *SFPtrTy = PointerType::getUnqual(F.getContext());
-
-  // First add the sret task input, if it exists.
-  ValueSet::iterator TaskInputIter = TaskHelperArgs.begin();
-  if ((TaskInputIter != TaskHelperArgs.end()) && isSRetInput(*TaskInputIter, F)) {
-    HelperArgs.insert(*TaskInputIter);
-    HelperInputs.push_back(*TaskInputIter);
-    ++TaskInputIter;
-  }
+                                       SmallVectorImpl<Value *> &HelperInputs,
+                                       const ValueSet &TaskHelperArgs) {
+  TapirTarget::setupTaskOutlineArgs(F, HelperArgs, HelperInputs,
+                                    TaskHelperArgs);
 
   // Add a pointer for the parent stack frame.  This pointer will be replaced
   // later in the call to the helper.
+  PointerType *SFPtrTy = PointerType::getUnqual(F.getContext());
   Value *ParentSFArg = ConstantPointerNull::get(SFPtrTy);
   HelperArgs.insert(ParentSFArg);
   HelperInputs.push_back(ParentSFArg);
-
-  // Add the remaining task input arguments.
-  while (TaskInputIter != TaskHelperArgs.end()) {
-    Value *V = *TaskInputIter++;
-    HelperArgs.insert(V);
-    HelperInputs.push_back(V);
-  }
 }
 
 void OpenCilkABI::addHelperAttributes(Function &Helper) {
@@ -401,7 +375,7 @@ void OpenCilkABI::addHelperAttributes(Function &Helper) {
         Helper.getMemoryEffects() |
         MemoryEffects(MemoryEffects::Location::Other, ModRefInfo::ModRef));
   }
-  // Note that the address of the helper is unimportant.
+  // Mark that the address of the helper is unimportant.
   Helper.setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
 
   // The helper is internal to this module.  We use internal linkage, rather
@@ -506,7 +480,7 @@ Value* OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
 }
 
 static unsigned getParentSFArgNum(Function &H) {
-  return isSRetInput(H.getArg(0), H) ? 1 : 0;
+  return H.arg_size() - 1;
 }
 
 // Helper function to add a debug location to an IRBuilder if it otherwise lacks
@@ -894,6 +868,8 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Value *SF = DetachCtxToStackFrame[&F];
   assert(SF && "No frame found for spawning task");
 
+  // Find the helper argument for the parent __cilkrts_stack_frame and update
+  // the corresponding operand in the call.
   const unsigned ParentSFArgNum = getParentSFArgNum(*TOI.Outline);
   assert(ReplCall->getOperand(ParentSFArgNum) ==
          ConstantPointerNull::get(PointerType::getUnqual(C)));
