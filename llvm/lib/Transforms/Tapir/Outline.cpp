@@ -325,11 +325,18 @@ Function *llvm::CreateHelper(
   for (Value *I : Inputs) {
     if (VMap.count(I) == 0) {       // Is this argument preserved?
       DestI->setName(I->getName()+NameSuffix); // Copy the name over...
-      if (isa<Constant>(I))
-        // Don't add this constant input to the VMap, so it won't get remapped
-        DestI++;
-      else
-        VMap[I] = &*DestI++;          // Add mapping to VMap
+
+      // The normal Tapir lowering process should never add a constant to the
+      // input list for a helper function, because the input list is determined
+      // by uses within the outlined blocks of SSA values defined outside of
+      // those outlined blocks.  Specific Tapir targets can add constant
+      // inputs to the list, however.  Don't add these constant inputs to the
+      // VMap, so that other instances of this constant won't get remapped
+      // to the function argument.
+      if (!isa<Constant>(I))
+        VMap[I] = &*DestI;               // Add mapping to VMap
+
+      DestI++;
     }
     // Check for any vector arguments, and record the maximum width of any
     // vector argument we find.
@@ -554,7 +561,13 @@ void llvm::AddAlignmentAssumptions(
   for (Value *ArgVal : Args) {
     // Ignore arguments to non-pointer types
     if (!ArgVal->getType()->isPointerTy()) continue;
-    // Ignore constant pointer arguments
+    // Ignore constant pointer arguments.  The normal Tapir lowering process
+    // should never add a constant to the input list for a helper function,
+    // because the input list is determined by uses within the outlined blocks
+    // of SSA values defined outside of those outlined blocks.  Specific Tapir
+    // targets can add constant inputs to the list, however.  We'll rely on
+    // the Tapir target to supply appropriate alignment information for this
+    // pointer argument.
     if (isa<Constant>(ArgVal)) continue;
     Argument *Arg = cast<Argument>(VMap[ArgVal]);
     // Ignore arguments to non-pointer types
