@@ -309,6 +309,7 @@ void OpenCilkABI::prepareModule() {
     }
     if (GlobalVariable *AlignVar =
         M.getGlobalVariable("__cilkrts_stack_frame_align", true)) {
+      // StackFrameAlign is undefined here.
       StackFrameAlign = AlignVar->getAlign();
       // Mark this variable with private linkage, to avoid linker failures when
       // compiling with no optimizations.
@@ -328,6 +329,12 @@ void OpenCilkABI::prepareModule() {
   if (StackFrameTy->isOpaque()) {
     // Create a dummy __cilkrts_stack_frame structure
     StackFrameTy->setBody(Int64Ty);
+  } else {
+    // Promote the stack frame structure alignment to the largest convenient
+    // value given the ABI.
+    Align ABIStackAlign = M.getDataLayout().getStackAlignment();
+    if (ABIStackAlign > StackFrameAlign.valueOrOne())
+      StackFrameAlign = ABIStackAlign;
   }
   // Create declarations of all CilkRTS functions, and add basic attributes to
   // those declarations.
@@ -875,9 +882,9 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
          ConstantPointerNull::get(PointerType::getUnqual(C)));
   ReplCall->setOperand(ParentSFArgNum, SF);
   Argument *ParentSFArg = TOI.Outline->getArg(ParentSFArgNum);
-  ParentSFArg->addAttr(
-      Attribute::getWithAlignment(C, StackFrameAlign.valueOrOne()));
-
+  if (StackFrameAlign)
+    ParentSFArg->addAttr(
+      Attribute::getWithAlignment(C, StackFrameAlign.value()));
   // Split the basic block containing the detach replacement just before the
   // start of the detach-replacement instructions.
   BasicBlock *DetBlock = ReplStart->getParent();

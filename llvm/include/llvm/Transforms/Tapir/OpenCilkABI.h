@@ -60,7 +60,12 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSCilkForGrainsize32 = nullptr;
   FunctionCallee CilkRTSCilkForGrainsize64 = nullptr;
 
-  MaybeAlign StackFrameAlign{8};
+  // The alignment of __cilkrts_stack_frame.  This value will be increased
+  // to the ABI-prescribed stack pointer alignment of the module.  This has
+  // no runtime cost.  The bitcode file may request even greater alignment
+  // by defining a variable __cilkrts_stack_frame_align.  This may have a
+  // runtime cost by forcing overalignment of stack pointers.
+  MaybeAlign StackFrameAlign;
 
   // Accessors for CilkRTS ABI functions. When a bitcode file is loaded, these
   // functions should return the function defined in the bitcode file.
