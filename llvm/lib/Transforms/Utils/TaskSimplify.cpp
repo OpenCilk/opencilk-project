@@ -117,7 +117,8 @@ static bool removeRedundantSyncs(MaybeParallelTasks &MPTasks, Task *T) {
 static bool syncIsDiscriminating(const Value *SyncSR,
                                  SmallPtrSetImpl<const Task *> &MPTasks) {
   for (const Task *MPTask : MPTasks)
-    if (SyncSR != MPTask->getDetach()->getSyncRegion())
+    if (!MPTask->encloses(cast<Instruction>(SyncSR)->getParent()) &&
+        SyncSR != MPTask->getDetach()->getSyncRegion())
       return true;
   return false;
 }
