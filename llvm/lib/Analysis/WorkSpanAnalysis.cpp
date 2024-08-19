@@ -13,20 +13,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/WorkSpanAnalysis.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
-#include "llvm/IR/InstVisitor.h"
-#include "llvm/Support/BranchProbability.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/InstructionCost.h"
 
 using namespace llvm;
 
@@ -74,7 +68,7 @@ static void estimateLoopCostHelper(const Loop *L, CodeMetrics &Metrics,
     }
 
     // Check if the total size of this subloop is huge.
-    if (InstructionCost::getMax() / ConstTripCount > SubLoopCost.Work)
+    if (InstructionCost::getMax() / ConstTripCount < SubLoopCost.Work)
       LoopCost.Work = InstructionCost::getMax();
 
     // Check if this subloop suffices to make loop L huge.
