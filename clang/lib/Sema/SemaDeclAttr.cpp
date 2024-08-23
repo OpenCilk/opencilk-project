@@ -9868,9 +9868,6 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
   case ParsedAttr::AT_HyperView:
     handleSimpleAttribute<HyperViewAttr>(S, D, AL);
     break;
-  case ParsedAttr::AT_HyperToken:
-    handleSimpleAttribute<HyperTokenAttr>(S, D, AL);
-    break;
   case ParsedAttr::AT_ReducerUnregister:
     handleSimpleAttribute<ReducerUnregisterAttr>(S, D, AL);
     break;
