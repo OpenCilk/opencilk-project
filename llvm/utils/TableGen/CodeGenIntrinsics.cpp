@@ -182,6 +182,8 @@ void CodeGenIntrinsic::setProperty(Record *R) {
     ME &= MemoryEffects::argMemOnly();
   else if (R->getName() == "IntrInaccessibleMemOnly")
     ME &= MemoryEffects::inaccessibleMemOnly();
+  else if (R->getName() == "IntrReadInaccessibleMemOnly")
+    ME &= MemoryEffects::inaccessibleMemOnly(ModRefInfo::Ref);
   else if (R->getName() == "IntrInaccessibleMemOrArgMemOnly")
     ME &= MemoryEffects::inaccessibleOrArgMemOnly();
   else if (R->getName() == "Commutative")
