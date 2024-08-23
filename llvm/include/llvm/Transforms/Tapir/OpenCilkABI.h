@@ -157,6 +157,8 @@ class OpenCilkABI final : public TapirTarget {
 
   BasicBlock *GetDefaultSyncLandingpad(Function &F, Value *SF, DebugLoc Loc);
 
+  Value *getValidFrame(CallBase *FrameCall, DominatorTree &DT);
+
 public:
   OpenCilkABI(Module &M);
   ~OpenCilkABI() { DetachCtxToStackFrame.clear(); }
@@ -167,6 +169,7 @@ public:
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
   void lowerReducerOperation(CallBase *CI) override;
+  void lowerFrameCall(CallBase *CI, DominatorTree &DT) override;
 
   ArgStructMode getArgStructMode() const override final {
     return ArgStructMode::None;

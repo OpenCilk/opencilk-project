@@ -16,6 +16,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfo.h"
@@ -1177,6 +1178,53 @@ OpenCilkABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
     return new RuntimeCilkFor(M);
   return nullptr;
 }
+
+Value *OpenCilkABI::getValidFrame(CallBase *FrameCall, DominatorTree &DT) {
+  Function *F = FrameCall->getFunction();
+  if (Value *Frame = DetachCtxToStackFrame.lookup(F)) {
+    // Make sure a call to enter_frame dominates this get_frame call
+    // and no call to leave_frame has potentially been executed.
+    // Otherwise return a null pointer value to mean unknown.
+    // This is correct in most functions and conservative in
+    // complicated functions.
+    bool Initialized = false;
+    Value *Enter1 = CILKRTS_FUNC(enter_frame_helper).getCallee();
+    Value *Enter2 = CILKRTS_FUNC(enter_frame).getCallee();
+    Value *Leave1 = CILKRTS_FUNC(leave_frame_helper).getCallee();
+    Value *Leave2 = CILKRTS_FUNC(leave_frame).getCallee();
+    Value *Leave3 = CilkHelperEpilogue.getCallee();
+    Value *Leave4 = CilkParentEpilogue.getCallee();
+    for (User *U : Frame->users()) {
+      if (CallBase *C = dyn_cast<CallBase>(U)) {
+        Function *Fn = C->getCalledFunction();
+        if (Fn == nullptr) // indirect function call
+          continue;
+        if (Fn == Enter1 || Fn == Enter2) {
+          if (!Initialized && DT.dominates(C, FrameCall))
+            Initialized = true;
+          continue;
+        }
+        if (Fn == Leave1 || Fn == Leave2 | Fn == Leave3 | Fn == Leave4) {
+          // TODO: ...unless an enter_frame call definitely intervenes.
+          if (isPotentiallyReachable(C, FrameCall, nullptr, &DT, nullptr))
+            return Constant::getNullValue(FrameCall->getType());
+          continue;
+        }
+      }
+    }
+    if (Initialized)
+      return Frame;
+  }
+  return Constant::getNullValue(FrameCall->getType());
+}
+
+void OpenCilkABI::lowerFrameCall(CallBase *FrameCall, DominatorTree &DT) {
+  assert(FrameCall->data_operands_size() == 0);
+  Value *Frame = getValidFrame(FrameCall, DT);
+  FrameCall->replaceAllUsesWith(Frame);
+  FrameCall->eraseFromParent();
+}
+
 
 void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   FunctionCallee Fn = nullptr;

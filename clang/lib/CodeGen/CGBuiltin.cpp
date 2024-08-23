@@ -5990,6 +5990,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
                                                      Str.getPointer(), Zeros);
     return RValue::get(Ptr);
   }
+  case Builtin::BI__tapir_frame: {
+    Function *FF = CGM.getIntrinsic(Intrinsic::tapir_frame);
+    return RValue::get(Builder.CreateCall(FF, {}));
+  }
   case Builtin::BI__hyper_lookup: {
     llvm::Value *Size = EmitScalarExpr(E->getArg(1));
     Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
