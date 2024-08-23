@@ -1767,6 +1767,10 @@ def int_tapir_loop_grainsize
     : Intrinsic<[llvm_anyint_ty], [LLVMMatchType<0>],
                 [IntrNoMem, IntrWillReturn, IntrSpeculatable]>;
 
+// Return the stack_frame in an OpenCilk function, otherwise null.
+def int_tapir_frame
+    : Intrinsic<[llvm_ptr_ty], [], [IntrWillReturn,IntrReadInaccessibleMemOnly]>;
+
 // Intrinsic to get the frame address of a spawned task.  Tapir
 // lowering transforms this intrinsic into ordinary frameaddress
 // intrinsics.

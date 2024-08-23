@@ -236,6 +236,10 @@ void IntrinsicLowering::LowerIntrinsicCall(CallInst *CI) {
     report_fatal_error("Code generator does not support intrinsic function '"+
                       Callee->getName()+"'!");
 
+  case Intrinsic::tapir_frame:
+    CI->replaceAllUsesWith(Constant::getNullValue(CI->getType()));
+    break;
+
   case Intrinsic::expect: {
     // Just replace __builtin_expect(exp, c) with EXP.
     Value *V = CI->getArgOperand(0);
