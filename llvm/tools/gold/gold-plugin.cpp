@@ -226,14 +226,14 @@ namespace options {
   static std::string opencilk_abi_bitcode_file;
 
   static TapirTargetID parseTapirTarget(StringRef tapirTarget) {
-    return StringSwitch<TapirTargetID>(tapirTarget)
+    return llvm::StringSwitch<TapirTargetID>(tapirTarget)
         .Case("none", TapirTargetID::None)
         .Case("serial", TapirTargetID::Serial)
         .Case("cheetah", TapirTargetID::Cheetah)
         .Case("cilkplus", TapirTargetID::Cilk)
-        .Case("cuda", TapirTargetID::Cuda)
+        .Case("lambda", TapirTargetID::Lambda)
+        .Case("omptask", TapirTargetID::OMPTask)
         .Case("opencilk", TapirTargetID::OpenCilk)
-        .Case("openmp", TapirTargetID::OpenMP)
         .Case("qthreads", TapirTargetID::Qthreads)
         .Default(TapirTargetID::Last_TapirTargetID);
   }
