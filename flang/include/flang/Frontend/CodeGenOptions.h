@@ -29,6 +29,8 @@
 
 namespace Fortran::frontend {
 
+using TapirTargetID = llvm::TapirTargetID;
+
 /// Bitfields of CodeGenOptions, split out from CodeGenOptions to ensure
 /// that this large collection of bitfields is a trivial class type.
 class CodeGenOptionsBase {
@@ -128,6 +130,9 @@ public:
   /// they want to explain why they decided to apply or not apply a given
   /// transformation.
   OptRemark OptimizationRemarkAnalysis;
+
+  /// Path to OpenCilk runtime bitcode file.
+  std::string OpenCilkABIBitcodeFile;
 
   // Define accessors/mutators for code generation options of enumeration type.
 #define CODEGENOPT(Name, Bits, Default)
