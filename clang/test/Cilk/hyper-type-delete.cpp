@@ -9,7 +9,7 @@ void reduce(void *l, void *r);
 using S_r = S _Hyperobject(identity, reduce);
 
 class Foo {
-    S_r r; // expected-warning{{reducer callbacks not implemented for structure members}}
+    S_r r;
 public:
     ~Foo() { delete r; }; // expected-error{{cannot delete expression of type 'S_r' (aka 'S _Hyperobject(identity, reduce)')}}
 };
