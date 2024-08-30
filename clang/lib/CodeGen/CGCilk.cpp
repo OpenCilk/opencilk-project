@@ -371,7 +371,7 @@ CodeGenFunction::TaskFrameScope::TaskFrameScope(CodeGenFunction &CGF)
 CodeGenFunction::TaskFrameScope::~TaskFrameScope() {
   if (LangOptions::Cilk_none == CGF.getLangOpts().getCilk())
     return;
-  if (!CGF.CurSyncRegion)
+  if (!TaskFrame)
     return;
 
   // Pop the taskframe.
