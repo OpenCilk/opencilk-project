@@ -49,6 +49,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
@@ -5005,6 +5006,112 @@ static bool isCleanupBlockEmpty(iterator_range<BasicBlock::iterator> R) {
   return true;
 }
 
+// Check if landingpad basic block has one predecessor that is a detach and
+// another that is a detached.rethrow intrinsic.
+static bool lpadBBIsDetachUnwind(const BasicBlock *BB) {
+  bool HasDetachPred = false;
+  bool HasDetachedRethrowPred = false;
+  for (const BasicBlock *Pred : predecessors(BB)) {
+    if (isa<DetachInst>(Pred->getTerminator()))
+      HasDetachPred = true;
+    if (isDetachedRethrow(Pred->getTerminator()))
+      HasDetachedRethrowPred = true;
+  }
+  return HasDetachPred && HasDetachedRethrowPred;
+}
+
+// Check if the given taskframe.create is unassociated with a spawned task.
+static bool isTaskFrameUnassociated(const Value *TFCreate) {
+  for (const User *U : TFCreate->users())
+    if (const Instruction *I = dyn_cast<Instruction>(U))
+      if (isTapirIntrinsic(Intrinsic::taskframe_use, I))
+        return false;
+  return true;
+}
+
+// Check whether the predecessor unwind block in a subtask is trivial.
+static bool checkSubtaskUnwindPredecessor(
+    BasicBlock *BB, Value *IncomingValue,
+    SmallSetVector<BasicBlock *, 4> &TrivialUnwindBlocks) {
+  if (LandingPadInst *LPInst = dyn_cast<LandingPadInst>(BB->getFirstNonPHI())) {
+    // Check the predecessors of this landingpad block for detached.rethrow and
+    // taskframe.resume intrinsics, and check those predecessor blocks
+    // recursively.
+
+    // Not the landing pad that caused the control to branch here.
+    if (IncomingValue != LPInst)
+      return false;
+
+    // Check that there are no other instructions except for debug and lifetime
+    // intrinsics in the block.
+    if (!isCleanupBlockEmpty(
+            make_range(LPInst->getNextNode(), BB->getTerminator())))
+      return false;
+
+    for (BasicBlock *Pred : predecessors(BB)) {
+      if (isTaskFrameResume(Pred->getTerminator())) {
+        InvokeInst *TFResume = cast<InvokeInst>(Pred->getTerminator());
+        // Check that no predecessor is a taskframe.resume for an unassociated
+        // taskframe.
+        if (isTaskFrameUnassociated(TFResume->getArgOperand(0)))
+          return false;
+
+        if (!checkSubtaskUnwindPredecessor(Pred, TFResume->getArgOperand(1),
+                                           TrivialUnwindBlocks))
+          return false;
+
+      } else if (isDetachedRethrow(Pred->getTerminator())) {
+        InvokeInst *DRInst = cast<InvokeInst>(Pred->getTerminator());
+        // Recursively check detached-rethrow predecessors.
+        if (!checkSubtaskUnwindPredecessor(Pred, DRInst->getArgOperand(1),
+                                           TrivialUnwindBlocks))
+          return false;
+
+      } else {
+        // We have reached a subtask instruction that can unwind, and all the
+        // unwind blocks up to this instruction are trivial.  Add this block to
+        // the set of trivial unwind blocks.
+        TrivialUnwindBlocks.insert(BB);
+      }
+    }
+  } else {
+    // This block might bring together landingpad values from multiple
+    // predecessors. Check those predecessors.
+
+    if (cast<Instruction>(IncomingValue)->getParent() != BB)
+      // The incoming value is defined in an unexpected place.  Assume something
+      // nontrivial is going on.
+      return false;
+
+    // Check that there are no other instructions except for debug and lifetime
+    // intrinsics in the block.
+    if (!isCleanupBlockEmpty(
+            make_range(BB->getFirstNonPHI(), BB->getTerminator())))
+      return false;
+
+    PHINode *PhiLPInst = cast<PHINode>(IncomingValue);
+
+    // Check incoming blocks to see if any of them are trivial.
+    for (unsigned Idx = 0, End = PhiLPInst->getNumIncomingValues(); Idx != End;
+         Idx++) {
+      auto *IncomingBB = PhiLPInst->getIncomingBlock(Idx);
+      auto *IncomingValue = PhiLPInst->getIncomingValue(Idx);
+
+      // Found a non-landingpad block with multiple successors.  This indicates
+      // something nontrivial among these unwind blocks.
+      if (IncomingBB->getUniqueSuccessor() != BB)
+        return false;
+
+      // Recursively check thie predecessor.
+      if (!checkSubtaskUnwindPredecessor(IncomingBB, IncomingValue,
+                                         TrivialUnwindBlocks))
+        return false;
+    }
+  }
+
+  return true;
+}
+
 // Simplify resume that is shared by several landing pads (phi of landing pad).
 bool SimplifyCFGOpt::simplifyCommonResume(ResumeInst *RI) {
   BasicBlock *BB = RI->getParent();
@@ -5033,6 +5140,24 @@ bool SimplifyCFGOpt::simplifyCommonResume(ResumeInst *RI) {
     // Not the landing pad that caused the control to branch here.
     if (IncomingValue != LandingPad)
       continue;
+
+    // If this block is a successor of both a detach and a detached.rethrow,
+    // check the detached.rethrow predecessors.
+    if (lpadBBIsDetachUnwind(IncomingBB)) {
+      SmallSetVector<BasicBlock *, 4> TrivialDetachUnwindBlocks;
+      // Check all detached.rethrow predecessors to see if all their unwind
+      // blocks are trivial.  If so, we can remove them.
+      if (!llvm::all_of(predecessors(IncomingBB), [&](BasicBlock *Pred) {
+            if (!isDetachedRethrow(Pred->getTerminator()))
+              return true;
+            InvokeInst *II = cast<InvokeInst>(Pred->getTerminator());
+            return checkSubtaskUnwindPredecessor(Pred, II->getOperand(1),
+                                                 TrivialDetachUnwindBlocks);
+          }))
+        continue;
+      TrivialUnwindBlocks.insert(TrivialDetachUnwindBlocks.begin(),
+                                 TrivialDetachUnwindBlocks.end());
+    }
 
     if (isCleanupBlockEmpty(
             make_range(LandingPad->getNextNode(), IncomingBB->getTerminator())))
@@ -5075,14 +5200,6 @@ bool SimplifyCFGOpt::simplifyCommonResume(ResumeInst *RI) {
   return !TrivialUnwindBlocks.empty();
 }
 
-static bool isTaskFrameUnassociated(const Value *TFCreate) {
-  for (const User *U : TFCreate->users())
-    if (const Instruction *I = dyn_cast<Instruction>(U))
-      if (isTapirIntrinsic(Intrinsic::taskframe_use, I))
-        return false;
-  return true;
-}
-
 // Simplify resume that is only used by a single (non-phi) landing pad.
 bool SimplifyCFGOpt::simplifySingleResume(ResumeInst *RI) {
   BasicBlock *BB = RI->getParent();
@@ -5098,10 +5215,35 @@ bool SimplifyCFGOpt::simplifySingleResume(ResumeInst *RI) {
   // Check that no predecessor is a taskframe.resume for an unassociated
   // taskframe.
   for (const BasicBlock *Pred : predecessors(BB))
-    if (isTaskFrameResume(Pred->getTerminator()))
-      if (isTaskFrameUnassociated(
-              cast<InvokeInst>(Pred->getTerminator())->getArgOperand(0)))
-        return false;
+    if (isTaskFrameResume(Pred->getTerminator()) &&
+        isTaskFrameUnassociated(
+            cast<InvokeInst>(Pred->getTerminator())->getArgOperand(0)))
+      return false;
+
+  // If this block is a successor of both a detach and a detached.rethrow,
+  // check the detached.rethrow predecessors.
+  SmallSetVector<BasicBlock *, 4> TrivialDetachUnwindBlocks;
+  if (lpadBBIsDetachUnwind(BB))
+    // Check all detached.rethrow predecessors to see if all their unwind
+    // blocks are trivial.  If so, we can remove them.
+    if (!llvm::all_of(predecessors(BB), [&](BasicBlock *Pred) {
+          if (!isDetachedRethrow(Pred->getTerminator()))
+            return true;
+          InvokeInst *II = cast<InvokeInst>(Pred->getTerminator());
+          return checkSubtaskUnwindPredecessor(Pred, II->getOperand(1),
+                                               TrivialDetachUnwindBlocks);
+        }))
+      return false;
+
+  for (BasicBlock *DUBlock : TrivialDetachUnwindBlocks) {
+    // Handle the original basic block separately.
+    if (DUBlock == BB)
+      continue;
+    for (BasicBlock *Pred : llvm::make_early_inc_range(predecessors(DUBlock))) {
+      removeUnwindEdge(Pred, DTU);
+      ++NumInvokes;
+    }
+  }
 
   // Turn all invokes that unwind here into calls and delete the basic block.
   for (BasicBlock *Pred : llvm::make_early_inc_range(predecessors(BB))) {

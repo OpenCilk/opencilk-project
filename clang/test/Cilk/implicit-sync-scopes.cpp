@@ -1985,8 +1985,7 @@ int parfor_trycatch(int a) {
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE1]]
 
 // CHECK: [[CONTINUE1]]:
-// CHECK-O0: detach within %[[PFORSYNCREG1]], label %[[PFORBODY1:.+]], label %[[PFORINC1:.+]] unwind label %[[PFORDU1:.+]]
-// CHECK-O1: detach within %[[PFORSYNCREG1]], label %[[PFORBODY1:.+]], label %[[PFORINC1:.+]]
+// CHECK: detach within %[[PFORSYNCREG1]], label %[[PFORBODY1:.+]], label %[[PFORINC1:.+]] unwind label %[[PFORDU1:.+]]
 
 // CHECK: [[PFORBODY1]]:
 // CHECK: %[[TRYSYNCREG1:.+]] = {{.*}}call token @llvm.syncregion.start()
@@ -2071,8 +2070,7 @@ int parfor_trycatch(int a) {
 // CHECK-O0-NEXT: br label %[[PFOREND1:.+]]
 
 // CHECK: [[PFOREND1]]:
-// CHECK-O0: detach within %[[PFORSYNCREG2]], label %[[PFORBODY2:.+]], label %[[PFORINC2:.+]] unwind label %[[PFORDU2:.+]]
-// CHECK-O1: detach within %[[PFORSYNCREG2]], label %[[PFORBODY2:.+]], label %[[PFORINC2:.+]]
+// CHECK: detach within %[[PFORSYNCREG2]], label %[[PFORBODY2:.+]], label %[[PFORINC2:.+]] unwind label %[[PFORDU2:.+]]
 
 // CHECK: [[PFORBODY2]]:
 // CHECK: %[[TRYSYNCREG2:.+]] = {{.*}}call token @llvm.syncregion.start()
