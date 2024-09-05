@@ -285,11 +285,15 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks,
   // properties.  We do not need to check the task that uses this taskframe.
   const Task *UserT = TF->getTaskFromTaskFrame();
 
-  if (!UserT && !MPTasks.TaskList[TF].empty() && getTaskFrameResume(TFCreate))
+  if (!UserT && !MPTasks.TaskList[TF].empty() && getTaskFrameResume(TFCreate)) {
     // Landingpads perform an implicit sync, so if there are logically parallel
     // tasks with this unassociated taskframe and it has a resume destination,
     // then it has a distinguishing sync.
+    LLVM_DEBUG(
+        dbgs() << "Can't remove taskframe with implicit distinguishing sync: "
+               << *TFCreate << "\n");
     return false;
+  }
 
   // Create filter for MPTasks of tasks from parent of task UserT, if UserT
   // exists.
@@ -324,8 +328,13 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks,
       for (const Instruction &I : *BB) {
         if (isa<AllocaInst>(I)) {
           TaskFrameContainsAlloca = true;
-          if (UserT)
+          if (UserT) {
+            LLVM_DEBUG(
+                dbgs()
+                << "Can't remove taskframe with allocas used by spawned task: "
+                << *TFCreate << "\n");
             return false;
+          }
         }
       }
 
@@ -333,8 +342,12 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks,
       // so would cause these syncs to sync tasks spawned in the parent
       // taskframe.
       if (const SyncInst *SI = dyn_cast<SyncInst>(BB->getTerminator()))
-        if (syncIsDiscriminating(SI->getSyncRegion(), LocalTaskList))
+        if (syncIsDiscriminating(SI->getSyncRegion(), LocalTaskList)) {
+          LLVM_DEBUG(dbgs()
+                     << "Can't remove taskframe with distinguishing sync: "
+                     << *TFCreate << "\n");
           return false;
+        }
     }
   }
 
