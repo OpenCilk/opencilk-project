@@ -1,5 +1,5 @@
 // RUN: %clang_cc1 %s -x c++ -fopencilk -verify -fsyntax-only
-struct C { int _Hyperobject c; };
+struct C { int _Hyperobject c = 0; };
 struct C _Hyperobject c; // expected-error{{type 'struct C', which contains a hyperobject, may not be a hyperobject}}
 long _Hyperobject d; // expected-note{{previous definition}}
 void f() {
