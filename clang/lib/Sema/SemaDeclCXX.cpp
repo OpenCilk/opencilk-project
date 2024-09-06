@@ -9595,6 +9595,12 @@ bool SpecialMemberDeletionInfo::shouldDeleteForField(FieldDecl *FD) {
           << !!ICI << MD->getParent() << FD << FieldType << /*Reference*/0;
       return true;
     }
+    if (FieldType->isHyperobjectType() && !FD->hasInClassInitializer()) {
+      if (Diagnose)
+        S.Diag(FD->getLocation(), diag::note_deleted_default_ctor_uninit_field)
+          << !!ICI << MD->getParent() << FD << FieldType << /*Reducer*/2;
+      return true;
+    }
     // C++11 [class.ctor]p5 (modified by DR2394): any non-variant non-static
     // data member of const-qualified type (or array thereof) with no
     // brace-or-equal-initializer is not const-default-constructible.

@@ -3,7 +3,7 @@
 struct S {
   static void identity(void *);
   static void reduce(void *, void *);
-  int _Hyperobject(identity, reduce) member;
+  int _Hyperobject(identity, reduce) member = 0;
   S();
   ~S();
 };
