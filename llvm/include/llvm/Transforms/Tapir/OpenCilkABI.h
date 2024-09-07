@@ -13,8 +13,8 @@
 #ifndef OPEN_CILK_ABI_H_
 #define OPEN_CILK_ABI_H_
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
 
@@ -24,6 +24,7 @@ class TapirLoopInfo;
 
 class OpenCilkABI final : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
+  SmallPtrSet<Function *, 8> Processed;
   SmallPtrSet<CallBase *, 8> CallsToInline;
   DenseMap<BasicBlock *, SmallVector<IntrinsicInst *, 4>> TapirRTCalls;
   ValueToValueMapTy DefaultSyncLandingpad;
