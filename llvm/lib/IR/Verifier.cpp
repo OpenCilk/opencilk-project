@@ -6249,6 +6249,17 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
                 DI1, DI2);
     break;
   }
+  case Intrinsic::tapir_runtime_start: {
+    Check(llvm::any_of(
+              Call.users(),
+              [](const User *U) {
+                if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(U))
+                  return Intrinsic::tapir_runtime_end == II->getIntrinsicID();
+                return false;
+              }),
+          "tapir.runtime.start has no associated tapir.runtime.end", &Call);
+    break;
+  }
   };
 
   // Verify that there aren't any unmediated control transfers between funclets.
