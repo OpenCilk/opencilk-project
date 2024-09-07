@@ -358,6 +358,7 @@ static bool skipForHoisting(const Instruction *I,
                             SmallPtrSetImpl<const Instruction *> &NotHoisted) {
   if (I->isTerminator() || isTapirIntrinsic(Intrinsic::taskframe_create, I) ||
       isTapirIntrinsic(Intrinsic::syncregion_start, I) ||
+      isTapirIntrinsic(Intrinsic::tapir_runtime_start, I) ||
       isa<AllocaInst>(I))
     return true;
 
