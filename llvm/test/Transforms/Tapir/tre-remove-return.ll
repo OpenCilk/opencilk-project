@@ -20,6 +20,7 @@ if.end10:                                         ; preds = %entry
   br label %cleanup
 
 cleanup:                                          ; preds = %if.end10, %if.then7
+  call void @llvm.tapir.runtime.end(token %0)
   ret void
 }
 
@@ -43,6 +44,9 @@ cleanup:                                          ; preds = %if.end10, %if.then7
 
 ; Function Attrs: nounwind willreturn memory(argmem: readwrite)
 declare token @llvm.tapir.runtime.start() #0
+
+; Function Attrs: nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.tapir.runtime.end(token) #0
 
 ; Function Attrs: nounwind willreturn memory(argmem: readwrite)
 declare token @llvm.syncregion.start() #0
