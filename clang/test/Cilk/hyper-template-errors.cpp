@@ -7,7 +7,8 @@ struct reducer
  // expected-error@-1{{type 'long _Hyperobject', which contains a hyperobject, may not be a hyperobject}}
  // expected-error@-2{{type 'reducer<char>', which contains a hyperobject, may not be a hyperobject}}
  // expected-error@-3{{type 'wrap<int _Hyperobject>', which contains a hyperobject, may not be a hyperobject}}
-  int _Hyperobject value2;
+  int _Hyperobject value2 = 0;
+  reducer();
 };
 
 reducer<long _Hyperobject> r_hl; // expected-note{{in instantiation}}

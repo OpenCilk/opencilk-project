@@ -5896,7 +5896,7 @@ def note_deleted_special_member_class_subobject : Note<
 def note_deleted_default_ctor_uninit_field : Note<
   "%select{default constructor of|constructor inherited by}0 "
   "%1 is implicitly deleted because field %2 of "
-  "%select{reference|const-qualified}4 type %3 would not be initialized">;
+  "%select{reference|const-qualified|reducer}4 type %3 would not be initialized">;
 def note_deleted_default_ctor_all_const : Note<
   "%select{default constructor of|constructor inherited by}0 "
   "%1 is implicitly deleted because all "
@@ -10895,8 +10895,8 @@ def incomplete_hyperobject : Error<
 def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
 
-def reducer_callbacks_not_allowed: Warning<
-   "reducer callbacks not implemented for structure members">,
+def reducer_registration_not_implemented: Warning<
+   "reducer registration not implemented for structure members">,
     InGroup<CilkIgnored>;
 
 def err_invalid_reducer_callback : Error<
