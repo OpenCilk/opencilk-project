@@ -746,6 +746,44 @@ void CSIImpl::initializeTapirHooks() {
       M.getOrInsertFunction("__csi_after_sync", RetType, IDType, SyncRegType);
 }
 
+FunctionCallee CSIImpl::getOrInsertSynthesizedHook(StringRef Name,
+                                                   FunctionType *T,
+                                                   AttributeList AL) {
+  // If no bitcode file has been linked, then we cannot check if it contains a
+  // particular library hook.  Simply return the hook.  If the Cilksan library
+  // doesn't contain that hook, the linker will raise an error.
+  if (!LinkedBitcode)
+    return getHookFunction(Name, T, AL);
+
+  // Check if the linked bitcode file contains the library hook.  If it does,
+  // return that hook.
+  if (FunctionsInBitcode.contains(std::string(Name)))
+    return getHookFunction(Name, T, AL);
+
+  // We did not find the library hook in the linked bitcode file.  Synthesize a
+  // default version of the hook that simply calls __csi_default_libhook.
+  FunctionCallee NewHook = M.getOrInsertFunction(Name, T, AL);
+  Function *NewHookFn = cast<Function>(NewHook.getCallee());
+  NewHookFn->setOnlyAccessesInaccessibleMemOrArgMem();
+  NewHookFn->setDoesNotThrow();
+  BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", NewHookFn);
+  IRBuilder<> IRB(ReturnInst::Create(M.getContext(), Entry));
+
+  // Insert a call to the default library function hook
+  Type *IDType = IRB.getInt64Ty();
+  FunctionType *DefaultHookTy =
+      FunctionType::get(IRB.getVoidTy(),
+                        {/*call_id*/
+                         IDType, /*func_id*/ IDType,
+                         /*MAAP_count*/ IRB.getInt8Ty()},
+                        /*isVarArg*/ false);
+  FunctionCallee DefaultHook =
+      M.getOrInsertFunction("__csi_default_libhook", DefaultHookTy);
+  IRB.CreateCall(DefaultHook, {NewHookFn->getArg(0), NewHookFn->getArg(1),
+                               NewHookFn->getArg(2)});
+  return NewHook;
+}
+
 // Prepare any calls in the CFG for instrumentation, e.g., by making sure any
 // call that can throw is modeled with an invoke.
 void CSIImpl::setupCalls(Function &F) {
@@ -1257,16 +1295,40 @@ void CSIImpl::instrumentLoop(Loop &L, TaskInfo &TI, ScalarEvolution *SE) {
   }
 }
 
+// Helper function to get the ID of a function being called.  These IDs are
+// stored in separate global variables in the program.  This method will create
+// a new global variable for the Callee's ID if necessary.
+Value *CSIImpl::getCalleeFuncID(const Function *Callee, IRBuilder<> &IRB) {
+  if (!Callee)
+    // Unknown targets (i.e., indirect calls) are always unknown.
+    return IRB.getInt64(CsiCallsiteUnknownTargetId);
+
+  std::string GVName =
+    CsiFuncIdVariablePrefix + Callee->getName().str();
+  GlobalVariable *FuncIdGV = M.getNamedGlobal(GVName);
+  Type *FuncIdGVTy = IRB.getInt64Ty();
+  if (!FuncIdGV) {
+    FuncIdGV =
+        dyn_cast<GlobalVariable>(M.getOrInsertGlobal(GVName, FuncIdGVTy));
+    assert(FuncIdGV);
+    FuncIdGV->setConstant(false);
+    if (Options.jitMode && !Callee->empty())
+      FuncIdGV->setLinkage(Callee->getLinkage());
+    else
+      FuncIdGV->setLinkage(GlobalValue::WeakAnyLinkage);
+    FuncIdGV->setInitializer(IRB.getInt64(CsiCallsiteUnknownTargetId));
+  }
+  return IRB.CreateLoad(FuncIdGVTy, FuncIdGV);
+}
+
 void CSIImpl::instrumentCallsite(Instruction *I, DominatorTree *DT) {
   if (callsPlaceholderFunction(*I))
     return;
 
   bool IsInvoke = isa<InvokeInst>(I);
   Function *Called = nullptr;
-  if (CallInst *CI = dyn_cast<CallInst>(I))
-    Called = CI->getCalledFunction();
-  else if (InvokeInst *II = dyn_cast<InvokeInst>(I))
-    Called = II->getCalledFunction();
+  if (CallBase *CB = dyn_cast<CallBase>(I))
+    Called = CB->getCalledFunction();
 
   bool ShouldInstrumentBefore = true;
   bool ShouldInstrumentAfter = true;
@@ -1286,25 +1348,7 @@ void CSIImpl::instrumentCallsite(Instruction *I, DominatorTree *DT) {
   Value *DefaultID = getDefaultID(IRB);
   uint64_t LocalId = CallsiteFED.add(*I, Called ? Called->getName() : "");
   Value *CallsiteId = CallsiteFED.localToGlobalId(LocalId, IRB);
-  Value *FuncId = nullptr;
-  GlobalVariable *FuncIdGV = nullptr;
-  if (Called) {
-    std::string GVName = CsiFuncIdVariablePrefix + Called->getName().str();
-    Type *FuncIdGVTy = IRB.getInt64Ty();
-    FuncIdGV = dyn_cast<GlobalVariable>(
-        M.getOrInsertGlobal(GVName, FuncIdGVTy));
-    assert(FuncIdGV);
-    FuncIdGV->setConstant(false);
-    if (Options.jitMode && !Called->empty())
-      FuncIdGV->setLinkage(Called->getLinkage());
-    else
-      FuncIdGV->setLinkage(GlobalValue::WeakAnyLinkage);
-    FuncIdGV->setInitializer(IRB.getInt64(CsiCallsiteUnknownTargetId));
-    FuncId = IRB.CreateLoad(FuncIdGVTy, FuncIdGV);
-  } else {
-    // Unknown targets (i.e. indirect calls) are always unknown.
-    FuncId = IRB.getInt64(CsiCallsiteUnknownTargetId);
-  }
+  Value *FuncId = getCalleeFuncID(Called, IRB);
   assert(FuncId != NULL);
   CsiCallProperty Prop;
   Value *DefaultPropVal = Prop.getValue(IRB);
@@ -1651,14 +1695,79 @@ bool CSIImpl::getAllocFnArgs(const Instruction *I,
   return true;
 }
 
+bool CSIImpl::instrumentAllocFnLibCall(Instruction *I,
+                                       const TargetLibraryInfo *TLI) {
+  bool IsInvoke = isa<InvokeInst>(I);
+  CallBase *CB = dyn_cast<CallBase>(I);
+  if (!CB)
+    return false;
+  Function *Called = CB->getCalledFunction();
+
+  // Get the CSI IDs for this hook
+  IRBuilder<> IRB(I);
+  LLVMContext &Ctx = IRB.getContext();
+  Value *DefaultID = getDefaultID(IRB);
+  uint64_t LocalId = AllocFnFED.add(*I);
+  Value *AllocFnId = AllocFnFED.localToGlobalId(LocalId, IRB);
+  Value *FuncId = getCalleeFuncID(Called, IRB);
+  assert(FuncId != NULL);
+
+  CsiAllocFnProperty Prop;
+  Value *DefaultPropVal = Prop.getValue(IRB);
+  LibFunc AllocLibF;
+  TLI->getLibFunc(*Called, AllocLibF);
+  Prop.setAllocFnTy(static_cast<unsigned>(getAllocFnTy(AllocLibF)));
+  Value *PropVal = Prop.getValue(IRB);
+  Type *IDType = IRB.getInt64Ty();
+
+  // Synthesize the after hook for this function.
+  SmallVector<Type *, 8> AfterHookParamTys(
+      {IDType, /*callee func_id*/ IDType, CsiAllocFnProperty::getType(Ctx)});
+  SmallVector<Value *, 8> AfterHookParamVals({AllocFnId, FuncId, PropVal});
+  SmallVector<Value *, 8> AfterHookDefaultVals(
+      {DefaultID, DefaultID, DefaultPropVal});
+  if (!Called->getReturnType()->isVoidTy()) {
+    AfterHookParamTys.push_back(Called->getReturnType());
+    AfterHookParamVals.push_back(CB);
+    AfterHookDefaultVals.push_back(
+        Constant::getNullValue(Called->getReturnType()));
+  }
+  AfterHookParamTys.append(Called->getFunctionType()->param_begin(),
+                           Called->getFunctionType()->param_end());
+  AfterHookParamVals.append(CB->arg_begin(), CB->arg_end());
+  for (Value *Arg : CB->args())
+    AfterHookDefaultVals.push_back(Constant::getNullValue(Arg->getType()));
+  FunctionType *AfterHookTy =
+      FunctionType::get(IRB.getVoidTy(), AfterHookParamTys, Called->isVarArg());
+  FunctionCallee AfterLibCallHook = getOrInsertSynthesizedHook(
+      ("__csi_alloc_" + Called->getName()).str(), AfterHookTy);
+
+  // Insert the hook after the call.
+  BasicBlock::iterator Iter(I);
+  if (IsInvoke) {
+    // There are two "after" positions for invokes: the normal block and the
+    // exception block.
+    InvokeInst *II = cast<InvokeInst>(I);
+    insertHookCallInSuccessorBB(II->getNormalDest(), II->getParent(),
+                                AfterLibCallHook, AfterHookParamVals,
+                                AfterHookDefaultVals);
+    // Don't insert any instrumentation in the exception block.
+  } else {
+    // Simple call instruction; there is only one "after" position.
+    Iter++;
+    IRB.SetInsertPoint(&*Iter);
+    insertHookCall(&*Iter, AfterLibCallHook, AfterHookParamVals);
+  }
+
+  return true;
+}
+
 void CSIImpl::instrumentAllocFn(Instruction *I, DominatorTree *DT,
                                 const TargetLibraryInfo *TLI) {
   bool IsInvoke = isa<InvokeInst>(I);
   Function *Called = nullptr;
-  if (CallInst *CI = dyn_cast<CallInst>(I))
-    Called = CI->getCalledFunction();
-  else if (InvokeInst *II = dyn_cast<InvokeInst>(I))
-    Called = II->getCalledFunction();
+  if (CallBase *CB = dyn_cast<CallBase>(I))
+    Called = CB->getCalledFunction();
 
   assert(Called && "Could not get called function for allocation fn.");
 
@@ -1668,7 +1777,10 @@ void CSIImpl::instrumentAllocFn(Instruction *I, DominatorTree *DT,
   Value *AllocFnId = AllocFnFED.localToGlobalId(LocalId, IRB);
 
   SmallVector<Value *, 4> AllocFnArgs;
-  getAllocFnArgs(I, AllocFnArgs, IntptrTy, IRB.getPtrTy(), *TLI);
+  if (!getAllocFnArgs(I, AllocFnArgs, IntptrTy, IRB.getPtrTy(), *TLI)) {
+    instrumentAllocFnLibCall(I, TLI);
+    return;
+  }
   SmallVector<Value *, 4> DefaultAllocFnArgs({
       /* Allocated size */ Constant::getNullValue(IntptrTy),
       /* Number of elements */ Constant::getNullValue(IntptrTy),
