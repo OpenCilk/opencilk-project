@@ -643,6 +643,14 @@ public:
     }
     return traverseNode(X, [&] { return Base::TraverseDecl(X); });
   }
+  // A declaration of a hyperobject should not be allowed to shadow
+  // the callback references.  Process the callbacks first.
+  // Note that this does not handle typedefs, using, and any other
+  // methods of making type names available.
+  bool TraverseVarDecl(VarDecl *Var) {
+    TraverseType(Var->getType());
+    return Base::TraverseVarDecl(Var);
+  }
   bool TraverseTypeLoc(TypeLoc X) {
     return traverseNode(&X, [&] { return Base::TraverseTypeLoc(X); });
   }
@@ -699,7 +707,19 @@ public:
   }
   // Uninteresting parts of the AST that don't have locations within them.
   bool TraverseNestedNameSpecifier(NestedNameSpecifier *) { return true; }
-  bool TraverseType(QualType) { return true; }
+
+  // With the introduction of hyperobjects, QualType is interesting.
+  bool TraverseType(QualType Ty) {
+    if (Ty.isNull())
+      return true;
+    if (const HyperobjectType *H = Ty->getAs<HyperobjectType>()) {
+      if (Stmt *I = H->getIdentity())
+        TraverseStmt(I);
+      if (Stmt *R = H->getReduce())
+        TraverseStmt(R);
+    }
+    return true;
+  }
 
   // The DeclStmt for the loop variable claims to cover the whole range
   // inside the parens, this causes the range-init expression to not be hit.
@@ -975,6 +995,10 @@ private:
       }
       if (auto FTL = TL->getAs<FunctionTypeLoc>()) {
         claimRange(SourceRange(FTL.getLParenLoc(), FTL.getEndLoc()), Result);
+        return;
+      }
+      if (auto HTL = TL->getAs<HyperobjectTypeLoc>()) {
+        claimRange(HTL.getHyperLoc(), Result);
         return;
       }
     }

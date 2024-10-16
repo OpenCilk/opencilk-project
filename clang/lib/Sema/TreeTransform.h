@@ -5226,7 +5226,7 @@ QualType TreeTransform<Derived>::TransformComplexType(TypeLocBuilder &TLB,
 template<typename Derived>
 QualType TreeTransform<Derived>::TransformHyperobjectType
   (TypeLocBuilder &TLB, HyperobjectTypeLoc TL) {
-  ExprResult NewR, NewI, NewD;
+  ExprResult NewR, NewI;
 
   {
     const HyperobjectType *H = TL.getTypePtr();
