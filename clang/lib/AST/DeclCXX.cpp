@@ -1083,6 +1083,15 @@ void CXXRecordDecl::addedMember(Decl *D) {
         data().DefaultedCopyConstructorIsDeleted = true;
     }
 
+    if (T->isHyperobjectType()) {
+      // Do not allow braced list initialization, which would
+      // suppress hyperobject registration.
+      data().Aggregate = false;
+      data().HasIrrelevantDestructor = false;
+      data().HasTrivialSpecialMembers &= ~SMF_All;
+      data().HasTrivialSpecialMembersForCall &= ~SMF_All;
+    }
+
     if (!Field->hasInClassInitializer() && !Field->isMutable()) {
       if (CXXRecordDecl *FieldType = T->getAsCXXRecordDecl()) {
         if (FieldType->hasDefinition() && !FieldType->allowConstDefaultInit())

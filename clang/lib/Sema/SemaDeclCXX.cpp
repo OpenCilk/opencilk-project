@@ -5863,7 +5863,7 @@ Sema::MarkBaseAndMemberDestructorsReferenced(SourceLocation Location,
 
     QualType FieldType = Context.getBaseElementType(Field->getType());
 
-    const RecordType* RT = FieldType->getAs<RecordType>();
+    const RecordType* RT = FieldType.stripHyperobject()->getAs<RecordType>();
     if (!RT)
       continue;
 
@@ -9593,6 +9593,12 @@ bool SpecialMemberDeletionInfo::shouldDeleteForField(FieldDecl *FD) {
       if (Diagnose)
         S.Diag(FD->getLocation(), diag::note_deleted_default_ctor_uninit_field)
           << !!ICI << MD->getParent() << FD << FieldType << /*Reference*/0;
+      return true;
+    }
+    if (FieldType->isHyperobjectType() && !FD->hasInClassInitializer()) {
+      if (Diagnose)
+        S.Diag(FD->getLocation(), diag::note_deleted_default_ctor_uninit_field)
+          << !!ICI << MD->getParent() << FD << FieldType << /*Reducer*/2;
       return true;
     }
     // C++11 [class.ctor]p5 (modified by DR2394): any non-variant non-static
