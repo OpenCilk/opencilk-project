@@ -5096,7 +5096,7 @@ BuildImplicitMemberInitializer(Sema &SemaRef, CXXConstructorDecl *Constructor,
          "Unhandled implicit init kind!");
 
   QualType FieldBaseElementType =
-    SemaRef.Context.getBaseElementType(Field->getType());
+    SemaRef.Context.getBaseElementType(Field->getType().stripHyperobject());
 
   if (FieldBaseElementType->isRecordType()) {
     InitializedEntity InitEntity =
