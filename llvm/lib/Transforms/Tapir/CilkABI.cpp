@@ -163,10 +163,13 @@ FunctionCallee CilkABI::Get__cilkrts_get_nworkers() {
 
   LLVMContext &C = M.getContext();
   AttributeList AL;
-  AL = AL.addFnAttribute(C, Attribute::ReadNone);
   AL = AL.addFnAttribute(C, Attribute::NoUnwind);
   FunctionType *FTy = FunctionType::get(Type::getInt32Ty(C), {}, false);
   CilkRTSGetNworkers = M.getOrInsertFunction("__cilkrts_get_nworkers", FTy, AL);
+  if (Function *Fn = dyn_cast<Function>(CilkRTSGetNworkers.getCallee())) {
+      MemoryEffects ME = MemoryEffects::inaccessibleMemOnly(ModRefInfo::Ref);
+      Fn->setMemoryEffects(ME);
+  }
   return CilkRTSGetNworkers;
 }
 
