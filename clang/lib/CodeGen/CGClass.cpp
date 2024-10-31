@@ -1643,6 +1643,11 @@ namespace {
       LValue LV = CGF.EmitLValueForField(ThisLV, field);
       assert(LV.isSimple());
 
+      if (field->getType()->isHyperobjectType()) {
+        llvm::Function *F =
+          CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
+        CGF.Builder.CreateCall(F, {LV.getPointer(CGF)});
+      }
       CGF.emitDestroy(LV.getAddress(CGF), field->getType(), destroyer,
                       flags.isForNormalCleanup() && useEHCleanupForArray);
     }
