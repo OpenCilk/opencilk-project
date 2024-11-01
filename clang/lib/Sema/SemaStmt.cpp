@@ -4028,6 +4028,184 @@ Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
                                    OgInc, CilkForLoc, LParenLoc, RParenLoc);
 }
 
+StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
+  if (!S || !B)
+    return StmtError();
+
+  CilkForRangeStmt *CilkForRange = cast<CilkForRangeStmt>(S);
+
+  StmtResult ForRange =
+      FinishCXXForRangeStmt(CilkForRange->getCXXForRangeStmt(), B);
+  if (ForRange.isInvalid())
+    return StmtError();
+  CilkForRange->setForRange(ForRange.get());
+
+  CXXForRangeStmt *CXXForRange = cast<CXXForRangeStmt>(ForRange.get());
+
+  if (isa<NullStmt>(CXXForRange->getBody())) {
+    Diag(CXXForRange->getForLoc(), diag::warn_empty_cilk_for_body);
+    getCurCompoundScope().setHasEmptyLoopBodies();
+  }
+
+  SearchForReturnInStmt(*this, CXXForRange->getBody());
+
+  if (BreakContinueFinder(*this, CXXForRange->getBody()).BreakFound())
+    Diag(CXXForRange->getForLoc(), diag::err_cilk_for_cannot_break);
+
+  VarDecl *BeginVar =
+      cast<VarDecl>(CXXForRange->getBeginStmt()->getSingleDecl());
+  QualType BeginType = BeginVar->getType();
+  const QualType BeginRefNonRefType = BeginType.getNonReferenceType();
+  ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
+                                         VK_LValue, CXXForRange->getColonLoc());
+  if (BeginRef.isInvalid())
+    return StmtError();
+
+  VarDecl *LoopIndex = CilkForRange->getLocalLoopIndex();
+  QualType LoopIndexType = LoopIndex->getType();
+  const QualType LoopIndexRefNonRefType = LoopIndexType.getNonReferenceType();
+  ExprResult LoopIndexRef = BuildDeclRefExpr(
+      LoopIndex, LoopIndexRefNonRefType, VK_LValue, CXXForRange->getColonLoc());
+  if (LoopIndexRef.isInvalid())
+    return StmtError();
+
+  VarDecl *LoopVar = CXXForRange->getLoopVariable();
+  SourceLocation LoopVarLoc = LoopVar->getBeginLoc();
+  ExprResult NewLoopVarInit = ActOnBinOp(getCurScope(), LoopVarLoc, tok::plus,
+                                         BeginRef.get(), LoopIndexRef.get());
+  if (NewLoopVarInit.isInvalid())
+    return StmtError();
+
+  ExprResult DerefExpr =
+      ActOnUnaryOp(getCurScope(), LoopVarLoc, tok::star, NewLoopVarInit.get());
+  if (DerefExpr.isInvalid()) {
+    Diag(LoopVarLoc, diag::note_for_range_invalid_iterator)
+        << LoopVarLoc << 1 << NewLoopVarInit.get()->getType();
+    return StmtError();
+  }
+
+  AddInitializerToDecl(LoopVar, DerefExpr.get(), /*DirectInit=*/false);
+
+  return CilkForRange;
+}
+
+StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc,
+                                       Stmt *InitStmt, Stmt *First,
+                                       SourceLocation ColonLoc, Expr *Range,
+                                       SourceLocation RParenLoc,
+                                       BuildForRangeKind Kind) {
+  // We wrap the CXXForRange, in an attempt to reduce code copying.
+  SourceLocation EmptyCoawaitLoc;
+  StmtResult ForRangeStmt =
+      ActOnCXXForRangeStmt(S, ForLoc, EmptyCoawaitLoc, InitStmt, First,
+                           ColonLoc, Range, RParenLoc, Kind);
+
+  if (ForRangeStmt.isInvalid())
+    return ForRangeStmt;
+
+  CXXForRangeStmt *ForRange = cast_or_null<CXXForRangeStmt>(ForRangeStmt.get());
+
+  return BuildCilkForRangeStmt(ForRange);
+}
+
+StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
+  Scope *S = getCurScope();
+
+  // 1. Build an induction variable of type difference_type<iterator>
+  // 2. Create an end - begin stmt, the end value of the induction variable.
+
+  VarDecl *BeginVar = cast<VarDecl>(ForRange->getBeginStmt()->getSingleDecl());
+  QualType BeginType = BeginVar->getType();
+  const QualType BeginRefNonRefType = BeginType.getNonReferenceType();
+  ExprResult BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
+                                         VK_LValue, ForRange->getColonLoc());
+  if (BeginRef.isInvalid()) {
+    return StmtError();
+  }
+
+  VarDecl *EndVar = cast<VarDecl>(ForRange->getEndStmt()->getSingleDecl());
+  QualType EndType = EndVar->getType();
+  const QualType EndRefNonRefType = EndType.getNonReferenceType();
+  ExprResult EndRef = BuildDeclRefExpr(EndVar, EndRefNonRefType, VK_LValue,
+                                       ForRange->getColonLoc());
+  if (EndRef.isInvalid()) {
+    return StmtError();
+  }
+  ExprResult LimitExpr = ActOnBinOp(S, ForRange->getColonLoc(), tok::minus,
+                                    EndRef.get(), BeginRef.get());
+  if (LimitExpr.isInvalid()) {
+    // CilkForRange currently only supports random access iterators.
+    Diag(ForRange->getForLoc(), diag::err_cilk_for_range_end_minus_begin);
+    return StmtError();
+  }
+  SourceLocation RangeLoc = ForRange->getBeginLoc();
+  VarDecl *Limit =
+      BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(),
+                           std::string("__cilk_looplimit"));
+  AddInitializerToDecl(Limit, LimitExpr.get(),
+                       /*DirectInit=*/false);
+  FinalizeDeclaration(Limit);
+  CurContext->addHiddenDecl(Limit);
+
+  DeclGroupPtrTy LimitGroup =
+      BuildDeclaratorGroup(MutableArrayRef<Decl *>((Decl **)&Limit, 1));
+  StmtResult LimitStmt = ActOnDeclStmt(LimitGroup, RangeLoc, RangeLoc);
+  if (LimitStmt.isInvalid())
+    return StmtError();
+
+  VarDecl *LoopIndex =
+      BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(),
+                           std::string("__cilk_loopindex"));
+  AddInitializerToDecl(LoopIndex, ActOnIntegerConstant(RangeLoc, 0).get(),
+                       /*DirectInit=*/false);
+  FinalizeDeclaration(LoopIndex);
+  CurContext->addHiddenDecl(LoopIndex);
+
+  DeclGroupPtrTy LoopIndexGroup =
+      BuildDeclaratorGroup(MutableArrayRef<Decl *>((Decl **)&LoopIndex, 1));
+  StmtResult LoopIndexStmt = ActOnDeclStmt(LoopIndexGroup, RangeLoc, RangeLoc);
+  if (LoopIndexStmt.isInvalid())
+    return StmtError();
+
+  ExprResult LimitRef =
+      BuildDeclRefExpr(Limit, Limit->getType(), VK_LValue, RangeLoc);
+  ExprResult LoopIndexRef =
+      BuildDeclRefExpr(LoopIndex, LoopIndex->getType(), VK_LValue, RangeLoc);
+  ExprResult Cond;
+  Cond = ActOnBinOp(S, RangeLoc, tok::exclaimequal, LoopIndexRef.get(),
+                    LimitRef.get());
+  if (Cond.isInvalid())
+    return StmtError();
+
+  VarDecl *LocalLoopIndex =
+      BuildForRangeVarDecl(*this, RangeLoc, LimitExpr.get()->getType(),
+                           std::string("__local_loopindex"));
+  AddInitializerToDecl(LocalLoopIndex, LoopIndexRef.get(),
+                       /*DirectInit=*/false);
+  FinalizeDeclaration(LocalLoopIndex);
+  CurContext->addHiddenDecl(LocalLoopIndex);
+
+  DeclGroupPtrTy LocalLoopIndexGroup = BuildDeclaratorGroup(
+      MutableArrayRef<Decl *>((Decl **)&LocalLoopIndex, 1));
+  StmtResult LocalLoopIndexStmt =
+      ActOnDeclStmt(LocalLoopIndexGroup, RangeLoc, RangeLoc);
+  if (LocalLoopIndexStmt.isInvalid())
+    return StmtError();
+
+  // Create a new increment operation on the new beginning variable, and add it
+  // to the existing increment operation.
+  SourceLocation IncLoc = RangeLoc;
+  ExprResult NewInc =
+      ActOnUnaryOp(S, IncLoc, tok::plusplus, LoopIndexRef.get());
+  if (NewInc.isInvalid())
+    return StmtError();
+
+  return new (Context) CilkForRangeStmt(
+      Context, ForRange, LoopIndex, cast<DeclStmt>(LocalLoopIndexStmt.get()),
+      cast<DeclStmt>(LimitStmt.get()), Cond.get(), NewInc.get(),
+      cast<DeclStmt>(LoopIndexStmt.get()));
+}
+
 /// Determine whether the given expression might be move-eligible or
 /// copy-elidable in either a (co_)return statement or throw expression,
 /// without considering function return type, if applicable.

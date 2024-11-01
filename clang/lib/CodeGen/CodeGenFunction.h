@@ -3919,6 +3919,8 @@ public:
   void EmitCilkSyncStmt(const CilkSyncStmt &S);
   void EmitCilkForStmt(const CilkForStmt &S,
                        ArrayRef<const Attr *> Attrs = std::nullopt);
+  void EmitCilkForRangeStmt(const CilkForRangeStmt &S,
+                       ArrayRef<const Attr *> Attrs = std::nullopt);
   LValue EmitCilkSpawnExprLValue(const CilkSpawnExpr *E);
 
   void EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S);

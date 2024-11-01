@@ -179,6 +179,9 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::CilkScopeStmtClass:
     EmitCilkScopeStmt(cast<CilkScopeStmt>(*S));
     break;
+  case Stmt::CilkForRangeStmtClass:
+    EmitCilkForRangeStmt(cast<CilkForRangeStmt>(*S), Attrs);
+    break;
   case Stmt::ObjCAtTryStmtClass:
     EmitObjCAtTryStmt(cast<ObjCAtTryStmt>(*S));
     break;
