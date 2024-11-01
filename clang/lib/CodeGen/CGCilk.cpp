@@ -18,7 +18,6 @@
 
 using namespace clang;
 using namespace CodeGen;
-using namespace std;
 
 CodeGenFunction::IsSpawnedScope::IsSpawnedScope(CodeGenFunction *CGF)
     : CGF(CGF), OldIsSpawned(CGF->IsSpawned),
@@ -497,6 +496,7 @@ void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
 void 
 CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
                                            ArrayRef<const Attr *> ForAttrs) {
+  
   JumpDest LoopExit = getJumpDestInCurrentScope("pfor.end");
 
   // Setup the sync region
