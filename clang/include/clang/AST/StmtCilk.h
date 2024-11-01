@@ -14,6 +14,7 @@
 #define LLVM_CLANG_AST_STMTCILK_H
 
 #include "clang/AST/Stmt.h"
+#include "clang/AST/StmtCXX.h"
 #include "clang/Basic/SourceLocation.h"
 
 namespace clang {
@@ -90,6 +91,81 @@ public:
   const_child_range children() const {
     return const_child_range(const_child_iterator(), const_child_iterator());
   }
+};
+
+/// CilkForRangeStmt - This represents a '_Cilk_for(range-declarator :
+/// range-expression)' or a '_Cilk_for (init-statement range-declarator :
+/// range-expression)', based on a CXXForRangeStmt which is a C++0x
+/// [stmt.ranged]'s ranged for stmt
+///
+/// This is stored as a FORRANGE stmt embedded inside a CILKFORRANGE with some
+/// other necessary semantic components.
+class CilkForRangeStmt : public Stmt {
+  enum {
+    FORRANGE,
+    LOOPINDEX,
+    LOOPINDEXSTMT,
+    LOCALLOOPINDEX,
+    LIMIT,
+    COND,
+    INC,
+    END
+  };
+  Stmt *SubExprs[END];
+
+public:
+  CilkForRangeStmt(const ASTContext &C, CXXForRangeStmt *ForRange,
+                   VarDecl *LoopIndex, DeclStmt *LocalLoopIndex,
+                   DeclStmt *Limit, Expr *Cond, Expr *Inc,
+                   DeclStmt *LoopIndexStmt);
+
+  /// \brief Build an empty cilk for range statement.
+  explicit CilkForRangeStmt(EmptyShell Empty)
+      : Stmt(CilkForRangeStmtClass, Empty) {}
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == CilkForRangeStmtClass;
+  }
+
+  CXXForRangeStmt *getCXXForRangeStmt() const;
+
+  void setForRange(Stmt *S) { SubExprs[FORRANGE] = S; }
+
+  VarDecl *getLoopIndex() const;
+  void setLoopIndex(const ASTContext &C, VarDecl *V);
+
+  VarDecl *getLocalLoopIndex();
+  const VarDecl *getLocalLoopIndex() const;
+
+  Expr *getCond() { return reinterpret_cast<Expr *>(SubExprs[COND]); }
+  Expr *getInc() { return reinterpret_cast<Expr *>(SubExprs[INC]); }
+  DeclStmt *getLoopIndexStmt() {
+    return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
+  }
+  DeclStmt *getLimitStmt() { return cast_or_null<DeclStmt>(SubExprs[LIMIT]); }
+  DeclStmt *getLocalLoopIndexStmt() {
+    return cast<DeclStmt>(SubExprs[LOCALLOOPINDEX]);
+  }
+
+  const Expr *getCond() const {
+    return reinterpret_cast<Expr *>(SubExprs[COND]);
+  }
+  const Expr *getInc() const { return reinterpret_cast<Expr *>(SubExprs[INC]); }
+  const DeclStmt *getLoopIndexStmt() const {
+    return cast_or_null<DeclStmt>(SubExprs[LOOPINDEXSTMT]);
+  }
+  const DeclStmt *getLimitStmt() const {
+    return cast_or_null<DeclStmt>(SubExprs[LIMIT]);
+  }
+  const DeclStmt *getLocalLoopIndexStmt() const {
+    return cast<DeclStmt>(SubExprs[LOCALLOOPINDEX]);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY;
+  SourceLocation getEndLoc() const LLVM_READONLY;
+
+  // Iterators
+  child_range children() { return child_range(&SubExprs[0], &SubExprs[END]); }
 };
 
 /// CilkForStmt - This represents a '_Cilk_for(init;cond;inc)' stmt.
