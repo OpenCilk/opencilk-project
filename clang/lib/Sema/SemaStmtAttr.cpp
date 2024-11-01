@@ -88,7 +88,8 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
           .Default("clang loop");
 
   if ((PragmaName == "cilk") &&
-      (St->getStmtClass() != Stmt::CilkForStmtClass)) {
+      (St->getStmtClass() != Stmt::CilkForStmtClass &&
+       St->getStmtClass() != Stmt::CilkForRangeStmtClass)) {
     S.Diag(St->getBeginLoc(), diag::err_pragma_cilk_precedes_noncilk)
       << "#pragma cilk";
     return nullptr;

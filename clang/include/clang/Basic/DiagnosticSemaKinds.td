@@ -10919,7 +10919,12 @@ def err_hyperobject_struct_assign : Error<
 def no_reducer_array : Warning<
     "array of reducer not implemented">,
     InGroup<CilkIgnored>;
-} // end of Cilk category
+
+// cilk for_range
+def err_cilk_for_range_end_minus_begin : Error<
+  "Cannot determine length with '__end - __begin'. Please use a random access iterator.">;
+} 
+// end of Cilk category
 
 let CategoryName = "OpenMP Issue" in {
 // OpenMP support.

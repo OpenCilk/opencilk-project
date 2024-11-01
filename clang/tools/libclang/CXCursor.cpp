@@ -312,6 +312,10 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
   case Stmt::CilkScopeStmtClass:
     K = CXCursor_CilkScopeStmt;
     break;
+  
+  case Stmt::CilkForRangeStmtClass:
+    K = CXCursor_CilkForRangeStmt;
+    break;
 
   case Stmt::ArrayTypeTraitExprClass:
   case Stmt::AsTypeExprClass:
