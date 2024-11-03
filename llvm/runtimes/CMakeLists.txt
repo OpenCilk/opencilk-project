@@ -418,6 +418,13 @@ if(runtimes)
   # The runtimes target is a configuration of all the runtime libraries
   # together in a single CMake invocation.
   set(extra_deps "")
+  if("cheetah" IN_LIST LLVM_ENABLE_RUNTIMES OR "cilktools" IN_LIST LLVM_ENABLE_RUNTIMES)
+    foreach(dep llvm-link clang)
+      if(TARGET ${dep})
+        list(APPEND extra_deps ${dep})
+      endif()
+    endforeach()
+  endif()
   if("openmp" IN_LIST LLVM_ENABLE_RUNTIMES)
     foreach(dep opt llvm-link llvm-extract clang clang-offload-packager)
       if(TARGET ${dep} AND OPENMP_ENABLE_LIBOMPTARGET)
