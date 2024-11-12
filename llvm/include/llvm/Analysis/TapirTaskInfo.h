@@ -20,6 +20,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instruction.h"
@@ -302,6 +303,17 @@ public:
   void addBlock(BasicBlock &B) {
     Blocks.push_back(&B);
     DenseBlockSet.insert(&B);
+  }
+
+  /// Raw method to remove block B from this spindle.
+  void removeBlock(BasicBlock &B) {
+    DenseBlockSet.erase(&B);
+    for (auto Iter = Blocks.begin(); Iter != Blocks.end(); ++Iter) {
+      if (*Iter == &B) {
+        Blocks.erase(Iter);
+        break;
+      }
+    }
   }
 
   // Returns true if the basic block B predeces this spindle.
@@ -1456,6 +1468,27 @@ public:
     SpindleMap[S] = T;
   }
 
+  // Move spindle S from its task to that task's parent.
+  //
+  // NOTE: The resulting TaskInfo may not exactly match the state of a freshly
+  // computed TaskInfo.
+  void moveSpindlesToParent(Task *T) {
+    // Currently this method simply adds T's spindles to T's parent task
+    // and removes those spindles from T.
+    // TODO: Update Spindle types and edges.
+    Task *Parent = T->getParentTask();
+    // Add all spindles to parent task.
+    for (Spindle *S : T->Spindles) {
+      Parent->addSpindle(*S);
+      S->setParentTask(Parent);
+      SpindleMap[S] = Parent;
+    }
+
+    // Remove all spindles from this task.
+    while (!T->Spindles.empty())
+      T->Spindles.pop_back();
+  }
+
   // Add spindle S to task T, where S is a shared exception-handling spindle
   // among subtasks of T.
   void addEHSpindleToTask(Spindle *S, Task *T) {
@@ -1470,6 +1503,15 @@ public:
     assert(!BBMap.count(&B) && "Block already mapped to a spindle.");
     S->addBlock(B);
     BBMap[&B] = S;
+  }
+
+  // Remove basic block B from its spindle.
+  void removeBlock(BasicBlock &B) {
+    if (!BBMap.count(&B))
+      return;
+    Spindle *S = BBMap[&B];
+    S->removeBlock(B);
+    BBMap.erase(&B);
   }
 
   // Associate a task T with the spindle TFSpindle that creates its taskframe.
