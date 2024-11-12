@@ -370,6 +370,7 @@ eh.resume:                                        ; preds = %lpad
 ; CHECK-NEXT: %[[LPADIVAL:.+]] = landingpad [[LPADTYPE]]
 ; CHECK-NEXT: catch ptr @_ZTIc
 ; CHECK-NEXT: catch ptr @_ZTIi
+; CHECK: call i32 @llvm.eh.typeid.for(ptr @_ZTIc)
 ; CHECK: br i1 %{{.+}}, label %[[CATCHI:.+]], label %[[RESUMEI:.+]]
 
 ; CHECK: [[CATCHI]]:
@@ -377,7 +378,7 @@ eh.resume:                                        ; preds = %lpad
 ; CHECK: br label %[[EXITI:.+]]
 
 ; CHECK: [[RESUMEI]]:
-; CHECK-NEXT: resume [[LPADTYPE]] %[[LPADIVAL]]
+; CHECK: br label %[[LPADBODY:.+]]
 
 ; CHECK: [[UNREACHABLEI]]:
 ; CHECK-NEXT: unreachable
@@ -385,8 +386,21 @@ eh.resume:                                        ; preds = %lpad
 ; CHECK: [[EXITI]]:
 ; CHECK-NEXT: br label %[[TRYCONT:.+]]
 
+; CHECK: [[LPADBODY]]:
+; CHECK-NEXT: %[[EH_LPADBODY:.+]] = phi [[LPADTYPE]]
+; CHECK: [ %[[LPADIVAL]], %[[RESUMEI]] ]
+; CHECK: call i32 @llvm.eh.typeid.for(ptr @_ZTIi)
+; CHECK: br i1 %{{.+}}, label %[[CATCH:.+]], label %[[RESUME:.+]]
+
+; CHECK: [[CATCH]]:
+; CHECK: call void @_Z7catch_ii(
+; CHECK: br label %[[TRYCONT]]
+
 ; CHECK: [[TRYCONT]]:
 ; CHECK-NEXT: ret void
+
+; CHECK: [[RESUME]]:
+; CHECK-NEXT: resume [[LPADTYPE]] %[[EH_LPADBODY]]
 
 attributes #0 = { uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { nounwind readnone }

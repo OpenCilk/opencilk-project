@@ -675,8 +675,8 @@ static void HandleInlinedTasksHelper(
     }
 
     // Promote any calls in the block to invokes.
-    if (BasicBlock *NewBB = HandleCallsInBlockInlinedThroughInvoke(
-            BB, UnwindEdge)) {
+    if (BasicBlock *NewBB =
+            HandleCallsInBlockInlinedThroughInvoke(BB, UnwindEdge)) {
       // If this is the topmost invocation of HandleInlinedTasksHelper, update
       // any PHI nodes in the exceptional block to indicate that there is now a
       // new entry in them.
@@ -745,7 +745,7 @@ static void HandleInlinedTasksHelper(
           Invoke.addIncomingPHIValuesFor(SubTaskUnwindEdge);
         }
 
-      } else if (Visited.insert(DI->getUnwindDest()).second) {
+      } else if (!Visited.contains(DI->getUnwindDest())) {
         // If the detach-unwind isn't dead, add it to the worklist.
         Worklist.push_back(DI->getUnwindDest());
       }
