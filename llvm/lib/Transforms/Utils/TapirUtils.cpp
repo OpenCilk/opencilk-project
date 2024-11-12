@@ -2260,7 +2260,8 @@ void llvm::eraseTaskFrame(Value *TaskFrame, DominatorTree *DT) {
   for (User *U : TaskFrame->users()) {
     if (Instruction *UI = dyn_cast<Instruction>(U))
       if (isTapirIntrinsic(Intrinsic::taskframe_use, UI) ||
-          isTapirIntrinsic(Intrinsic::taskframe_end, UI))
+          isTapirIntrinsic(Intrinsic::taskframe_end, UI) ||
+          isTapirIntrinsic(Intrinsic::taskframe_resume, UI))
         ToErase.push_back(UI);
   }
 
