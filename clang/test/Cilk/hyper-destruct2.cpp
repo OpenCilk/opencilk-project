@@ -16,8 +16,8 @@ struct Outer {
 };
 
 // Make sure the appropriate variant of ~Inner() is emitted.
-// CHECK: {{^}}define{{.*}} void @_ZN5OuterD2Ev
-// CHECK: call void @_ZN5InnerIcED2Ev
-// CHECK: {{^}}define linkonce_odr void @_ZN5InnerIcED2Ev
+// CHECK: {{^}}define{{.*}} {{void|ptr}} @_ZN5OuterD2Ev
+// CHECK: call{{.*}} {{void|ptr}} @_ZN5InnerIcED2Ev
+// CHECK: {{^}}define linkonce_odr{{.*}} {{void|ptr}} @_ZN5InnerIcED2Ev
 
 Outer::~Outer() { }
