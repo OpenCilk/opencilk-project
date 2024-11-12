@@ -31,7 +31,7 @@ public:
 bool simplifySyncs(Task *T, MaybeParallelTasks &MPTasks);
 
 /// Simplify the specified task T.
-bool simplifyTask(Task *T);
+bool simplifyTask(Task *T, TaskInfo &TI, DominatorTree &DT);
 
 /// Simplify the taskframes analyzed by TapirTaskInfo TI.
 bool simplifyTaskFrames(TaskInfo &TI, DominatorTree &DT);

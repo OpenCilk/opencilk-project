@@ -1099,7 +1099,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     SerializeDetach(ClonedDI, ParentEntry, EHCont, EHContLPadVal,
                     ClonedReattaches, &ClonedEHBlocks, &ClonedEHBlockPreds,
                     &ClonedInlinedLPads, &ClonedDetachedRethrows,
-                    NeedToInsertTaskFrame, DT, LI);
+                    NeedToInsertTaskFrame, DT, nullptr, LI);
   }
 
   // Detach the stripmined loop.

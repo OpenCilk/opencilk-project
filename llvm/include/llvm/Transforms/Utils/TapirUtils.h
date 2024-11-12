@@ -103,7 +103,8 @@ bool MoveStaticAllocasInBlock(BasicBlock *Entry, BasicBlock *Block,
 
 /// Inline any taskframe.resume markers associated with the given taskframe.  If
 /// \p DT is provided, then it will be updated to reflect the CFG changes.
-void InlineTaskFrameResumes(Value *TaskFrame, DominatorTree *DT = nullptr);
+void InlineTaskFrameResumes(Value *TaskFrame, DominatorTree *DT = nullptr,
+                            TaskInfo *TI = nullptr);
 
 /// Clone exception-handling blocks EHBlocksToClone, with predecessors
 /// EHBlockPreds in a given task.  Updates EHBlockPreds to point at the cloned
@@ -131,7 +132,8 @@ void SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
                      SmallPtrSetImpl<LandingPadInst *> *InlinedLPads,
                      SmallVectorImpl<Instruction *> *DetachedRethrows,
                      bool ReplaceWithTaskFrame = false,
-                     DominatorTree *DT = nullptr, LoopInfo *LI = nullptr);
+                     DominatorTree *DT = nullptr, TaskInfo *TI = nullptr,
+                     LoopInfo *LI = nullptr);
 
 /// Analyze a task T for serialization.  Gets the reattaches, landing pads, and
 /// detached rethrows that need special handling during serialization.
@@ -145,7 +147,7 @@ void AnalyzeTaskForSerialization(
 /// Serialize the detach DI that spawns task T.  If \p DT is provided, then it
 /// will be updated to reflect the CFG changes.
 void SerializeDetach(DetachInst *DI, Task *T, bool ReplaceWithTaskFrame = false,
-                     DominatorTree *DT = nullptr);
+                     DominatorTree *DT = nullptr, TaskInfo *TI = nullptr);
 
 /// Get the entry basic block to the detached context that contains
 /// the specified block.
