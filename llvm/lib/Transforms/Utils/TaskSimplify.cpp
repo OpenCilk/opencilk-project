@@ -238,10 +238,11 @@ static bool detachImmediatelySyncs(DetachInst *DI) {
   return isa<SyncInst>(I);
 }
 
-bool llvm::simplifyTask(Task *T) {
+bool llvm::simplifyTask(Task *T, TaskInfo &TI, DominatorTree &DT) {
   if (T->isRootTask())
     return false;
 
+  DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
   LLVM_DEBUG(dbgs() << "Simplifying task @ " << T->getEntry()->getName()
                     << "\n");
 
@@ -254,7 +255,8 @@ bool llvm::simplifyTask(Task *T) {
   // destination from T's detach.
   if (DI->hasUnwindDest()) {
     if (!taskCanThrow(T)) {
-      removeUnwindEdge(DI->getParent());
+      LLVM_DEBUG(dbgs() << "Removing unwind edge of " << *DI << "\n");
+      removeUnwindEdge(DI->getParent(), &DTU);
       // removeUnwindEdge will invalidate the DI pointer.  Get the new DI
       // pointer.
       DI = T->getDetach();
@@ -263,13 +265,17 @@ bool llvm::simplifyTask(Task *T) {
   }
 
   if (!taskCanReachContinuation(T)) {
+    LLVM_DEBUG(dbgs() << "Task cannot reach continuation.  Serializing " << *DI
+                      << "\n");
     // This optimization assumes that if a task cannot reach its continuation
     // then we shouldn't bother spawning it.  The task might perform code that
     // can reach the unwind destination, however.
-    SerializeDetach(DI, T, NestedSync);
+    SerializeDetach(DI, T, NestedSync, &DT, &TI);
     Changed = true;
   } else if (!PreserveAllSpawns && detachImmediatelySyncs(DI)) {
-    SerializeDetach(DI, T, NestedSync);
+    LLVM_DEBUG(dbgs() << "Detach immediately syncs.  Serializing " << *DI
+                      << "\n");
+    SerializeDetach(DI, T, NestedSync, &DT, &TI);
     Changed = true;
   }
 
@@ -651,7 +657,7 @@ bool TaskSimplify::runOnFunction(Function &F) {
 
   // Simplify each task in the function.
   for (Task *T : post_order(TI.getRootTask()))
-    Changed |= simplifyTask(T);
+    Changed |= simplifyTask(T, TI, DT);
 
   if (PostCleanupCFG && (Changed | SplitBlocks))
     Changed |= simplifyFunctionCFG(F, TTI, nullptr, Options);
@@ -729,7 +735,7 @@ PreservedAnalyses TaskSimplifyPass::run(Function &F,
 
   // Simplify each task in the function.
   for (Task *T : post_order(TI.getRootTask()))
-    Changed |= simplifyTask(T);
+    Changed |= simplifyTask(T, TI, DT);
 
   if (PostCleanupCFG && (Changed | SplitBlocks))
     Changed |= simplifyFunctionCFG(F, TTI, nullptr, Options);
