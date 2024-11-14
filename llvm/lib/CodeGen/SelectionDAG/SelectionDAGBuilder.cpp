@@ -7816,6 +7816,11 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
                              TLI.getFrameIndexTy(DAG.getDataLayout()),
                              getValue(I.getArgOperand(0))));
     return;
+  case Intrinsic::tapir_frame: {
+    EVT VT = TLI.getValueType(DAG.getDataLayout(), I.getType());
+    setValue(&I, DAG.getConstant(0, sdl, VT));
+    return;
+  }
   }
 }
 
