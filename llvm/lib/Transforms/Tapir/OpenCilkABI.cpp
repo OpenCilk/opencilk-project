@@ -1179,48 +1179,101 @@ OpenCilkABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
   return nullptr;
 }
 
+// Return the stack frame for this function if it is definitely
+// initialized.  Otherwise return null.
+// The lookup call must be dominated by a call to enter frame.
+// The lookup call must not be reachable by any call to leave
+// frame unless there is an intervening enter frame.
+// This function will conservatively return null in some cases
+// it does not understand.  Most likely to matter, if a basic
+// block contains a leave frame call followed by an enter frame
+// call it will be treated as leaving the frame invalid.
+
 Value *OpenCilkABI::getValidFrame(CallBase *FrameCall, DominatorTree &DT) {
-  Function *F = FrameCall->getFunction();
-  if (Value *Frame = DetachCtxToStackFrame.lookup(F)) {
-    // Make sure a call to enter_frame dominates this get_frame call
-    // and no call to leave_frame has potentially been executed.
-    // Otherwise return a null pointer value to mean unknown.
-    // This is correct in most functions and conservative in
-    // complicated functions.
-    bool Initialized = false;
-    Value *Enter1 = CILKRTS_FUNC(enter_frame_helper).getCallee();
-    Value *Enter2 = CILKRTS_FUNC(enter_frame).getCallee();
-    Value *Leave1 = CILKRTS_FUNC(leave_frame_helper).getCallee();
-    Value *Leave2 = CILKRTS_FUNC(leave_frame).getCallee();
-    Value *Leave3 = CilkHelperEpilogue.getCallee();
-    Value *Leave4 = CilkParentEpilogue.getCallee();
-    for (User *U : Frame->users()) {
-      if (CallBase *C = dyn_cast<CallBase>(U)) {
-        Function *Fn = C->getCalledFunction();
-        if (Fn == nullptr) // indirect function call
-          continue;
-        if (Fn == Enter1 || Fn == Enter2) {
+  BasicBlock *FrameBlock = FrameCall->getParent();
+  Function *F = FrameBlock->getParent();
+  Value *Frame = DetachCtxToStackFrame.lookup(F);
+  if (!Frame)
+    return nullptr;
+
+  // Blocks with enter frame calls.
+  SmallPtrSet<BasicBlock *, 8> EnterBlocks;
+  // The last enter or leave frame call before FrameCall
+  // in the same basic block.
+  CallBase *SameBlockCall = nullptr;
+  // True if the call is enter, false if leave or not yet set.
+  bool SameBlockEnter = false;
+  // Leave frame calls other than those before FrameCall
+  // in the same basic block.
+  SmallPtrSet<CallBase *, 8> Leaves;
+
+  // Use pointer identity to check call target.  Enter and leave
+  // are always called with a known getCalledFunction().
+  // This function runs before inlining of runtime calls.
+  Value *Enter1 = CILKRTS_FUNC(enter_frame_helper).getCallee();
+  Value *Enter2 = CILKRTS_FUNC(enter_frame).getCallee();
+  Value *Leave1 = CILKRTS_FUNC(leave_frame_helper).getCallee();
+  Value *Leave2 = CILKRTS_FUNC(leave_frame).getCallee();
+  Value *Leave3 = CilkHelperEpilogue.getCallee();
+  Value *Leave4 = CilkParentEpilogue.getCallee();
+
+  // Collect all enter_frame and leave_frame calls.
+  bool Initialized = false;
+  for (User *U : Frame->users()) {
+    if (CallBase *C = dyn_cast<CallBase>(U)) {
+      Function *Fn = C->getCalledFunction();
+      BasicBlock *Block = C->getParent();
+      if (Fn == Enter1 || Fn == Enter2) {
+        if (FrameBlock == Block && C->comesBefore(FrameCall)) {
+          if (!SameBlockCall || SameBlockCall->comesBefore(C)) {
+            SameBlockCall = C;
+            SameBlockEnter = true;
+          }
+          Initialized = true;
+        } else {
+          EnterBlocks.insert(Block);
           if (!Initialized && DT.dominates(C, FrameCall))
             Initialized = true;
-          continue;
         }
-        if (Fn == Leave1 || Fn == Leave2 | Fn == Leave3 | Fn == Leave4) {
-          // TODO: ...unless an enter_frame call definitely intervenes.
-          if (isPotentiallyReachable(C, FrameCall, nullptr, &DT, nullptr))
-            return Constant::getNullValue(FrameCall->getType());
-          continue;
+      } else if (Fn == Leave1 || Fn == Leave2 || Fn == Leave3 || Fn == Leave4) {
+        if (Block == FrameBlock && C->comesBefore(FrameCall)) {
+          if (!SameBlockCall || SameBlockCall->comesBefore(C)) {
+            SameBlockCall = C;
+            SameBlockEnter = false;
+          }
+        } else {
+          Leaves.insert(C);
         }
       }
     }
-    if (Initialized)
-      return Frame;
   }
-  return Constant::getNullValue(FrameCall->getType());
+  if (!Initialized)
+    return nullptr;
+
+  // Is the answer found in the same basic block?
+  if (SameBlockCall)
+    return SameBlockEnter ? Frame : nullptr;
+
+  // Ignore any enter frame call in a block that also contains
+  // a leave frame call.
+  for (CallBase *L : Leaves) {
+    EnterBlocks.erase(L->getParent());
+  }
+
+  // Look for leave frame calls that might reach the use without
+  // an intervening enter frame call.
+  for (CallBase *L : Leaves) {
+    if (isPotentiallyReachable(L, FrameCall, &EnterBlocks, &DT, nullptr))
+      return nullptr;
+  }
+  return Frame;
 }
 
 void OpenCilkABI::lowerFrameCall(CallBase *FrameCall, DominatorTree &DT) {
   assert(FrameCall->data_operands_size() == 0);
   Value *Frame = getValidFrame(FrameCall, DT);
+  if (Frame == nullptr)
+    Frame = Constant::getNullValue(FrameCall->getType());
   FrameCall->replaceAllUsesWith(Frame);
   FrameCall->eraseFromParent();
 }
