@@ -1161,7 +1161,7 @@ ExpectedType ASTNodeImporter::VisitHyperobjectType(const HyperobjectType *T) {
     return ToReduceOrErr.takeError();
 
   return Importer.getToContext().getHyperobjectType(
-      *ToElementTypeOrErr, *ToReduceOrErr, *ToIdentityOrErr);
+      *ToElementTypeOrErr, *ToIdentityOrErr, *ToReduceOrErr);
 }
 
 ExpectedType ASTNodeImporter::VisitComplexType(const ComplexType *T) {
