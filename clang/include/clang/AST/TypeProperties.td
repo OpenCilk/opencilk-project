@@ -21,15 +21,15 @@ let Class = HyperobjectType in {
   def : Property<"elementType", QualType> {
     let Read = [{ node->getElementType() }];
   }
-  def : Property<"reduce", ExprRef> {
-    let Read = [{ node->getReduce() }];
-  }
   def : Property<"identity", ExprRef> {
     let Read = [{ node->getIdentity() }];
   }
+  def : Property<"reduce", ExprRef> {
+    let Read = [{ node->getReduce() }];
+  }
 
   def : Creator<[{
-    return ctx.getHyperobjectType(elementType, reduce, identity);
+    return ctx.getHyperobjectType(elementType, identity, reduce);
   }]>;
 }
 

@@ -1272,8 +1272,8 @@ public:
   QualType RebuildDependentBitIntType(bool IsUnsigned, Expr *NumBitsExpr,
                                       SourceLocation Loc);
 
-  QualType RebuildHyperobjectType(QualType ElementType, Expr *R,
-                                  Expr *I, SourceLocation Loc);
+  QualType RebuildHyperobjectType(QualType ElementType, Expr *I,
+                                  Expr *R, SourceLocation Loc);
 
   /// Build a new template name given a nested name specifier, a flag
   /// indicating whether the "template" keyword was provided, and the template
