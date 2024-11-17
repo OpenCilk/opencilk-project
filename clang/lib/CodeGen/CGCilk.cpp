@@ -15,9 +15,11 @@
 #include "CGCleanup.h"
 #include "clang/AST/ExprCilk.h"
 #include "clang/AST/StmtCilk.h"
+#include <iostream>
 
 using namespace clang;
 using namespace CodeGen;
+using namespace std;
 
 CodeGenFunction::IsSpawnedScope::IsSpawnedScope(CodeGenFunction *CGF)
     : CGF(CGF), OldIsSpawned(CGF->IsSpawned),
@@ -530,16 +532,27 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   // increment, the continue scope will be overwritten later.
   JumpDest Continue = getJumpDestInCurrentScope("pfor.cond");
   llvm::BasicBlock *CondBlock = Continue.getBlock();
+
+  // TODO: need to check condition and then get to pfor.end
+  llvm::BasicBlock *InitialEntryBlock = createBasicBlock("pfor.initial.entry");
+  EmitBlock(InitialEntryBlock);
+  llvm::Value *InitialBoolCondVal = EvaluateExprAsBool(S.getCond());
+  // llvm::MDNode *Weights = 
+  //   createProfileWeightsForLoop(S.getCond(), getProfileCount(S.getBody()));
+
+  // Do we need weights?
+  Builder.CreateCondBr(InitialBoolCondVal, Continue.getBlock(), LoopExit.getBlock()); 
+
+
+
   EmitBlock(CondBlock);
   Expr::EvalResult Result;
-  bool CondIsConstInt = S.getCond()->EvaluateAsInt(Result, getContext());
 
   LoopStack.setSpawnStrategy(LoopAttributes::DAC);
   const SourceRange &R = S.getSourceRange();
   LoopStack.push(CondBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
-                 SourceLocToDebugLoc(R.getEnd()),
-                 checkIfLoopMustProgress(CondIsConstInt));
+                 SourceLocToDebugLoc(R.getEnd()));
 
   const Expr *Inc = S.getInc();
   assert(Inc && "_Cilk_for range loop has no increment");
