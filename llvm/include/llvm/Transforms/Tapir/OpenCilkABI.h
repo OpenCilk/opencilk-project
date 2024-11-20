@@ -26,7 +26,8 @@ class OpenCilkABI final : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
   SmallPtrSet<Function *, 8> Processed;
   SmallPtrSet<CallBase *, 8> CallsToInline;
-  DenseMap<BasicBlock *, SmallVector<IntrinsicInst *, 4>> TapirRTCalls;
+  using CallVector = SmallVector<IntrinsicInst *, 4>;
+  DenseMap<BasicBlock *, CallVector> TapirRTCalls;
   ValueToValueMapTy DefaultSyncLandingpad;
 
   StringRef RuntimeBCPath = "";
@@ -141,7 +142,7 @@ class OpenCilkABI final : public TapirTarget {
   }
 
   void GetTapirRTCalls(Spindle *TaskFrame, bool IsRootTask, TaskInfo &TI);
-  void LowerTapirRTCalls(Function &F, BasicBlock *TFEntry);
+  void LowerTapirRTCalls(Function &F, CallVector &Calls);
 
   Value *CreateStackFrame(Function &F);
   Value *GetOrCreateCilkStackFrame(Function &F);
