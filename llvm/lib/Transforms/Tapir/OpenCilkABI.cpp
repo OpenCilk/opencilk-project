@@ -393,15 +393,16 @@ void OpenCilkABI::addHelperAttributes(Function &Helper) {
 
 void OpenCilkABI::remapAfterOutlining(BasicBlock *TFEntry,
                                       ValueToValueMapTy &VMap) {
-  if (TapirRTCalls[TFEntry].empty())
+  CallVector &Calls = TapirRTCalls[TFEntry];
+  if (Calls.empty())
     return;
 
   // Update the set of tapir.runtime.{start,end} intrinsics in the taskframe
   // rooted at TFEntry to process.
-  SmallVector<IntrinsicInst *, 4> OldTapirRTCalls(TapirRTCalls[TFEntry]);
-  TapirRTCalls[TFEntry].clear();
+  CallVector OldTapirRTCalls(Calls);
+  Calls.clear();
   for (IntrinsicInst *II : OldTapirRTCalls)
-    TapirRTCalls[TFEntry].push_back(cast<IntrinsicInst>(VMap[II]));
+    Calls.push_back(cast<IntrinsicInst>(VMap[II]));
 }
 
 // Check whether the allocation of a __cilkrts_stack_frame can be inserted after
@@ -477,12 +478,12 @@ Value *OpenCilkABI::CreateStackFrame(Function &F) {
 }
 
 Value* OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
-  if (DetachCtxToStackFrame.count(&F))
-    return DetachCtxToStackFrame[&F];
+  Value *SF = DetachCtxToStackFrame.lookup(&F);
+  if (SF)
+    return SF;
 
-  Value *SF = CreateStackFrame(F);
+  SF = CreateStackFrame(F);
   DetachCtxToStackFrame[&F] = SF;
-
   return SF;
 }
 
@@ -619,9 +620,9 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
 }
 
 // Lower any calls to tapir.runtime.{start,end} that need to be processed.
-void OpenCilkABI::LowerTapirRTCalls(Function &F, BasicBlock *TFEntry) {
+void OpenCilkABI::LowerTapirRTCalls(Function &F, CallVector &Calls) {
   Instruction *SF = cast<Instruction>(GetOrCreateCilkStackFrame(F));
-  for (IntrinsicInst *II : TapirRTCalls[TFEntry]) {
+  for (IntrinsicInst *II : Calls) {
     IRBuilder<> Builder(II);
     if (Intrinsic::tapir_runtime_start == II->getIntrinsicID()) {
       // Lower calls to tapir.runtime.start to __cilkrts_enter_frame.
@@ -688,8 +689,8 @@ Value *OpenCilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
 BasicBlock *OpenCilkABI::GetDefaultSyncLandingpad(Function &F, Value *SF,
                                                   DebugLoc Loc) {
   // Return an existing default sync landingpad, if there is one.
-  if (DefaultSyncLandingpad.count(&F))
-    return cast<BasicBlock>(DefaultSyncLandingpad[&F]);
+  if (Value *BB = DefaultSyncLandingpad.lookup(&F))
+    return cast<BasicBlock>(BB);
 
   // Create a default cleanup landingpad block.
   LLVMContext &C = F.getContext();
@@ -716,7 +717,7 @@ BasicBlock *OpenCilkABI::GetDefaultSyncLandingpad(Function &F, Value *SF,
 // Lower a sync instruction SI.
 void OpenCilkABI::lowerSync(SyncInst &SI) {
   Function &Fn = *SI.getFunction();
-  if (!DetachCtxToStackFrame[&Fn])
+  if (!DetachCtxToStackFrame.count(&Fn))
     // If we have not created a stackframe for this function, then we don't need
     // to handle the sync.
     return;
@@ -821,10 +822,11 @@ void OpenCilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
 
 void OpenCilkABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
   MarkSpawner(F);
-  if (TapirRTCalls[TFEntry].empty()) {
+  CallVector &Calls = TapirRTCalls[TFEntry];
+  if (Calls.empty()) {
     InsertStackFramePush(F, nullptr, false, true);
   } else {
-    LowerTapirRTCalls(F, TFEntry);
+    LowerTapirRTCalls(F, Calls);
   }
   Value *SF = DetachCtxToStackFrame[&F];
   for (BasicBlock &BB : F) {
@@ -872,7 +874,7 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
   Function &F = *ReplCall->getFunction();
   LLVMContext &C = F.getContext();
-  Value *SF = DetachCtxToStackFrame[&F];
+  Value *SF = DetachCtxToStackFrame.lookup(&F);
   assert(SF && "No frame found for spawning task");
 
   // Find the helper argument for the parent __cilkrts_stack_frame and update
@@ -1098,11 +1100,16 @@ bool OpenCilkABI::preProcessFunction(Function &F, TaskInfo &TI,
   // enter_frame/leave_frame calls.
   GetTapirRTCalls(TI.getRootTask()->getEntrySpindle(), true, TI);
 
-  if (!TI.isSerial() || TapirRTCalls[&F.getEntryBlock()].empty())
+  if (!TI.isSerial())
+    return false;
+
+  CallVector &Calls = TapirRTCalls[&F.getEntryBlock()];
+
+  if (Calls.empty())
     return false;
 
   MarkSpawner(F);
-  LowerTapirRTCalls(F, &F.getEntryBlock());
+  LowerTapirRTCalls(F, Calls);
   return false;
 }
 
@@ -1161,8 +1168,9 @@ bool OpenCilkABI::processOrdinaryFunction(Function &F, BasicBlock *TFEntry) {
 
   // If any calls to tapir.runtime.{start,end} were found in this taskframe that
   // need processing, lower them now.
-  if (!TapirRTCalls[TFEntry].empty()) {
-    LowerTapirRTCalls(F, TFEntry);
+  CallVector &Calls = TapirRTCalls[TFEntry];
+  if (!Calls.empty()) {
+    LowerTapirRTCalls(F, Calls);
     Changed = true;
   }
 
