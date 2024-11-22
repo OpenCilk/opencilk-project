@@ -349,6 +349,10 @@ CodeGenFunction::TaskFrameScope::TaskFrameScope(CodeGenFunction &CGF)
       CGF.CGM.getIntrinsic(llvm::Intrinsic::taskframe_create);
   TaskFrame = CGF.Builder.CreateCall(TaskFrameCreate);
 
+  // Make sure the normal cleanup dest slot is allocated before changing the
+  // alloca insertion point.
+  CGF.getNormalCleanupDestSlot();
+
   // Create a new alloca insertion point within the task frame.
   OldAllocaInsertPt = CGF.AllocaInsertPt;
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
@@ -362,8 +366,6 @@ CodeGenFunction::TaskFrameScope::TaskFrameScope(CodeGenFunction &CGF)
   CGF.ExceptionSlot = nullptr;
   OldEHSelectorSlot = CGF.EHSelectorSlot;
   CGF.EHSelectorSlot = nullptr;
-  OldNormalCleanupDest = CGF.NormalCleanupDest;
-  CGF.NormalCleanupDest = Address::invalid();
 
   CGF.pushFullExprCleanup<EndUnassocTaskFrame>(
       static_cast<CleanupKind>(NormalAndEHCleanup | LifetimeMarker | TaskExit),
@@ -377,7 +379,7 @@ CodeGenFunction::TaskFrameScope::~TaskFrameScope() {
     return;
 
   // Pop the taskframe.
-  CGF.PopCleanupBlock();
+  CGF.PopCleanupBlock(true);
 
   // Restore the alloca insertion point.
   {
@@ -391,7 +393,6 @@ CodeGenFunction::TaskFrameScope::~TaskFrameScope() {
   CGF.EHResumeBlock = OldEHResumeBlock;
   CGF.ExceptionSlot = OldExceptionSlot;
   CGF.EHSelectorSlot = OldEHSelectorSlot;
-  CGF.NormalCleanupDest = OldNormalCleanupDest;
 
   if (TempInvokeDest) {
     if (llvm::BasicBlock *InvokeDest = CGF.getInvokeDest()) {
@@ -477,16 +478,13 @@ void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
                                                   TapirRTStart);
     }
     // Create a nested synced scope.
-    SyncedScopeRAII SyncedScp(*this);
-    PushSyncRegion()->addImplicitSync();
+    SyncRegionRAII SyncReg(*this);
     bool BodyIsCompoundStmt = isa<CompoundStmt>(S.getBody());
     if (BodyIsCompoundStmt)
       ScopeIsSynced = true;
 
     // Emit the spawned statement.
     EmitStmt(S.getBody());
-
-    PopSyncRegion();
   }
 
   // If this _Cilk_scope is outermost in the function, mark that CodeGen is no
