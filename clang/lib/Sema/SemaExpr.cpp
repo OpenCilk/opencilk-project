@@ -2279,7 +2279,7 @@ NonOdrUseReason Sema::getNonOdrUseReasonInCurrentContext(ValueDecl *D) {
 }
 
 Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
-  if (!Pointer && !E->isLValue())
+  if (!Pointer && !E->isGLValue())
     return E;
 
   if (getLangOpts().getCilk() != LangOptions::Cilk_opencilk)

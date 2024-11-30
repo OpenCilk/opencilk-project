@@ -3416,7 +3416,8 @@ QualType QualType::getNonLValueExprType(const ASTContext &Context) const {
 
 QualType QualType::stripHyperobject() const {
   if (const auto *Hyperobject = getTypePtr()->getAs<HyperobjectType>())
-    return Hyperobject->getElementType();
+    return Hyperobject->getElementType().withFastQualifiers(
+        getLocalFastQualifiers());
   return *this;
 }
 
