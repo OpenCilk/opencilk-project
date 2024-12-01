@@ -39,8 +39,10 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/ProfileData/InstrProf.h"
@@ -587,6 +589,7 @@ private:
   }
 
   FunctionCallee getOrInsertSynthesizedHook(StringRef Name, FunctionType *T,
+                                            int ReturnParam = -1,
                                             AttributeList AL = AttributeList());
 };
 
@@ -3668,6 +3671,7 @@ bool CilkSanitizerImpl::instrumentAtomic(Instruction *I, IRBuilder<> &IRB) {
 
 FunctionCallee CilkSanitizerImpl::getOrInsertSynthesizedHook(StringRef Name,
                                                              FunctionType *T,
+                                                             int ReturnParam,
                                                              AttributeList AL) {
   // If no bitcode file has been linked, then we cannot check if it contains a
   // particular library hook.  Simply return the hook.  If the Cilksan library
@@ -3680,14 +3684,28 @@ FunctionCallee CilkSanitizerImpl::getOrInsertSynthesizedHook(StringRef Name,
   if (FunctionsInBitcode.contains(std::string(Name)))
     return getHookFunction(Name, T, AL);
 
+  // If the function is already present, just return it.
+  if (Function *F = M.getFunction(Name))
+    if (F->getFunctionType() == T)
+      return M.getOrInsertFunction(Name, T);
+
   // We did not find the library hook in the linked bitcode file.  Synthesize a
   // default version of the hook that simply calls __csan_default_libhook.
   FunctionCallee NewHook = M.getOrInsertFunction(Name, T, AL);
   Function *NewHookFn = cast<Function>(NewHook.getCallee());
   NewHookFn->setOnlyAccessesInaccessibleMemOrArgMem();
   NewHookFn->setDoesNotThrow();
-  BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", NewHookFn);
-  IRBuilder<> IRB(ReturnInst::Create(M.getContext(), Entry));
+  LLVMContext &Ctx = M.getContext();
+  assert((T->getReturnType() == Type::getVoidTy(Ctx) || ReturnParam >= 0) &&
+         "Synthesizing hook with return value, but no return parameter "
+         "specified.");
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", NewHookFn);
+  // Return void or the parameter at the specified index.
+  ReturnInst *RI =
+      (T->getReturnType() == Type::getVoidTy(Ctx) || ReturnParam < 0)
+          ? ReturnInst::Create(Ctx, Entry)
+          : ReturnInst::Create(Ctx, NewHookFn->getArg(ReturnParam), Entry);
+  IRBuilder<> IRB(RI);
 
   // Insert a call to the default library function hook
   Type *IDType = IRB.getInt64Ty();
@@ -3818,9 +3836,11 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
 
   // Populate the AfterHook parameters with the parameters of the instrumented
   // function itself.
+  int ReturnParam = -1;
   Value *SavedStack = nullptr;
   const DataLayout &DL = M.getDataLayout();
   if (!Called->getReturnType()->isVoidTy()) {
+    ReturnParam = AfterHookParamVals.size();
     Type *RetTy = Called->getReturnType();
     if (!needToSpillType(RetTy)) {
       // We can simply pass the return value directly to the hook.
@@ -3871,8 +3891,8 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
   case Intrinsic::hyper_lookup: {
     FunctionType *AfterHookTy =
         FunctionType::get(IRB.getPtrTy(), AfterHookParamTys, Called->isVarArg());
-    FunctionCallee AfterIntrinCallHook =
-        getOrInsertSynthesizedHook(("__csan_" + Buf).str(), AfterHookTy);
+    FunctionCallee AfterIntrinCallHook = getOrInsertSynthesizedHook(
+        ("__csan_" + Buf).str(), AfterHookTy, ReturnParam);
     CallInst *HookCall =
         insertHookCall(&*Iter, AfterIntrinCallHook, AfterHookParamVals);
     II->replaceUsesWithIf(HookCall, [HookCall](Use &U) {
@@ -3884,8 +3904,8 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
 
   FunctionType *AfterHookTy =
       FunctionType::get(IRB.getVoidTy(), AfterHookParamTys, Called->isVarArg());
-  FunctionCallee AfterIntrinCallHook =
-      getOrInsertSynthesizedHook(("__csan_" + Buf).str(), AfterHookTy);
+  FunctionCallee AfterIntrinCallHook = getOrInsertSynthesizedHook(
+      ("__csan_" + Buf).str(), AfterHookTy, ReturnParam);
 
   // Insert the hook call
   insertHookCall(&*Iter, AfterIntrinCallHook, AfterHookParamVals);
@@ -3958,7 +3978,9 @@ bool CilkSanitizerImpl::instrumentLibCall(Instruction *I,
       {CallsiteId, FuncId, NumMVVal, PropVal});
   SmallVector<Value *, 8> AfterHookDefaultVals(
       {DefaultID, DefaultID, IRB.getInt8(0), DefaultPropVal});
+  int ReturnParam = -1;
   if (!Called->getReturnType()->isVoidTy()) {
+    ReturnParam = AfterHookParamTys.size();
     AfterHookParamTys.push_back(Called->getReturnType());
     AfterHookParamVals.push_back(CB);
     AfterHookDefaultVals.push_back(
@@ -3972,7 +3994,7 @@ bool CilkSanitizerImpl::instrumentLibCall(Instruction *I,
   FunctionType *AfterHookTy =
       FunctionType::get(IRB.getVoidTy(), AfterHookParamTys, Called->isVarArg());
   FunctionCallee AfterLibCallHook = getOrInsertSynthesizedHook(
-      ("__csan_" + Called->getName()).str(), AfterHookTy);
+      ("__csan_" + Called->getName()).str(), AfterHookTy, ReturnParam);
 
   BasicBlock::iterator Iter(I);
   if (IsInvoke) {
@@ -4595,7 +4617,9 @@ bool CilkSanitizerImpl::instrumentAllocFnLibCall(Instruction *I,
       {AllocFnId, FuncId, NumMVVal, PropVal});
   SmallVector<Value *, 8> AfterHookDefaultVals(
       {DefaultID, DefaultID, IRB.getInt8(0), DefaultPropVal});
+  int ReturnParam = -1;
   if (!Called->getReturnType()->isVoidTy()) {
+    ReturnParam = AfterHookParamVals.size();
     AfterHookParamTys.push_back(Called->getReturnType());
     AfterHookParamVals.push_back(CB);
     AfterHookDefaultVals.push_back(
@@ -4609,7 +4633,7 @@ bool CilkSanitizerImpl::instrumentAllocFnLibCall(Instruction *I,
   FunctionType *AfterHookTy =
       FunctionType::get(IRB.getVoidTy(), AfterHookParamTys, Called->isVarArg());
   FunctionCallee AfterLibCallHook = getOrInsertSynthesizedHook(
-      ("__csan_alloc_" + Called->getName()).str(), AfterHookTy);
+      ("__csan_alloc_" + Called->getName()).str(), AfterHookTy, ReturnParam);
 
   // Insert the hook after the call.
   BasicBlock::iterator Iter(I);
