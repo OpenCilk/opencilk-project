@@ -10892,6 +10892,9 @@ def confusing_hyperobject : Error<
 def incomplete_hyperobject : Error<
    "incomplete type %0 may not be a hyperobject">;
 
+def qualified_hyperobject : Error<
+   "qualified type %0 may not be a hyperobject">;
+
 def nested_hyperobject : Error<
    "type %0, which contains a hyperobject, may not be a hyperobject">;
 

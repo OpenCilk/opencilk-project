@@ -37,4 +37,16 @@ void function() {
   // expected-error@-2{{use of undeclared identifier 'typo3'}}
   int _Hyperobject(0, typo4) var3 = 0;
   // expected-error@-1{{use of undeclared identifier 'typo4'}}
+  const int _Hyperobject(identity, reduce) var4 = 0;
+  // expected-error@-1{{qualified type 'const int' may not be a hyperobject}}
+  volatile int _Hyperobject(identity, reduce) var5 = 0;
+  // expected-error@-1{{qualified type 'volatile int' may not be a hyperobject}}
+  typedef const int c_int;
+  c_int _Hyperobject(identity, reduce) var6 = 0;
+  // expected-error@-1{{qualified type 'c_int' (aka 'const int') may not be a hyperobject}}
+  ++var4;
+  // expected-error@-1{{read-only variable is not assignable}}
+  ++var5;
+  ++var6;
+  // expected-error@-1{{read-only variable is not assignable}}
 }
