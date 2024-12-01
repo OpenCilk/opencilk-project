@@ -4270,6 +4270,8 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
   {
     // Instrument the entry point of the detached task.
     IRBuilder<> IRB(&*getFirstInsertionPtInDetachedBlock(DetachedBlock));
+    if (!IRB.getCurrentDebugLocation())
+      IRB.SetCurrentDebugLocation(searchForDebugLoc(&*IRB.GetInsertPoint()));
     uint64_t LocalID = TaskFED.add(*DetachedBlock);
     Value *TaskID = TaskFED.localToGlobalId(LocalID, IDBuilder);
     CsiTaskProperty Prop;
@@ -4336,6 +4338,8 @@ bool CilkSanitizerImpl::instrumentDetach(DetachInst *DI, unsigned SyncRegNum,
           CriticalEdgeSplittingOptions(&DT, &LI).setSplitDetachContinue());
 
     IRBuilder<> IRB(&*ContinueBlock->getFirstInsertionPt());
+    if (!IRB.getCurrentDebugLocation())
+      IRB.SetCurrentDebugLocation(searchForDebugLoc(&*IRB.GetInsertPoint()));
     uint64_t LocalID = DetachContinueFED.add(*ContinueBlock);
     Value *ContinueID = DetachContinueFED.localToGlobalId(LocalID, IDBuilder);
     CsiDetachContinueProperty ContProp;
