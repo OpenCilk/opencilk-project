@@ -1324,13 +1324,6 @@ static std::optional<unsigned> ContainsHyperobject(QualType Outer) {
   case Type::Decltype:
     Inner = cast<DecltypeType>(T)->getUnderlyingType();
     break;
-  case Type::Elaborated:
-    Inner = cast<ElaboratedType>(T)->desugar();
-    break;
-  case Type::Adjusted:
-  case Type::Decayed:
-    Inner = cast<AdjustedType>(T)->desugar();
-    break;
   case Type::Auto:
   case Type::DeducedTemplateSpecialization:
     Inner = cast<DeducedType>(T)->desugar();
@@ -1340,6 +1333,11 @@ static std::optional<unsigned> ContainsHyperobject(QualType Outer) {
   case Type::DependentTemplateSpecialization:
   case Type::PackExpansion:
   case Type::UnaryTransform:
+  case Type::LValueReference:
+  case Type::RValueReference:
+  case Type::BlockPointer:
+  case Type::FunctionProto:
+  case Type::FunctionNoProto:
     return diag::confusing_hyperobject;
   case Type::Builtin:
   case Type::TemplateTypeParm:
@@ -2494,6 +2492,9 @@ QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
     if (std::optional<unsigned> Code = ContainsHyperobject(Element))
       Diag(Loc, *Code) << Element;
   }
+
+  if (!Element->isObjectType())
+    Diag(Loc, diag::confusing_hyperobject) << Element;
 
   if (Element.isConstQualified() || Element.isVolatileQualified()) {
     Diag(Loc, diag::qualified_hyperobject) << Element;
