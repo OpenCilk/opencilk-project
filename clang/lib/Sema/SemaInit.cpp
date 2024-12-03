@@ -4996,9 +4996,14 @@ static void TryReferenceInitializationCore(Sema &S,
   // OpenCilk: If the right hand side is a hyperobject, see if the
   // left hand side wants the hyperobject or a view.
   if (T2->isHyperobjectType() && !T1->isHyperobjectType()) {
-    Sequence.AddViewLookup(T1);
-    T2 = T2.stripHyperobject();
-    cv2T2 = cv2T2.stripHyperobject();
+    // If the view of T2 is a reference type (already diagnosed)
+    // then CompareReferenceRelationship will assert fail.
+    QualType View2 = T2.stripHyperobject();
+    if (!View2->isReferenceType()) {
+      Sequence.AddViewLookup(T1);
+      T2 = View2;
+      cv2T2 = cv2T2.stripHyperobject();
+    }
   }
 
   // Compute some basic properties of the types and the initializer.
