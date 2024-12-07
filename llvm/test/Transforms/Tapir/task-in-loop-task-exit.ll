@@ -61,14 +61,15 @@ entry:
 
 define internal fastcc void @"_ZN6parlay12parallel_forIZNS_8sequenceINS1_ISt6vectorIiSaIiEENS_9allocatorIS4_EELb0EEENS5_IS7_EELb0EEC1IZNS_8internal7delayed25block_delayed_filter_op_tIRKNS_16delayed_sequenceIS4_S4_ZN58TestDelayedFilterOp_TestFilterOpNonTrivialTemporaries_Test8TestBodyEvE3$_0EEZNSF_8TestBodyEvE3$_1E13filter_blocksISJ_SK_EEDaOT_OT0_EUlmE_EEmSO_NS9_18_from_function_tagEmEUlmE_EEvmmSO_lb"() #1 {
 entry:
+  %syncreg = call token @llvm.syncregion.start()
   br label %pfor.cond
 
 pfor.cond:                                        ; preds = %pfor.body.entry, %pfor.cond, %entry
-  detach within none, label %pfor.body.entry, label %pfor.cond
+  detach within %syncreg, label %pfor.body.entry, label %pfor.cond
 
 pfor.body.entry:                                  ; preds = %pfor.cond
   call fastcc void @"_ZZN6parlay8sequenceINS0_ISt6vectorIiSaIiEENS_9allocatorIS3_EELb0EEENS4_IS6_EELb0EEC1IZNS_8internal7delayed25block_delayed_filter_op_tIRKNS_16delayed_sequenceIS3_S3_ZN58TestDelayedFilterOp_TestFilterOpNonTrivialTemporaries_Test8TestBodyEvE3$_0EEZNSE_8TestBodyEvE3$_1E13filter_blocksISI_SJ_EEDaOT_OT0_EUlmE_EEmSN_NS8_18_from_function_tagEmENKUlmE_clEm"()
-  reattach within none, label %pfor.cond
+  reattach within %syncreg, label %pfor.cond
 }
 
 define internal fastcc void @"_ZZN6parlay8sequenceINS0_ISt6vectorIiSaIiEENS_9allocatorIS3_EELb0EEENS4_IS6_EELb0EEC1IZNS_8internal7delayed25block_delayed_filter_op_tIRKNS_16delayed_sequenceIS3_S3_ZN58TestDelayedFilterOp_TestFilterOpNonTrivialTemporaries_Test8TestBodyEvE3$_0EEZNSE_8TestBodyEvE3$_1E13filter_blocksISI_SJ_EEDaOT_OT0_EUlmE_EEmSN_NS8_18_from_function_tagEmENKUlmE_clEm"() personality ptr null {
@@ -139,7 +140,7 @@ pfor.body.entry:                                  ; preds = %pfor.cond
 ; CHECK: define internal fastcc void @"_ZN6parlay12parallel_forIZNS_8sequenceINS1_ISt6vectorIiSaIiEENS_9allocatorIS4_EELb0EEENS5_IS7_EELb0EEC1IZNS_8internal7delayed25block_delayed_filter_op_tIRKNS_16delayed_sequenceIS4_S4_ZN58TestDelayedFilterOp_TestFilterOpNonTrivialTemporaries_Test8TestBodyEvE3$_0EEZNSF_8TestBodyEvE3$_1E13filter_blocksISJ_SK_EEDaOT_OT0_EUlmE_EEmSO_NS9_18_from_function_tagEmEUlmE_EEvmmSO_lb"() #1 personality ptr null {
 
 ; CHECK: pfor.cond:
-; CHECK-NEXT: detach within none, label %pfor.body.entry, label %pfor.cond.backedge unwind label
+; CHECK-NEXT: detach within %syncreg, label %pfor.body.entry, label %pfor.cond.backedge unwind label
 
 ; CHECK: pfor.body.entry:
 ; CHECK-NEXT: [[REFTMP11IIIII:%.+]] = alloca [1 x [1 x [1 x %class.anon.645]]]
@@ -163,7 +164,7 @@ pfor.body.entry:                                  ; preds = %pfor.cond
 ; CHECK-NEXT: reattach within [[SYNCREG19IIIIII]], label %pfor.cond.backedge.i.i.i.i.i.i
 
 ; CHECK: "_ZZN6parlay8sequenceINS0_ISt6vectorIiSaIiEENS_9allocatorIS3_EELb0EEENS4_IS6_EELb0EEC1IZNS_8internal7delayed25block_delayed_filter_op_tIRKNS_16delayed_sequenceIS3_S3_ZN58TestDelayedFilterOp_TestFilterOpNonTrivialTemporaries_Test8TestBodyEvE3$_0EEZNSE_8TestBodyEvE3$_1E13filter_blocksISI_SJ_EEDaOT_OT0_EUlmE_EEmSN_NS8_18_from_function_tagEmENKUlmE_clEm.exit":
-; CHECK: reattach within none, label %pfor.cond.backedge
+; CHECK: reattach within %syncreg, label %pfor.cond.backedge
 
 ; uselistorder directives
 uselistorder ptr null, { 8, 9, 0, 2, 3, 10, 11, 1, 12, 13, 4, 14, 15, 5, 16, 17, 6, 18, 19, 7 }

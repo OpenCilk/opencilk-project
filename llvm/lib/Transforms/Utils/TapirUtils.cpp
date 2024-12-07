@@ -19,8 +19,10 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/EHPersonalities.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -1003,6 +1005,10 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
   // Erase instructions marked to be erased.
   for (Instruction *I : ToErase)
     I->eraseFromParent();
+  if (ReplaceWithTaskFrame && TaskFrame && TaskFrame->use_empty())
+    cast<Instruction>(TaskFrame)->eraseFromParent();
+  if (isa_and_nonnull<Instruction>(SyncRegion) && SyncRegion->use_empty())
+    cast<Instruction>(SyncRegion)->eraseFromParent();
 
   // Update dominator tree.
   if (DT) {
@@ -1765,12 +1771,12 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
     return;
   Task *T = TF->getTaskFrameUser();
 
-  LLVM_DEBUG(dbgs() << "fixupTaskFrameExternalUses: spindle@"
-             << TF->getEntry()->getName() << "\n");
   LLVM_DEBUG({
-      if (T)
-        dbgs() << "  used by task@" << T->getEntry()->getName() << "\n";
-    });
+    dbgs() << "fixupTaskFrameExternalUses: spindle@"
+           << TF->getEntry()->getName() << "\n";
+    if (T)
+      dbgs() << "  used by task@" << T->getEntry()->getName() << "\n";
+  });
 
   // Get the set of basic blocks in the taskframe spindles.  At the same time,
   // find the continuation of corresponding taskframe.resume intrinsics.
@@ -1880,12 +1886,11 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
   for (auto &TFInstr : ToRewrite) {
     LLVM_DEBUG(dbgs() << "Fixing taskframe output " << *TFInstr.first << "\n");
     // Create an allocation to store the result of the instruction.
-    BasicBlock *ParentEntry;
-    if (Spindle *ParentTF = TF->getTaskFrameParent())
-      ParentEntry = ParentTF->getEntry();
-    else
-      ParentEntry = TF->getParentTask()->getEntry();
-    IRBuilder<> Builder(&*ParentEntry->getFirstInsertionPt());
+    Spindle *ParentS = TF->getTaskFrameParent()
+                           ? TF->getTaskFrameParent()
+                           : TF->getParentTask()->getEntrySpindle();
+    BasicBlock::iterator ParentInsertionPt = ParentS->getTaskFrameFirstInsertionPt();
+    IRBuilder<> Builder(&*ParentInsertionPt);
     Type *TFInstrTy = TFInstr.first->getType();
     AllocaInst *AI = Builder.CreateAlloca(TFInstrTy);
     AI->setName(TFInstr.first->getName());
@@ -1898,13 +1903,18 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
       Builder.SetInsertPoint(&*(++TFInstr.first->getIterator()));
     Builder.CreateStore(TFInstr.first, AI);
 
-    // Load the result of the instruction at the continuation.
-    Builder.SetInsertPoint(&*Continuation->getFirstInsertionPt());
-    Builder.CreateCall(
-        Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
-                                  { AI->getType() }), { AI });
-    LoadInst *ContinVal = Builder.CreateLoad(TFInstrTy, AI);
+    LoadInst *ContinVal = nullptr;
     LoadInst *EHContinVal = nullptr;
+    // Load the result of the instruction at the continuation.
+    if (Continuation) {
+      Builder.SetInsertPoint(&*Continuation->getFirstInsertionPt());
+      if (T)
+        Builder.CreateCall(
+            Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
+                                      {AI->getType()}),
+            {AI});
+      ContinVal = Builder.CreateLoad(TFInstrTy, AI);
+    }
 
     // For each external use, replace the use with a load from the alloca.
     for (Use *UseToRewrite : TFInstr.second) {
@@ -1919,9 +1929,11 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
         // If necessary, load the value at the taskframe.resume continuation.
         if (!EHContinVal) {
           Builder.SetInsertPoint(&*(TFResumeContin->getFirstInsertionPt()));
-          Builder.CreateCall(
-              Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
-                                        { AI->getType() }), { AI });
+          if (T)
+            Builder.CreateCall(
+                Intrinsic::getDeclaration(M, Intrinsic::taskframe_load_guard,
+                                          {AI->getType()}),
+                {AI});
           EHContinVal = Builder.CreateLoad(TFInstrTy, AI);
         }
 
@@ -1933,9 +1945,11 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
       }
 
       // Rewrite to use the value loaded at the continuation.
-      if (UseToRewrite->get()->hasValueHandle())
-        ValueHandleBase::ValueIsRAUWd(*UseToRewrite, ContinVal);
-      UseToRewrite->set(ContinVal);
+      if (ContinVal) {
+        if (UseToRewrite->get()->hasValueHandle())
+          ValueHandleBase::ValueIsRAUWd(*UseToRewrite, ContinVal);
+        UseToRewrite->set(ContinVal);
+      }
     }
   }
 }

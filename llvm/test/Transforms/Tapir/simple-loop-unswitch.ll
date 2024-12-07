@@ -83,7 +83,7 @@ pfor.inc.i:                                       ; preds = %if.end.i, %pfor.con
   br i1 false, label %pfor.cond.cleanup.i, label %pfor.cond.i
 
 pfor.cond.cleanup.i:                              ; preds = %pfor.inc.i
-  sync within none, label %sync.continue.i
+  sync within %syncreg.i, label %sync.continue.i
 
 ehcleanup18.i:                                    ; preds = %lpad5.i
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg.i, { i8*, i32 } zeroinitializer)

@@ -4,10 +4,13 @@
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-macosx15.0.0"
 
+; Function Attrs: nounwind willreturn memory(argmem: readwrite)
+declare token @llvm.syncregion.start() #0
+
 ; CHECK: define void @_ZNK5Graph17pbfs_walk_PennantEP7PennantIiERH3BagIiEjPj()
 
 ; CHECK: pfor.cond:
-; CHECK-NEXT: detach within none, label %pfor.body.entry, label %pfor.cond unwind label %lpad59
+; CHECK-NEXT: detach within %syncreg, label %pfor.body.entry, label %pfor.cond unwind label %lpad59
 
 ; CHECK: pfor.body.entry:
 ; CHECK: br label %[[INLINED_PFOR_COND:.+]]
@@ -25,18 +28,19 @@ target triple = "arm64-apple-macosx15.0.0"
 
 define void @_ZNK5Graph17pbfs_walk_PennantEP7PennantIiERH3BagIiEjPj() personality ptr null {
 entry:
+  %syncreg = tail call token @llvm.syncregion.start()
   %0 = call token @llvm.tapir.runtime.start()
   br label %pfor.cond
 
 pfor.cond:                                        ; preds = %pfor.preattach, %pfor.cond, %entry
-  detach within none, label %pfor.body.entry, label %pfor.cond unwind label %lpad59
+  detach within %syncreg, label %pfor.body.entry, label %pfor.cond unwind label %lpad59
 
 pfor.body.entry:                                  ; preds = %pfor.cond
   invoke fastcc void @_ZL14pbfs_proc_NodePKiiRH3BagIiEjPjS0_S0_(ptr null, i32 0, ptr null, i32 0, ptr null, ptr null, ptr null)
           to label %pfor.preattach unwind label %lpad49
 
 pfor.preattach:                                   ; preds = %pfor.body.entry
-  reattach within none, label %pfor.cond
+  reattach within %syncreg, label %pfor.cond
 
 lpad49:                                           ; preds = %pfor.body.entry
   %1 = landingpad { ptr, i32 }
@@ -52,10 +56,11 @@ lpad59:                                           ; preds = %pfor.cond
 
 define fastcc void @_ZL14pbfs_proc_NodePKiiRH3BagIiEjPjS0_S0_(ptr %n, i32 %fillSize, ptr %next, i32 %newdist, ptr %distances, ptr %nodes, ptr %edges) personality ptr null {
 entry:
+  %syncreg = tail call token @llvm.syncregion.start()
   br label %pfor.cond
 
 pfor.cond:                                        ; preds = %pfor.cond, %entry
-  detach within none, label %pfor.body.entry, label %pfor.cond unwind label %lpad20
+  detach within %syncreg, label %pfor.body.entry, label %pfor.cond unwind label %lpad20
 
 pfor.body.entry:                                  ; preds = %pfor.cond
   br label %for.cond

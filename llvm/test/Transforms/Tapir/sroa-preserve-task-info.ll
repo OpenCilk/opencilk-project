@@ -38,10 +38,10 @@ entry:
 ; CHECK: br label %pfor.cond
 
 pfor.cond:                                        ; preds = %pfor.body.entry, %pfor.cond, %entry
-  detach within none, label %pfor.body.entry, label %pfor.cond
+  detach within %syncreg105, label %pfor.body.entry, label %pfor.cond
 
 pfor.body.entry:                                  ; preds = %pfor.cond
-  reattach within none, label %pfor.cond
+  reattach within %syncreg105, label %pfor.cond
 }
 
 ; uselistorder directives

@@ -33,7 +33,7 @@ pfor.inc273:                                      ; preds = %pfor.inc273, %pfor.
   detach within %syncreg, label %pfor.body.entry, label %pfor.inc273 unwind label %lpad651
 
 pfor.detach470:                                   ; preds = %pfor.detach470, %entry
-  detach within none, label %pfor.body.entry472, label %pfor.detach470 unwind label %lpad651
+  detach within %syncreg359, label %pfor.body.entry472, label %pfor.detach470 unwind label %lpad651
 
 pfor.body.entry472:                               ; preds = %pfor.detach470
   %syncreg481 = call token @llvm.syncregion.start()
@@ -49,10 +49,10 @@ lpad651:                                          ; preds = %pfor.inc907, %pfor.
 
 pfor.body.entry799:                               ; preds = %pfor.inc907
   %syncreg843 = call token @llvm.syncregion.start()
-  reattach within none, label %pfor.inc907
+  reattach within %syncreg461, label %pfor.inc907
 
 pfor.inc907:                                      ; preds = %pfor.inc907, %pfor.body.entry799
-  detach within none, label %pfor.body.entry799, label %pfor.inc907 unwind label %lpad651
+  detach within %syncreg461, label %pfor.body.entry799, label %pfor.inc907 unwind label %lpad651
 }
 
 ; CHECK: define void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiPNSt3__16vectorIiNS1_9allocatorIiEEEES6_PiS7_PPdS9_()

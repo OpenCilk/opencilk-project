@@ -4,12 +4,16 @@
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
+; Function Attrs: nounwind willreturn memory(argmem: readwrite)
+declare token @llvm.syncregion.start()
+
 define ptr @_Z12generateNodePP5rangePP5eventS0_ii() personality ptr null !dbg !78 {
 entry:
-  detach within none, label %det.achd.peel, label %for.body.tf, !dbg !80
+  %syncreg = call token @llvm.syncregion.start()
+  detach within %syncreg, label %det.achd.peel, label %for.body.tf, !dbg !80
 
 det.achd.peel:                                    ; preds = %entry
-  reattach within none, label %for.body.tf
+  reattach within %syncreg, label %for.body.tf
 
 for.body.tf:                                      ; preds = %det.achd.peel, %entry
   ret ptr null

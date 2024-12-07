@@ -18,18 +18,18 @@ entry:
   ret void
 
 if.then48.tf:                                     ; No predecessors!
-  detach within none, label %det.achd, label %det.cont
+  detach within %syncreg, label %det.achd, label %det.cont
 
 det.achd:                                         ; preds = %if.then48.tf
   call void @_Z21walk_bicut_pbc_helperiiP9AtomGraphRSt3mapIiS1_ISt5tupleIJiiiEESt3setIiSt4lessIiESaIiEES5_IS3_ESaISt4pairIKS3_S8_EEES6_SaISA_IKiSE_EEE4cutsRK14base_case_args()
-  reattach within none, label %det.cont
+  reattach within %syncreg, label %det.cont
 
 det.cont:                                         ; preds = %det.achd, %if.then48.tf
   ret void
 }
 
 ; CHECK: if.then48.tf:
-; CHECK-NEXT: detach within none, label %det.achd, label %det.cont unwind label %[[TSAN_CLEANUP:.+]]
+; CHECK-NEXT: detach within %syncreg, label %det.achd, label %det.cont unwind label %[[TSAN_CLEANUP:.+]]
 
 ; CHECK: det.achd:
 ; CHECK-NEXT: invoke void @_Z21walk_bicut_pbc_helperiiP9AtomGraphRSt3mapIiS1_ISt5tupleIJiiiEESt3setIiSt4lessIiESaIiEES5_IS3_ESaISt4pairIKS3_S8_EEES6_SaISA_IKiSE_EEE4cutsRK14base_case_args()

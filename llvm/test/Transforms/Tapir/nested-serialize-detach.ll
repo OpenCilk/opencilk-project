@@ -16,6 +16,9 @@ declare void @llvm.detached.rethrow.sl_p0i32s(token, { ptr, i32 }) #1
 ; Function Attrs: nounwind willreturn memory(argmem: readwrite)
 declare token @llvm.taskframe.create() #0
 
+; Function Attrs: nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.taskframe.end(token) #0
+
 ; CHECK: define void @_ZNK5Graph17pbfs_walk_PennantEP7PennantIiERH3BagIiEjPj()
 ; CHECK-NEXT: entry:
 ; CHECK-NOT: detach within
@@ -35,14 +38,14 @@ pfor.body.entry.tf:                               ; preds = %entry
 
 pfor.cond.i.strpm.detachloop.entry:               ; preds = %pfor.body.entry.tf
   %syncreg.i.strpm.detachloop = tail call token @llvm.syncregion.start()
-  detach within none, label %pfor.body.entry.i.strpm.outer.1, label %pfor.inc.i.strpm.outer.1 unwind label %lpad4924.loopexit.strpm
+  detach within %syncreg.i.strpm.detachloop, label %pfor.body.entry.i.strpm.outer.1, label %pfor.inc.i.strpm.outer.1 unwind label %lpad4924.loopexit.strpm
 
 pfor.body.entry.i.strpm.outer.1:                  ; preds = %pfor.cond.i.strpm.detachloop.entry
-  invoke void @llvm.detached.rethrow.sl_p0i32s(token none, { ptr, i32 } zeroinitializer)
+  invoke void @llvm.detached.rethrow.sl_p0i32s(token %syncreg.i.strpm.detachloop, { ptr, i32 } zeroinitializer)
           to label %lpad4924.unreachable unwind label %lpad4924.loopexit.strpm
 
 pfor.inc.i.strpm.outer.1:                         ; preds = %pfor.cond.i.strpm.detachloop.entry
-  sync within none, label %pfor.cond.i.strpm.detachloop.reattach.split
+  sync within %syncreg.i.strpm.detachloop, label %pfor.cond.i.strpm.detachloop.reattach.split
 
 pfor.cond.i.strpm.detachloop.reattach.split:      ; preds = %pfor.inc.i.strpm.outer.1
   reattach within %syncreg.i, label %pfor.cond.cleanup.i
@@ -66,13 +69,13 @@ lpad4924.loopexit.strpm.unreachable:              ; preds = %lpad4924.loopexit.s
 lpad4924.loopexit.split-lp:                       ; preds = %lpad4924.loopexit.strpm, %sync.continue.i, %pfor.body.entry.tf
   %lpad.loopexit.split-lp = landingpad { ptr, i32 }
           cleanup
-  call void @llvm.detached.rethrow.sl_p0i32s(token none, { ptr, i32 } zeroinitializer)
   unreachable
 
 lpad4924.unreachable:                             ; preds = %pfor.body.entry.i.strpm.outer.1
   unreachable
 
 pfor.preattach:                                   ; preds = %sync.continue.i
+  call void @llvm.taskframe.end(token %tf.i)
   reattach within %syncreg45, label %pfor.inc
 
 pfor.inc:                                         ; preds = %pfor.preattach, %entry
