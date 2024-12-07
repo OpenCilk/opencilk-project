@@ -576,6 +576,10 @@ static void renderTapirLoweringOptions(const ArgList &Args,
     } else if (Args.hasArg(options::OPT_fcilkplus))
       CmdArgs.push_back("--tapir-target=cilkplus");
   }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ))
+    CmdArgs.push_back(
+        Args.MakeArgString(Twine("--plugin-opt=cilktool=") + A->getValue()));
 }
 
 static void AppendPlatformPrefix(SmallString<128> &Path, const llvm::Triple &T);

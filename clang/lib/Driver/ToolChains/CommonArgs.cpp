@@ -301,6 +301,10 @@ static void renderTapirLoweringOptions(const ArgList &Args,
     } else if (Args.hasArg(options::OPT_fcilkplus))
       CmdArgs.push_back("--plugin-opt=tapir-target=cilkplus");
   }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ))
+    CmdArgs.push_back(Args.MakeArgString(
+        Twine("--plugin-opt=cilktool=") + A->getValue()));
 }
 
 void tools::addPathIfExists(const Driver &D, const Twine &Path,
