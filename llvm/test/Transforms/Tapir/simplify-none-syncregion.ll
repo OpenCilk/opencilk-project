@@ -1,6 +1,10 @@
 ; Check that task-simplify handles sync regions that are not instructions, specifically when debugging.
 ;
 ; RUN: opt < %s -passes="function<eager-inv>(task-simplify)" -S | FileCheck %s
+;
+; The verifier has been changed to require valid syncregions, meaning this IR is no longer valid.
+; Keeping this test around in case none syncregions are allowed in the future.
+; XFAIL: *
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-macosx15.0.0"
 
