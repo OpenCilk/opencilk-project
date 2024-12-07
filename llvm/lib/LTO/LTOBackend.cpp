@@ -42,6 +42,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/Transforms/IPO/WholeProgramDevirt.h"
+#include "llvm/Transforms/Instrumentation/ComprehensiveStaticInstrumentation.h"
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 #include "llvm/Transforms/Utils/FunctionImportUtils.h"
 #include "llvm/Transforms/Utils/SplitModule.h"
@@ -239,6 +240,29 @@ static bool hasTapirTarget(const Config &Conf) {
          (Conf.TapirTarget != TapirTargetID::None);
 }
 
+enum class CilktoolID { Cilkscale, CilkscaleInstructions, Unknown };
+
+static CilktoolID parseCilktool(StringRef ToolName) {
+  return llvm::StringSwitch<CilktoolID>(ToolName)
+      .Case("cilkscale", CilktoolID::Cilkscale)
+      .Case("cilkscale-instructions", CilktoolID::CilkscaleInstructions)
+      .Default(CilktoolID::Unknown);
+}
+
+static CSIOptions getCSIOptionsForCilkscale(bool InstrumentBasicBlocks) {
+  CSIOptions Options;
+  // Disable CSI hooks that Cilkscale doesn't need.
+  Options.InstrumentBasicBlocks = InstrumentBasicBlocks;
+  Options.InstrumentLoops = false;
+  Options.InstrumentMemoryAccesses = false;
+  Options.InstrumentCalls = false;
+  Options.InstrumentAtomics = false;
+  Options.InstrumentMemIntrinsics = false;
+  Options.InstrumentAllocas = false;
+  Options.InstrumentAllocFns = false;
+  return Options;
+}
+
 static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
                            unsigned OptLevel, bool IsThinLTO,
                            ModuleSummaryIndex *ExportSummary,
@@ -326,6 +350,32 @@ static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
     break;
   case 3:
     OL = OptimizationLevel::O3;
+    break;
+  }
+
+  // Handle tools with late CSI instrumentation passes.
+  switch (parseCilktool(Conf.Cilktool)) {
+  case CilktoolID::Cilkscale: {
+    PB.registerTapirLoopEndEPCallback(
+        [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
+          MPM.addPass(CSISetupPass(getCSIOptionsForCilkscale(false)));
+          MPM.addPass(ComprehensiveStaticInstrumentationPass(
+              getCSIOptionsForCilkscale(false)));
+          MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
+        });
+    break;
+  }
+  case CilktoolID::CilkscaleInstructions: {
+    PB.registerTapirLoopEndEPCallback(
+        [&PB](ModulePassManager &MPM, OptimizationLevel Level) {
+          MPM.addPass(CSISetupPass(getCSIOptionsForCilkscale(true)));
+          MPM.addPass(ComprehensiveStaticInstrumentationPass(
+              getCSIOptionsForCilkscale(true)));
+          MPM.addPass(PB.buildPostCilkInstrumentationPipeline(Level));
+        });
+    break;
+  }
+  case CilktoolID::Unknown:
     break;
   }
 

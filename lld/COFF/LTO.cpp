@@ -86,6 +86,7 @@ lto::Config BitcodeCompiler::createConfig() {
   if (args::validTapirTarget(ctx.config.tapirTarget))
     c.TapirTarget = ctx.config.tapirTarget;
   c.OpenCilkABIBitcodeFile = std::string(ctx.config.opencilkABIBitcodeFile);
+  c.Cilktool = std::string(ctx.config.cilktool);
   c.CSIRProfile = std::string(ctx.config.ltoCSProfileFile);
   c.RunCSIRInstr = ctx.config.ltoCSProfileGenerate;
   c.PGOWarnMismatch = ctx.config.ltoPGOWarnMismatch;

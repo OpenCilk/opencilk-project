@@ -1224,6 +1224,7 @@ static void readConfigs(opt::InputArgList &args) {
   config->checkSections =
       args.hasFlag(OPT_check_sections, OPT_no_check_sections, true);
   config->chroot = args.getLastArgValue(OPT_chroot);
+  config->cilktool = args.getLastArgValue(OPT_cilktool);
   config->compressDebugSections = getCompressionType(
       args.getLastArgValue(OPT_compress_debug_sections, "none"),
       "--compress-debug-sections");

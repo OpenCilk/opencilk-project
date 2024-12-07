@@ -237,6 +237,7 @@ struct Configuration {
 
   llvm::TapirTargetID tapirTarget = llvm::TapirTargetID::None;
   llvm::StringRef opencilkABIBitcodeFile;
+  llvm::StringRef cilktool;
 
   llvm::MachO::Architecture arch() const { return platformInfo.target.Arch; }
 

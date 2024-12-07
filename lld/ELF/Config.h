@@ -157,6 +157,7 @@ struct Config {
   llvm::StringMap<uint64_t> sectionStartMap;
   llvm::StringRef bfdname;
   llvm::StringRef chroot;
+  llvm::StringRef cilktool;
   llvm::StringRef dependencyFile;
   llvm::StringRef dwoDir;
   llvm::StringRef dynamicLinker;

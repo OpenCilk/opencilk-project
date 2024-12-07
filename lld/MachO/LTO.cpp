@@ -65,6 +65,7 @@ static lto::Config createConfig() {
   if (args::validTapirTarget(config->tapirTarget))
     c.TapirTarget = config->tapirTarget;
   c.OpenCilkABIBitcodeFile = std::string(config->opencilkABIBitcodeFile);
+  c.Cilktool = std::string(config->cilktool);
   if (config->saveTemps)
     checkError(c.addSaveTemps(config->outputFile.str() + ".",
                               /*UseInputModulePath=*/true));

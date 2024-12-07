@@ -618,6 +618,7 @@ defm lto_validate_all_vtables_have_type_infos: BB<"lto-validate-all-vtables-have
 defm lto_whole_program_visibility: BB<"lto-whole-program-visibility",
   "Asserts that the LTO link has whole program visibility",
   "Asserts that the LTO link does not have whole program visibility">;
+defm cilktool: Eq<"cilktool", "Name of Cilk tool">;
 def disable_verify: F<"disable-verify">;
 defm mllvm: Eq<"mllvm", "Additional arguments to forward to LLVM's option processing">;
 defm opencilk_abi_bitcode: EEq<"opencilk-abi-bitcode", "Path to OpenCilk ABI bitcode file">;
@@ -683,6 +684,9 @@ def: J<"plugin-opt=cs-profile-path=">,
 def: J<"plugin-opt=obj-path=">,
   Alias<lto_obj_path_eq>,
   HelpText<"Alias for --lto-obj-path=">;
+def: J<"plugin-opt=cilktool=">,
+  Alias<cilktool>,
+  HelpText<"Alias for --cilktool">;
 def: J<"plugin-opt=opencilk-abi-bitcode=">,
   Alias<opencilk_abi_bitcode>,
   HelpText<"Alias for --opencilk-abi-bitcode">;

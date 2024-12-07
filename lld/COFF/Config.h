@@ -239,6 +239,9 @@ struct Configuration {
   llvm::StringRef opencilkABIBitcodeFile;
   llvm::TapirTargetID tapirTarget = llvm::TapirTargetID::None;
 
+  // Used for Cilk tool.
+  llvm::StringRef cilktool;
+
   // Used for /thinlto-index-only:
   llvm::StringRef thinLTOIndexOnlyArg;
 
