@@ -135,6 +135,10 @@ TapirToTargetImpl::outlineAllTasks(Function &F,
       for (Spindle *SubTF : TF->subtaskframes())
         TFToOutline[SubTF].remapOutlineInfo(VMap, InputMap);
 
+      if (Instruction *ClonedTFCreate =
+              dyn_cast<Instruction>(VMap[TF->getTaskFrameCreate()]))
+        ClonedTFCreate->eraseFromParent();
+
       continue;
     }
 

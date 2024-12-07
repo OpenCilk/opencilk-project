@@ -1523,6 +1523,8 @@ public:
     ~DetachScope() {
       if (TempInvokeDest && TempInvokeDest->use_empty())
         delete TempInvokeDest;
+      if (TaskFrame && TaskFrame->use_empty())
+        cast<llvm::Instruction>(TaskFrame)->eraseFromParent();
       CGF.CurDetachScope = ParentScope;
     }
 
