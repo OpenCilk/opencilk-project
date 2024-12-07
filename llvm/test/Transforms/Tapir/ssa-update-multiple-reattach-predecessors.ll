@@ -6,8 +6,12 @@
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
+; Function Attrs: nounwind willreturn memory(argmem: readwrite)
+declare token @llvm.syncregion.start()
+
 define linkonce_odr void @_Z10matmul_dacIfLb0ELb1EEvPT_PKS0_S3_llllll(ptr %arrayidx83) {
 if.end.lr.ph.lr.ph.preheader:
+  %syncreg = call token @llvm.syncregion.start()
   br label %if.end.lr.ph.lr.ph
 
 if.end.lr.ph.lr.ph:                               ; preds = %tailrecurse.outer.outer.backedge, %if.end.lr.ph.lr.ph.preheader
@@ -24,10 +28,10 @@ land.lhs.true:                                    ; preds = %if.end
   br label %det.cont22.tf
 
 det.cont22.tf:                                    ; preds = %land.lhs.true
-  detach within none, label %det.achd32, label %tailrecurse.outer.outer.backedge
+  detach within %syncreg, label %det.achd32, label %tailrecurse.outer.outer.backedge
 
 det.achd32:                                       ; preds = %det.cont22.tf
-  reattach within none, label %tailrecurse.outer.outer.backedge
+  reattach within %syncreg, label %tailrecurse.outer.outer.backedge
 
 if.else57:                                        ; preds = %if.end
   br i1 false, label %if.then59, label %if.else75
@@ -36,10 +40,10 @@ if.then59:                                        ; preds = %if.else57
   br label %_ZL9split_diml.exit164
 
 _ZL9split_diml.exit164:                           ; preds = %if.then59
-  detach within none, label %det.achd66, label %tailrecurse.outer.outer.backedge
+  detach within %syncreg, label %det.achd66, label %tailrecurse.outer.outer.backedge
 
 det.achd66:                                       ; preds = %_ZL9split_diml.exit164
-  reattach within none, label %tailrecurse.outer.outer.backedge
+  reattach within %syncreg, label %tailrecurse.outer.outer.backedge
 
 tailrecurse.outer.outer.backedge:                 ; preds = %det.achd66, %_ZL9split_diml.exit164, %det.achd32, %det.cont22.tf
   %lhs.tr.ph.ph.be = getelementptr inbounds float, ptr %lhs.tr2511, i64 0

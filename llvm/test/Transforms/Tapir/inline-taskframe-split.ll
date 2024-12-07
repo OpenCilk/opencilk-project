@@ -44,7 +44,7 @@ define internal fastcc void @_Z12timeMatching9edgeArrayIiEiPc(%struct.edgeArray*
   br label %13
 
 13:                                               ; preds = %16, %12
-  detach within none, label %14, label %16
+  detach within %9, label %14, label %16
 
 14:                                               ; preds = %13
   br label %15
@@ -59,7 +59,7 @@ define internal fastcc void @_Z12timeMatching9edgeArrayIiEiPc(%struct.edgeArray*
   br label %18
 
 18:                                               ; preds = %17
-  sync within none, label %19
+  sync within %9, label %19
 
 19:                                               ; preds = %18
   br label %20
@@ -73,7 +73,7 @@ define internal fastcc void @_Z12timeMatching9edgeArrayIiEiPc(%struct.edgeArray*
   br label %23
 
 23:                                               ; preds = %22, %26
-  detach within none, label %24, label %26
+  detach within %9, label %24, label %26
 
 24:                                               ; preds = %23
   br label %25
@@ -88,7 +88,7 @@ define internal fastcc void @_Z12timeMatching9edgeArrayIiEiPc(%struct.edgeArray*
   br label %28
 
 28:                                               ; preds = %27
-  sync within none, label %29
+  sync within %9, label %29
 
 29:                                               ; preds = %28
   br label %30

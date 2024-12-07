@@ -58,10 +58,10 @@ pfor.cond.cleanup.i:                              ; preds = %pfor.cond.i.strpm.d
 lpad4924.loopexit.strpm.detachloop.unwind:        ; preds = %pfor.body.entry.tf
   %lpad.strpm.detachloop.unwind = landingpad { ptr, i32 }
           cleanup
-  call void @llvm.taskframe.resume.sl_p0i32s(token %tf.i, { ptr, i32 } %lpad.strpm.detachloop.unwind)
   unreachable
 
 sync.continue.i:                                  ; preds = %pfor.cond.cleanup.i
+  call void @llvm.taskframe.end(token %tf.i)
   reattach within %syncreg45, label %pfor.inc
 
 pfor.inc:                                         ; preds = %sync.continue.i, %entry

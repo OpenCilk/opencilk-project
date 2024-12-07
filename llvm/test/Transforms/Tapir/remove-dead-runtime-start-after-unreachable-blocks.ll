@@ -11,15 +11,16 @@ target triple = "arm64-apple-macosx15.0.0"
 
 define void @_ZNK5Graph17pbfs_walk_PennantEP7PennantIiERH3BagIiEjPj() personality ptr null {
 entry:
+  %syncreg = call token @llvm.syncregion.start()
   %0 = tail call token @llvm.tapir.runtime.start()
-  detach within none, label %pfor.body.entry.tf, label %pfor.inc unwind label %lpad59.loopexit
+  detach within %syncreg, label %pfor.body.entry.tf, label %pfor.inc unwind label %lpad59.loopexit
 
 pfor.body.entry.tf:                               ; preds = %entry
   %call.i15.i26.1 = call ptr @_Znwm()
   unreachable
 
 pfor.inc:                                         ; preds = %entry
-  sync within none, label %sync.continue
+  sync within %syncreg, label %sync.continue
 
 common.ret:                                       ; preds = %sync.continue, %lpad59.loopexit
   ret void

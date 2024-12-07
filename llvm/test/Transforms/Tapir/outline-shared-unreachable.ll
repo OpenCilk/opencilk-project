@@ -6,15 +6,19 @@
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-macosx13.0.0"
 
+; Function Attrs: nounwind willreturn memory(argmem: readwrite)
+declare token @llvm.syncregion.start()
+
 define void @_ZN9LAMMPS_NS6Verlet14run_stencil_mdEiRNSt3__13mapIiNS1_6vectorIiNS1_9allocatorIiEEEENS1_4lessIiEENS4_INS1_4pairIKiS6_EEEEEESE_RNS2_IiiS8_NS4_INS9_ISA_iEEEEEESI_PPdSK_() personality ptr null {
 entry:
+  %syncreg = call token @llvm.syncregion.start()
   br i1 false, label %entry.unreachable_crit_edge, label %pfor.detach
 
 entry.unreachable_crit_edge:                      ; preds = %entry
   br label %unreachable
 
 pfor.detach:                                      ; preds = %pfor.detach, %entry
-  detach within none, label %pfor.body, label %pfor.detach unwind label %lpad714.loopexit
+  detach within %syncreg, label %pfor.body, label %pfor.detach unwind label %lpad714.loopexit
 
 pfor.body:                                        ; preds = %pfor.detach
   br label %unreachable

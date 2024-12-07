@@ -29,6 +29,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Casting.h"
 #include <utility>
 
 namespace llvm {
@@ -100,6 +101,12 @@ public:
          CurTF = CurTF->TaskFrameParent)
       ++D;
     return D;
+  }
+  BasicBlock::iterator getTaskFrameFirstInsertionPt() {
+    if (Instruction *TFCreate =
+            dyn_cast_or_null<Instruction>(getTaskFrameCreate()))
+      return TFCreate->getNextNode()->getIterator();
+    return getEntry()->getFirstInsertionPt();
   }
 
   Task *getTaskFromTaskFrame() const;

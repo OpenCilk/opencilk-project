@@ -22,12 +22,12 @@ for.cond86:                                       ; preds = %for.cond86, %entry
 
 ; CHECK: [[IF_ELSE_I]]:
 ; CHECK-NEXT: %[[TF_I:.+]] = call token @llvm.taskframe.create()
-; CHECK-NEXT: %syncreg19.i.i3 = call token @llvm.syncregion.start()
-; CHECK-NEXT: detach within %syncreg19.i.i3, label %det.achd.i.i, label
+; CHECK: %syncreg19.i.i5 = call token @llvm.syncregion.start()
+; CHECK-NEXT: detach within %syncreg19.i.i5, label %det.achd.i.i, label
 ; CHECK-NOT: unwind label
 
 ; CHECK: det.achd.i.i:
-; CHECK-NEXT: reattach within %syncreg19.i.i3, label
+; CHECK-NEXT: reattach within %syncreg19.i.i5, label
 
 lpad90:                                           ; preds = %for.cond86
   %0 = landingpad { ptr, i32 }
@@ -53,10 +53,11 @@ if.else:                                          ; preds = %entry
 
 define linkonce_odr void @_ZN6parlay12parallel_forIZN4gbbs9vertexMapINS1_16vertexSubsetDataINS1_5emptyEEENS1_2bc37SSBetweennessCentrality_Back_Vertex_FINS_8sequenceIbSaIbELb0EEENS8_IdSaIdELb0EEEEELi0EEEvRT_T0_mEUlmE_EEvmmOSE_lb() {
 entry:
-  detach within none, label %pfor.body.entry, label %pfor.inc
+  %syncreg = tail call token @llvm.syncregion.start()
+  detach within %syncreg, label %pfor.body.entry, label %pfor.inc
 
 pfor.body.entry:                                  ; preds = %entry
-  reattach within none, label %pfor.inc
+  reattach within %syncreg, label %pfor.inc
 
 pfor.inc:                                         ; preds = %pfor.body.entry, %entry
   ret void
@@ -64,16 +65,17 @@ pfor.inc:                                         ; preds = %pfor.body.entry, %e
 
 define linkonce_odr void @_ZN6parlay12parallel_forIZN4gbbs9vertexMapINS1_16vertexSubsetDataINS1_5emptyEEENS1_2bc37SSBetweennessCentrality_Back_Vertex_FINS_8sequenceIbSaIbELb0EEENS8_IdSaIdELb0EEEEELi0EEEvRT_T0_mEUlmE0_EEvmmOSE_lb(i64 %granularity) {
 entry:
+  %syncreg = tail call token @llvm.syncregion.start()
   %syncreg19 = call token @llvm.syncregion.start()
   %cmp = icmp eq i64 %granularity, 0
   br i1 %cmp, label %pfor.cond, label %if.else
 
 pfor.cond:                                        ; preds = %pfor.body.entry, %pfor.cond, %entry
-  detach within none, label %pfor.body.entry, label %pfor.cond
+  detach within %syncreg, label %pfor.body.entry, label %pfor.cond
 
 pfor.body.entry:                                  ; preds = %pfor.cond
   call void @_ZZN4gbbs9vertexMapINS_16vertexSubsetDataINS_5emptyEEENS_2bc37SSBetweennessCentrality_Back_Vertex_FIN6parlay8sequenceIbSaIbELb0EEENS7_IdSaIdELb0EEEEELi0EEEvRT_T0_mENKUlmE0_clEm()
-  reattach within none, label %pfor.cond
+  reattach within %syncreg, label %pfor.cond
 
 if.else:                                          ; preds = %entry
   detach within %syncreg19, label %det.achd, label %det.cont
