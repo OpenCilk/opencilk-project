@@ -2867,7 +2867,7 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
       if (Instruction *I = dyn_cast<Instruction>(U))
         if (isTapirIntrinsic(Intrinsic::taskframe_use, I) ||
             isTapirIntrinsic(Intrinsic::taskframe_end, I) ||
-            isTaskFrameResume(I)) {
+            isTapirIntrinsic(Intrinsic::taskframe_resume, I)) {
           ++NumUsers;
           break;
         }

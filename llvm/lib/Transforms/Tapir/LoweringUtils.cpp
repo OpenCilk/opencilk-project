@@ -923,6 +923,7 @@ Function *llvm::createHelperForTaskFrame(
   // values in old function.
   AddAlignmentAssumptions(&F, Args, VMap, &Header->front(), &OA.AC, &OA.DT);
 
+  SmallVector<Instruction *, 4> TaskEnds;
   // Move allocas in the newly cloned detached CFG to the entry block of the
   // helper.
   {
@@ -930,9 +931,9 @@ Function *llvm::createHelperForTaskFrame(
                          TimerGroupName, TimerGroupDescription,
                          TimePassesIsEnabled);
     // Collect the end instructions of the task.
-    SmallVector<Instruction *, 4> TaskEnds;
     for (BasicBlock *EndBlock : TFEndBlocks)
-      TaskEnds.push_back(cast<BasicBlock>(VMap[EndBlock])->getTerminator());
+      TaskEnds.push_back(
+          cast<BasicBlock>(VMap[EndBlock])->getTerminator()->getPrevNode());
     for (BasicBlock *EndBlock : TFResumeBlocks)
       TaskEnds.push_back(cast<BasicBlock>(VMap[EndBlock])->getTerminator());
 
@@ -953,14 +954,12 @@ Function *llvm::createHelperForTaskFrame(
                          TimerGroupName, TimerGroupDescription,
                          TimePassesIsEnabled);
     SmallVector<Instruction *, 1> TFEndsToRemove;
-    for (BasicBlock *EndBlock : TFEndBlocks) {
-      BasicBlock *ClonedEndBlock = cast<BasicBlock>(VMap[EndBlock]);
-      if (Instruction *Prev = ClonedEndBlock->getTerminator()->getPrevNode())
-        if (isTapirIntrinsic(Intrinsic::taskframe_end, Prev))
-          TFEndsToRemove.push_back(Prev);
-    }
-    for (Instruction *ClonedTFEnd : TFEndsToRemove)
-      ClonedTFEnd->eraseFromParent();
+    for (Instruction *TFEnd : TaskEnds)
+      if (isTapirIntrinsic(Intrinsic::taskframe_end, TFEnd))
+        TFEndsToRemove.push_back(TFEnd);
+
+    for (Instruction *TFEnd : TFEndsToRemove)
+      TFEnd->eraseFromParent();
   }
 
   Helper->setMemoryEffects(computeFunctionBodyMemoryAccess(*Helper, OA.AA));
