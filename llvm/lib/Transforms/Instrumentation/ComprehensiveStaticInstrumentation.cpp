@@ -576,13 +576,13 @@ void CSIImpl::initializeFuncHooks() {
   IRBuilder<> IRB(C);
   // Initialize function entry hook
   Type *FuncPropertyTy = CsiFuncProperty::getType(C);
-  CsiFuncEntry = M.getOrInsertFunction("__csi_func_entry", IRB.getVoidTy(),
-                                       IRB.getInt64Ty(), FuncPropertyTy);
+  CsiFuncEntry = getHookFunction("__csi_func_entry", IRB.getVoidTy(),
+                                 IRB.getInt64Ty(), FuncPropertyTy);
   // Initialize function exit hook
   Type *FuncExitPropertyTy = CsiFuncExitProperty::getType(C);
-  CsiFuncExit = M.getOrInsertFunction("__csi_func_exit", IRB.getVoidTy(),
-                                      IRB.getInt64Ty(), IRB.getInt64Ty(),
-                                      FuncExitPropertyTy);
+  CsiFuncExit =
+      getHookFunction("__csi_func_exit", IRB.getVoidTy(), IRB.getInt64Ty(),
+                      IRB.getInt64Ty(), FuncExitPropertyTy);
 }
 
 /// Basic-block hook initialization
@@ -590,10 +590,10 @@ void CSIImpl::initializeBasicBlockHooks() {
   LLVMContext &C = M.getContext();
   IRBuilder<> IRB(C);
   Type *PropertyTy = CsiBBProperty::getType(C);
-  CsiBBEntry = M.getOrInsertFunction("__csi_bb_entry", IRB.getVoidTy(),
-                                     IRB.getInt64Ty(), PropertyTy);
-  CsiBBExit = M.getOrInsertFunction("__csi_bb_exit", IRB.getVoidTy(),
-                                    IRB.getInt64Ty(), PropertyTy);
+  CsiBBEntry = getHookFunction("__csi_bb_entry", IRB.getVoidTy(),
+                               IRB.getInt64Ty(), PropertyTy);
+  CsiBBExit = getHookFunction("__csi_bb_exit", IRB.getVoidTy(),
+                              IRB.getInt64Ty(), PropertyTy);
 }
 
 /// Loop hook initialization
@@ -604,18 +604,15 @@ void CSIImpl::initializeLoopHooks() {
   Type *LoopPropertyTy = CsiLoopProperty::getType(C);
   Type *LoopExitPropertyTy = CsiLoopExitProperty::getType(C);
 
-  CsiBeforeLoop = M.getOrInsertFunction("__csi_before_loop", IRB.getVoidTy(),
-                                        IDType, IRB.getInt64Ty(),
-                                        LoopPropertyTy);
-  CsiAfterLoop = M.getOrInsertFunction("__csi_after_loop", IRB.getVoidTy(),
-                                       IDType, LoopPropertyTy);
+  CsiBeforeLoop = getHookFunction("__csi_before_loop", IRB.getVoidTy(), IDType,
+                                  IRB.getInt64Ty(), LoopPropertyTy);
+  CsiAfterLoop = getHookFunction("__csi_after_loop", IRB.getVoidTy(), IDType,
+                                 LoopPropertyTy);
 
-  CsiLoopBodyEntry = M.getOrInsertFunction("__csi_loopbody_entry",
-                                           IRB.getVoidTy(), IDType,
-                                           LoopPropertyTy);
-  CsiLoopBodyExit = M.getOrInsertFunction("__csi_loopbody_exit",
-                                          IRB.getVoidTy(), IDType, IDType,
-                                          LoopExitPropertyTy);
+  CsiLoopBodyEntry = getHookFunction("__csi_loopbody_entry", IRB.getVoidTy(),
+                                     IDType, LoopPropertyTy);
+  CsiLoopBodyExit = getHookFunction("__csi_loopbody_exit", IRB.getVoidTy(),
+                                    IDType, IDType, LoopExitPropertyTy);
 }
 
 // Call-site hook initialization
@@ -623,12 +620,12 @@ void CSIImpl::initializeCallsiteHooks() {
   LLVMContext &C = M.getContext();
   IRBuilder<> IRB(C);
   Type *PropertyTy = CsiCallProperty::getType(C);
-  CsiBeforeCallsite = M.getOrInsertFunction("__csi_before_call",
-                                            IRB.getVoidTy(), IRB.getInt64Ty(),
-                                            IRB.getInt64Ty(), PropertyTy);
-  CsiAfterCallsite = M.getOrInsertFunction("__csi_after_call", IRB.getVoidTy(),
-                                           IRB.getInt64Ty(), IRB.getInt64Ty(),
-                                           PropertyTy);
+  CsiBeforeCallsite =
+      getHookFunction("__csi_before_call", IRB.getVoidTy(), IRB.getInt64Ty(),
+                      IRB.getInt64Ty(), PropertyTy);
+  CsiAfterCallsite =
+      getHookFunction("__csi_after_call", IRB.getVoidTy(), IRB.getInt64Ty(),
+                      IRB.getInt64Ty(), PropertyTy);
 }
 
 // Alloca (local variable) hook initialization
@@ -639,8 +636,8 @@ void CSIImpl::initializeAllocaHooks() {
   Type *AddrType = IRB.getPtrTy();
   Type *PropType = CsiAllocaProperty::getType(C);
 
-  CsiAfterAlloca = M.getOrInsertFunction("__csi_after_alloca", IRB.getVoidTy(),
-                                         IDType, AddrType, IntptrTy, PropType);
+  CsiAfterAlloca = getHookFunction("__csi_after_alloca", IRB.getVoidTy(),
+                                   IDType, AddrType, IntptrTy, PropType);
 }
 
 // Non-local-variable allocation/free hook initialization
@@ -654,22 +651,21 @@ void CSIImpl::initializeAllocFnHooks() {
   Type *AllocFnPropType = CsiAllocFnProperty::getType(C);
   Type *FreePropType = CsiFreeProperty::getType(C);
 
-  CsiBeforeAllocFn = M.getOrInsertFunction("__csi_before_allocfn", RetType,
-                                           IDType, LargeNumBytesType,
-                                           LargeNumBytesType, LargeNumBytesType,
-                                           AddrType, AllocFnPropType);
-  CsiAfterAllocFn = M.getOrInsertFunction("__csi_after_allocfn", RetType,
-                                          IDType, /* new ptr */ AddrType,
-                                          /* size */ LargeNumBytesType,
-                                          /* num elements */ LargeNumBytesType,
-                                          /* alignment */ LargeNumBytesType,
-                                          /* old ptr */ AddrType,
-                                          /* property */ AllocFnPropType);
+  CsiBeforeAllocFn = getHookFunction(
+      "__csi_before_allocfn", RetType, IDType, LargeNumBytesType,
+      LargeNumBytesType, LargeNumBytesType, AddrType, AllocFnPropType);
+  CsiAfterAllocFn = getHookFunction("__csi_after_allocfn", RetType, IDType,
+                                    /* new ptr */ AddrType,
+                                    /* size */ LargeNumBytesType,
+                                    /* num elements */ LargeNumBytesType,
+                                    /* alignment */ LargeNumBytesType,
+                                    /* old ptr */ AddrType,
+                                    /* property */ AllocFnPropType);
 
-  CsiBeforeFree = M.getOrInsertFunction("__csi_before_free", RetType, IDType,
-                                        AddrType, FreePropType);
-  CsiAfterFree = M.getOrInsertFunction("__csi_after_free", RetType, IDType,
-                                       AddrType, FreePropType);
+  CsiBeforeFree = getHookFunction("__csi_before_free", RetType, IDType,
+                                  AddrType, FreePropType);
+  CsiAfterFree = getHookFunction("__csi_after_free", RetType, IDType, AddrType,
+                                 FreePropType);
 }
 
 // Load and store hook initialization
@@ -683,18 +679,17 @@ void CSIImpl::initializeLoadStoreHooks() {
   Type *NumBytesType = IRB.getInt32Ty();
 
   CsiBeforeRead =
-      M.getOrInsertFunction("__csi_before_load", RetType, IRB.getInt64Ty(),
-                            AddrType, NumBytesType, LoadPropertyTy);
-  CsiAfterRead =
-      M.getOrInsertFunction("__csi_after_load", RetType, IRB.getInt64Ty(),
-                            AddrType, NumBytesType, LoadPropertyTy);
+      getHookFunction("__csi_before_load", RetType, IRB.getInt64Ty(), AddrType,
+                      NumBytesType, LoadPropertyTy);
+  CsiAfterRead = getHookFunction("__csi_after_load", RetType, IRB.getInt64Ty(),
+                                 AddrType, NumBytesType, LoadPropertyTy);
 
   CsiBeforeWrite =
-      M.getOrInsertFunction("__csi_before_store", RetType, IRB.getInt64Ty(),
-                            AddrType, NumBytesType, StorePropertyTy);
+      getHookFunction("__csi_before_store", RetType, IRB.getInt64Ty(), AddrType,
+                      NumBytesType, StorePropertyTy);
   CsiAfterWrite =
-      M.getOrInsertFunction("__csi_after_store", RetType, IRB.getInt64Ty(),
-                            AddrType, NumBytesType, StorePropertyTy);
+      getHookFunction("__csi_after_store", RetType, IRB.getInt64Ty(), AddrType,
+                      NumBytesType, StorePropertyTy);
 }
 
 // Initialization of hooks for LLVM memory intrinsics
@@ -702,12 +697,12 @@ void CSIImpl::initializeMemIntrinsicsHooks() {
   LLVMContext &C = M.getContext();
   IRBuilder<> IRB(C);
 
-  MemmoveFn = M.getOrInsertFunction("memmove", IRB.getPtrTy(), IRB.getPtrTy(),
-                                    IRB.getPtrTy(), IntptrTy);
-  MemcpyFn = M.getOrInsertFunction("memcpy", IRB.getPtrTy(), IRB.getPtrTy(),
-                                   IRB.getPtrTy(), IntptrTy);
-  MemsetFn = M.getOrInsertFunction("memset", IRB.getPtrTy(), IRB.getPtrTy(),
-                                   IRB.getInt32Ty(), IntptrTy);
+  MemmoveFn = getHookFunction("memmove", IRB.getPtrTy(), IRB.getPtrTy(),
+                              IRB.getPtrTy(), IntptrTy);
+  MemcpyFn = getHookFunction("memcpy", IRB.getPtrTy(), IRB.getPtrTy(),
+                             IRB.getPtrTy(), IntptrTy);
+  MemsetFn = getHookFunction("memset", IRB.getPtrTy(), IRB.getPtrTy(),
+                             IRB.getInt32Ty(), IntptrTy);
 }
 
 // Initialization of Tapir hooks
@@ -722,28 +717,26 @@ void CSIImpl::initializeTapirHooks() {
   Type *DetachPropertyTy = CsiDetachProperty::getType(C);
   Type *DetContPropertyTy = CsiDetachContinueProperty::getType(C);
 
-  CsiDetach =
-      M.getOrInsertFunction("__csi_detach", RetType,
-                            /* detach_id */ IDType,
-                            /* sync_reg */ SyncRegType, DetachPropertyTy);
-  CsiTaskEntry = M.getOrInsertFunction("__csi_task", RetType,
-                                       /* task_id */ IDType,
-                                       /* detach_id */ IDType, TaskPropertyTy);
-  CsiTaskExit =
-      M.getOrInsertFunction("__csi_task_exit", RetType,
-                            /* task_exit_id */ IDType,
-                            /* task_id */ IDType,
-                            /* detach_id */ IDType,
-                            /* sync_reg */ SyncRegType, TaskExitPropertyTy);
+  CsiDetach = getHookFunction("__csi_detach", RetType,
+                              /* detach_id */ IDType,
+                              /* sync_reg */ SyncRegType, DetachPropertyTy);
+  CsiTaskEntry = getHookFunction("__csi_task", RetType,
+                                 /* task_id */ IDType,
+                                 /* detach_id */ IDType, TaskPropertyTy);
+  CsiTaskExit = getHookFunction("__csi_task_exit", RetType,
+                                /* task_exit_id */ IDType,
+                                /* task_id */ IDType,
+                                /* detach_id */ IDType,
+                                /* sync_reg */ SyncRegType, TaskExitPropertyTy);
   CsiDetachContinue =
-      M.getOrInsertFunction("__csi_detach_continue", RetType,
-                            /* detach_continue_id */ IDType,
-                            /* detach_id */ IDType,
-                            /* sync_reg */ SyncRegType, DetContPropertyTy);
+      getHookFunction("__csi_detach_continue", RetType,
+                      /* detach_continue_id */ IDType,
+                      /* detach_id */ IDType,
+                      /* sync_reg */ SyncRegType, DetContPropertyTy);
   CsiBeforeSync =
-      M.getOrInsertFunction("__csi_before_sync", RetType, IDType, SyncRegType);
+      getHookFunction("__csi_before_sync", RetType, IDType, SyncRegType);
   CsiAfterSync =
-      M.getOrInsertFunction("__csi_after_sync", RetType, IDType, SyncRegType);
+      getHookFunction("__csi_after_sync", RetType, IDType, SyncRegType);
 }
 
 // Prepare any calls in the CFG for instrumentation, e.g., by making sure any
@@ -2843,7 +2836,7 @@ Function *CSIImpl::getInterpositionFunction(Function *F) {
 
   std::string InterposedName = "__csi_interpose_" + F->getName().str();
   Function *InterpositionFunction = cast<Function>(
-      M.getOrInsertFunction(InterposedName, F->getFunctionType()).getCallee());
+      getHookFunction(InterposedName, F->getFunctionType()).getCallee());
 
   InterpositionFunctions.insert({F, InterpositionFunction});
 

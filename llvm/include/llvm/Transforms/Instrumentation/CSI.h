@@ -14,9 +14,11 @@
 #ifndef LLVM_TRANSFORMS_CSI_H
 #define LLVM_TRANSFORMS_CSI_H
 
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
@@ -1166,6 +1168,35 @@ public:
                           DominatorTree *DT = nullptr, LoopInfo *LI = nullptr);
   static void splitBlocksAtCalls(Function &F, DominatorTree *DT = nullptr,
                                  LoopInfo *LI = nullptr);
+
+  FunctionCallee getHookFunction(StringRef Name, FunctionType *FnTy,
+                                 AttributeList AL) {
+    FunctionCallee Callee = M.getOrInsertFunction(Name, FnTy, AL);
+    if (Function *Fn = dyn_cast<Function>(Callee.getCallee())) {
+      MemoryEffects ME = MemoryEffects::argMemOnly(ModRefInfo::Ref) |
+                         MemoryEffects::inaccessibleMemOnly(ModRefInfo::ModRef);
+      Fn->setMemoryEffects(ME);
+      Fn->setDoesNotThrow();
+    }
+    return Callee;
+  }
+  template <typename... ArgsTy>
+  FunctionCallee getHookFunction(StringRef Name, AttributeList AL, Type *RetTy,
+                                 ArgsTy... Args) {
+    FunctionCallee Callee = M.getOrInsertFunction(Name, AL, RetTy, Args...);
+    if (Function *Fn = dyn_cast<Function>(Callee.getCallee())) {
+      MemoryEffects ME = MemoryEffects::argMemOnly(ModRefInfo::Ref) |
+                         MemoryEffects::inaccessibleMemOnly(ModRefInfo::ModRef);
+      Fn->setMemoryEffects(ME);
+      Fn->setDoesNotThrow();
+    }
+    return Callee;
+  }
+  template <typename... ArgsTy>
+  FunctionCallee getHookFunction(StringRef Name, Type *RetTy,
+                                 ArgsTy... Args) {
+    return getHookFunction(Name, AttributeList{}, RetTy, Args...);
+  }
 
   /// Helper function that identifies calls or invokes of placeholder functions,
   /// such as debug-info intrinsics or lifetime intrinsics.

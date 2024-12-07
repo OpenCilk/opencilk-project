@@ -386,33 +386,6 @@ struct CilkSanitizerImpl : public CSIImpl {
                    LoopInfo *LI = nullptr);
   bool setupFunction(Function &F, bool NeedToSetupCalls);
 
-  FunctionCallee getHookFunction(StringRef Name, FunctionType *FnTy,
-                                 AttributeList AL) {
-    FunctionCallee Callee = M.getOrInsertFunction(Name, FnTy, AL);
-    if (Function *Fn = dyn_cast<Function>(Callee.getCallee())) {
-      Fn->setOnlyAccessesInaccessibleMemOrArgMem();
-      Fn->setDoesNotThrow();
-    }
-    return Callee;
-  }
-  template <typename... ArgsTy>
-  FunctionCallee getHookFunction(StringRef Name, AttributeList AL, Type *RetTy,
-                                 ArgsTy... Args) {
-    FunctionCallee Callee = M.getOrInsertFunction(Name, AL, RetTy, Args...);
-    if (Function *Fn = dyn_cast<Function>(Callee.getCallee())) {
-      MemoryEffects ME = MemoryEffects::argMemOnly(ModRefInfo::Ref) |
-                         MemoryEffects::inaccessibleMemOnly(ModRefInfo::ModRef);
-      Fn->setMemoryEffects(ME);
-      Fn->setDoesNotThrow();
-    }
-    return Callee;
-  }
-  template <typename... ArgsTy>
-  FunctionCallee getHookFunction(StringRef Name, Type *RetTy,
-                                 ArgsTy... Args) {
-    return getHookFunction(Name, AttributeList{}, RetTy, Args...);
-  }
-
   // Methods for handling FED tables
   void initializeFEDTables() {}
   void collectUnitFEDTables() {}
