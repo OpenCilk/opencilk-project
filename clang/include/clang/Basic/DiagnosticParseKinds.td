@@ -1400,7 +1400,7 @@ def warn_pragma_cilk_grainsize_equals: Warning<
   "'#pragma cilk grainsize' no longer requires '='">,
   InGroup<SourceUsesCilkPlus>;
 def warn_cilk_for_forrange_loop_experimental: Warning<
-  "'_Cilk_for' support for for-range loops is currently EXPERIMENTAL only!">,
+  "'cilk_for' support for for-range loops is currently EXPERIMENTAL only!">,
   InGroup<SourceUsesCilkPlus>;
 def error_hyperobject_arguments: Error<
   "hyperobject must have 0 or 2 callbacks">;
