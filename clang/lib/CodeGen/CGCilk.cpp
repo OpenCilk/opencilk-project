@@ -533,14 +533,10 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   JumpDest Continue = getJumpDestInCurrentScope("pfor.cond");
   llvm::BasicBlock *CondBlock = Continue.getBlock();
 
-  // TODO: need to check condition and then get to pfor.end
   llvm::BasicBlock *InitialEntryBlock = createBasicBlock("pfor.initial.entry");
   EmitBlock(InitialEntryBlock);
   llvm::Value *InitialBoolCondVal = EvaluateExprAsBool(S.getCond());
-  // llvm::MDNode *Weights = 
-  //   createProfileWeightsForLoop(S.getCond(), getProfileCount(S.getBody()));
 
-  // Do we need weights?
   Builder.CreateCondBr(InitialBoolCondVal, Continue.getBlock(), LoopExit.getBlock()); 
 
 
