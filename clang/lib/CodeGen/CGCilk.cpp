@@ -15,11 +15,9 @@
 #include "CGCleanup.h"
 #include "clang/AST/ExprCilk.h"
 #include "clang/AST/StmtCilk.h"
-#include <iostream>
 
 using namespace clang;
 using namespace CodeGen;
-using namespace std;
 
 CodeGenFunction::IsSpawnedScope::IsSpawnedScope(CodeGenFunction *CGF)
     : CGF(CGF), OldIsSpawned(CGF->IsSpawned),
@@ -538,8 +536,6 @@ CodeGenFunction::EmitCilkForRangeStmt(const CilkForRangeStmt &S,
   llvm::Value *InitialBoolCondVal = EvaluateExprAsBool(S.getCond());
 
   Builder.CreateCondBr(InitialBoolCondVal, Continue.getBlock(), LoopExit.getBlock()); 
-
-
 
   EmitBlock(CondBlock);
   Expr::EvalResult Result;
