@@ -1830,7 +1830,10 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     addOpenCilkRuntimeRunPath(*this, Args, CmdArgs, Triple);
     if (OnlyStaticOpenCilk) {
       CmdArgs.push_back("-Bdynamic");
-      CmdArgs.push_back("-lpthread");
+      if (!getTriple().isAndroid()) {
+        // There is no libpthread on Android
+        CmdArgs.push_back("-lpthread");
+      }
     }
     break;
   }
