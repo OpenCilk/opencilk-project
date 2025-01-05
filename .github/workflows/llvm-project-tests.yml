@@ -62,6 +62,7 @@ jobs:
       image: ${{(startsWith(matrix.os, 'ubuntu') && 'ghcr.io/llvm/ci-ubuntu-22.04:latest') || null}}
       volumes:
         - /mnt/:/mnt/
+      options: --user root
     strategy:
       fail-fast: false
       matrix:
