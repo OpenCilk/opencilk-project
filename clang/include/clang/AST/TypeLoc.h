@@ -1931,15 +1931,35 @@ class ComplexTypeLoc : public InheritingConcreteTypeLoc<TypeSpecTypeLoc,
                                                         ComplexType> {
 };
 
+/* TODO: More locations so call to getSourceRange in Selection.cpp
+   canSafelySkipRange covers the callbacks too. */
+
+struct HyperobjectTypeLocInfo : public PointerLikeLocInfo {
+  SourceLocation RParenLoc;
+};
+
 class HyperobjectTypeLoc :
-    public PointerLikeTypeLoc<HyperobjectTypeLoc, HyperobjectType> {
+    public PointerLikeTypeLoc<HyperobjectTypeLoc, HyperobjectType,
+                              HyperobjectTypeLocInfo> {
 public:
+  SourceRange getLocalSourceRange() const {
+    return SourceRange(getSigilLoc(), getRParenLoc());
+  }
+
   SourceLocation getHyperLoc() const {
     return getSigilLoc();
   }
 
+  SourceLocation getRParenLoc() const {
+    return getLocalData()->RParenLoc;
+  }
+
   void setHyperLoc(SourceLocation Loc) {
     setSigilLoc(Loc);
+  }
+
+  void setRParenLoc(SourceLocation Loc) {
+    getLocalData()->RParenLoc = Loc;
   }
 
   void initializeLocal(ASTContext &Context, SourceLocation Loc) {

@@ -967,10 +967,8 @@ DEF_TRAVERSE_TYPE(ComplexType, { TRY_TO(TraverseType(T->getElementType())); })
 
 DEF_TRAVERSE_TYPE(HyperobjectType, {
     TRY_TO(TraverseType(T->getElementType()));
-    if (Stmt *I = T->getIdentity())
-      TRY_TO(TraverseStmt(I));
-    if (Stmt *R = T->getReduce())
-      TRY_TO(TraverseStmt(R));
+    TRY_TO(TraverseStmt(T->getIdentity()));
+    TRY_TO(TraverseStmt(T->getReduce()));
   })
 
 DEF_TRAVERSE_TYPE(PointerType, { TRY_TO(TraverseType(T->getPointeeType())); })

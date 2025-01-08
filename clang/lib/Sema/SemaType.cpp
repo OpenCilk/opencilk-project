@@ -6794,6 +6794,7 @@ namespace {
     }
     void VisitHyperobjectTypeLoc(HyperobjectTypeLoc TL) {
       TL.setHyperLoc(Chunk.Loc);
+      TL.setRParenLoc(Chunk.Hyper.RParenLoc);
     }
 
     void VisitTypeLoc(TypeLoc TL) {
