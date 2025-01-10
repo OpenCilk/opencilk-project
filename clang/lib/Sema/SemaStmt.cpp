@@ -4002,7 +4002,7 @@ StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   }
   ExprResult LimitExpr = ActOnBinOp(S, ForRange->getColonLoc(), tok::minus,
                                     EndRef.get(), BeginRef.get());
-  if (LimitExpr.isInvalid()) {
+  if (LimitExpr.isInvalid() || !LimitExpr.get()->getType()->isIntegerType()) {
     // CilkForRange currently only supports random access iterators.
     Diag(ForRange->getForLoc(), diag::err_cilk_for_range_end_minus_begin);
     return StmtError();
