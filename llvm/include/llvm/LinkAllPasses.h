@@ -43,8 +43,8 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
-#include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Tapir.h"
+#include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include "llvm/Transforms/Vectorize/LoadStoreVectorizer.h"
 #include <cstdlib>
@@ -107,7 +107,6 @@ struct ForcePassLinking {
     (void)llvm::createLowerGlobalDtorsLegacyPass();
     (void)llvm::createLowerInvokePass();
     (void)llvm::createLowerSwitchPass();
-    (void)llvm::createLowerTapirToTargetPass();
     (void)llvm::createNaryReassociatePass();
     (void)llvm::createObjCARCContractPass();
     (void)llvm::createPromoteMemoryToRegisterPass();

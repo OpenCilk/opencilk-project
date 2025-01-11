@@ -377,6 +377,7 @@ static bool shouldPinPassToLegacyPM(StringRef Pass) {
       "expand-fp",
       "callbrprepare",
       "scalarizer",
+      "tapircleanup",
   };
   for (const auto &P : PassNamePrefix)
     if (Pass.starts_with(P))
@@ -418,7 +419,6 @@ extern "C" int optMain(
   initializeCore(Registry);
   initializeScalarOpts(Registry);
   initializeVectorization(Registry);
-  initializeTapirOpts(Registry);
   initializeIPO(Registry);
   initializeAnalysis(Registry);
   initializeTransformUtils(Registry);

@@ -50,9 +50,6 @@ LLVM_ABI void initializeGlobalISel(PassRegistry &);
 /// Initialize all passes linked into the CodeGen library.
 LLVM_ABI void initializeTarget(PassRegistry &);
 
-/// Initialize all passes linked into the TapirOpts library.
-LLVM_ABI void initializeTapirOpts(PassRegistry &);
-
 LLVM_ABI void initializeAAResultsWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeAlwaysInlinerLegacyPassPass(PassRegistry &);
 LLVM_ABI void initializeAssignmentTrackingAnalysisPass(PassRegistry &);
