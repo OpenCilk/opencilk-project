@@ -1206,6 +1206,8 @@ public:
     return IRB.getInt64(CsiUnknownId);
   }
 
+  Value *getCalleeFuncID(const Function *Callee, IRBuilder<> &IRB);
+
   static bool spawnsTapirLoopBody(DetachInst *DI, LoopInfo &LI, TaskInfo &TI);
 
   static BasicBlock::iterator
@@ -1220,6 +1222,32 @@ protected:
   /// Finalize the CSI pass.
   void finalizeCsi();
 
+  FunctionCallee getHookFunction(StringRef Name, FunctionType *FnTy,
+                                 AttributeList AL) {
+    FunctionCallee Callee = M.getOrInsertFunction(Name, FnTy, AL);
+    if (Function *Fn = dyn_cast<Function>(Callee.getCallee())) {
+      Fn->setOnlyAccessesInaccessibleMemOrArgMem();
+    }
+    return Callee;
+  }
+  template <typename... ArgsTy>
+  FunctionCallee getHookFunction(StringRef Name, AttributeList AL, Type *RetTy,
+                                 ArgsTy... Args) {
+    FunctionCallee Callee = M.getOrInsertFunction(Name, AL, RetTy, Args...);
+    if (Function *Fn = dyn_cast<Function>(Callee.getCallee())) {
+      MemoryEffects ME = MemoryEffects::argMemOnly(ModRefInfo::Ref) |
+                         MemoryEffects::inaccessibleMemOnly(ModRefInfo::ModRef);
+      Fn->setMemoryEffects(ME);
+      Fn->setDoesNotThrow();
+    }
+    return Callee;
+  }
+  template <typename... ArgsTy>
+  FunctionCallee getHookFunction(StringRef Name, Type *RetTy,
+                                 ArgsTy... Args) {
+    return getHookFunction(Name, AttributeList{}, RetTy, Args...);
+  }
+
   /// Initialize FunctionCallees for the CSI hooks.
   /// @{
   void initializeLoadStoreHooks();
@@ -1232,6 +1260,9 @@ protected:
   void initializeTapirHooks();
   void initializeAllocFnHooks();
   /// @}
+
+  FunctionCallee getOrInsertSynthesizedHook(StringRef Name, FunctionType *T,
+                                            AttributeList AL = AttributeList());
 
   static StructType *getUnitFedTableType(LLVMContext &C,
                                          PointerType *EntryPointerType);
@@ -1286,6 +1317,7 @@ protected:
                         LoopInfo &LI);
   void instrumentSync(SyncInst *SI, unsigned SyncRegNum);
   void instrumentAlloca(Instruction *I, TaskInfo &TI);
+  bool instrumentAllocFnLibCall(Instruction *I, const TargetLibraryInfo *TLI);
   void instrumentAllocFn(Instruction *I, DominatorTree *DT,
                          const TargetLibraryInfo *TLI);
   void instrumentFree(Instruction *I, const TargetLibraryInfo *TLI);
