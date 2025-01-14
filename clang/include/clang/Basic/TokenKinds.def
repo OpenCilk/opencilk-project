@@ -339,6 +339,7 @@ KEYWORD(_Bool                       , KEYNOCXX)
 KEYWORD(_Complex                    , KEYALL)
 KEYWORD(_Generic                    , KEYALL)
 KEYWORD(_Hyperobject                , KEYALL)
+KEYWORD(cilk_reducer                , KEYOPENCILK)
 // Note, C2y removed support for _Imaginary; we retain it as a keyword because
 // 1) it's a reserved identifier, so we're allowed to steal it, 2) there's no
 // good way to specify a keyword in earlier but not later language modes within
@@ -494,6 +495,10 @@ KEYWORD(_Cilk_spawn                 , KEYALL)
 KEYWORD(_Cilk_sync                  , KEYALL)
 KEYWORD(_Cilk_for                   , KEYALL)
 KEYWORD(_Cilk_scope                 , KEYALL)
+KEYWORD(cilk_spawn                  , KEYOPENCILK)
+KEYWORD(cilk_sync                   , KEYOPENCILK)
+KEYWORD(cilk_for                    , KEYOPENCILK)
+KEYWORD(cilk_scope                  , KEYOPENCILK)
 
 // MSVC12.0 / VS2013 Type Traits
 TYPE_TRAIT_1(__is_destructible, IsDestructible, KEYALL)

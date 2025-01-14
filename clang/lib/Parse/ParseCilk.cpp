@@ -19,7 +19,8 @@ using namespace clang;
 ///       cilk_sync-statement:
 ///         '_Cilk_sync' ';'
 StmtResult Parser::ParseCilkSyncStatement() {
-  assert(Tok.is(tok::kw__Cilk_sync) && "Not a _Cilk_sync stmt!");
+  assert(Tok.isOneOf(tok::kw__Cilk_sync, tok::kw_cilk_sync) &&
+         "Not a cilk_sync stmt!");
   return Actions.ActOnCilkSyncStmt(ConsumeToken());
 }
 
@@ -27,7 +28,8 @@ StmtResult Parser::ParseCilkSyncStatement() {
 ///       cilk_spawn-statement:
 ///         '_Cilk_spawn' statement
 StmtResult Parser::ParseCilkSpawnStatement() {
-  assert(Tok.is(tok::kw__Cilk_spawn) && "Not a _Cilk_spawn stmt!");
+  assert(Tok.isOneOf(tok::kw__Cilk_spawn, tok::kw_cilk_spawn) &&
+         "Not a cilk_spawn stmt!");
   SourceLocation SpawnLoc = ConsumeToken();  // eat the '_Cilk_spawn'.
 
   unsigned ScopeFlags = Scope::BlockScope | Scope::FnScope | Scope::DeclScope;
@@ -149,9 +151,9 @@ struct MisleadingIndentationChecker {
 
 /// ParseCilkForStatement
 ///       cilk_for-statement:
-///         '_Cilk_for' '(' expr ';' expr ';' expr ')' statement
-///         '_Cilk_for' '(' declaration expr ';' expr ';' expr ')' statement
-/// [C++0x] '_Cilk_for'
+///         'cilk_for' '(' expr ';' expr ';' expr ')' statement
+///         'cilk_for' '(' declaration expr ';' expr ';' expr ')' statement
+/// [C++0x] 'cilk_for'
 ///             '(' for-range-declaration ':' for-range-initializer ')'
 ///             statement
 ///
@@ -161,15 +163,17 @@ struct MisleadingIndentationChecker {
 /// [C++0x]   expression
 /// [C++0x]   braced-init-list
 StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
-  assert(Tok.is(tok::kw__Cilk_for) && "Not a _Cilk_for stmt!");
-  SourceLocation ForLoc = ConsumeToken();  // eat the '_Cilk_for'.
+  StringRef Spelling = Tok.getName();
+  assert(Tok.isOneOf(tok::kw__Cilk_for, tok::kw_cilk_for) && 
+         "Not a cilk_for stmt!");
+  SourceLocation ForLoc = ConsumeToken();  // eat the 'cilk_for'.
 
   // SourceLocation CoawaitLoc;
   // if (Tok.is(tok::kw_co_await))
   //   CoawaitLoc = ConsumeToken();
 
   if (Tok.isNot(tok::l_paren)) {
-    Diag(Tok, diag::err_expected_lparen_after) << "_Cilk_for";
+    Diag(Tok, diag::err_expected_lparen_after) << Spelling;
     SkipUntil(tok::semi);
     return StmtError();
   }
@@ -523,7 +527,8 @@ StmtResult Parser::ParseCilkForStatement(SourceLocation *TrailingElseLoc) {
 ///       cilk_scope-statement:
 ///         '_Cilk_scope' statement
 StmtResult Parser::ParseCilkScopeStatement() {
-  assert(Tok.is(tok::kw__Cilk_scope) && "Not a _Cilk_scope stmt!");
+  assert(Tok.isOneOf(tok::kw__Cilk_scope, tok::kw_cilk_scope) &&
+         "Not a cilk_scope stmt!");
   SourceLocation ScopeLoc = ConsumeToken();  // eat the '_Cilk_scope'.
 
   // TODO: Decide whether to allow break statements in _Cilk_scopes.

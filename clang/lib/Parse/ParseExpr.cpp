@@ -1840,7 +1840,8 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
 
   // postfix-expression: [CP]
   //   _Cilk_spawn[opt] postfix-expression '(' argument-expression-list[opt] ')'
-  case tok::kw__Cilk_spawn: {
+  case tok::kw__Cilk_spawn:
+  case tok::kw_cilk_spawn: {
     SourceLocation SpawnLoc = ConsumeToken();
     // if (!getLangOpts().Cilk) {
     //   Diag(SpawnLoc, diag::err_cilkplus_disable);

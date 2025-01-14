@@ -488,7 +488,8 @@ Retry:
     ProhibitAttributes(GNUAttrs);
     return HandlePragmaCaptured();
 
-  case tok::kw__Cilk_spawn:              // [CP] _Cilk_spawn statement
+  case tok::kw__Cilk_spawn:              // [CP] cilk_spawn statement
+  case tok::kw_cilk_spawn:
     // if (!getLangOpts().Cilk) {
     //   Diag(Tok, diag::err_cilkplus_disable);
     //   SkipUntil(tok::semi);
@@ -497,16 +498,18 @@ Retry:
     return ParseCilkSpawnStatement();
 
   case tok::kw__Cilk_sync:               // [CP] _Cilk_sync statement
+  case tok::kw_cilk_sync:
     // if (!getLangOpts().Cilk) {
     //   Diag(Tok, diag::err_cilkplus_disable);
     //   SkipUntil(tok::semi);
     //   return StmtError();
     // }
     Res = ParseCilkSyncStatement();
-    SemiError = "_Cilk_sync";
+    SemiError = "cilk_sync";
     break;
 
   case tok::kw__Cilk_for:
+  case tok::kw_cilk_for:
     // if (!getLangOpts().Cilk) {
     //   Diag(Tok, diag::err_cilkplus_disable);
     //   SkipUntil(tok::semi);
@@ -515,6 +518,7 @@ Retry:
     return ParseCilkForStatement(TrailingElseLoc);
 
   case tok::kw__Cilk_scope:              // [CP] _Cilk_scope statement
+  case tok::kw_cilk_scope:
     // if (!getLangOpts().Cilk) {
     //   Diag(Tok, diag::err_cilkplus_disable);
     //   SkipUntil(tok::semi);

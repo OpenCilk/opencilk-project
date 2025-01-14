@@ -65,7 +65,7 @@ void serial_tryblock(int n) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// _Cilk_for code snippets
+/// cilk_for code snippets
 ////////////////////////////////////////////////////////////////////////////////
 
 // CHECK-LABEL: @_Z20parallelfor_noexcepti(
@@ -73,7 +73,7 @@ void serial_tryblock(int n) {
 // CHECK-NOT: landingpad
 // CHECK-NOT: resume
 void parallelfor_noexcept(int n) {
-  _Cilk_for (int i = 0; i < n; ++i)
+  cilk_for (int i = 0; i < n; ++i)
     quuz(i);
 }
 
@@ -99,7 +99,7 @@ void parallelfor_noexcept(int n) {
 // CHECK: [[DRUNREACH]]:
 // CHECK-NEXT: unreachable
 void parallelfor_except(int n) {
-  _Cilk_for (int i = 0; i < n; ++i)
+  cilk_for (int i = 0; i < n; ++i)
     bar(new Foo());
 }
 
@@ -110,7 +110,7 @@ void parallelfor_tryblock(int n) {
   try
     {
       // CHECK-NOT: detach within %[[SYNCREG1]], label %{{.+}}, label %{{.+}} unwind
-      _Cilk_for (int i = 0; i < n; ++i)
+      cilk_for (int i = 0; i < n; ++i)
         quuz(i);
       // CHECK: invoke void @llvm.sync.unwind(token %[[SYNCREG1]])
       // CHECK-NEXT: to label %{{.+}} unwind label %[[CATCH:.+]]
@@ -145,7 +145,7 @@ void parallelfor_tryblock(int n) {
       // CHECK: invoke void @llvm.detached.rethrow
       // CHECK: (token %[[SYNCREG2]], [[LPADTYPE]] {{.+}})
       // CHECK-NEXT: to label {{.+}} unwind label %[[CATCH]]
-      _Cilk_for (int i = 0; i < n; ++i)
+      cilk_for (int i = 0; i < n; ++i)
         bar(new Foo());
     }
   catch (int e)
@@ -182,7 +182,7 @@ void parallelfor_tryblock_inline(int n) {
       // CHECK: landingpad [[LPADTYPE]]
       // CHECK-NEXT: catch ptr @_ZTIi
       // CHECK-NEXT: catch ptr null
-      _Cilk_for (int i = 0; i < n; ++i)
+      cilk_for (int i = 0; i < n; ++i)
         foo(new Foo());
     }
   catch (int e)
@@ -196,14 +196,14 @@ void parallelfor_tryblock_inline(int n) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// _Cilk_spawn code snippets
+/// cilk_spawn code snippets
 ////////////////////////////////////////////////////////////////////////////////
 
 // CHECK-LABEL: @_Z14spawn_noexcepti(
 // CHECK-NOT: landingpad
 // CHECK-NOT: detached.rethrow
 void spawn_noexcept(int n) {
-  _Cilk_spawn quuz(n);
+  cilk_spawn quuz(n);
   quuz(n);
 }
 
@@ -237,7 +237,7 @@ void spawn_tf_except(int n) {
   // CHECK-NOT: load ptr, ptr %[[EXN]],
   // CHECK-NOT: load i32, ptr %[[EHSELECTOR]],
   // CHECK: resume [[LPADTYPE]]
-  _Cilk_spawn bar(new Foo());
+  cilk_spawn bar(new Foo());
   quuz(n);
 }
 
@@ -292,7 +292,7 @@ void spawn_stmt_destructor(int n) {
   // CHECK-NOT: load ptr, ptr %[[EXNTF]],
   // CHECK-NOT: load i32, ptr %[[EHSELECTORTF]],
   // CHECK: resume [[LPADTYPE]]
-  _Cilk_spawn baz(Foo());
+  cilk_spawn baz(Foo());
   quuz(n);
 }
 
@@ -348,7 +348,7 @@ void spawn_decl_destructor(int n) {
   // CHECK-NOT: load ptr, ptr %[[EXNTF]],
   // CHECK-NOT: load i32, ptr %[[EHSELECTORTF]],
   // CHECK: resume [[LPADTYPE]]
-  int result = _Cilk_spawn baz(Foo());
+  int result = cilk_spawn baz(Foo());
   quuz(n);
 }
 
@@ -414,7 +414,7 @@ void spawn_block_destructor(int n) {
   // CHECK: resume [[LPADTYPE]]
   {
     auto f = Foo();
-    int result = _Cilk_spawn baz(f);
+    int result = cilk_spawn baz(f);
     quuz(n);
   }
 }
@@ -444,7 +444,7 @@ void spawn_throw_inline(int n) {
   // CHECK: invoke void @llvm.taskframe.resume
   // CHECK: (token %[[TASKFRAME]], [[LPADTYPE]] {{.+}})
   // CHECK-NEXT: to label {{.+}} unwind label {{.+}}
-  _Cilk_spawn foo(new Foo());
+  cilk_spawn foo(new Foo());
   quuz(n);
 }
 
@@ -460,7 +460,7 @@ void spawn_tryblock(int n) {
       // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME]])
       // CHECK-NEXT: call {{.*}}i32 @_Z4quuzi(
       // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE1]]
-      _Cilk_spawn quuz(n);
+      cilk_spawn quuz(n);
       // CHECK: %[[TASKFRAME2:.+]] = call token @llvm.taskframe.create()
       // CHECK: detach within %[[SYNCREG]], label %[[DETACHED2:.+]], label %[[CONTINUE2:.+]] unwind label %[[DUNWIND:.+]]
       // CHECK: [[DETACHED2]]:
@@ -469,21 +469,21 @@ void spawn_tryblock(int n) {
       // CHECK-NEXT: to label %[[INVOKECONT1:.+]] unwind label %[[TASKLPAD:.+]]
       // CHECK: [[INVOKECONT1]]:
       // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE2]]
-      _Cilk_spawn bar(new Foo());
+      cilk_spawn bar(new Foo());
       // CHECK: %[[TASKFRAME3:.+]] = call token @llvm.taskframe.create()
       // CHECK: detach within %[[SYNCREG]], label %[[DETACHED3:.+]], label %[[CONTINUE3:.+]]
       // CHECK: [[DETACHED3]]:
       // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME3]])
       // CHECK-NEXT: call {{.*}}i32 @_Z4quuzi(
       // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE3]]
-      _Cilk_spawn quuz(n);
+      cilk_spawn quuz(n);
       // CHECK: [[CONTINUE3]]:
       // CHECK: invoke {{.*}}i32 @_Z3barP3Foo(
       // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[CONT3UNWIND:.+]]
       bar(new Foo());
       // CHECK: [[INVOKECONT2]]:
       // CHECK-NEXT: sync within %[[SYNCREG]]
-      _Cilk_sync;
+      cilk_sync;
     }
   // CHECK: [[DUNWIND]]:
   // CHECK: landingpad [[LPADTYPE]]
