@@ -49,6 +49,8 @@ def IntrArgMemOnly : IntrinsicProperty;
 // accessible by the module being compiled. This is a weaker form of IntrNoMem.
 def IntrInaccessibleMemOnly : IntrinsicProperty;
 
+def IntrReadInaccessibleMemOnly : IntrinsicProperty;
+
 // IntrInaccessibleMemOrArgMemOnly -- This intrinsic only accesses memory that
 // its pointer-typed arguments point to or memory that is not accessible
 // by the module being compiled. This is a weaker form of IntrArgMemOnly.
@@ -1719,10 +1721,10 @@ def int_syncregion_start
     : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly, IntrWillReturn]>;
 
 def int_tapir_runtime_start
-    : Intrinsic<[llvm_token_ty], [], [IntrArgMemOnly, IntrWillReturn]>;
+    : Intrinsic<[llvm_token_ty], [], [IntrInaccessibleMemOnly, IntrWillReturn]>;
 
 def int_tapir_runtime_end
-    : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly, IntrWillReturn]>;
+    : Intrinsic<[], [llvm_token_ty], [IntrInaccessibleMemOnly, IntrWillReturn]>;
 
 // Intrinsics for taskframes.
 
@@ -1765,18 +1767,23 @@ def int_tapir_loop_grainsize
     : Intrinsic<[llvm_anyint_ty], [LLVMMatchType<0>],
                 [IntrNoMem, IntrWillReturn, IntrSpeculatable]>;
 
+// Return the stack_frame in an OpenCilk function, otherwise null.
+def int_tapir_frame
+    : Intrinsic<[llvm_ptr_ty], [], [IntrWillReturn,IntrReadInaccessibleMemOnly]>;
+
 // Intrinsic to get the frame address of a spawned task.  Tapir
 // lowering transforms this intrinsic into ordinary frameaddress
 // intrinsics.
 def int_task_frameaddress
-    : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty], [IntrWillReturn]>;
+    : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty],
+                [IntrReadInaccessibleMemOnly,IntrWillReturn]>;
 
 // Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
 // but that does not work, so rely on the front end to insert bitcasts.
 def int_hyper_lookup
     : Intrinsic<[llvm_ptr_ty],
                 [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty], [
-                  IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+                  IntrWillReturn, IntrReadInaccessibleMemOnly,
                   IntrStrandPure, IntrHyperView, IntrInjective
                 ]>;
 

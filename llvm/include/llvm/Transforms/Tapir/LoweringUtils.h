@@ -244,6 +244,8 @@ public:
   /// Lower a Tapir sync instruction \p SI.
   virtual void lowerSync(SyncInst &SI) = 0;
 
+  virtual void lowerFrameCall(CallBase *Call, DominatorTree &DT) {}
+
   virtual void lowerReducerOperation(CallBase *Call) {}
 
   /// Lower calls to the tapir.runtime.{start,end} intrinsics.  Only
