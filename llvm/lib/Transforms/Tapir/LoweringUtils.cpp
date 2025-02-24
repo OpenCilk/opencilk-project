@@ -577,6 +577,11 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
       if (isPlaceholderSuccessor(S->getEntry()))
         continue;
 
+      // Skip shared-EH spindles, which will be handled when processing the
+      // task's blocks.
+      if (S->isSharedEH())
+        continue;
+
       LLVM_DEBUG(dbgs() << "Adding blocks in taskframe spindle " << *S << "\n");
       assert(!SpindlesToExclude.count(S) &&
              "Taskframe spindle marked for exclusion.");

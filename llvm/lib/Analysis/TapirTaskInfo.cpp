@@ -187,6 +187,31 @@ static bool isTaskFrameResume(const Instruction *I,
 // Spindle implementation
 //
 
+static const BasicBlock *
+getSingleNotUnreachableSuccessor(const BasicBlock *BB) {
+  const BasicBlock *SingleSuccessor = nullptr;
+  for (const auto *Succ : children<const BasicBlock *>(BB)) {
+    if (isa<UnreachableInst>(Succ->getFirstNonPHIOrDbgOrLifetime()))
+      continue;
+    if (!SingleSuccessor)
+      SingleSuccessor = Succ;
+    else
+      return nullptr;
+  }
+  return SingleSuccessor;
+}
+
+static bool isUnusualExit(const BasicBlock *Exit, const Spindle *S) {
+  const Instruction *ExitTerm = Exit->getTerminator();
+  const BasicBlock *EHContin = nullptr;
+  if (DetachInst *DI = S->getParentTask()->getDetach())
+    EHContin = DI->getUnwindDest();
+  return !(isTaskFrameResume(ExitTerm) || isa<UnreachableInst>(ExitTerm) ||
+           isa<ResumeInst>(ExitTerm) || isa<ReattachInst>(ExitTerm) ||
+           isa<ReturnInst>(ExitTerm) ||
+           (EHContin && (getSingleNotUnreachableSuccessor(Exit) == EHContin)));
+}
+
 /// Return true if this spindle is a shared EH spindle.
 bool Spindle::isSharedEH() const {
   return getParentTask()->containsSharedEH(this);
@@ -466,6 +491,12 @@ static void computeSpindleEdges(TaskInfo *TI) {
         Spindle *Succ = TI->getSpindleFor(SB);
         if (Succ != S) {
           S->addSpindleEdgeTo(Succ, Exit);
+          if (Succ->getParentTask() != S->getParentTask())
+            // Check if Succ is an unusual exit for S.  If so, then Succ may be
+            // a shared EH spindle with S's parent task.
+            if (!isa<DetachInst>(Exit->getTerminator()) &&
+                isUnusualExit(Exit, S))
+              Succ->getParentTask()->markEHSpindle(*Succ);
           // Add this successor spindle for processing.
           WorkList.push_back(Succ);
         }
@@ -1393,20 +1424,6 @@ bool TaskInfo::invalidate(Function &F, const PreservedAnalyses &PA,
   auto PAC = PA.getChecker<TaskAnalysis>();
   return !(PAC.preserved() || PAC.preservedSet<AllAnalysesOn<Function>>() ||
            PAC.preservedSet<CFGAnalyses>());
-}
-
-static const BasicBlock *getSingleNotUnreachableSuccessor(
-    const BasicBlock *BB) {
-  const BasicBlock *SingleSuccessor = nullptr;
-  for (const auto *Succ : children<const BasicBlock *>(BB)) {
-    if (isa<UnreachableInst>(Succ->getFirstNonPHIOrDbgOrLifetime()))
-      continue;
-    if (!SingleSuccessor)
-      SingleSuccessor = Succ;
-    else
-      return nullptr;
-  }
-  return SingleSuccessor;
 }
 
 /// Print spindle with all the BBs inside it.

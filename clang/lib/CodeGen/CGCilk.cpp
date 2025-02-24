@@ -108,7 +108,6 @@ void CodeGenFunction::DetachScope::EnsureTaskFrame() {
     llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
     CGF.AllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "",
                                                CGF.Builder.GetInsertBlock());
-    // SavedDetachedAllocaInsertPt = CGF.AllocaInsertPt;
 
     CreateTaskFrameEHState();
 
@@ -248,7 +247,6 @@ void CodeGenFunction::DetachScope::FinishDetach() {
   {
     llvm::Instruction *Ptr = CGF.AllocaInsertPt;
     CGF.AllocaInsertPt = TFAllocaInsertPt;
-    SavedDetachedAllocaInsertPt = nullptr;
     Ptr->eraseFromParent();
   }
 
