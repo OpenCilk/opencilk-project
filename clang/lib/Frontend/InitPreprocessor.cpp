@@ -1469,7 +1469,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("__cilk", "200");
     break;
   case LangOptions::Cilk_opencilk:
-    Builder.defineMacro("__cilk", "300");
+    Builder.defineMacro("__cilk", "301");
     break;
   }
 
