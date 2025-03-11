@@ -834,11 +834,8 @@ public:
   }
 
   /// Return the shared EH spindles contained within this task.
-  const SmallVectorImpl<Spindle *> &getSharedEHSpindles() const {
-    return SharedSubTaskEH;
-  }
-  SmallVectorImpl<Spindle *> &getSharedEHSpindles() {
-    return SharedSubTaskEH;
+  const SmallPtrSetImpl<const Spindle *> &getSharedEHSpindles() const {
+    return DenseEHSpindleSet;
   }
   /// Get the shared EH spindle containing basic block B, if it exists.
   const Spindle *getSharedEHContaining(const BasicBlock *B) const {
@@ -849,7 +846,7 @@ public:
   }
 
   using shared_eh_spindle_iterator =
-    typename SmallVectorImpl<Spindle *>::const_iterator;
+    typename SmallPtrSetImpl<const Spindle *>::const_iterator;
   shared_eh_spindle_iterator shared_eh_spindle_begin() const {
     return getSharedEHSpindles().begin();
   }

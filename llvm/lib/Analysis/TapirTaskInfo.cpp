@@ -472,6 +472,34 @@ static void associateWithSpindle(TaskInfo *TI, Spindle *S,
          "Not all unassociated blocks were associated with spindle.");
 }
 
+// Helper function to mark successor spindles connected to \p Exiting as
+// shared-EH spindles, starting at spindle \p FirstSharedEH.
+static void markSharedEHSpindles(TaskInfo *TI, Spindle *Exiting,
+                                 Spindle *FirstSharedEH) {
+  SmallVector<Spindle *, 8> WorkList;
+  SmallPtrSet<Spindle *, 8> Visited;
+
+  WorkList.push_back(FirstSharedEH);
+  while (!WorkList.empty()) {
+    Spindle *S = WorkList.pop_back_val();
+    if (!Visited.insert(S).second)
+      continue;
+
+    S->getParentTask()->markEHSpindle(*S);
+    for (BasicBlock *Exit : S->spindle_exits()) {
+      for (BasicBlock *SB : successors(Exit)) {
+        Spindle *Succ = TI->getSpindleFor(SB);
+        // Check if Succ is an unusual exit for S.  If so, then Succ may be
+        // a shared EH spindle with S's parent task.
+        if (!isa<DetachInst>(Exit->getTerminator()) &&
+            isUnusualExit(Exit, Exiting)) {
+          WorkList.push_back(Succ);
+        }
+      }
+    }
+  }
+}
+
 // Helper function to add spindle edges to spindles.
 static void computeSpindleEdges(TaskInfo *TI) {
   // Walk all spindles in the CFG to find all spindle edges.
@@ -496,7 +524,7 @@ static void computeSpindleEdges(TaskInfo *TI) {
             // a shared EH spindle with S's parent task.
             if (!isa<DetachInst>(Exit->getTerminator()) &&
                 isUnusualExit(Exit, S))
-              Succ->getParentTask()->markEHSpindle(*Succ);
+              markSharedEHSpindles(TI, S, Succ);
           // Add this successor spindle for processing.
           WorkList.push_back(Succ);
         }
