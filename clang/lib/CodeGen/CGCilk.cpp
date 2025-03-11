@@ -456,7 +456,7 @@ void CodeGenFunction::EmitCilkSyncStmt(const CilkSyncStmt &S) {
 void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
   LexicalScope CilkScope(*this, S.getSourceRange());
 
-  // If this _Cilk_scope is outermost in the function, emit
+  // If this cilk_scope is outermost in the function, emit
   // tapir_runtime_{start,end} intrinsics around the scope.
   bool ThisScopeIsOutermost = false;
   if (!WithinCilkScope) {
@@ -465,13 +465,14 @@ void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
   }
 
   {
+    ScopeIsSynced = true;
     // Add a taskframe around this scope in case there are other spawns outside
     // of this scope, which would need to be synced separately.
     TaskFrameScope TFScope(*this);
     if (ThisScopeIsOutermost && !CurSyncRegion) {
       llvm::Instruction *TapirRTStart = Builder.CreateCall(
           CGM.getIntrinsic(llvm::Intrinsic::tapir_runtime_start));
-      // Mark the end of the _Cilk_scope with tapir_runtime_end.
+      // Mark the end of the cilk_scope with tapir_runtime_end.
       EHStack.pushCleanup<TapirRuntimeEndCleanup>(NormalAndEHCleanup,
                                                   TapirRTStart);
     }
@@ -485,8 +486,8 @@ void CodeGenFunction::EmitCilkScopeStmt(const CilkScopeStmt &S) {
     EmitStmt(S.getBody());
   }
 
-  // If this _Cilk_scope is outermost in the function, mark that CodeGen is no
-  // longer emitting within a _Cilk_scope.
+  // If this cilk_scope is outermost in the function, mark that CodeGen is no
+  // longer emitting within a cilk_scope.
   if (ThisScopeIsOutermost)
     WithinCilkScope = false;
 }
