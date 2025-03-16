@@ -3633,9 +3633,8 @@ void DarwinClang::AddOpenCilkABIBitcode(const ArgList &Args,
     if (!getVFS().exists(P))
       getDriver().Diag(diag::err_drv_opencilk_missing_abi_bitcode)
           << A->getAsString(Args);
-    if (IsLTO)
-      CmdArgs.push_back(
-          Args.MakeArgString("--opencilk-abi-bitcode=" + P));
+    CmdArgs.push_back(Args.MakeArgString("--opencilk-abi-bitcode=" + P));
+    return;
   }
 
   bool UseAsan = getSanitizerArgs(Args).needsAsanRt();

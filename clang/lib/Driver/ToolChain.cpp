@@ -1756,6 +1756,9 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
     if (IsLTO)
       CmdArgs.push_back(
           Args.MakeArgString("--plugin-opt=opencilk-abi-bitcode=" + P));
+    else
+      CmdArgs.push_back(Args.MakeArgString("--opencilk-abi-bitcode=" + P));
+    return;
   }
 
   bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
