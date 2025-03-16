@@ -579,7 +579,7 @@ static void renderTapirLoweringOptions(const ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_fcilktool_EQ))
     CmdArgs.push_back(
-        Args.MakeArgString(Twine("--plugin-opt=cilktool=") + A->getValue()));
+        Args.MakeArgString(Twine("--cilktool=") + A->getValue()));
 }
 
 static void AppendPlatformPrefix(SmallString<128> &Path, const llvm::Triple &T);
