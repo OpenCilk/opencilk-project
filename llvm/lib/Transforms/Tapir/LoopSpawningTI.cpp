@@ -947,6 +947,20 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
     return nullptr;
   }
 
+  if (!isa<BranchInst>(L->getLoopLatch()->getTerminator()) ||
+      dyn_cast<BranchInst>(L->getLoopLatch()->getTerminator())
+          ->isUnconditional()) {
+    LLVM_DEBUG(
+        dbgs() << "Loop latch is not terminated by a conditional branch.\n");
+    if (hintsDemandOutlining(Hints)) {
+      ORE.emit(
+          TapirLoopInfo::createMissedAnalysis(LS_NAME, "UnexpectedLatch", L)
+          << "loop latch not terminated by a conditional branch");
+      emitMissedWarning(L, Hints, &ORE);
+    }
+    return nullptr;
+  }
+
   // Get the task for this loop if it is a Tapir loop.
   Task *T = llvm::getTaskIfTapirLoop(L, &TI);
   if (!T) {
