@@ -968,7 +968,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
                           ConstantInt::get(BECount->getType(), Count),
                           "xtraiter");
   }
-  Value *BranchVal = B.CreateICmpULT(
+  Value *BranchVal = B.CreateICmpSLT(
       BECount, ConstantInt::get(BECount->getType(),
                                 TL.isInclusiveRange() ? Count : Count - 1));
   BasicBlock *RemainderLoopBB = NewExit;

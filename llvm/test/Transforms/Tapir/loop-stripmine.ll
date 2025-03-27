@@ -46,7 +46,7 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK: pfor.detach.preheader:
 ; CHECK:  %[[STRPLOOPITER:.+]] = add nsw i64 %[[TRIPCOUNT:.+]], -1
 ; CHECK:  %[[XTRAITER:.+]] = and i64 %[[TRIPCOUNT]], 2047
-; CHECK:  %[[ICMP:.+]] = icmp ult i64 %[[STRPLOOPITER]], 2047
+; CHECK:  %[[ICMP:.+]] = icmp slt i64 %[[STRPLOOPITER]], 2047
 ; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !8
 
 ; CHECK: [[STRPLOOPPH]]:
@@ -175,7 +175,7 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK: pfor.detach.preheader:
 ; CHECK:  %[[STRPLOOPITER:.+]] = add nsw i64 %[[TRIPCOUNT:.+]], -1
 ; CHECK:  %[[XTRAITER:.+]] = and i64 %[[TRIPCOUNT]], 15
-; CHECK:  %[[ICMP:.+]] = icmp ult i64 %[[STRPLOOPITER]], 15
+; CHECK:  %[[ICMP:.+]] = icmp slt i64 %[[STRPLOOPITER]], 15
 ; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPPH]]:
@@ -349,7 +349,7 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK: pfor.detach.preheader:
 ; CHECK:  %[[STRPLOOPITER:.+]] = add nsw i64 %[[TRIPCOUNT:.+]], -1
 ; CHECK:  %[[XTRAITER:.+]] = and i64 %[[TRIPCOUNT]], 31
-; CHECK:  %[[ICMP:.+]] = icmp ult i64 %[[STRPLOOPITER]], 31
+; CHECK:  %[[ICMP:.+]] = icmp slt i64 %[[STRPLOOPITER]], 31
 ; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !51
 
 ; CHECK: [[STRPLOOPPH]]:

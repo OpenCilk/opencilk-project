@@ -160,7 +160,7 @@ pfor.cond.preheader:                              ; preds = %entry
   br label %pfor.cond
 
 ; CHECK: pfor.cond.preheader:
-; CHECK: %[[ICMP:.+]] = icmp ult i64
+; CHECK: %[[ICMP:.+]] = icmp slt i64
 ; CHECK-NEXT: br i1 %[[ICMP]], label %[[EPIL_CHECK:.+]], label %[[PLOOP_START:.+]]
 
 ; CHECK: [[EPIL_CHECK]]:

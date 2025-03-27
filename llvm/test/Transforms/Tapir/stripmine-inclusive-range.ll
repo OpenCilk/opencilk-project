@@ -95,7 +95,7 @@ cleanup:                                          ; preds = %pfor.cond.cleanup, 
 ; CHECK: pfor.cond.preheader:
 ; CHECK: %[[XTRAITER:.+]] = and i64 %n, 2047
 ; CHECK-NEXT: add i64 %[[XTRAITER]], 1
-; CHECK: %[[CMP:.+]] = icmp ult i64 %n, 2048
+; CHECK: %[[CMP:.+]] = icmp slt i64 %n, 2048
 ; CHECK: br i1 %[[CMP]],
 
 ; Function Attrs: uwtable
@@ -219,7 +219,7 @@ _ZN4cilk7reducerINS_6op_addIxLb1EEEED2Ev.exit:    ; preds = %cond.end.i.i
 ; CHECK: pfor.cond.preheader:
 ; CHECK: %[[XTRAITER:.+]] = and i64 %n, 2047
 ; CHECK-NEXT: add i64 %[[XTRAITER]], 1
-; CHECK: %[[CMP:.+]] = icmp ult i64 %n, 2048
+; CHECK: %[[CMP:.+]] = icmp slt i64 %n, 2048
 ; CHECK: br i1 %[[CMP]],
 
 ; Function Attrs: argmemonly nounwind willreturn
