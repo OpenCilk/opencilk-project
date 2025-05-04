@@ -37,6 +37,7 @@ add_llvm_component_library(LLVMTapirOpts
   MC
   Scalar
   Support
+  TargetParser
   TransformUtils
   Vectorize
   )
