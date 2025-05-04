@@ -31,12 +31,12 @@ add_llvm_component_library(LLVMTapirOpts
   LINK_COMPONENTS
   Analysis
   Core
-  IPO
   IRReader
   Linker
   MC
   Scalar
   Support
+  TargetParser
   TransformUtils
   Vectorize
   )

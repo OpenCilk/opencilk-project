@@ -17,7 +17,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Timer.h"
-#include "llvm/Transforms/IPO/FunctionAttrs.h"
 #include "llvm/Transforms/Tapir/CilkABI.h"
 #include "llvm/Transforms/Tapir/LambdaABI.h"
 #include "llvm/Transforms/Tapir/OMPTaskABI.h"
@@ -759,8 +758,6 @@ Function *llvm::createHelperForTask(Function &F, Task *T, ValueSet &Args,
     VMap[DI] = DetachRepl;
   }
 
-  Helper->setMemoryEffects(computeFunctionBodyMemoryAccess(*Helper, OA.AA));
-
   return Helper;
 }
 
@@ -972,8 +969,6 @@ Function *llvm::createHelperForTaskFrame(Function &F, Spindle *TF,
     for (Instruction *TFEnd : TFEndsToRemove)
       TFEnd->eraseFromParent();
   }
-
-  Helper->setMemoryEffects(computeFunctionBodyMemoryAccess(*Helper, OA.AA));
 
   return Helper;
 }
