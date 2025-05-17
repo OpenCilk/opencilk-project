@@ -3223,6 +3223,10 @@ static bool isDetachedRethrow(const Instruction *I,
 }
 
 void Verifier::verifyTask(const DetachInst *DI) {
+  Check(DI->getContinue() != DI->getUnwindDest(),
+        "Detach must have different continuation and unwind destinations");
+  Check(!DI->hasUnwindDest() || DI->getUnwindDest()->isLandingPad(),
+        "Detach unwind destination must be a landingpad.");
   SmallVector<const BasicBlock *, 32> Worklist;
   SmallPtrSet<const BasicBlock *, 32> Visited;
   Worklist.push_back(DI->getDetached());

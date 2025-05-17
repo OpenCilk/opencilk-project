@@ -904,7 +904,7 @@ void llvm::SerializeDetach(DetachInst *DI, BasicBlock *ParentEntry,
     startSerializingTaskFrame(TaskFrame, ToErase, DT, TI, ReplaceWithTaskFrame);
 
   // Clone any EH blocks that need cloning.
-  if (EHBlocksToClone) {
+  if (EHBlocksToClone && !EHBlocksToClone->empty()) {
     assert(EHBlockPreds &&
            "Given EH blocks to clone, but not blocks exiting to them.");
     cloneEHBlocks(Spawner->getParent(), *EHBlocksToClone, *EHBlockPreds, ".sd",
@@ -1033,9 +1033,9 @@ void llvm::AnalyzeTaskForSerialization(
     for (BasicBlock *BB : S->blocks()) {
       // Record any shared-EH blocks that need to be cloned.
       if (S->isSharedEH()) {
-	// Skip basic blocks that are placeholder successors
-	if (isPlaceholderSuccessor(BB))
-	  continue;
+        // Skip basic blocks that are placeholder successors
+        if (isPlaceholderSuccessor(BB))
+          continue;
 
         EHBlocksToClone.push_back(BB);
         if (S->getEntry() == BB)

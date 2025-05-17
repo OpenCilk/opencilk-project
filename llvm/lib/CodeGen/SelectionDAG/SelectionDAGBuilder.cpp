@@ -8227,6 +8227,10 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
   case Intrinsic::tapir_runtime_end:
     // Discard any tapir.runtime.ends.
     return;
+  case Intrinsic::reducer_register:
+  case Intrinsic::reducer_unregister:
+    // Discard any reducer.register and reducer.unregister calls.
+    return;
   case Intrinsic::task_frameaddress:
     setValue(&I, DAG.getNode(ISD::FRAMEADDR, sdl,
                              TLI.getFrameIndexTy(DAG.getDataLayout()),

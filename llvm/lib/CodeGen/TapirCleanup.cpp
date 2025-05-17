@@ -12,11 +12,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/CodeGen/Passes.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
@@ -69,7 +74,7 @@ bool TapirCleanup::runOnFunction(Function &F) {
 
   // If we haven't lowered the Tapir task to a particular parallel runtime by
   // this point, simply serialize the task.
-  for (Task *T : post_order(TI.getRootTask())) {
+  for (Task *T : ReversePostOrderTraversal<Task *>(TI.getRootTask())) {
     if (T->isRootTask())
       continue;
     ORE.emit(DiagnosticInfoOptimizationFailure(DEBUG_TYPE, "CleanedUpTapir",
@@ -96,6 +101,18 @@ bool TapirCleanup::runOnFunction(Function &F) {
     ++NumTaskFramesErased;
     Changed = true;
   }
+
+  // Clean up hyper.lookup calls
+  SmallVector<Instruction *, 8> ToErase;
+  for (BasicBlock &BB : F)
+    for (Instruction &I : BB)
+      if (isTapirIntrinsic(Intrinsic::hyper_lookup, &I)) {
+        I.replaceAllUsesWith(cast<CallBase>(&I)->getArgOperand(0));
+        ToErase.push_back(&I);
+        Changed = true;
+      }
+  for (Instruction *I : ToErase)
+    I->eraseFromParent();
 
   return Changed;
 }
