@@ -3910,6 +3910,13 @@ StmtResult Sema::FinishCilkForRangeStmt(Stmt *S, Stmt *B) {
   CilkForRange->setForRange(ForRange.get());
 
   CXXForRangeStmt *CXXForRange = cast<CXXForRangeStmt>(ForRange.get());
+  DeclStmt *RangeDS = cast<DeclStmt>(CXXForRange->getRangeStmt());
+  VarDecl *RangeVar = cast<VarDecl>(RangeDS->getSingleDecl());
+  QualType RangeVarType = RangeVar->getType();
+
+  if (RangeVarType->isDependentType()) {
+    return CilkForRange;
+  }
 
   if (isa<NullStmt>(CXXForRange->getBody())) {
     Diag(CXXForRange->getForLoc(), diag::warn_empty_cilk_for_body);
@@ -3979,6 +3986,15 @@ StmtResult Sema::ActOnCilkForRangeStmt(Scope *S, SourceLocation ForLoc,
 
 StmtResult Sema::BuildCilkForRangeStmt(CXXForRangeStmt *ForRange) {
   Scope *S = getCurScope();
+
+  DeclStmt *RangeDS = cast<DeclStmt>(ForRange->getRangeStmt());
+  VarDecl *RangeVar = cast<VarDecl>(RangeDS->getSingleDecl());
+  QualType RangeVarType = RangeVar->getType();
+
+  if (RangeVarType->isDependentType()) {
+    return new (Context) CilkForRangeStmt(Context, ForRange, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr);
+  }
 
   // 1. Build an induction variable of type difference_type<iterator>
   // 2. Create an end - begin stmt, the end value of the induction variable.
