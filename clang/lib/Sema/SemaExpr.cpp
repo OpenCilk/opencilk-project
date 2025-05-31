@@ -2284,8 +2284,6 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   if (!HT)
     return E;
 
-  bool Difficult = CurContext->isDependentContext();
-
   QualType ResultType = HT->getElementType().withFastQualifiers(
       InputType.getLocalFastQualifiers());
   QualType Ptr = Context.getPointerType(ResultType);
@@ -2304,7 +2302,7 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   Expr *VarAddr;
   if (Pointer) {
     VarAddr = E;
-  } else if (Difficult) {
+  } else if (HT->getElementType()->isDependentType()) {
     ExprResult Address =
       BuildBuiltinCallExpr(Loc, Builtin::BI__builtin_addressof, E);
     assert(Address.isUsable());
@@ -2322,7 +2320,7 @@ Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
   // Template expansion normally strips out implicit casts, so make this
   // explicit in C++.
   Expr *Casted = nullptr;
-  if (Difficult)
+  if (CurContext->isDependentContext())
     // Based on logic in CoroutineStmtBuilder::makeNewAndDeleteExpr()
     Casted =
         BuildCXXNamedCast(Loc, tok::kw_static_cast,
