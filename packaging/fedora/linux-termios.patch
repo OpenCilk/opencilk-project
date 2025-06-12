@@ -1,0 +1,45 @@
+diff -ruN opencilk-project-opencilk-v3.0/compiler-rt/lib/sanitizer_common/sanitizer_common_interceptors_ioctl.inc opencilk-project-opencilk-v3.0-mod/compiler-rt/lib/sanitizer_common/sanitizer_common_interceptors_ioctl.inc
+--- opencilk-project-opencilk-v3.0/compiler-rt/lib/sanitizer_common/sanitizer_common_interceptors_ioctl.inc	2025-05-08 13:32:27.000000000 +0300
++++ opencilk-project-opencilk-v3.0-mod/compiler-rt/lib/sanitizer_common/sanitizer_common_interceptors_ioctl.inc	2025-06-12 07:22:52.251346829 +0300
+@@ -338,17 +338,9 @@
+   _(SOUND_PCM_WRITE_CHANNELS, WRITE, sizeof(int));
+   _(SOUND_PCM_WRITE_FILTER, WRITE, sizeof(int));
+   _(TCFLSH, NONE, 0);
+-#if SANITIZER_GLIBC
+-  _(TCGETA, WRITE, struct_termio_sz);
+-#endif
+   _(TCGETS, WRITE, struct_termios_sz);
+   _(TCSBRK, NONE, 0);
+   _(TCSBRKP, NONE, 0);
+-#if SANITIZER_GLIBC
+-  _(TCSETA, READ, struct_termio_sz);
+-  _(TCSETAF, READ, struct_termio_sz);
+-  _(TCSETAW, READ, struct_termio_sz);
+-#endif
+   _(TCSETS, READ, struct_termios_sz);
+   _(TCSETSF, READ, struct_termios_sz);
+   _(TCSETSW, READ, struct_termios_sz);
+diff -ruN opencilk-project-opencilk-v3.0/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.cpp opencilk-project-opencilk-v3.0-mod/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.cpp
+--- opencilk-project-opencilk-v3.0/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.cpp	2025-05-08 13:32:27.000000000 +0300
++++ opencilk-project-opencilk-v3.0-mod/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.cpp	2025-06-12 07:19:02.145949709 +0300
+@@ -479,9 +479,6 @@
+   unsigned struct_input_id_sz = sizeof(struct input_id);
+   unsigned struct_mtpos_sz = sizeof(struct mtpos);
+   unsigned struct_rtentry_sz = sizeof(struct rtentry);
+-#if SANITIZER_GLIBC || SANITIZER_ANDROID
+-  unsigned struct_termio_sz = sizeof(struct termio);
+-#endif
+   unsigned struct_vt_consize_sz = sizeof(struct vt_consize);
+   unsigned struct_vt_sizes_sz = sizeof(struct vt_sizes);
+   unsigned struct_vt_stat_sz = sizeof(struct vt_stat);
+diff -ruN opencilk-project-opencilk-v3.0/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.h opencilk-project-opencilk-v3.0-mod/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.h
+--- opencilk-project-opencilk-v3.0/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.h	2025-05-08 13:32:27.000000000 +0300
++++ opencilk-project-opencilk-v3.0-mod/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.h	2025-06-12 12:16:57.076203680 +0300
+@@ -1013,7 +1013,6 @@
+ extern unsigned struct_input_absinfo_sz;
+ extern unsigned struct_input_id_sz;
+ extern unsigned struct_mtpos_sz;
+-extern unsigned struct_termio_sz;
+ extern unsigned struct_vt_consize_sz;
+ extern unsigned struct_vt_sizes_sz;
+ extern unsigned struct_vt_stat_sz;
