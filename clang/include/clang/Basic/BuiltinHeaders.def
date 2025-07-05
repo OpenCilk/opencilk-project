@@ -41,5 +41,6 @@ HEADER(UNISTD_H, "unistd.h")
 HEADER(UTILITY, "utility")
 HEADER(WCHAR_H, "wchar.h")
 HEADER(XMMINTRIN_H, "xmmintrin.h")
+HEADER(CILK_REDUCER, "cilk/reducer")
 
 #undef HEADER

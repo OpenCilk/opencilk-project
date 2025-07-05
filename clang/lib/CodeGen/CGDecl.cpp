@@ -1961,8 +1961,10 @@ void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF, Address Addr,
 void CodeGenFunction::EmitReducerInit(const DeclaratorDecl *D,
                                       const ReducerCallbacks &C,
                                       llvm::Value *Addr) {
-  RValue Identity = EmitAnyExpr(C.Identity);
-  RValue Reduce = EmitAnyExpr(C.Reduce);
+  // RValue Identity = EmitAnyExpr(C.Identity);
+  // RValue Reduce = EmitAnyExpr(C.Reduce);
+  RValue Identity = RValue::get(EmitLValue(C.Identity).getPointer(*this));
+  RValue Reduce = RValue::get(EmitLValue(C.Reduce).getPointer(*this));
 
   llvm::Type *SizeType = ConvertType(getContext().getSizeType());
   llvm::Value *Size = nullptr;
@@ -1980,8 +1982,12 @@ void CodeGenFunction::EmitReducerInit(const DeclaratorDecl *D,
   SmallVector<llvm::Type *, 1> Types = {SizeType};
   llvm::Function *F =
     CGM.getIntrinsic(llvm::Intrinsic::reducer_register, Types);
-  llvm::Value *IdentityV = Identity.getScalarVal();
-  llvm::Value *ReduceV = Reduce.getScalarVal();
+  llvm::Value *IdentityV =
+      Identity.isScalar() ? Identity.getScalarVal()
+                          : Identity.getAggregateAddress().getBasePointer();
+  llvm::Value *ReduceV = Reduce.isScalar()
+                             ? Reduce.getScalarVal()
+                             : Reduce.getAggregateAddress().getBasePointer();
   Builder.CreateCall(F, {Addr, Size, IdentityV, ReduceV});
 }
 

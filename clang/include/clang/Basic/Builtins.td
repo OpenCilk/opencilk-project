@@ -5166,8 +5166,8 @@ def CountedByRef : Builtin {
 
 // Tapir.  Rewriting of reducer references happens during sema
 // and needs a builtin to carry the information to codegen.
-def HyperLookup : Builtin {
+def HyperLookup : LibBuiltin<"cilk/reducer"> {
   let Spellings = ["__hyper_lookup"];
-  let Attributes = [NoThrow, Pure];
-  let Prototype = "void*(void const*, size_t, ...)";
+  let Attributes = [NoThrow, Pure, IgnoreSignature, RequireDeclaration];
+  let Prototype = "void*(void const*, size_t, void&, void&)";
 }

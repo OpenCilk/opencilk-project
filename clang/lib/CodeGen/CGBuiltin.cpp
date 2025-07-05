@@ -6449,11 +6449,23 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     llvm::Value *Size = EmitScalarExpr(E->getArg(1));
     Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
     llvm::Value *Ptr = EmitScalarExpr(E->getArg(0));
-    llvm::Value *Identity = EmitScalarExpr(E->getArg(2));
-    llvm::Value *Reduce = EmitScalarExpr(E->getArg(3));
-    return RValue::get(Builder.CreateCall(
-        F, {Ptr, Size, Builder.CreateBitCast(Identity, VoidPtrTy),
-            Builder.CreateBitCast(Reduce, VoidPtrTy)}));
+    // llvm::Value *Identity = EmitScalarExpr(E->getArg(2));
+    // llvm::Value *Reduce = EmitScalarExpr(E->getArg(3));
+
+    // RValue IdentityV = EmitAnyExpr(E->getArg(2));
+    // RValue ReduceV = EmitAnyExpr(E->getArg(3));
+    // llvm::Value *Identity =
+    //     IdentityV.isScalar() ? IdentityV.getScalarVal()
+    //                          : IdentityV.getAggregateAddress().getBasePointer();
+    // llvm::Value *Reduce = ReduceV.isScalar()
+    //                           ? ReduceV.getScalarVal()
+    //                           : ReduceV.getAggregateAddress().getBasePointer();
+    llvm::Value *Identity = EmitLValue(E->getArg(2)).getPointer(*this);
+    llvm::Value *Reduce = EmitLValue(E->getArg(3)).getPointer(*this);
+    // return RValue::get(Builder.CreateCall(
+    //     F, {Ptr, Size, Builder.CreateBitCast(Identity, VoidPtrTy),
+    //         Builder.CreateBitCast(Reduce, VoidPtrTy)}));
+    return RValue::get(Builder.CreateCall(F, {Ptr, Size, Identity, Reduce}));
   }
   }
   IsSpawnedScope SpawnedScp(this);

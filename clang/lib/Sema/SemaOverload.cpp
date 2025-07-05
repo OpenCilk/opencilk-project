@@ -5915,6 +5915,11 @@ static ImplicitConversionSequence TryObjectArgumentInitialization(
     QualType ExplicitParameterType = QualType(),
     bool SuppressUserConversion = false) {
 
+  // Remove any Hyperobject type.
+  if (const auto *HT = FromType->getAs<HyperobjectType>()) {
+    FromType = HT->getElementType();
+  }
+
   // We need to have an object of class type.
   if (const auto *PT = FromType->getAs<PointerType>()) {
     FromType = PT->getPointeeType();
