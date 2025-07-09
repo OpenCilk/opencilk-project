@@ -495,6 +495,13 @@ static void handleTaskExits(
     // No task exits to handle.
     return;
 
+  // Record and predecessors of task exits that are not cloned.
+  SmallPtrSet<BasicBlock *, 4> ExitPredsNotCloned;
+  for (BasicBlock *BB : TaskExits)
+    for (BasicBlock *Pred : predecessors(BB))
+      if (!L->contains(Pred) && !TaskExits.contains(Pred))
+        ExitPredsNotCloned.insert(Pred);
+
   // Process the task exits similarly to loop blocks.
   auto BlockInsertPt = std::next(BBInsertPt->getIterator());
   for (BasicBlock *BB : reverse(TaskExitsRPO)) {
@@ -531,6 +538,17 @@ static void handleTaskExits(
 
     NewBlocks.push_back(New);
     UnrolledLoopBlocks.push_back(New);
+
+    // Fix any phi nodes in the cloned task exits to remove predecessors that
+    // are not cloned.
+    for (PHINode &PHI : BB->phis()) {
+      PHINode *NewPHI = cast<PHINode>(VMap[&PHI]);
+      for (BasicBlock *NotCopied : ExitPredsNotCloned) {
+        int Idx = NewPHI->getBasicBlockIndex(NotCopied);
+        if (Idx > -1)
+          NewPHI->removeIncomingValue(Idx);
+      }
+    }
 
     // Update DomTree: since we just copy the loop body, and each copy has a
     // dedicated entry block (copy of the header block), this header's copy
@@ -881,11 +899,18 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
       for (BasicBlock *Succ : successors(*BB)) {
         if (L->contains(Succ))
           continue;
-        if (TaskExits.count(Succ)) {
+        if (TaskExits.contains(Succ)) {
           if (llvm::none_of(predecessors(Succ),
                             [&TaskExits](const BasicBlock *B) {
-                              return TaskExits.count(B);
+                              return TaskExits.contains(B);
                             }))
+            TaskExitSrcs.insert(Succ);
+          if (llvm::any_of(predecessors(Succ), [Succ](const BasicBlock *B) {
+                if (const DetachInst *DI =
+                        dyn_cast<DetachInst>(B->getTerminator()))
+                  return Succ == DI->getUnwindDest();
+                return false;
+              }))
             TaskExitSrcs.insert(Succ);
           continue;
         }
@@ -982,12 +1007,12 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   // routes which can lead to the exit: we can now reach it from the copied
   // iterations too.
   if (ULO.Count > 1) {
-    for (auto *BB : OriginalLoopBlocks) {
+    for (auto *BB : UnrolledLoopBlocks) {
       auto *BBDomNode = DT->getNode(BB);
       SmallVector<BasicBlock *, 16> ChildrenToUpdate;
       for (auto *ChildDomNode : BBDomNode->children()) {
         auto *ChildBB = ChildDomNode->getBlock();
-        if (!L->contains(ChildBB))
+        if (!L->contains(ChildBB) && !TaskExits.contains(ChildBB))
           ChildrenToUpdate.push_back(ChildBB);
       }
       // The new idom of the block will be the nearest common dominator

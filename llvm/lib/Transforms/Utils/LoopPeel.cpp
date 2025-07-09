@@ -789,6 +789,49 @@ static void cloneLoopBlocks(
     }
   }
 
+  // Clone any task-exit blocks in the loop as well.
+  SmallPtrSet<BasicBlock*, 8> TaskExits;
+  L->getTaskExits(TaskExits);
+
+  SmallPtrSet<BasicBlock *, 4> ExitPredsNotCloned;
+  for (BasicBlock *BB : TaskExits) {
+    BasicBlock *NewBB = CloneBasicBlock(BB, VMap, ".peel", F);
+    NewBlocks.push_back(NewBB);
+
+    // If an original block is an immediate child of the loop L, its copy
+    // is a child of a ParentLoop after peeling. If a block is a child of
+    // a nested loop, it is handled in the cloneLoop() call below.
+    if (ParentLoop)
+      ParentLoop->addBasicBlockToLoop(NewBB, *LI);
+
+    VMap[BB] = NewBB;
+
+    // If dominator tree is available, insert nodes to represent cloned blocks.
+    if (DT) {
+      DomTreeNode *IDom = DT->getNode(BB)->getIDom();
+      // VMap must contain entry for IDom, as the iteration order is RPO.
+      DT->addNewBlock(NewBB, cast<BasicBlock>(VMap[IDom->getBlock()]));
+    }
+
+    // Record any predecessor blocks that are not cloned.
+    for (BasicBlock *Pred : predecessors(BB))
+      if (!L->contains(Pred) && !TaskExits.contains(Pred))
+        ExitPredsNotCloned.insert(Pred);
+  }
+
+  // Fix any phi nodes in the cloned task exits to remove predecessors that are
+  // not cloned.
+  for (BasicBlock *BB : TaskExits) {
+    for (PHINode &PHI : BB->phis()) {
+      PHINode *NewPHI = cast<PHINode>(VMap[&PHI]);
+      for (BasicBlock *NotCopied : ExitPredsNotCloned) {
+        int Idx = NewPHI->getBasicBlockIndex(NotCopied);
+        if (Idx > -1)
+          NewPHI->removeIncomingValue(Idx);
+      }
+    }
+  }
+
   {
     // Identify what other metadata depends on the cloned version. After
     // cloning, replace the metadata with the corrected version for both
@@ -928,17 +971,25 @@ bool llvm::peelLoop(Loop *L, unsigned PeelCount, LoopInfo *LI,
   SmallVector<std::pair<BasicBlock *, BasicBlock *>, 4> ExitEdges;
   L->getExitEdges(ExitEdges);
 
+  // Collect all blocks that are cloned, including task exits.
+  SmallPtrSet<BasicBlock *, 8> TaskExits;
+  L->getTaskExits(TaskExits);
+  SmallVector<BasicBlock *, 8> AllClonedBlocks(L->blocks().begin(),
+                                               L->blocks().end());
+  AllClonedBlocks.insert(AllClonedBlocks.end(), TaskExits.begin(),
+                         TaskExits.end());
+
   // Remember dominators of blocks we might reach through exits to change them
   // later. Immediate dominator of such block might change, because we add more
   // routes which can lead to the exit: we can reach it from the peeled
   // iterations too.
   DenseMap<BasicBlock *, BasicBlock *> NonLoopBlocksIDom;
-  for (auto *BB : L->blocks()) {
+  for (auto *BB : AllClonedBlocks) {
     auto *BBDomNode = DT.getNode(BB);
     SmallVector<BasicBlock *, 16> ChildrenToUpdate;
     for (auto *ChildDomNode : BBDomNode->children()) {
       auto *ChildBB = ChildDomNode->getBlock();
-      if (!L->contains(ChildBB))
+      if (!L->contains(ChildBB) && !TaskExits.contains(ChildBB))
         ChildrenToUpdate.push_back(ChildBB);
     }
     // The new idom of the block will be the nearest common dominator

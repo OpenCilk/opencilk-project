@@ -105,11 +105,36 @@ static bool isTapirPlaceholderSuccessor(const BasicBlock *B) {
   return true;
 }
 
+/// Return the taskframe used in the given detached block.
+static Value *getTaskFrameUsed(BasicBlock *Detached) {
+  // Scan the detached block for a taskframe.use intrinsic.  If we find one,
+  // return its argument.
+  for (const Instruction &I : *Detached)
+    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+      if (Intrinsic::taskframe_use == II->getIntrinsicID())
+        return II->getArgOperand(0);
+  return nullptr;
+}
+
+/// Return the taskframe used in the given detached block.
+static const Value *getTaskFrameCreate(BasicBlock *TFEntry) {
+  // Scan the detached block for a taskframe.use intrinsic.  If we find one,
+  // return its argument.
+  for (const Instruction &I : *TFEntry)
+    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+      if (Intrinsic::taskframe_create == II->getIntrinsicID())
+        return II;
+  return nullptr;
+}
+
 /// Helper method to find loop-exit blocks that are contained within tasks
 /// spawned within the loop.
-static void getTaskExitsHelper(BasicBlock *TaskEntry, const Value *SyncRegion,
+static void getTaskExitsHelper(BasicBlock *TaskEntry, const DetachInst *TaskDI,
                                const Loop *L,
                                SmallPtrSetImpl<BasicBlock *> &TaskExits) {
+  const Value *TaskFrame = getTaskFrameCreate(TaskEntry);
+  const Value *SyncRegion = TaskDI->getSyncRegion();
+
   // Traverse the CFG to find the exit blocks from SubT.
   SmallVector<BasicBlock *, 4> Worklist;
   SmallPtrSet<BasicBlock *, 4> Visited;
@@ -124,12 +149,24 @@ static void getTaskExitsHelper(BasicBlock *TaskEntry, const Value *SyncRegion,
       TaskExits.insert(BB);
 
     // Stop the CFG traversal at any reattach or detached.rethrow in the same
-    // sync region.
+    // sync region or taskframe.resume in the same task frame.
     if (ReattachInst *RI = dyn_cast<ReattachInst>(BB->getTerminator()))
       if (SyncRegion == RI->getSyncRegion())
         continue;
     if (isDetachedRethrow(BB->getTerminator(), SyncRegion))
       continue;
+    if (TaskFrame && isTaskFrameResume(BB->getTerminator(), TaskFrame))
+      continue;
+
+    if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      if (TaskDI == DI) {
+        // Don't add the reattach for this detach.
+        Worklist.push_back(DI->getDetached());
+        if (BasicBlock *DetachUnwind = DI->getUnwindDest())
+          Worklist.push_back(DetachUnwind);
+        continue;
+      }
+    }
 
     // For all other basic blocks, traverse all successors
     for (BasicBlock *Succ : successors(BB))
@@ -141,15 +178,23 @@ static void getTaskExitsHelper(BasicBlock *TaskEntry, const Value *SyncRegion,
 /// analysis, but inside tasks created within the loop.
 ///
 void Loop::getTaskExits(SmallPtrSetImpl<BasicBlock *> &TaskExits) const {
-  SmallVector<std::pair<BasicBlock *, Value *>, 4> TaskEntriesToCheck;
+  SmallVector<std::pair<BasicBlock *, DetachInst *>, 4> TaskEntriesToCheck;
   for (auto *BB : blocks())
     if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator()))
       if (DI->hasUnwindDest())
-        if (!contains(DI->getUnwindDest()))
-          TaskEntriesToCheck.push_back(
-              std::make_pair(DI->getDetached(), DI->getSyncRegion()));
+        if (!contains(DI->getUnwindDest())) {
+          if (Instruction *TaskFrame = dyn_cast_or_null<Instruction>(
+                  getTaskFrameUsed(DI->getDetached()))) {
+            assert(contains(TaskFrame) &&
+                   "Spawned loop body uses taskframe outside of loop!");
+            TaskEntriesToCheck.push_back(
+                std::make_pair(TaskFrame->getParent(), DI));
+          } else {
+            TaskEntriesToCheck.push_back(std::make_pair(DI->getDetached(), DI));
+          }
+        }
 
-  for (std::pair<BasicBlock *, Value *> &TaskEntry : TaskEntriesToCheck)
+  for (std::pair<BasicBlock *, DetachInst *> &TaskEntry : TaskEntriesToCheck)
     getTaskExitsHelper(TaskEntry.first, TaskEntry.second, this, TaskExits);
 }
 

@@ -2049,8 +2049,7 @@ int parfor_trycatch(int a) {
 // CHECK: reattach within %[[PFORSYNCREG1]], label %[[PFORINC1]]
 
 // CHECK: [[PFORINC1]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC1:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC1]]:
 // CHECK-O0: sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
@@ -2134,8 +2133,7 @@ int parfor_trycatch(int a) {
 // CHECK: reattach within %[[PFORSYNCREG2]], label %[[PFORINC2]]
 
 // CHECK: [[PFORINC2]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC2:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC2]]:
 // CHECK-O0: sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
@@ -2337,8 +2335,7 @@ int parfor_trycatch_destructors(int a) {
 // CHECK: reattach within %[[PFORSYNCREG1]], label %[[PFORINC1]]
 
 // CHECK: [[PFORINC1]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC1:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC1:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC1]]:
 // CHECK-O0: sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
@@ -2439,8 +2436,7 @@ int parfor_trycatch_destructors(int a) {
 // CHECK: reattach within %[[PFORSYNCREG2]], label %[[PFORINC2]]
 
 // CHECK: [[PFORINC2]]:
-// CHECK-O0: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
-// CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC2:.+]], label {{.+}}, !llvm.loop
+// CHECK: br i1 {{.+}}, label {{.+}}, label %[[PFORSYNC2:.+]], !llvm.loop
 
 // CHECK: [[PFORSYNC2]]:
 // CHECK-O0: sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
