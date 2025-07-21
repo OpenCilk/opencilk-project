@@ -745,7 +745,12 @@ void DACSpawning::implementDACIterSpawnOnHelper(
     if (PrimaryIVStart->getType() != End->getType())
       Start = Builder.CreateZExtOrTrunc(PrimaryIVStart, End->getType());
     IterCount = Builder.CreateSub(End, Start, "itercount");
-    Value *IterCountCmp = Builder.CreateICmpUGT(IterCount, Grainsize);
+    Value *IterCountCmp = nullptr;
+    if (TL.isInclusiveRange()) {
+      IterCountCmp = Builder.CreateICmpUGE(IterCount, Grainsize);
+    } else {
+      IterCountCmp = Builder.CreateICmpUGT(IterCount, Grainsize);
+    }
     Instruction *RecurTerm =
       SplitBlockAndInsertIfThen(IterCountCmp, PreheaderOrigFront,
                                 /*Unreachable=*/false,
