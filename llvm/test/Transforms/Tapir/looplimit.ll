@@ -40,7 +40,7 @@ pfor.end.continue:                                ; preds = %pfor.cond.cleanup
 ; CHECK: {{^(; <label>:)?}}[[DACSTART:[a-zA-Z0-9._]+]]:
 ; CHECK: [[ITERSTART:%[a-zA-Z0-9._]+]] = phi [[TYPE]] [{{.*}}[[START]]{{.*}}]
 ; CHECK-NEXT: [[ITERCOUNT:%[a-zA-Z0-9._]+]] = sub [[TYPE]] [[END]], [[ITERSTART]]
-; CHECK-NEXT: [[CMP:%[0-9]+]] = icmp ugt [[TYPE]] [[ITERCOUNT]], [[GRAIN]]
+; CHECK-NEXT: [[CMP:%[0-9]+]] = icmp uge [[TYPE]] [[ITERCOUNT]], [[GRAIN]]
 ; CHECK-NEXT: br i1 [[CMP]], label %[[RECUR:[0-9]+]], label %[[BODY:[0-9]+]]
 
 ; CHECK: {{^(; <label>:)?}}[[RECUR]]:
