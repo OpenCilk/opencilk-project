@@ -29,6 +29,7 @@
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -66,28 +67,31 @@ static bool succIsDetachUnwind(const BasicBlock *BB, const BasicBlock *Succ) {
   return false;
 }
 
-/// Returns true if the given instruction performs a taskframe resume, false
-/// otherwise.
-static bool isDetachedRethrow(const Instruction *I,
-                              const Value *SyncReg = nullptr) {
-  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
-    if (const Function *Called = II->getCalledFunction())
-      if (Intrinsic::detached_rethrow == Called->getIntrinsicID())
-        if (!SyncReg || (SyncReg == II->getArgOperand(0)))
+// Check if the given instruction is an intrinsic with the specified ID.  If a
+// value \p V is specified, then additionally checks that the first argument of
+// the intrinsic matches \p V.
+static bool isTapirIntrinsic(Intrinsic::ID ID, const Instruction *I,
+                             const Value *V = nullptr) {
+  if (const CallBase *CB = dyn_cast<CallBase>(I))
+    if (const Function *Called = CB->getCalledFunction())
+      if (ID == Called->getIntrinsicID())
+        if (!V || (V == CB->getArgOperand(0)))
           return true;
   return false;
 }
 
 /// Returns true if the given instruction performs a taskframe resume, false
 /// otherwise.
+static bool isDetachedRethrow(const Instruction *I,
+                              const Value *SyncReg = nullptr) {
+  return isTapirIntrinsic(Intrinsic::detached_rethrow, I, SyncReg);
+}
+
+/// Returns true if the given instruction performs a taskframe resume, false
+/// otherwise.
 static bool isTaskFrameResume(const Instruction *I,
                               const Value *TaskFrame = nullptr) {
-  if (const InvokeInst *II = dyn_cast<InvokeInst>(I))
-    if (const Function *Called = II->getCalledFunction())
-      if (Intrinsic::taskframe_resume == Called->getIntrinsicID())
-        if (!TaskFrame || (TaskFrame == II->getArgOperand(0)))
-          return true;
-  return false;
+  return isTapirIntrinsic(Intrinsic::taskframe_resume, I, TaskFrame);
 }
 
 /// Returns true if the given basic block is a placeholder successor of a
@@ -116,23 +120,16 @@ static Value *getTaskFrameUsed(BasicBlock *Detached) {
   return nullptr;
 }
 
-/// Return the taskframe used in the given detached block.
-static const Value *getTaskFrameCreate(BasicBlock *TFEntry) {
-  // Scan the detached block for a taskframe.use intrinsic.  If we find one,
-  // return its argument.
-  for (const Instruction &I : *TFEntry)
-    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
-      if (Intrinsic::taskframe_create == II->getIntrinsicID())
-        return II;
-  return nullptr;
-}
-
 /// Helper method to find loop-exit blocks that are contained within tasks
 /// spawned within the loop.
-static void getTaskExitsHelper(BasicBlock *TaskEntry, const DetachInst *TaskDI,
+static void getTaskExitsHelper(Instruction *TaskStart, const DetachInst *TaskDI,
                                const Loop *L,
                                SmallPtrSetImpl<BasicBlock *> &TaskExits) {
-  const Value *TaskFrame = getTaskFrameCreate(TaskEntry);
+  const Value *TaskFrame =
+      isTapirIntrinsic(Intrinsic::taskframe_create, TaskStart) ? TaskStart
+                                                               : nullptr;
+  BasicBlock *TaskEntry =
+      TaskFrame ? TaskStart->getParent() : TaskDI->getDetached();
   const Value *SyncRegion = TaskDI->getSyncRegion();
 
   // Traverse the CFG to find the exit blocks from SubT.
@@ -178,7 +175,7 @@ static void getTaskExitsHelper(BasicBlock *TaskEntry, const DetachInst *TaskDI,
 /// analysis, but inside tasks created within the loop.
 ///
 void Loop::getTaskExits(SmallPtrSetImpl<BasicBlock *> &TaskExits) const {
-  SmallVector<std::pair<BasicBlock *, DetachInst *>, 4> TaskEntriesToCheck;
+  SmallVector<std::pair<Instruction *, DetachInst *>, 4> TaskEntriesToCheck;
   for (auto *BB : blocks())
     if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator()))
       if (DI->hasUnwindDest())
@@ -188,13 +185,13 @@ void Loop::getTaskExits(SmallPtrSetImpl<BasicBlock *> &TaskExits) const {
             assert(contains(TaskFrame) &&
                    "Spawned loop body uses taskframe outside of loop!");
             TaskEntriesToCheck.push_back(
-                std::make_pair(TaskFrame->getParent(), DI));
+                std::make_pair(TaskFrame, DI));
           } else {
-            TaskEntriesToCheck.push_back(std::make_pair(DI->getDetached(), DI));
+            TaskEntriesToCheck.push_back(std::make_pair(DI, DI));
           }
         }
 
-  for (std::pair<BasicBlock *, DetachInst *> &TaskEntry : TaskEntriesToCheck)
+  for (auto &TaskEntry : TaskEntriesToCheck)
     getTaskExitsHelper(TaskEntry.first, TaskEntry.second, this, TaskExits);
 }
 
