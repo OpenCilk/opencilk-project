@@ -298,13 +298,18 @@ static bool canRemoveTaskFrame(const Spindle *TF, MaybeParallelTasks &MPTasks,
   const Task *UserT = TF->getTaskFromTaskFrame();
 
   if (!UserT && !MPTasks.TaskList[TF].empty() && getTaskFrameResume(TFCreate)) {
-    // Landingpads perform an implicit sync, so if there are logically parallel
-    // tasks with this unassociated taskframe and it has a resume destination,
-    // then it has a distinguishing sync.
-    LLVM_DEBUG(
-        dbgs() << "Can't remove taskframe with implicit distinguishing sync: "
-               << *TFCreate << "\n");
-    return false;
+    for (auto *T : MPTasks.TaskList[TF]) {
+      if (T->contains(TF))
+        continue;
+
+      // Landingpads perform an implicit sync, so if there are logically
+      // parallel tasks with this unassociated taskframe and it has a resume
+      // destination, then it has a distinguishing sync.
+      LLVM_DEBUG(
+          dbgs() << "Can't remove taskframe with implicit distinguishing sync: "
+                 << *TFCreate << "\n");
+      return false;
+    }
   }
 
   // Create filter for MPTasks of tasks from parent of task UserT, if UserT
