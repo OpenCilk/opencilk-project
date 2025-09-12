@@ -4663,13 +4663,15 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     Address Buf = EmitPointerWithAlignment(E->getArg(0));
 
     // Store the frame pointer to the setjmp buffer.
-    Value *FrameAddr = Builder.CreateCall(
+    CallInst *FrameAddr = Builder.CreateCall(
         CGM.getIntrinsic(Intrinsic::frameaddress, AllocaInt8PtrTy),
         ConstantInt::get(Int32Ty, 0));
+    FrameAddr->setTailCallKind(CallInst::TCK_NoTail);
     Builder.CreateStore(FrameAddr, Buf);
 
     // Store the stack pointer to the setjmp buffer.
-    Value *StackAddr = Builder.CreateStackSave();
+    CallInst *StackAddr = Builder.CreateStackSave();
+    StackAddr->setTailCallKind(CallInst::TCK_NoTail);
     assert(Buf.emitRawPointer(*this)->getType() == StackAddr->getType());
 
     Address StackSaveSlot = Builder.CreateConstInBoundsGEP(Buf, 2);
@@ -4677,7 +4679,10 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
 
     // Call LLVM's EH setjmp, which is lightweight.
     Function *F = CGM.getIntrinsic(Intrinsic::eh_sjlj_setjmp);
-    return RValue::get(Builder.CreateCall(F, Buf.emitRawPointer(*this)));
+    CallInst *C = Builder.CreateCall(F, Buf.emitRawPointer(*this));
+    C->setTailCallKind(CallInst::TCK_NoTail);
+    C->addFnAttr(Attribute::ReturnsTwice);
+    return RValue::get(C);
   }
   case Builtin::BI__builtin_longjmp: {
     Value *Buf = EmitScalarExpr(E->getArg(0));
