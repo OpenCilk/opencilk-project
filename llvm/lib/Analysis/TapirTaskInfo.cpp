@@ -1168,6 +1168,11 @@ static void computeLiveInBlocks(
         if (SI->getOperand(1) != AI)
           continue;
 
+        if (SI->isAtomic() && SI->getOrdering() != AtomicOrdering::Unordered)
+          // Treat this atomic store as a use that makes the alloca live-in
+          // here.
+          break;
+
         // We found a store to the alloca before a load.  The alloca is not
         // actually live-in here.
         LiveInBlockWorklist[i] = LiveInBlockWorklist.back();
@@ -1257,9 +1262,17 @@ bool TaskInfo::isAllocaParallelPromotable(const AllocaInst *AIP) const {
     if (StoreInst *SI = dyn_cast<StoreInst>(User)) {
       // Remember the basic blocks which define new values for the alloca
       DefBlocks.insert(SI->getParent());
+      if (SI->isAtomic() && SI->getOrdering() != AtomicOrdering::Unordered)
+        // Treat this atomic store as a use, to avoid removing uses of atomics
+        // to synchronize tasks.
+        UsingBlocks.push_back(SI->getParent());
     } else if (LoadInst *LI = dyn_cast<LoadInst>(User)) {
       // Otherwise it must be a load instruction, keep track of variable reads.
       UsingBlocks.push_back(LI->getParent());
+      if (LI->isAtomic() && LI->getOrdering() != AtomicOrdering::Unordered)
+        // Treat this atomic load as a def, to avoid removing uses of atomics
+        // to synchronize tasks.
+        DefBlocks.insert(LI->getParent());
     } else continue;
 
     if (OnlyUsedInOneSpindle)
