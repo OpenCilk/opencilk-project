@@ -246,10 +246,21 @@ static bool markTails(Function &F, OptimizationRemarkEmitter *ORE) {
         Escaped = ESCAPED;
 
       CallInst *CI = dyn_cast<CallInst>(&I);
+
+      if (!CI)
+        continue;
+
+      if (isa<IntrinsicInst>(CI)) {
+        if (cast<IntrinsicInst>(CI)->getIntrinsicID() ==
+            Intrinsic::eh_sjlj_setjmp)
+          return false;
+      }
+
       // A PseudoProbeInst has the IntrInaccessibleMemOnly tag hence it is
       // considered accessing memory and will be marked as a tail call if we
       // don't bail out here.
-      if (!CI || CI->isTailCall() || isa<PseudoProbeInst>(&I))
+      if (CI->isTailCall() || isa<DbgInfoIntrinsic>(&I) ||
+          isa<PseudoProbeInst>(&I))
         continue;
 
       // Bail out for intrinsic stackrestore call because it can modify
