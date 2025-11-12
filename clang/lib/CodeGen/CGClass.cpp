@@ -712,9 +712,8 @@ void CodeGenFunction::EmitInitializerForField(FieldDecl *Field, LValue LHS,
   }
   }
 
-  ReducerCallbacks RCB = {0, 0};
-  if (getReducer(Field, RCB))
-    EmitReducerInit(Field, RCB, LHS.getPointer(*this));
+  if (Field->getType()->isHyperobjectType())
+    EmitReducerInit(Field, LHS.getPointer(*this));
 
   // Ensure that we destroy this object if an exception is thrown
   // later in the constructor.

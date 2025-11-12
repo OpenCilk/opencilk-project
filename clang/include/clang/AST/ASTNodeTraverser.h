@@ -388,10 +388,12 @@ public:
 
   void VisitHyperobjectType(const HyperobjectType *T) {
     Visit(T->getElementType());
+    if (T->getCallbacks())
+      Visit(T->getCallbacks().value());
     if (T->getIdentity())
-      Visit(T->getIdentity());
+      Visit(T->getIdentity().value());
     if (T->getReduce())
-      Visit(T->getReduce());
+      Visit(T->getReduce().value());
   }
   void VisitComplexType(const ComplexType *T) { Visit(T->getElementType()); }
   void VisitLocInfoType(const LocInfoType *T) {

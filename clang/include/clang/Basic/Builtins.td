@@ -5166,8 +5166,24 @@ def CountedByRef : Builtin {
 
 // Tapir.  Rewriting of reducer references happens during sema
 // and needs a builtin to carry the information to codegen.
-def HyperLookup : LibBuiltin<"cilk/reducer"> {
-  let Spellings = ["__hyper_lookup"];
+
+// One pointer to leftmost view with polymorphic type.
+def HyperLookupClass : LibBuiltin<"cilk/reducer"> {
+  let Spellings = ["__hyper_lookup_class"];
   let Attributes = [NoThrow, Pure, IgnoreSignature, RequireDeclaration];
-  let Prototype = "void*(void const*, size_t, void&, void&)";
+  let Prototype = "void*(void const*)";
+}
+
+// Leftmost view, size, callback class with polymorphic type.
+def HyperLookupFunctional : LibBuiltin<"cilk/reducer"> {
+  let Spellings = ["__hyper_lookup_internal_1"];
+  let Attributes = [NoThrow, Pure, CustomTypeChecking, RequireDeclaration];
+  let Prototype = "void&(void const*, void *)";
+}
+
+// Leftmost view, size, identity, reduce
+def HyperLookupInternal2 : Builtin {
+  let Spellings = ["__hyper_lookup_internal_2"];
+  let Attributes = [NoThrow, Pure, CustomTypeChecking];
+  let Prototype = "void&(void const*, size_t, 1, 2)";
 }

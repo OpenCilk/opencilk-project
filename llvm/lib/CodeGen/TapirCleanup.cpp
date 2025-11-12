@@ -106,7 +106,7 @@ bool TapirCleanup::runOnFunction(Function &F) {
   SmallVector<Instruction *, 8> ToErase;
   for (BasicBlock &BB : F)
     for (Instruction &I : BB)
-      if (isTapirIntrinsic(Intrinsic::hyper_lookup, &I)) {
+      if (isTapirHyperobjectIntrinsic(&I)) {
         I.replaceAllUsesWith(cast<CallBase>(&I)->getArgOperand(0));
         ToErase.push_back(&I);
         Changed = true;

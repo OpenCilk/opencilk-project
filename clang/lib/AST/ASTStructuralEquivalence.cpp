@@ -920,14 +920,27 @@ static bool IsStructurallyEquivalent(StructuralEquivalenceContext &Context,
   case Type::Hyperobject: {
     const HyperobjectType *H1 = cast<HyperobjectType>(T1);
     const HyperobjectType *H2 = cast<HyperobjectType>(T2);
-    Expr *R1 = H1->getReduce(), *R2 = H2->getReduce();
-    Expr *I1 = H1->getIdentity(), *I2 = H2->getIdentity();
-    if (!!I1 != !!I2 || !!R1 != !!R2)
-      return false;
-    if (I1 && !IsStructurallyEquivalent(Context, I1, I2))
-      return false;
-    if (R1 && !IsStructurallyEquivalent(Context, R1, R2))
-      return false;
+    if (H1->getCallbacks()) {
+      if (!H2->getCallbacks())
+        return false;
+      if (!IsStructurallyEquivalent(Context, H1->getCallbacks().value(),
+                                    H2->getCallbacks().value()))
+        return false;
+    }
+    if (H1->getIdentity()) {
+      if (!H2->getIdentity())
+        return false;
+      if (!IsStructurallyEquivalent(Context, H1->getIdentity().value(),
+                                    H2->getIdentity().value()))
+        return false;
+    }
+    if (H1->getReduce()) {
+      if (!H2->getReduce())
+        return false;
+      if (!IsStructurallyEquivalent(Context, H1->getReduce().value(),
+                                    H2->getReduce().value()))
+        return false;
+    }
     if (!IsStructurallyEquivalent(Context,
                                   cast<HyperobjectType>(T1)->getElementType(),
                                   cast<HyperobjectType>(T2)->getElementType()))

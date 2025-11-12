@@ -214,55 +214,48 @@ void OpenCilkABI::prepareModule() {
   StackFrameTy = StructType::lookupOrCreate(C, StackFrameName);
   WorkerTy = StructType::lookupOrCreate(C, "struct.__cilkrts_worker");
 
-  PointerType *StackFramePtrTy = PointerType::getUnqual(C);
   Type *VoidTy = Type::getVoidTy(C);
-  Type *VoidPtrTy = PointerType::getUnqual(C);
+  Type *PtrTy = PointerType::getUnqual(C);
   Type *BoolTy = Type::getInt1Ty(C);
 
   // Define the types of the CilkRTS functions.
-  FunctionType *CilkRTSFnTy =
-      FunctionType::get(VoidTy, {StackFramePtrTy}, false);
-  FunctionType *CilkRTSHelperFnTy = FunctionType::get(
-      VoidTy, {StackFramePtrTy, StackFramePtrTy, BoolTy}, false);
+  FunctionType *V_P_Ty =
+      FunctionType::get(VoidTy, {PtrTy}, false);
+  FunctionType *V_P_P_Ty =
+      FunctionType::get(VoidTy, {PtrTy, PtrTy}, false);
+  FunctionType *V_P_P_B_Ty = FunctionType::get(
+      VoidTy, {PtrTy, PtrTy, BoolTy}, false);
   FunctionType *CilkPrepareSpawnFnTy =
-      FunctionType::get(Int32Ty, {StackFramePtrTy}, false);
-  FunctionType *CilkRTSDetachFnTy =
-      FunctionType::get(VoidTy, {StackFramePtrTy, StackFramePtrTy}, false);
+      FunctionType::get(Int32Ty, {PtrTy}, false);
   FunctionType *CilkRTSEnterLandingpadFnTy =
-      FunctionType::get(VoidTy, {StackFramePtrTy, Int32Ty}, false);
+      FunctionType::get(VoidTy, {PtrTy, Int32Ty}, false);
   FunctionType *CilkRTSPauseFrameFnTy = FunctionType::get(
-      VoidTy,
-      {StackFramePtrTy, StackFramePtrTy, PointerType::getUnqual(C), BoolTy},
-      false);
+      VoidTy, {PtrTy, PtrTy, PtrTy, BoolTy}, false);
   FunctionType *Grainsize8FnTy = FunctionType::get(Int8Ty, {Int8Ty}, false);
   FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
   FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
   FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
-  FunctionType *LookupTy = FunctionType::get(
-      VoidPtrTy, {VoidPtrTy, Int64Ty, VoidPtrTy, VoidPtrTy}, false);
-  FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
-  FunctionType *Reg32Ty =
-      FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
-              VoidPtrTy}, false);
-  FunctionType *Reg64Ty =
-      FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty, VoidPtrTy,
-              VoidPtrTy}, false);
+  FunctionType *Lookup0Ty = FunctionType::get(PtrTy, {PtrTy}, false);
+  FunctionType *Lookup1Ty = FunctionType::get(PtrTy, {PtrTy, PtrTy}, false);
+  FunctionType *Lookup2Ty = FunctionType::get(
+      PtrTy, {PtrTy, Int64Ty, PtrTy, PtrTy}, false);
+  FunctionType *UnregTy = FunctionType::get(VoidTy, {PtrTy}, false);
+  FunctionType *Reg1Ty = FunctionType::get(VoidTy, {PtrTy}, false);
+  FunctionType *Reg2Ty = FunctionType::get(VoidTy, {PtrTy, PtrTy}, false);
 
   // Create an array of CilkRTS functions, with their associated types and
   // FunctionCallee member variables in the OpenCilkABI class.
   CilkRTSFnDesc CilkRTSFunctions[] = {
-      {"__cilkrts_enter_frame", CilkRTSFnTy, CilkRTSEnterFrame},
-      {"__cilkrts_enter_frame_helper", CilkRTSHelperFnTy,
-       CilkRTSEnterFrameHelper},
-      {"__cilkrts_detach", CilkRTSDetachFnTy, CilkRTSDetach},
-      {"__cilkrts_leave_frame", CilkRTSFnTy, CilkRTSLeaveFrame},
-      {"__cilkrts_leave_frame_helper", CilkRTSHelperFnTy,
-       CilkRTSLeaveFrameHelper},
+      {"__cilkrts_enter_frame", V_P_Ty, CilkRTSEnterFrame},
+      {"__cilkrts_enter_frame_helper", V_P_P_B_Ty, CilkRTSEnterFrameHelper},
+      {"__cilkrts_detach", V_P_P_Ty, CilkRTSDetach},
+      {"__cilkrts_leave_frame", V_P_Ty, CilkRTSLeaveFrame},
+      {"__cilkrts_leave_frame_helper", V_P_P_B_Ty, CilkRTSLeaveFrameHelper},
       {"__cilk_prepare_spawn", CilkPrepareSpawnFnTy, CilkPrepareSpawn},
-      {"__cilk_sync", CilkRTSFnTy, CilkSync},
-      {"__cilk_sync_nothrow", CilkRTSFnTy, CilkSyncNoThrow},
-      {"__cilk_parent_epilogue", CilkRTSFnTy, CilkParentEpilogue},
-      {"__cilk_helper_epilogue", CilkRTSHelperFnTy, CilkHelperEpilogue},
+      {"__cilk_sync", V_P_Ty, CilkSync},
+      {"__cilk_sync_nothrow", V_P_Ty, CilkSyncNoThrow},
+      {"__cilk_parent_epilogue", V_P_Ty, CilkParentEpilogue},
+      {"__cilk_helper_epilogue", V_P_P_B_Ty, CilkHelperEpilogue},
       {"__cilkrts_enter_landingpad", CilkRTSEnterLandingpadFnTy,
        CilkRTSEnterLandingpad},
       {"__cilkrts_pause_frame", CilkRTSPauseFrameFnTy, CilkRTSPauseFrame},
@@ -276,9 +269,12 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
-      {"__cilkrts_reducer_lookup", LookupTy, CilkRTSReducerLookup},
-      {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
-      {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
+      {"__cilkrts_reducer_lookup_0", Lookup0Ty, CilkRTSReducerLookup0},
+      {"__cilkrts_reducer_lookup_1", Lookup1Ty, CilkRTSReducerLookup1},
+      {"__cilkrts_reducer_lookup_2", Lookup2Ty, CilkRTSReducerLookup2},
+      {"__cilkrts_reducer_register_0", Reg1Ty, CilkRTSReducerRegister0},
+      {"__cilkrts_reducer_register_1", Reg2Ty, CilkRTSReducerRegister1},
+      {"__cilkrts_reducer_register_2", Reg2Ty, CilkRTSReducerRegister2},
       {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
   };
 
@@ -1193,23 +1189,62 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   FunctionCallee Fn = nullptr;
   const Function *Called = CI->getCalledFunction();
   assert(Called);
+  unsigned NumArgs = Called->getFunctionType()->getNumParams();
   Intrinsic::ID ID = Called->getIntrinsicID();
   switch (ID) {
   default:
     llvm_unreachable("unexpected reducer intrinsic");
-  case Intrinsic::hyper_lookup:
-    Fn = Get__cilkrts_reducer_lookup();
+  case Intrinsic::hyper_lookup_0:
+    Fn = Get__cilkrts_reducer_lookup_0();
+    // TODO: error if null
+    break;
+  case Intrinsic::hyper_lookup_1:
+    Fn = Get__cilkrts_reducer_lookup_1();
+    // TODO: error if null
+    break;
+  case Intrinsic::hyper_lookup_2:
+    Fn = Get__cilkrts_reducer_lookup_2();
     break;
   case Intrinsic::reducer_register: {
-    const Type *SizeType = CI->getArgOperand(1)->getType();
-    assert(isa<IntegerType>(SizeType));
-    Fn = Get__cilkrts_reducer_register(SizeType->getIntegerBitWidth());
-    assert(Fn);
+    IRBuilder<> Builder(CI);
+    switch (cast<ConstantInt>(CI->getArgOperand(0))->getZExtValue()) {
+    case 0:
+      Fn = Get__cilkrts_reducer_register_0();
+      if (Fn) {
+        assert(Fn.getFunctionType()->getNumParams() == 1);
+        CI->replaceAllUsesWith(Builder.CreateCall(Fn, {CI->getArgOperand(1)}));
+      }
+      return;
+    case 1:
+      Fn = Get__cilkrts_reducer_register_1();
+      if (Fn) {
+        assert(Fn.getFunctionType()->getNumParams() == 2);
+        CI->replaceAllUsesWith(Builder.CreateCall(Fn, { CI->getArgOperand(1),
+                                                        CI->getArgOperand(2)}));
+      }
+      return;
+    case 2:
+      Fn = Get__cilkrts_reducer_register_2();
+      if (Fn) {
+        assert(Fn.getFunctionType()->getNumParams() == 2);
+        CI->replaceAllUsesWith(Builder.CreateCall(Fn, { CI->getArgOperand(1),
+                                                        CI->getArgOperand(2)}));
+      }
+      return;
+    default:
+      llvm_unreachable("invalid reducer register variant");
+    }
     break;
   }
   case Intrinsic::reducer_unregister:
     Fn = Get__cilkrts_reducer_unregister();
     break;
   }
+  // Make sure a user-provided function declaration won't
+  // crash the compiler.
+  if (Fn.getFunctionType()->getNumParams() !=
+      Called->getFunctionType()->getNumParams())
+    return;
+
   CI->setCalledFunction(Fn);
 }

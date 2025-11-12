@@ -3,8 +3,11 @@
 
 extern double X[], Y[];
 
+struct Base { virtual void polymorphic(); };
+extern "C" struct Base *__hyper_lookup_class(struct Base *);
+
 template<typename T>
-struct Box { T value; };
+struct Box : public Base { T value; };
 
 template<typename T>
 // CHECK-LABEL: mult_indirect

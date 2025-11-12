@@ -5,9 +5,9 @@
 extern void identity(void * value);
 extern void reduce(void* left, void* right);
 
-typedef long _Hyperobject *long_hp;
-typedef long _Hyperobject long_h;
-extern int _Hyperobject x, _Hyperobject y;
+typedef long _Hyperobject(identity, reduce) *long_hp;
+typedef long _Hyperobject(identity, reduce) long_h;
+extern int _Hyperobject(identity, reduce) x, _Hyperobject(identity, reduce) y;
 // CHECK-LABEL: extern1
 void extern1()
 {

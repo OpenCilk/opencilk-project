@@ -8047,9 +8047,23 @@ class HyperobjectType final : public Type, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   QualType ElementType;
-  Expr *Identity, *Reduce;
+  // There can be 0, 1, or 2 arguments.
+  // The 0-argument HyperobjectType has a view type of RecordType.
+  // All other fields are empty.
+  // The 1-argument HyperobjectType has a single object of RecordType
+  // which contains the identity and reduce methods.  Callbacks holds
+  // that object and the remaining four fields are empty or null.
+  // The 2-argument HyperobjectType has a pair of functions.
+  // Callbacks is empty.  Identity and Reduce are not null.
+  // The fields are optional in case serialization crashes on null pointers.
+  std::optional<Expr *> Callbacks;
+  std::optional<Expr *> Identity, Reduce;
+  // If Identity and Reduce are identifiable functions, their declarations
+  // follow.
   const FunctionDecl *IdentityID, *ReduceID;
 
+  HyperobjectType(QualType Element, QualType CanonicalPtr);
+  HyperobjectType(QualType Element, QualType CanonicalPtr, Expr *c);
   HyperobjectType(QualType Element, QualType CanonicalPtr,
                   Expr *i, const FunctionDecl *ifn,
                   Expr *r, const FunctionDecl *rfn);
@@ -8057,18 +8071,22 @@ class HyperobjectType final : public Type, public llvm::FoldingSetNode {
 public:
   QualType getElementType() const { return ElementType; }
 
-  static bool isNullish(Expr *);
+  // Does this hyperobject use the type _0 interface
+  // with no callbacks?
+  bool hasClassView() const { return !Callbacks && !Identity; }
 
-  Expr *getIdentity() const { return Identity; }
-  Expr *getReduce() const { return Reduce; }
-
-  bool hasCallbacks() const;
+  std::optional<Expr *> getCallbacks() const { return Callbacks; }
+  std::optional<Expr *> getIdentity() const { return Identity; }
+  std::optional<Expr *> getReduce() const { return Reduce; }
 
   bool isSugared() const { return false; }
   QualType desugar() const { return QualType(this, 0); }
 
   void Profile(llvm::FoldingSetNodeID &ID) const;
 
+  static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee);
+  static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
+                      const ValueDecl *C);
   static void Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
                       const FunctionDecl *I,
                       const FunctionDecl *R);

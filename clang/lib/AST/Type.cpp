@@ -2056,8 +2056,11 @@ public:
   Type *VisitPackExpansionType(const PackExpansionType *T) {
     return Visit(T->getPattern());
   }
-};
 
+  Type *VisitHyperobjectType(const HyperobjectType *T) {
+    return Visit(T->getElementType());
+  }
+};
 } // namespace
 
 DeducedType *Type::getContainedDeducedType() const {
@@ -3605,18 +3608,23 @@ QualType QualType::stripHyperobject() const {
   return *this;
 }
 
-/// Check if the expression is nullptr, 0, or contains an error.
-/// The more general isNullPointerConstant requires a non-const ASTContext.
-bool HyperobjectType::isNullish(Expr *E) {
-  E = E->IgnoreParenCasts();
-  switch (E->getStmtClass()) {
-  case Expr::CXXNullPtrLiteralExprClass:
-    return true;
-  case Expr::IntegerLiteralClass:
-    return cast<IntegerLiteral>(E)->getValue().isZero();
-  default:
-    return E->getType()->containsErrors();
-  }
+HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr)
+  : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
+    ElementType(Element) {
+  // these errors are diagnosed in the caller
+  if (Element->isIncompleteType() || !Element->isRecordType())
+    addDependence(TypeDependence::Error);
+  addDependence(Element->getDependence());
+}
+
+HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
+                                 Expr *c)
+  : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
+    ElementType(Element), Callbacks(c) {
+  if (Element->isIncompleteType()) // diagnosed in caller
+    addDependence(TypeDependence::Error);
+  addDependence(Element->getDependence());
+  addDependence(toTypeDependence(c->getDependence()));
 }
 
 HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
@@ -3632,22 +3640,33 @@ HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr,
   addDependence(toTypeDependence(r->getDependence()));
 }
 
-bool HyperobjectType::hasCallbacks() const {
-  return Identity && Reduce && !isNullish(Identity) && !isNullish(Reduce);
+void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID) const {
+  if (IdentityID && ReduceID) {
+    Profile(ID, getElementType(), IdentityID, ReduceID);
+  } else if (Callbacks) {
+    const UnaryOperator *U = cast<UnaryOperator>(Callbacks.value());
+    const DeclRefExpr *D = cast<DeclRefExpr>(U->getSubExpr());
+    Profile(ID, getElementType(), D->getDecl());
+  } else {
+    Profile(ID, getElementType());
+  }
 }
 
-void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID) const {
-  Profile(ID, getElementType(), IdentityID, ReduceID);
+void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
+                              const ValueDecl *C) {
+  ID.AddPointer(Pointee.getAsOpaquePtr());
+  ID.AddPointer(C);
+}
+
+void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID, QualType Pointee) {
+  ID.AddPointer(Pointee.getAsOpaquePtr());
 }
 
 void HyperobjectType::Profile(llvm::FoldingSetNodeID &ID, QualType Pointee,
                               const FunctionDecl *I, const FunctionDecl *R) {
   ID.AddPointer(Pointee.getAsOpaquePtr());
-  // In normal use both I and R will be non-null or neither of them will be.
-  if (I)
-    ID.AddPointer(I);
-  if (R)
-    ID.AddPointer(R);
+  ID.AddPointer(I);
+  ID.AddPointer(R);
 }
 
 StringRef FunctionType::getNameForCallConv(CallingConv CC) {
@@ -5387,9 +5406,7 @@ QualType::DestructionKind QualType::isDestructedTypeImpl(QualType type) {
     QualType::DestructionKind DK_Inner = isDestructedTypeImpl(Inner);
     if (DK_Inner != DK_none)
       return DK_Inner;
-    if (HT->hasCallbacks())
-      return DK_hyperobject;
-    return DK_none;
+    return DK_hyperobject;
   }
 
   if (const auto *RT = type->getBaseElementTypeUnsafe()->getAs<RecordType>()) {

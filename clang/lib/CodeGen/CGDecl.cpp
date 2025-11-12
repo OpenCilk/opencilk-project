@@ -1932,18 +1932,6 @@ void CodeGenFunction::emitZeroOrPatternForAutoVarInit(QualType type,
   }
 }
 
-bool CodeGenFunction::getReducer(const DeclaratorDecl *D,
-                                 ReducerCallbacks &CB) {
-  if (const HyperobjectType *H = D->getType()->getAs<HyperobjectType>()) {
-    if (H->hasCallbacks()) {
-      CB.Identity = H->getIdentity();
-      CB.Reduce = H->getReduce();
-      return true;
-    }
-  }
-  return false;
-}
-
 void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF, Address Addr,
                                          QualType Type) {
   llvm::Function *F = CGF.CGM.getIntrinsic(llvm::Intrinsic::reducer_unregister);
@@ -1959,36 +1947,25 @@ void CodeGenFunction::destroyHyperobject(CodeGenFunction &CGF, Address Addr,
 }
 
 void CodeGenFunction::EmitReducerInit(const DeclaratorDecl *D,
-                                      const ReducerCallbacks &C,
                                       llvm::Value *Addr) {
-  // RValue Identity = EmitAnyExpr(C.Identity);
-  // RValue Reduce = EmitAnyExpr(C.Reduce);
-  RValue Identity = RValue::get(EmitLValue(C.Identity).getPointer(*this));
-  RValue Reduce = RValue::get(EmitLValue(C.Reduce).getPointer(*this));
 
-  llvm::Type *SizeType = ConvertType(getContext().getSizeType());
-  llvm::Value *Size = nullptr;
-  QualType Type = D->getType();
-  if (const VariableArrayType *VLA =
-      getContext().getAsVariableArrayType(Type)) {
-    auto V = getVLASize(VLA);
-    llvm::Value *Size1 = CGM.getSize(getContext().getTypeSizeInChars(V.Type));
-    Size = Builder.CreateNUWMul(V.NumElts, Size1);
-  } else {
-    Size = CGM.getSize(getContext().getTypeSizeInChars(Type));
-  }
-  // TODO: mark this call as registering a local
-  // TODO: add better handling of attribute arguments that evaluate to null
-  SmallVector<llvm::Type *, 1> Types = {SizeType};
+  const HyperobjectType *H = D->getType()->getAs<HyperobjectType>();
   llvm::Function *F =
-    CGM.getIntrinsic(llvm::Intrinsic::reducer_register, Types);
-  llvm::Value *IdentityV =
-      Identity.isScalar() ? Identity.getScalarVal()
-                          : Identity.getAggregateAddress().getBasePointer();
-  llvm::Value *ReduceV = Reduce.isScalar()
-                             ? Reduce.getScalarVal()
-                             : Reduce.getAggregateAddress().getBasePointer();
-  Builder.CreateCall(F, {Addr, Size, IdentityV, ReduceV});
+    CGM.getIntrinsic(llvm::Intrinsic::reducer_register);
+  // TODO: mark this call as registering a local
+  unsigned int Variant = ~0U;
+  llvm::Value *Arg;
+  if (std::optional<Expr *> Callbacks = H->getCallbacks()) {
+    Arg = EmitLValue(*Callbacks).getPointer(*this);
+    Variant = 1;
+  } else if (std::optional<Expr *> Reduce = H->getReduce()) {
+    Arg = EmitScalarExpr(*Reduce);
+    Variant = 2;
+  } else {
+    Arg = llvm::Constant::getNullValue(Int8PtrTy);
+    Variant = 0;
+  }
+  Builder.CreateCall(F, {Builder.getInt32(Variant), Addr, Arg});
 }
 
 void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
@@ -2002,14 +1979,6 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
   ApplyAtomGroup Grp(getDebugInfo());
   QualType type = D.getType();
 
-  ReducerCallbacks RCB = {0, 0};
-  bool Reducer = false;
-  if (const HyperobjectType *H = type->getAs<HyperobjectType>()) {
-    type = H->getElementType();
-    assert(!emission.IsEscapingByRef); // block reducers not supported
-    Reducer = getReducer(&D, RCB);
-  }
-
   // If this local has an initializer, emit it now.
   const Expr *Init = D.getInit();
 
@@ -2021,6 +1990,15 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
       return;
     }
     EnsureInsertPoint();
+  }
+
+  llvm::Value *ReducerAddr = nullptr;
+  if (const HyperobjectType *H = type->getAs<HyperobjectType>()) {
+    type = H->getElementType();
+    assert(!emission.IsEscapingByRef); // block reducers not supported
+    ReducerAddr =
+      Builder.CreateBitCast(emission.Addr.emitRawPointer(*this),
+                            CGM.VoidPtrTy);
   }
 
   // Initialize the structure of a __block variable.
@@ -2075,10 +2053,8 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
 
   if (isTrivialInitializer(Init)) {
     initializeWhatIsTechnicallyUninitialized(Loc);
-    if (Reducer)
-      EmitReducerInit(&D, RCB,
-                      Builder.CreateBitCast(emission.Addr.emitRawPointer(*this),
-                                            CGM.VoidPtrTy));
+    if (ReducerAddr)
+      EmitReducerInit(&D, ReducerAddr);
     return;
   }
 
@@ -2134,10 +2110,8 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     LValue lv = MakeAddrLValue(Loc, type);
     lv.setNonGC(true);
     EmitExprAsInit(Init, &D, lv, capturedByInit);
-    if (Reducer)
-      EmitReducerInit(&D, RCB,
-                      Builder.CreateBitCast(emission.Addr.emitRawPointer(*this),
-                                            CGM.VoidPtrTy));
+    if (ReducerAddr)
+      EmitReducerInit(&D, ReducerAddr);
     return;
   }
 
@@ -2148,10 +2122,8 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     LValue lv = MakeAddrLValue(Loc, type);
     lv.setNonGC(true);
     EmitStoreThroughLValue(RValue::get(constant), lv, true);
-    if (Reducer)
-      EmitReducerInit(&D, RCB,
-                      Builder.CreateBitCast(emission.Addr.emitRawPointer(*this),
-                                            CGM.VoidPtrTy));
+    if (ReducerAddr)
+      EmitReducerInit(&D, ReducerAddr);
     return;
   }
 
@@ -2159,10 +2131,8 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
                         type.isVolatileQualified(), constant,
                         /*IsAutoInit=*/false);
 
-  if (Reducer)
-    EmitReducerInit(&D, RCB,
-                    Builder.CreateBitCast(emission.Addr.emitRawPointer(*this),
-                                          CGM.VoidPtrTy));
+  if (ReducerAddr)
+    EmitReducerInit(&D, ReducerAddr);
 }
 
 void CodeGenFunction::MaybeEmitDeferredVarDeclInit(const VarDecl *VD) {
@@ -2246,23 +2216,18 @@ void CodeGenFunction::emitAutoVarTypeCleanup(
   CleanupKind cleanupKind = NormalAndEHCleanup;
   CodeGenFunction::Destroyer *destroyer = nullptr;
 
-  bool IsReducer = false;
-
   switch (dtorKind) {
   case QualType::DK_none:
     llvm_unreachable("no cleanup for trivially-destructible variable");
 
   case QualType::DK_hyperobject:
-    IsReducer = true;
     break;
 
   case QualType::DK_cxx_destructor:
-    if (const HyperobjectType *H = type->getAs<HyperobjectType>())
-      IsReducer = H->hasCallbacks();
     // If there's an NRVO flag on the emission, we need a different
     // cleanup.
     if (emission.NRVOFlag) {
-      assert(!type->isArrayType() && !IsReducer);
+      assert(!type->isArrayType() && !type->isHyperobjectType());
       CXXDestructorDecl *dtor = type->getAsCXXRecordDecl()->getDestructor();
       EHStack.pushCleanup<DestroyNRVOVariableCXX>(cleanupKind, addr, type, dtor,
                                                   emission.NRVOFlag);

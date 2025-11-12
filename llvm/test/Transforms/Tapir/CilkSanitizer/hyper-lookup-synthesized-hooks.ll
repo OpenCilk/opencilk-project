@@ -15,13 +15,13 @@ entry:
   call void @llvm.lifetime.start.p0(i64 8, ptr nonnull %sumAParRelError) #7
   store double 0.000000e+00, ptr %sumAParRelError, align 8, !tbaa !5
   call void @llvm.reducer.register.i64(ptr nonnull %sumAParRelError, i64 8, ptr nonnull @_Z8sum_initIdEvPv, ptr nonnull @_Z10sum_reduceIdEvPvS0_)
-  %0 = call ptr @llvm.hyper.lookup.i64(ptr nonnull %sumAParRelError, i64 8, ptr nonnull @_Z8sum_initIdEvPv, ptr nonnull @_Z10sum_reduceIdEvPvS0_)
+  %0 = call ptr @llvm.hyper.lookup.2.i64(ptr nonnull %sumAParRelError, i64 8, ptr nonnull @_Z8sum_initIdEvPv, ptr nonnull @_Z10sum_reduceIdEvPvS0_)
   %1 = load double, ptr %0, align 8, !tbaa !5
   invoke void @_Z1hd(double noundef %1)
           to label %invoke.cont unwind label %lpad
 
 invoke.cont:                                      ; preds = %entry
-  %2 = call ptr @llvm.hyper.lookup.i64(ptr nonnull %sumAParRelError, i64 8, ptr nonnull @_Z8sum_initIdEvPv, ptr nonnull @_Z10sum_reduceIdEvPvS0_)
+  %2 = call ptr @llvm.hyper.lookup.2.i64(ptr nonnull %sumAParRelError, i64 8, ptr nonnull @_Z8sum_initIdEvPv, ptr nonnull @_Z10sum_reduceIdEvPvS0_)
   %3 = load double, ptr %2, align 8, !tbaa !5
   invoke void @_Z1hd(double noundef %3)
           to label %invoke.cont1 unwind label %lpad
@@ -43,15 +43,15 @@ lpad:                                             ; preds = %invoke.cont, %entry
 
 ; CHECK: define dso_local void @_Z3runv()
 
-; CHECK: %[[HYPER_LOOKUP:.+]] = call ptr @llvm.hyper.lookup.i64(ptr nonnull %sumAParRelError
-; CHECK: %[[CSAN_HYPER_LOOKUP:.+]] = call {{.*}}ptr @__csan_llvm_hyper_lookup_i64(i64 %{{.*}}, i64 %{{.*}}, i8 3, i64 0, ptr %[[HYPER_LOOKUP]],
+; CHECK: %[[HYPER_LOOKUP:.+]] = call ptr @llvm.hyper.lookup.2.i64(ptr nonnull %sumAParRelError
+; CHECK: %[[CSAN_HYPER_LOOKUP:.+]] = call {{.*}}ptr @__csan_llvm_hyper_lookup_2_i64(i64 %{{.*}}, i64 %{{.*}}, i8 3, i64 0, ptr %[[HYPER_LOOKUP]],
 ; CHECK: call void @__csan_load(i64 %{{.*}}, ptr %[[CSAN_HYPER_LOOKUP]],
 ; CHECK-NEXT: %[[VIEW_LOAD:.+]] = load double, ptr %[[CSAN_HYPER_LOOKUP]]
 
 ; CHECK: invoke void @_Z1hd(double noundef %[[VIEW_LOAD]])
 
-; CHECK: %[[HYPER_LOOKUP_2:.+]] = call ptr @llvm.hyper.lookup.i64(ptr nonnull %sumAParRelError
-; CHECK: %[[CSAN_HYPER_LOOKUP_2:.+]] = call {{.*}}ptr @__csan_llvm_hyper_lookup_i64(i64 %{{.*}}, i64 %{{.*}}, i8 3, i64 0, ptr %[[HYPER_LOOKUP_2]],
+; CHECK: %[[HYPER_LOOKUP_2:.+]] = call ptr @llvm.hyper.lookup.2.i64(ptr nonnull %sumAParRelError
+; CHECK: %[[CSAN_HYPER_LOOKUP_2:.+]] = call {{.*}}ptr @__csan_llvm_hyper_lookup_2_i64(i64 %{{.*}}, i64 %{{.*}}, i8 3, i64 0, ptr %[[HYPER_LOOKUP_2]],
 ; CHECK: call void @__csan_load(i64 %{{.*}}, ptr %[[CSAN_HYPER_LOOKUP_2]],
 ; CHECK-NEXT: %[[VIEW_LOAD_2:.+]] = load double, ptr %[[CSAN_HYPER_LOOKUP_2]]
 
@@ -60,7 +60,7 @@ lpad:                                             ; preds = %invoke.cont, %entry
 
 ; Check that synthesized __csan_llvm_hyper_lookup function simply calls the default hook and returns the return-value parameter.
 
-; CHECK: define {{.*}}ptr @__csan_llvm_hyper_lookup_i64(i64 %0, i64 %1, i8 %2, i64 %3, ptr %4, ptr %5, i64 %6, ptr %7, ptr %8)
+; CHECK: define {{.*}}ptr @__csan_llvm_hyper_lookup_2_i64(i64 %0, i64 %1, i8 %2, i64 %3, ptr %4, ptr %5, i64 %6, ptr %7, ptr %8)
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT: call {{.*}}void @__csan_default_libhook(i64 %0, i64 %1, i8 %2)
 ; CHECK-NEXT: ret ptr %4
@@ -100,7 +100,7 @@ declare void @llvm.lifetime.end.p0(i64 immarg, ptr nocapture) #1
 declare void @_Z1hd(double noundef) local_unnamed_addr #5
 
 ; Function Attrs: hyper_view injective mustprogress nofree nounwind strand_pure willreturn memory(inaccessiblemem: read)
-declare ptr @llvm.hyper.lookup.i64(ptr, i64, ptr, ptr) #6
+declare ptr @llvm.hyper.lookup.2.i64(ptr, i64, ptr, ptr) #6
 
 attributes #0 = { mustprogress sanitize_cilk uwtable "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #1 = { mustprogress nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }

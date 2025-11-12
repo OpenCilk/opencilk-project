@@ -1280,8 +1280,11 @@ public:
   QualType RebuildDependentBitIntType(bool IsUnsigned, Expr *NumBitsExpr,
                                       SourceLocation Loc);
 
-  QualType RebuildHyperobjectType(QualType ElementType, Expr *I,
-                                  Expr *R, SourceLocation Loc);
+  QualType RebuildHyperobjectType(QualType ElementType,
+                                  std::optional<Expr *> C,
+                                  std::optional<Expr *> I,
+                                  std::optional<Expr *> R,
+                                  SourceLocation Loc);
 
   /// Build a new template name given a nested name specifier, a flag
   /// indicating whether the "template" keyword was provided, and the template
@@ -5551,24 +5554,40 @@ template <typename Derived>
 QualType
 TreeTransform<Derived>::TransformHyperobjectType(TypeLocBuilder &TLB,
                                                  HyperobjectTypeLoc TL) {
-  ExprResult NewR, NewI;
+  std::optional<Expr *> NewC, NewI, NewR;
+
   {
     const HyperobjectType *H = TL.getTypePtr();
     EnterExpressionEvaluationContext Context(
         SemaRef, Sema::ExpressionEvaluationContext::PotentiallyEvaluated);
-    NewR = getDerived().TransformExpr(H->getReduce());
-    NewI = getDerived().TransformExpr(H->getIdentity());
+    if (std::optional<Expr *> C = H->getCallbacks()) {
+      ExprResult T = getDerived().TransformExpr(C.value());
+      if (T.isInvalid())
+        return QualType();
+      NewC = T.get();
+      assert(!H->getIdentity() && !H->getReduce());
+    }
+    if (std::optional<Expr *> I = H->getIdentity()) {
+      ExprResult T = getDerived().TransformExpr(I.value());
+      if (T.isInvalid())
+        return QualType();
+      NewI = T.get();
+    }
+    if (std::optional<Expr *> R = H->getReduce()) {
+      ExprResult T = getDerived().TransformExpr(R.value());
+      if (T.isInvalid())
+        return QualType();
+      NewR = T.get();
+    }
   }
-  if (NewR.isInvalid() || NewI.isInvalid())
-    return QualType();
 
   QualType ElementType = getDerived().TransformType(TLB, TL.getPointeeLoc());
   if (ElementType.isNull())
     return QualType();
 
   QualType Result =
-    getDerived().RebuildHyperobjectType(ElementType, NewI.get(),
-                                        NewR.get(), TL.getHyperLoc());
+    getDerived().RebuildHyperobjectType(ElementType, NewC, NewI, NewR,
+                                        TL.getHyperLoc());
   if (Result.isNull())
     return QualType();
 
@@ -17526,9 +17545,11 @@ QualType TreeTransform<Derived>::RebuildDependentBitIntType(
 
 template<typename Derived>
 QualType TreeTransform<Derived>::RebuildHyperobjectType(QualType ElementType,
-                                                        Expr *I, Expr *R,
+                                                        std::optional<Expr *> C,
+                                                        std::optional<Expr *> I,
+                                                        std::optional<Expr *> R,
                                                         SourceLocation Loc) {
-  return SemaRef.BuildHyperobjectType(ElementType, I, R, Loc);
+  return SemaRef.BuildHyperobjectType(ElementType, C, I, R, Loc);
 }
 
 template<typename Derived>

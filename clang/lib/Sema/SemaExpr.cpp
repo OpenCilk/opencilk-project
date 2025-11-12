@@ -681,7 +681,8 @@ ExprResult Sema::DefaultLvalueConversion(Expr *E) {
   CheckForNullPointerDereference(*this, E);
 
   E = BuildHyperobjectLookup(E);
-  assert(T == E->getType() && "Unexpected Type from hyperobject lookup.");
+  if (T != E->getType())
+    assert(E->containsErrors() && "Unexpected Type from hyperobject lookup");
 
   if (const ObjCIsaExpr *OISA = dyn_cast<ObjCIsaExpr>(E->IgnoreParenCasts())) {
     NamedDecl *ObjectGetClass = LookupSingleName(TUScope,
@@ -2372,81 +2373,151 @@ NonOdrUseReason Sema::getNonOdrUseReasonInCurrentContext(ValueDecl *D) {
   return NOUR_None;
 }
 
-Expr *Sema::BuildHyperobjectLookup(Expr *E, bool Pointer) {
-  if (!Pointer && !E->isGLValue())
+// Resolve hyperobject on left hand side of arrow operator.
+// The expression will not be an lvalue.
+Expr *Sema::BuildHyperobjectLookupBase(Expr *E) {
+  // Error or not yet completed type.
+  if (E->getDependence() != ExprDependence::None)
     return E;
 
   if (getLangOpts().getCilk() != LangOptions::Cilk_opencilk)
     return E;
 
-  QualType InputType = E->getType();
-  if (Pointer) {
-    const PointerType *PT = InputType->getAs<PointerType>();
-    if (!PT)
-      return E;
-    InputType = PT->getPointeeType();
-  }
+  const PointerType *PT = E->getType()->getAs<PointerType>();
+  if (!PT)
+    return E;
+  QualType Ty = PT->getPointeeType();
 
-  const HyperobjectType *HT = InputType->getAs<HyperobjectType>();
+  const HyperobjectType *HT = Ty->getAs<HyperobjectType>();
+  if (!HT)
+    return E;
+  QualType ViewType = HT->getElementType().withFastQualifiers(
+      Ty.getLocalFastQualifiers());
+  QualType Ptr = Context.getPointerType(ViewType);
+
+  // E is known to be a pointer to hyperobject.  Compute &lookup(*E).
+  Expr *Deref = UnaryOperator::Create(Context, E, UO_Deref, Ty,
+                                      VK_LValue, OK_Ordinary, E->getExprLoc(),
+                                      false, CurFPFeatureOverrides());
+  Expr *View = BuildHyperobjectLookup(Deref);
+  if (!View)
+    return E;
+
+  return UnaryOperator::Create(Context, View, UO_AddrOf, Ptr, VK_PRValue,
+                               OK_Ordinary, E->getExprLoc(), false,
+                               CurFPFeatureOverrides());
+}
+
+// Resolve a hyperobject used in an lvalue context.
+Expr *Sema::BuildHyperobjectLookup(Expr *E) {
+  if (!E->isGLValue())
+    return E;
+
+  // Error or not yet completed type.
+  if (E->getDependence() != ExprDependence::None)
+    return E;
+
+  if (getLangOpts().getCilk() != LangOptions::Cilk_opencilk)
+    return E;
+
+  const HyperobjectType *HT = E->getType()->getAs<HyperobjectType>();
   if (!HT)
     return E;
 
-  QualType ResultType = HT->getElementType().withFastQualifiers(
-      InputType.getLocalFastQualifiers());
-  QualType Ptr = Context.getPointerType(ResultType);
+  QualType ViewType = HT->getElementType().withFastQualifiers(
+      E->getType().getLocalFastQualifiers());
+  QualType Ptr = Context.getPointerType(ViewType);
 
   SourceLocation Loc = E->getExprLoc();
-  ExprResult SizeExpr;
-  if (ResultType.getTypePtr()->isDependentType()) {
-    SizeExpr = CreateUnaryExprOrTypeTraitExpr(E, Loc, UETT_SizeOf);
-  } else {
-    QualType SizeType = Context.getSizeType();
-    llvm::APInt Size(Context.getTypeSize(SizeType),
-                     Context.getTypeSizeInChars(ResultType).getQuantity());
-    SizeExpr = IntegerLiteral::Create(Context, Size, SizeType, E->getExprLoc());
+  // View size is a constant here.  Hyperobjects with variable length
+  // views are rejected in BuildHyperobjectType.
+  QualType SizeType = Context.getSizeType();
+  llvm::APInt Size(Context.getTypeSize(SizeType),
+                   Context.getTypeSizeInChars(ViewType).getQuantity());
+  ExprResult SizeExpr =
+    IntegerLiteral::Create(Context, Size, SizeType, E->getExprLoc());
+
+  // For variants with callbacks taking the address of the variable
+  // can be deferred until codegen.
+  if (HT->getIdentity() || HT->getCallbacks()) {
+    unsigned Code =
+      HT->getIdentity() ? Builtin::BI__hyper_lookup_internal_2 :
+      Builtin::BI__hyper_lookup_internal_1;
+    std::string Name = Context.BuiltinInfo.getName(Code);
+    LookupResult R(*this, &Context.Idents.get(Name), Loc,
+                   Sema::LookupOrdinaryName);
+    LookupName(R, TUScope, /*AllowBuiltinCreation=*/false);
+    FunctionDecl *BuiltInDecl = R.getAsSingle<FunctionDecl>();
+    assert(BuiltInDecl); // TODO: has it definitely been created?
+    ExprResult DeclRef =
+      BuildDeclRefExpr(BuiltInDecl, BuiltInDecl->getType(), VK_LValue, Loc);
+    assert(DeclRef.isUsable() && "Builtin reference cannot fail");
+
+    Expr *Call = nullptr;
+    if (Code == Builtin::BI__hyper_lookup_internal_2) {
+      Expr *Args[] =
+        {E, SizeExpr.get(), *HT->getIdentity(), *HT->getReduce()};
+      // Can not use BuildBuiltinCallExpr because it would recurse doing
+      // lvalue conversion on the first argument.
+      Call = CallExpr::Create(Context, DeclRef.get(), Args, ViewType,
+                              VK_LValue, Loc, FPOptionsOverride());
+    } else {
+      ExprResult Callbacks =
+        ConvertForHyperobject(Builtin::BI__hyper_lookup_internal_1, 1, Loc,
+                              HT->getCallbacks().value(), true, false);
+      Expr *Args[] = {E, Callbacks.get()};
+      Call = CallExpr::Create(Context, DeclRef.get(), Args, ViewType,
+                              VK_LValue, Loc, FPOptionsOverride());
+    }
+    return Call;
   }
 
-  Expr *VarAddr;
-  if (Pointer) {
-    VarAddr = E;
-  } else if (HT->getElementType()->isDependentType()) {
-    ExprResult Address =
-      BuildBuiltinCallExpr(Loc, Builtin::BI__builtin_addressof, E);
-    assert(Address.isUsable());
-    VarAddr = Address.get();
-  } else {
-    VarAddr = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr, VK_PRValue,
-                                    OK_Ordinary, SourceLocation(), false,
-                                    CurFPFeatureOverrides());
+  // The hyperobject type should be marked erroneous if the view
+  // type is not a record type.
+  assert(ViewType->isRecordType());
+
+  assert(!HT->getElementType()->isDependentType()); // checked above
+  Expr *VarAddr = UnaryOperator::Create(Context, E, UO_AddrOf, Ptr, VK_PRValue,
+                                        OK_Ordinary, E->getExprLoc(), false,
+                                        CurFPFeatureOverrides());
+
+  ExprResult Converted =
+    ConvertForHyperobject(Builtin::BI__hyper_lookup_class, 0, Loc, VarAddr,
+                          true, false);
+  Expr *Call = nullptr;
+  // Remember the root the view type hiearchy.  If it is a virtual
+  // base class of the view type a dynamic cast must be used below.
+  const CXXRecordDecl *BaseRecord = nullptr;
+  if (!Converted.isInvalid()) {
+    if (const PointerType *BP =
+        Converted.get()->getType()->getAs<PointerType>())
+      BaseRecord = BP->getPointeeType()->getAsCXXRecordDecl();
+    Expr *CallArgs[] = { Converted.get() };
+    Call =
+      BuildBuiltinCallExpr(Loc, Builtin::BI__hyper_lookup_class,
+                           CallArgs, true);
   }
-  Expr *CallArgs[] = {VarAddr, SizeExpr.get(), HT->getIdentity(),
-                      HT->getReduce()};
-  ExprResult Call =
-      BuildBuiltinCallExpr(Loc, Builtin::BI__hyper_lookup, CallArgs);
+  if (!Call)
+    Call = VarAddr;
 
   // Template expansion normally strips out implicit casts, so make this
-  // explicit in C++.
-  Expr *Casted = nullptr;
-  if (CurContext->isDependentContext())
-    // Based on logic in CoroutineStmtBuilder::makeNewAndDeleteExpr()
-    Casted =
-        BuildCXXNamedCast(Loc, tok::kw_static_cast,
-                          Context.getTrivialTypeSourceInfo(Ptr), Call.get(),
-                          SourceRange(Loc, Loc), SourceRange(Loc, Loc))
-            .get();
-  else
-    Casted =
-        ImplicitCastExpr::Create(Context, Ptr, CK_BitCast, Call.get(), nullptr,
-                                 VK_PRValue, CurFPFeatureOverrides());
+  // explicit in C++.  Only C++ code reaches here.  A dynamic_cast is
+  // needed if the result of view lookup is a virtual base class.
+  // Based on logic in CoroutineStmtBuilder::makeNewAndDeleteExpr()
+  tok::TokenKind style = tok::kw_static_cast;
+  if (BaseRecord)
+    if (CXXRecordDecl *ViewRecord = ViewType->getAsCXXRecordDecl())
+      if (ViewRecord->isVirtuallyDerivedFrom(BaseRecord))
+        style = tok::kw_dynamic_cast;
 
-  if (Pointer)
-    return Casted;
-
-  auto *Deref = UnaryOperator::Create(Context, Casted, UO_Deref, ResultType,
-                                      VK_LValue, OK_Ordinary, SourceLocation(),
-                                      false, CurFPFeatureOverrides());
-
-  return Deref;
+  ExprResult Casted =
+    BuildCXXNamedCast(Loc, style, Context.getTrivialTypeSourceInfo(Ptr),
+                      Call, SourceRange(Loc, Loc), SourceRange(Loc, Loc));
+  return UnaryOperator::Create(Context,
+                               Casted.isInvalid() ? Call : Casted.get(),
+                               UO_Deref, ViewType, VK_LValue,
+                               OK_Ordinary, SourceLocation(),
+                               false, CurFPFeatureOverrides());
 }
 
 DeclRefExpr *
@@ -6888,14 +6959,20 @@ ExprResult Sema::BuildCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
 }
 
 Expr *Sema::BuildBuiltinCallExpr(SourceLocation Loc, Builtin::ID Id,
-                                 MultiExprArg CallArgs) {
+                                 MultiExprArg CallArgs, bool FailOK) {
   std::string Name = Context.BuiltinInfo.getName(Id);
   LookupResult R(*this, &Context.Idents.get(Name), Loc,
                  Sema::LookupOrdinaryName);
   LookupName(R, TUScope, /*AllowBuiltinCreation=*/true);
 
   auto *BuiltInDecl = R.getAsSingle<FunctionDecl>();
-  assert(BuiltInDecl && "failed to find builtin declaration");
+  if (!BuiltInDecl) {
+    Diag(Loc, diag::warn_implicit_decl_requires_sysheader)
+        << Context.BuiltinInfo.getHeaderName(Id)
+        << Context.BuiltinInfo.getName(Id);
+    assert(FailOK);
+    return nullptr;
+  }
 
   ExprResult DeclRef =
       BuildDeclRefExpr(BuiltInDecl, BuiltInDecl->getType(), VK_LValue, Loc);
@@ -6904,6 +6981,8 @@ Expr *Sema::BuildBuiltinCallExpr(SourceLocation Loc, Builtin::ID Id,
   ExprResult Call =
       BuildCallExpr(/*Scope=*/nullptr, DeclRef.get(), Loc, CallArgs, Loc);
 
+  if (FailOK && Call.isInvalid())
+    return nullptr;
   assert(!Call.isInvalid() && "Call to builtin cannot fail!");
   return Call.get();
 }
@@ -15635,6 +15714,8 @@ ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
     return ExprError();
   LHSExpr = BuildHyperobjectLookup(LHSExpr);
   RHSExpr = BuildHyperobjectLookup(RHSExpr);
+  if (!LHSExpr || !RHSExpr)
+    return ExprError();
 
   // We want to end up calling one of SemaPseudoObject::checkAssignment
   // (if the LHS is a pseudo-object), BuildOverloadedBinOp (if

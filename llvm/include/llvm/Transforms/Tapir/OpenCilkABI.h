@@ -50,10 +50,13 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSEnterLandingpad = nullptr;
   FunctionCallee CilkRTSPauseFrame = nullptr;
 
-  FunctionCallee CilkRTSReducerRegister32 = nullptr;
-  FunctionCallee CilkRTSReducerRegister64 = nullptr;
+  FunctionCallee CilkRTSReducerRegister0 = nullptr;
+  FunctionCallee CilkRTSReducerRegister1 = nullptr;
+  FunctionCallee CilkRTSReducerRegister2 = nullptr;
   FunctionCallee CilkRTSReducerUnregister = nullptr;
-  FunctionCallee CilkRTSReducerLookup = nullptr;
+  FunctionCallee CilkRTSReducerLookup0 = nullptr;
+  FunctionCallee CilkRTSReducerLookup1 = nullptr;
+  FunctionCallee CilkRTSReducerLookup2 = nullptr;
 
   // Accessors for opaque Cilk RTS functions
   FunctionCallee CilkHelperEpilogueExn = nullptr;
@@ -107,18 +110,26 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee Get__cilkrts_cilk_for_grainsize_64() {
     return CilkRTSCilkForGrainsize64;
   }
-  FunctionCallee Get__cilkrts_reducer_register(unsigned Bits) {
-    if (Bits == 32)
-      return CilkRTSReducerRegister32;
-    if (Bits == 64)
-      return CilkRTSReducerRegister64;
-    return 0;
+  FunctionCallee Get__cilkrts_reducer_register_0() {
+    return CilkRTSReducerRegister0;
+  }
+  FunctionCallee Get__cilkrts_reducer_register_1() {
+    return CilkRTSReducerRegister1;
+  }
+  FunctionCallee Get__cilkrts_reducer_register_2() {
+    return CilkRTSReducerRegister2;
   }
   FunctionCallee Get__cilkrts_reducer_unregister() {
     return CilkRTSReducerUnregister;
   }
-  FunctionCallee Get__cilkrts_reducer_lookup() {
-    return CilkRTSReducerLookup;
+  FunctionCallee Get__cilkrts_reducer_lookup_0() {
+    return CilkRTSReducerLookup0;
+  }
+  FunctionCallee Get__cilkrts_reducer_lookup_1() {
+    return CilkRTSReducerLookup1;
+  }
+  FunctionCallee Get__cilkrts_reducer_lookup_2() {
+    return CilkRTSReducerLookup2;
   }
 
   // Helper functions for implementing the Cilk ABI protocol

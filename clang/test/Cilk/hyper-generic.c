@@ -40,7 +40,7 @@ ADD(ld, long double)      ZERO(ld, long double)
 // CHECK-LABEL: define_int_reducer
 void define_int_reducer(long *out)
 {
-  // CHECK: call void @llvm.reducer.register.i64
+  // CHECK: call void @llvm.reducer.register
   // CHECK: ptr nonnull @zero_sl
   // CHECK: ptr nonnull @add_sl
   ADD_REDUCER(long) sum;
@@ -54,7 +54,7 @@ void define_int_reducer(long *out)
 // CHECK-LABEL: define_float_reducer
 void define_float_reducer(float *out)
 {
-  // CHECK: call void @llvm.reducer.register.i64
+  // CHECK: call void @llvm.reducer.register
   // CHECK: ptr nonnull @zero_f
   // CHECK: ptr nonnull @add_f
   ADD_REDUCER(float) sum;

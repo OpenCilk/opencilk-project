@@ -2958,6 +2958,10 @@ private:
   /// This checks that the target supports __builtin_setjmp.
   bool BuiltinSetjmp(CallExpr *TheCall);
 
+  /// BuiltinHyperLookupSimple - Check the reference variant
+  /// of hyperobject view lookup.
+  bool BuiltinHyperLookupSimple(CallExpr *TheCall, unsigned NumArgs);
+
   /// We have a call to a function like __sync_fetch_and_add, which is an
   /// overloaded function based on the pointer type of its first argument.
   /// The main BuildCallExpr routines have already promoted the types of
@@ -7181,8 +7185,12 @@ public:
                    SourceLocation TemplateKWLoc = SourceLocation(),
                    const TemplateArgumentListInfo *TemplateArgs = nullptr);
 
-  Expr *BuildHyperobjectLookup(Expr *, bool Pointer = false);
-  Expr *ValidateReducerCallback(Expr *E, unsigned NumArgs, SourceLocation Loc);
+  ExprResult
+  ConvertForHyperobject(Builtin::ID Builtin, unsigned Argument,
+                        SourceLocation Loc, Expr *Value,
+                        bool Perform, bool Warn);
+  Expr *BuildHyperobjectLookupBase(Expr *);
+  Expr *BuildHyperobjectLookup(Expr *);
 
   bool UseArgumentDependentLookup(const CXXScopeSpec &SS, const LookupResult &R,
                                   bool HasTrailingLParen);
@@ -7410,7 +7418,7 @@ public:
   /// BuildBuiltinCallExpr - Create a call to a builtin function specified by Id
   //  with the specified CallArgs
   Expr *BuildBuiltinCallExpr(SourceLocation Loc, Builtin::ID Id,
-                             MultiExprArg CallArgs);
+                             MultiExprArg CallArgs, bool FailOK = false);
 
   using ADLCallKind = CallExpr::ADLCallKind;
 
@@ -14977,7 +14985,10 @@ public:
                               SourceLocation AttrLoc);
   QualType BuildMatrixType(QualType T, Expr *NumRows, Expr *NumColumns,
                            SourceLocation AttrLoc);
-  QualType BuildHyperobjectType(QualType Element, Expr *Identity, Expr *Reduce,
+  QualType BuildHyperobjectType(QualType Element,
+                                std::optional<Expr *> Callbacks,
+                                std::optional<Expr *> Identity,
+                                std::optional<Expr *> Reduce,
                                 SourceLocation Loc);
 
   QualType BuildCountAttributedArrayOrPointerType(QualType WrappedTy,

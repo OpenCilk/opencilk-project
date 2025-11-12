@@ -1505,7 +1505,7 @@ def warn_cilk_for_forrange_loop_experimental: Warning<
   "'cilk_for' support for for-range loops is currently experimental">,
   InGroup<SourceUsesCilkPlus>;
 def error_hyperobject_arguments: Error<
-  "hyperobject must have 0 or 2 callbacks">;
+  "extra hyperobject callbacks ignored">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

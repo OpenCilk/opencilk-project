@@ -4783,7 +4783,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
 
   case ICK_Hyperobject_To_View:
     FromType = FromType.stripHyperobject();
-    From = BuildHyperobjectLookup(From, false);
+    From = BuildHyperobjectLookup(From);
     break;
 
   default:

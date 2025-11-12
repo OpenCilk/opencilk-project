@@ -3,6 +3,8 @@
 extern void identity_long(void *);
 extern void reduce_long(void *, void *);
 
+extern void identity_array(void *), reduce_array(void *, void *);
+
 typedef long _Hyperobject(identity_long, reduce_long) rlong;
 
 // CHECK-LABEL: local_array_of_hyper
@@ -15,7 +17,7 @@ long local_array_of_hyper(unsigned int x)
   // CHECK-NOT: call void @llvm.reducer.register
   rlong array[10]; // expected-warning{{array of reducer not implemented}}
   // CHECK: getelementptr inbounds [[JUNK:.+]] %[[ARRAY]]
-  // CHECK: %[[RAW:.+]] = call ptr @llvm.hyper.lookup
+  // CHECK: %[[RAW:.+]] = call ptr @llvm.hyper.lookup.2
   // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: %[[VAL:.+]] = load i64, ptr %[[RAW]]
   return array[x];
@@ -28,16 +30,15 @@ long local_hyper_of_array(unsigned int x)
 {
   // CHECK: %x.addr = alloca
   // CHECK: %[[ARRAY:.+]] = alloca [10 x i64]
-  // A hyperobject without reducer attribute should not be registered.
-  // CHECK-NOT: call void @llvm.reducer.register
+  // CHECK: call void @llvm.reducer.register
   typedef long Array[10];
-  Array _Hyperobject array;
-  // CHECK: %[[RAW:.+]] = call ptr @llvm.hyper.lookup
+  Array _Hyperobject(identity_array, reduce_array) array;
+  // CHECK: %[[RAW:.+]] = call ptr @llvm.hyper.lookup.2
   // CHECK-NOT: call ptr @llvm.hyper.lookup
   // CHECK: %[[ELEMENT:.+]] = getelementptr inbounds [[JUNK:.+]] %[[RAW]]
   // CHECK: %[[VAL:.+]] = load i64, ptr %[[ELEMENT]]
   return array[x];
-  // CHECK-NOT: call void @llvm.reducer.unregister
+  // CHECK: call void @llvm.reducer.unregister
   // CHECK ret i64 [[VAL]]
 }
 

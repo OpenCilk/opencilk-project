@@ -3310,7 +3310,7 @@ static bool HandleLValueBase(EvalInfo &Info, const Expr *E, LValue &Obj,
   // here. We do MostDerivedType->getAsCXXRecordDecl() in several other
   // locations and if we see crashes in those locations in the future
   // it may make more sense to move this fix into Lvalue::set.
-  DerivedDecl = D.MostDerivedType.getNonReferenceType()->getAsCXXRecordDecl();
+  DerivedDecl = D.MostDerivedType.getNonReferenceType().stripHyperobject()->getAsCXXRecordDecl();
   if (!CastToDerivedClass(Info, E, Obj, DerivedDecl, D.MostDerivedPathLength))
     return false;
 
@@ -5123,7 +5123,7 @@ static bool HandleBaseToDerivedCast(EvalInfo &Info, const CastExpr *E,
   const CXXRecordDecl *TargetType = TargetQT->getAsCXXRecordDecl();
   const CXXRecordDecl *FinalType;
   if (NewEntriesSize == D.MostDerivedPathLength)
-    FinalType = D.MostDerivedType->getAsCXXRecordDecl();
+    FinalType = D.MostDerivedType.stripHyperobject()->getAsCXXRecordDecl();
   else
     FinalType = getAsBaseClass(D.Entries[NewEntriesSize - 1]);
   if (FinalType->getCanonicalDecl() != TargetType->getCanonicalDecl()) {
@@ -6099,7 +6099,7 @@ static const CXXRecordDecl *getBaseClassType(SubobjectDesignator &Designator,
   assert(PathLength >= Designator.MostDerivedPathLength && PathLength <=
       Designator.Entries.size() && "invalid path length");
   return (PathLength == Designator.MostDerivedPathLength)
-             ? Designator.MostDerivedType->getAsCXXRecordDecl()
+             ? Designator.MostDerivedType.stripHyperobject()->getAsCXXRecordDecl()
              : getAsBaseClass(Designator.Entries[PathLength - 1]);
 }
 
@@ -6125,7 +6125,7 @@ static std::optional<DynamicType> ComputeDynamicType(EvalInfo &Info,
   // Note that consumers of DynamicType assume that the type has no virtual
   // bases, and will need modifications if this restriction is relaxed.
   const CXXRecordDecl *Class =
-      This.Designator.MostDerivedType->getAsCXXRecordDecl();
+      This.Designator.MostDerivedType.stripHyperobject()->getAsCXXRecordDecl();
   if (!Class || Class->getNumVBases()) {
     Info.FFDiag(E);
     return std::nullopt;

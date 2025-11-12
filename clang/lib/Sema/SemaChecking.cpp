@@ -3207,6 +3207,14 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
     if (BuiltinCountedByRef(TheCall))
       return ExprError();
     break;
+  case Builtin::BI__hyper_lookup_internal_1:
+    if (BuiltinHyperLookupSimple(TheCall, 2))
+      return ExprError();
+    break;
+  case Builtin::BI__hyper_lookup_internal_2:
+    if (BuiltinHyperLookupSimple(TheCall, 4))
+      return ExprError();
+    break;
   }
 
   if (getLangOpts().HLSL && HLSL().CheckBuiltinFunctionCall(BuiltinID, TheCall))
@@ -5951,6 +5959,44 @@ bool Sema::BuiltinSetjmp(CallExpr *TheCall) {
   if (!Context.getTargetInfo().hasSjLjLowering())
     return Diag(TheCall->getBeginLoc(), diag::err_builtin_setjmp_unsupported)
            << SourceRange(TheCall->getBeginLoc(), TheCall->getEndLoc());
+  return false;
+}
+
+bool Sema::BuiltinHyperLookupSimple(CallExpr *TheCall, unsigned NumArgs) {
+  Expr *Arg0 = TheCall->getArg(0);
+  if (!Arg0->getType()->isHyperobjectType())
+    return Diag(Arg0->getBeginLoc(), diag::err_hyper_lookup_internal) << 0;
+  if (!Arg0->isGLValue())
+    return Diag(Arg0->getBeginLoc(), diag::err_hyper_lookup_internal) << 1;
+  if (checkArgCount(TheCall, NumArgs))
+    return true;
+  if (NumArgs == 2) {
+    Expr *Arg1 = TheCall->getArg(1);
+    if (!Arg1->getType()->isReferenceType())
+      return Diag(Arg1->getBeginLoc(), diag::err_hyper_lookup_internal) << 2;
+  } else {
+    assert(NumArgs == 4);
+    Expr *Arg1 = TheCall->getArg(1);
+    if (!Arg1->getType()->isIntegerType())
+      return Diag(Arg1->getBeginLoc(), diag::err_hyper_lookup_internal) << 3;
+    // Must handle function to pointer decay here because the function
+    // does not have a type signature.
+    Expr *Arg2 = TheCall->getArg(2);
+    if (Arg2->getType()->isFunctionType())
+      Arg2 = ImpCastExprToType(Arg2, Context.getDecayedType(Arg2->getType()),
+                               CK_FunctionToPointerDecay).get();
+    else if (!Arg2->getType()->isPointerType())
+      return Diag(Arg2->getBeginLoc(), diag::err_hyper_lookup_internal) << 4;
+    Expr *Arg3 = TheCall->getArg(3);
+    if (Arg3->getType()->isFunctionType())
+      Arg3 = ImpCastExprToType(Arg3, Context.getDecayedType(Arg3->getType()),
+                               CK_FunctionToPointerDecay).get();
+    else if (!Arg3->getType()->isPointerType())
+      return Diag(Arg3->getBeginLoc(), diag::err_hyper_lookup_internal) << 4;
+  }
+
+  TheCall->setType(Arg0->getType().stripHyperobject());
+  TheCall->setValueKind(VK_LValue);
   return false;
 }
 

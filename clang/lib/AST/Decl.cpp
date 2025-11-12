@@ -2857,11 +2857,9 @@ VarDecl::needsDestruction(const ASTContext &Ctx) const {
 
   QualType Type = getType();
 
-  if (const HyperobjectType *H = Type->getAs<HyperobjectType>()) {
+  if (!!Type->getAs<HyperobjectType>()) {
     // CodeGenFunction::destroyHyperobject will run the inner destructor.
-    if (H->hasCallbacks())
-      return QualType::DK_hyperobject;
-    Type = H->getElementType();
+    return QualType::DK_hyperobject;
   }
 
   QualType::DestructionKind Kind = Type.isDestructedType();
@@ -2952,9 +2950,7 @@ VarDecl::setInstantiationOfStaticDataMember(VarDecl *VD,
 }
 
 bool VarDecl::isReducer() const {
-  if (const HyperobjectType *H = getType()->getAs<HyperobjectType>())
-    return H->hasCallbacks();
-  return false;
+  return !!getType()->getAs<HyperobjectType>();
 }
 
 //===----------------------------------------------------------------------===//

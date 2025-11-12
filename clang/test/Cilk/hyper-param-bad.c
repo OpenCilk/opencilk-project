@@ -1,5 +1,7 @@
 // RUN: %clang_cc1 %s -xc -fopencilk -verify -fsyntax-only
-int f(int _Hyperobject x) // expected-error{{parameter is hyperobject}}
+extern void identity(void *), reduce(void *, void *);
+int f(int _Hyperobject(identity, reduce) x)
+// expected-error@-1{{parameter is hyperobject}}
 {
   return x;
 }

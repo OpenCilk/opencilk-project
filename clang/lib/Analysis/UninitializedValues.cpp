@@ -59,7 +59,7 @@ static bool isTrackedVar(const VarDecl *vd, const DeclContext *dc) {
   if (vd->isLocalVarDecl() && !vd->hasGlobalStorage() &&
       !vd->isExceptionVariable() && !vd->isInitCapture() && !vd->isImplicit() &&
       vd->getDeclContext() == dc) {
-    QualType ty = vd->getType();
+    QualType ty = vd->getType().stripHyperobject();
     if (const auto *RD = ty->getAsRecordDecl())
       return recordIsNotEmpty(RD);
     return ty->isScalarType() || ty->isVectorType() || ty->isRVVSizelessBuiltinType();
@@ -261,6 +261,15 @@ static const Expr *stripCasts(ASTContext &C, const Expr *Ex) {
 /// If E is an expression comprising a reference to a single variable, find that
 /// variable.
 static FindVarResult findVar(const Expr *E, const DeclContext *DC) {
+  if (const CallExpr *C = dyn_cast<CallExpr>(E)) {
+    switch (C->getBuiltinCallee()) {
+    case Builtin::BI__hyper_lookup_internal_1:
+    case Builtin::BI__hyper_lookup_internal_2:
+      return findVar(C->getArg(0), DC);
+    default:
+      break;
+    }
+  }
   if (const auto *DRE =
           dyn_cast<DeclRefExpr>(stripCasts(DC->getParentASTContext(), E)))
     if (const auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))

@@ -994,10 +994,12 @@ DEF_TRAVERSE_TYPE(ComplexType, { TRY_TO(TraverseType(T->getElementType())); })
 
 DEF_TRAVERSE_TYPE(HyperobjectType, {
     TRY_TO(TraverseType(T->getElementType()));
-    if (Stmt *I = T->getIdentity())
-      TRY_TO(TraverseStmt(I));
-    if (Stmt *R = T->getReduce())
-      TRY_TO(TraverseStmt(R));
+    if (std::optional<Expr *> C = T->getCallbacks())
+      TRY_TO(TraverseStmt(static_cast<Stmt *>(C.value())));
+    if (std::optional<Expr *> I = T->getIdentity())
+      TRY_TO(TraverseStmt(static_cast<Stmt *>(I.value())));
+    if (std::optional<Expr *> R = T->getReduce())
+      TRY_TO(TraverseStmt(static_cast<Stmt *>(R.value())));
   })
 
 DEF_TRAVERSE_TYPE(PointerType, { TRY_TO(TraverseType(T->getPointeeType())); })
@@ -1277,10 +1279,12 @@ DEF_TRAVERSE_TYPELOC(ComplexType, {
 DEF_TRAVERSE_TYPELOC(HyperobjectType, {
   const HyperobjectType *H = TL.getTypePtr();
   TRY_TO(TraverseType(H->getElementType()));
-  if (Stmt *I = H->getIdentity())
-    TRY_TO(TraverseStmt(I));
-  if (Stmt *R = H->getReduce())
-    TRY_TO(TraverseStmt(R));
+  if (std::optional<Expr *> C = H->getCallbacks())
+    TRY_TO(TraverseStmt(static_cast<Stmt *>(C.value())));
+  if (std::optional<Expr *> I = H->getIdentity())
+    TRY_TO(TraverseStmt(static_cast<Stmt *>(I.value())));
+  if (std::optional<Expr *> R = H->getReduce())
+    TRY_TO(TraverseStmt(static_cast<Stmt *>(R.value())));
 })
 
 DEF_TRAVERSE_TYPELOC(PointerType,

@@ -5548,7 +5548,6 @@ LValue CodeGenFunction::EmitCastLValue(const CastExpr *E) {
   case CK_BitCast:
   case CK_LValueToRValueBitCast:
   case CK_ArrayToPointerDecay:
-  case CK_FunctionToPointerDecay:
   case CK_NullToMemberPointer:
   case CK_NullToPointer:
   case CK_IntegralToPointer:
@@ -5618,6 +5617,7 @@ LValue CodeGenFunction::EmitCastLValue(const CastExpr *E) {
   case CK_CPointerToObjCPointerCast:
   case CK_BlockPointerToObjCPointerCast:
   case CK_LValueToRValue:
+  case CK_FunctionToPointerDecay:
     return EmitLValue(E->getSubExpr());
 
   case CK_NoOp: {

@@ -41,17 +41,17 @@ void run() {
 
 // CHECK-LABEL: define {{.*}}void @_Z3runv()
 // CHECK: %[[SUMAPARRELERROR:.+]] = alloca double
-// CHECK: call void @llvm.reducer.register.i64(ptr %[[SUMAPARRELERROR]]
+// CHECK: call void @llvm.reducer.register(i32 2, ptr %[[SUMAPARRELERROR]]
 // CHECK-NEXT: call void @_Z1gIHdEvRKT_(ptr {{.*}}%[[SUMAPARRELERROR]])
 // CHECK-NEXT: call void @_Z1fIRHdEvOT_(ptr {{.*}}%[[SUMAPARRELERROR]])
 // CHECK-NEXT: call void @llvm.reducer.unregister(ptr %sumAParRelError)
 
 // CHECK-LABEL: define {{.*}}void @_Z1gIHdEvRKT_(ptr
-// CHECK: %[[LOOKUP:.+]] = call ptr @llvm.hyper.lookup.i64(ptr
+// CHECK: %[[LOOKUP:.+]] = call ptr @llvm.hyper.lookup.2.i64(ptr
 // CHECK-NEXT: %[[VIEW:.+]] = load double, ptr %[[LOOKUP]]
 // CHECK-NEXT: call void @_Z1hd(double {{.*}}%[[VIEW]])
 
 // CHECK-LABEL: define {{.*}}void @_Z1fIRHdEvOT_(ptr
-// CHECK: %[[LOOKUP:.+]] = call ptr @llvm.hyper.lookup.i64(ptr
+// CHECK: %[[LOOKUP:.+]] = call ptr @llvm.hyper.lookup.2.i64(ptr
 // CHECK-NEXT: %[[VIEW:.+]] = load double, ptr %[[LOOKUP]]
 // CHECK-NEXT: call void @_Z1hd(double {{.*}}%[[VIEW]])

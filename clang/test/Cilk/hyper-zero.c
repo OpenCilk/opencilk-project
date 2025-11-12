@@ -1,16 +1,11 @@
 // RUN: %clang_cc1 %s -x c -fopencilk -verify -Wno-error=int-conversion -emit-llvm -disable-llvm-passes -o - | FileCheck %s
-extern int c;
-extern void *d;
+// expected-no-diagnostics
+extern void (*i)(void *);
+extern void (*r)(void *, void *);
 
 // Test for crash on definition of empty hyperobject
 // CHECK-LABEL: __cxx_global_var_init
-// CHECK: call void @llvm.reducer.register.i64(ptr @x, i64 0
+// CHECK: call void @llvm.reducer.register(i32 2, ptr @x
 typedef char Empty[0];
-Empty _Hyperobject(d, d) x;
+Empty _Hyperobject(i, r) x;
 
-void declares_hyperobject()
-{
-  // Test for crash on int to pointer conversion in hyperobject definition
-  int _Hyperobject(c, d) y;
-  //expected-warning@-1{{incompatible integer to pointer conversion}}
-}

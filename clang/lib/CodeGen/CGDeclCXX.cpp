@@ -1087,11 +1087,10 @@ void CodeGenFunction::GenerateCXXGlobalVarDeclInitFunc(llvm::Function *Fn,
     EmitCXXGlobalVarDeclInit(*D, Addr, PerformInit);
   }
 
-  ReducerCallbacks RCB = {0, 0};
-  if (getReducer(D, RCB)) {
+  if (D->getType()->isHyperobjectType()) {
     llvm::Value *Addr =
       Builder.CreateBitCast(CGM.GetAddrOfGlobalVar(D, nullptr), CGM.VoidPtrTy);
-    EmitReducerInit(D, RCB, Addr);
+    EmitReducerInit(D, Addr);
   }
 
   FinishFunction();
@@ -1225,7 +1224,7 @@ llvm::Function *CodeGenFunction::generateDestroyHelper(
   bool IsReducer;
   const char *Name;
   if (const HyperobjectType *H = type->getAs<HyperobjectType>()) {
-    IsReducer = VD->isReducer();
+    IsReducer = true;
     Kind = DynamicInitKind::AtExit;
     type = H->getElementType();
     Name = "__cxx_global_hyperobject_dtor";

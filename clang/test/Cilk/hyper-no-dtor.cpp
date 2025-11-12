@@ -8,7 +8,7 @@ extern void identity(void *), reduce(void *, void *);
 void function()
 {
   // call {{.+}} @_ZN1SC1Ev
-  // CHECK: call void @llvm.reducer.register.i64
+  // CHECK: call void @llvm.reducer.register
   S _Hyperobject(identity, reduce) s;
   // CHECK: call void @llvm.reducer.unregister
 }

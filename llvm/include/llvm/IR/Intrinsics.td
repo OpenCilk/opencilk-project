@@ -1906,23 +1906,41 @@ def int_tapir_loop_grainsize
 def int_task_frameaddress
     : Intrinsic<[llvm_ptr_ty], [llvm_i32_ty], [IntrWillReturn]>;
 
-// Ideally the types would be [llvm_anyptr_ty], [LLVMMatchType<0>]
-// but that does not work, so rely on the front end to insert bitcasts.
-def int_hyper_lookup
+def int_hyper_lookup_0
     : Intrinsic<[llvm_ptr_ty],
-                [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty], [
-                  IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
-                  IntrStrandPure, IntrHyperView, IntrInjective
+                [llvm_ptr_ty], [
+                 IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+                 IntrStrandPure, IntrHyperView, IntrInjective,
+                 NonNull<RetIndex>, NonNull<ArgIndex<0>>
                 ]>;
 
-// TODO: Change tablegen to allow function pointer types in intrinsics.
+def int_hyper_lookup_1
+    : Intrinsic<[llvm_ptr_ty],
+                [llvm_ptr_ty, llvm_ptr_ty], [
+                 IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+                 IntrStrandPure, IntrHyperView, IntrInjective,
+                 NonNull<RetIndex>, NonNull<ArgIndex<0>>,
+                 NonNull<ArgIndex<1>>
+                ]>;
+
+def int_hyper_lookup_2
+    : Intrinsic<[llvm_ptr_ty],
+                [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty], [
+                 IntrWillReturn, IntrReadMem, IntrInaccessibleMemOnly,
+                 IntrStrandPure, IntrHyperView, IntrInjective,
+                 NonNull<RetIndex>, NonNull<ArgIndex<0>>
+                ]>;
+
 def int_reducer_register
-    : Intrinsic<[], [llvm_ptr_ty, llvm_anyint_ty, llvm_ptr_ty, llvm_ptr_ty],
-     [IntrWillReturn, IntrInaccessibleMemOnly, IntrReducerRegister]>;
+    : Intrinsic<[], [llvm_i32_ty, llvm_ptr_ty, llvm_ptr_ty], [
+                 IntrWillReturn, IntrInaccessibleMemOnly,
+                 IntrReducerRegister, ImmArg<ArgIndex<0>>,
+                 NonNull<ArgIndex<1>>
+                ]>;
 
 def int_reducer_unregister
     : Intrinsic<[], [llvm_ptr_ty], [IntrWillReturn, IntrInaccessibleMemOnly,
-     IntrReducerUnregister]>;
+      IntrReducerUnregister, NonNull<ArgIndex<0>>]>;
 
 ///===-------------------------- Other Intrinsics --------------------------===//
 //

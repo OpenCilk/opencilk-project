@@ -1211,7 +1211,10 @@ Sema::PerformMemberExprBaseConversion(Expr *Base, bool IsArrow) {
     Result = CheckPlaceholderExpr(Base);
   if (Result.isInvalid())
     return Result;
-  return BuildHyperobjectLookup(Result.get(), IsArrow);
+  if (IsArrow)
+    return BuildHyperobjectLookupBase(Result.get());
+  else
+    return BuildHyperobjectLookup(Result.get());
 }
 
 /// Look up the given member of the given non-type-dependent

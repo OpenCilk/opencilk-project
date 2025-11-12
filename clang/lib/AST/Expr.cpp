@@ -1603,6 +1603,16 @@ bool CallExpr::isUnevaluatedBuiltinCall(const ASTContext &Ctx) const {
 
 QualType CallExpr::getCallReturnType(const ASTContext &Ctx) const {
   const Expr *Callee = getCallee();
+  // OpenCilk
+  if (const FunctionDecl *Fn = dyn_cast_or_null<FunctionDecl>(Callee->getReferencedDeclOfCallee())) {
+    switch (Fn->getBuiltinID()) {
+    case Builtin::BI__hyper_lookup_internal_1:
+    case Builtin::BI__hyper_lookup_internal_2:
+      return Ctx.getLValueReferenceType(getArg(0)->getType());
+    default:
+      break;
+    }
+  }
   QualType CalleeType = Callee->getType();
   if (const auto *FnTypePtr = CalleeType->getAs<PointerType>()) {
     CalleeType = FnTypePtr->getPointeeType();

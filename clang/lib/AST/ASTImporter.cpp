@@ -1387,15 +1387,28 @@ ExpectedType ASTNodeImporter::VisitHyperobjectType(const HyperobjectType *T) {
   ExpectedType ToElementTypeOrErr = import(T->getElementType());
   if (!ToElementTypeOrErr)
     return ToElementTypeOrErr.takeError();
-  ExpectedExpr ToIdentityOrErr = import(T->getIdentity());
-  if (!ToIdentityOrErr)
-    return ToIdentityOrErr.takeError();
-  ExpectedExpr ToReduceOrErr = import(T->getReduce());
-  if (!ToReduceOrErr)
-    return ToReduceOrErr.takeError();
+  std::optional<Expr *> Callbacks, Identity, Reduce;
+  if (T->getCallbacks()) {
+    Expected<std::optional<Expr *>> Imported = import(T->getCallbacks());
+    if (!Imported)
+      return Imported.takeError();
+    Callbacks = *Imported;
+  }
+  if (T->getIdentity()) {
+    Expected<std::optional<Expr *>> Imported = import(T->getIdentity());
+    if (!Imported)
+      return Imported.takeError();
+    Identity = *Imported;
+  }
+  if (T->getReduce()) {
+    Expected<std::optional<Expr *>> Imported = import(T->getReduce());
+    if (!Imported)
+      return Imported.takeError();
+    Reduce = *Imported;
+  }
 
   return Importer.getToContext().getHyperobjectType(
-      *ToElementTypeOrErr, *ToIdentityOrErr, *ToReduceOrErr);
+      *ToElementTypeOrErr, Callbacks, Identity, Reduce);
 }
 
 ExpectedType ASTNodeImporter::VisitComplexType(const ComplexType *T) {

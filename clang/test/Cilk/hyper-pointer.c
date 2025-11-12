@@ -4,10 +4,13 @@
 extern double array[];
 extern const int size;
 
+extern void identity(void *), reduce(void *, void *);
+
 // CHECK-LABEL: g
-void g(double _Hyperobject *sum) { // hyperobject-aware function
+// hyperobject-aware function
+void g(double _Hyperobject(identity, reduce) *sum) {
     // CHECK-LABEL: pfor.body
     _Cilk_for (int i = 0; i < size; ++i)
-        // CHECK: call ptr @llvm.hyper.lookup
+        // CHECK: call ptr @llvm.hyper.lookup.2
         *sum += array[i];
 }

@@ -10,7 +10,7 @@ entry:
   %syncreg13 = tail call token @llvm.syncregion.start()
   %syncreg13.strpm.detachloop = call token @llvm.syncregion.start()
   call void @llvm.reducer.register.i64(ptr null, i64 0, ptr null, ptr null)
-  %0 = call ptr @llvm.hyper.lookup.i64(ptr null, i64 0, ptr null, ptr null)
+  %0 = call ptr @llvm.hyper.lookup.2.i64(ptr null, i64 0, ptr null, ptr null)
   store i32 0, ptr %0, align 8
   call void @llvm.reducer.unregister(ptr null)
   ret i32 0
@@ -20,7 +20,7 @@ entry:
 ; CHECK: _ZNK5Graph4pbfsEiPj:
 ; CHECK: movl $0, 0
 ; CHECK-NEXT: xorl %eax, %eax
-; CHECK-NEXT: retq
+; CHECK: retq
 
 ; Function Attrs: nounwind willreturn memory(argmem: readwrite)
 declare token @llvm.syncregion.start() #0
@@ -29,7 +29,7 @@ declare token @llvm.syncregion.start() #0
 declare void @llvm.reducer.register.i64(ptr, i64, ptr, ptr) #2
 
 ; Function Attrs: hyper_view injective nounwind strand_pure willreturn memory(inaccessiblemem: read)
-declare ptr @llvm.hyper.lookup.i64(ptr, i64, ptr, ptr) #1
+declare ptr @llvm.hyper.lookup.2.i64(ptr, i64, ptr, ptr) #1
 
 ; Function Attrs: mustprogress nounwind reducer_unregister willreturn memory(inaccessiblemem: readwrite)
 declare void @llvm.reducer.unregister(ptr) #3

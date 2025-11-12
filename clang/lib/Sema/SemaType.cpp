@@ -893,78 +893,101 @@ TSTToUnaryTransformType(DeclSpec::TST SwitchTST) {
   }
 }
 
-static std::optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl);
+// -1 if OK, -2 for nested hyperobject, or index for unsupported_hyperobject
+// diagnostic
+static int DeclContainsHyperobject(const RecordDecl *Decl, QualType &Bad,
+                                   SourceLocation &Where);
 
 // It is forbidden to add new bits to the Type class so there is no
 // room for a cached or precomputed flag.  Do a deep search on every
 // hyperobject type creation.
-static std::optional<unsigned> ContainsHyperobject(QualType Outer) {
-  const Type *T = Outer.getCanonicalType().getTypePtr();
-  if (T->isVariablyModifiedType())
-    return diag::variable_length_hyperobject;
-  if (T->isDependentType())
-    return std::optional<unsigned>();
-  QualType Inner;
-  switch (T->getTypeClass()) {
-  case Type::Hyperobject:
-    return diag::nested_hyperobject;
-  case Type::Typedef:
-    Inner = cast<TypedefType>(T)->desugar();
-    break;
-  case Type::ConstantArray:
-  case Type::IncompleteArray:
-  case Type::VariableArray:
-  case Type::DependentSizedArray:
-    Inner = cast<ArrayType>(T)->getElementType();
-    break;
-  case Type::Complex:
-    Inner = cast<ComplexType>(T)->getElementType();
-    break;
-  case Type::Record: {
-    const RecordDecl *Decl = cast<RecordType>(T)->getDecl();
-    if (const RecordDecl *Def = Decl->getDefinition())
-      return DeclContainsHyperobject(Def);
-    return diag::confusing_hyperobject;
+int TypeContainsHyperobject(QualType Contained, QualType &Bad,
+                            SourceLocation &Where) {
+  while (true) {
+    const Type *T = Contained.getCanonicalType().getTypePtr();
+    if (T->isVariablyModifiedType()) {
+      Bad = Contained;
+      return 0;
+    }
+    if (T->isDependentType())
+      return -1;
+    switch (T->getTypeClass()) {
+    case Type::Hyperobject:
+      Bad = Contained;
+      return -2;
+    case Type::Typedef:
+      Contained = cast<TypedefType>(T)->desugar();
+      continue;
+    case Type::ConstantArray:
+    case Type::IncompleteArray:
+    case Type::VariableArray:
+    case Type::DependentSizedArray:
+      Contained = cast<ArrayType>(T)->getElementType();
+      continue;
+    case Type::Complex:
+      Contained = cast<ComplexType>(T)->getElementType();
+      continue;
+    case Type::Record: {
+      const RecordDecl *Decl = cast<RecordType>(T)->getDecl();
+      if (const RecordDecl *Def = Decl->getDefinition())
+        return DeclContainsHyperobject(Def, Bad, Where);
+      return DeclContainsHyperobject(Decl, Bad, Where);
+    }
+    case Type::LValueReference:
+    case Type::RValueReference:
+      Contained = cast<ReferenceType>(T)->getPointeeType();
+      continue;
+    case Type::TypeOf:
+      Contained = cast<TypeOfType>(T)->getUnmodifiedType();
+      continue;
+    case Type::TypeOfExpr:
+      Contained = cast<TypeOfExprType>(T)->getUnderlyingExpr()->getType();
+      continue;
+    case Type::Decltype:
+      Contained = cast<DecltypeType>(T)->getUnderlyingType();
+      continue;
+    case Type::Auto:
+    case Type::DeducedTemplateSpecialization:
+      Contained = cast<DeducedType>(T)->getDeducedType();
+      if (Contained.isNull())
+        return -1;
+      continue;
+    case Type::TemplateSpecialization:
+    case Type::DependentName:
+    case Type::DependentTemplateSpecialization:
+    case Type::PackExpansion:
+    case Type::UnaryTransform:
+      Bad = Contained;
+      return 4;
+    case Type::BlockPointer:
+      Bad = Contained;
+      return 3;
+    case Type::FunctionProto:
+    case Type::FunctionNoProto:
+      Bad = Contained;
+      return 2;
+    case Type::Builtin:
+    case Type::TemplateTypeParm:
+    default:
+      return -1;
+    }
   }
-  case Type::TypeOf:
-    Inner = cast<TypeOfType>(T)->getUnmodifiedType();
-    break;
-  case Type::TypeOfExpr:
-    Inner = cast<TypeOfExprType>(T)->getUnderlyingExpr()->getType();
-    break;
-  case Type::Decltype:
-    Inner = cast<DecltypeType>(T)->getUnderlyingType();
-    break;
-  case Type::Auto:
-  case Type::DeducedTemplateSpecialization:
-    Inner = cast<DeducedType>(T)->desugar();
-    break;
-  case Type::TemplateSpecialization:
-  case Type::DependentName:
-  case Type::DependentTemplateSpecialization:
-  case Type::PackExpansion:
-  case Type::UnaryTransform:
-  case Type::LValueReference:
-  case Type::RValueReference:
-  case Type::BlockPointer:
-  case Type::FunctionProto:
-  case Type::FunctionNoProto:
-    return diag::confusing_hyperobject;
-  case Type::Builtin:
-  case Type::TemplateTypeParm:
-  default:
-    return std::optional<unsigned>();
-  }
-  return ContainsHyperobject(Inner);
 }
 
-static std::optional<unsigned> DeclContainsHyperobject(const RecordDecl *Decl) {
+static int DeclContainsHyperobject(const RecordDecl *Decl, QualType &Bad,
+                                   SourceLocation &Where) {
   if (Decl->isInvalidDecl())
-    return std::optional<unsigned>();
-  for (const FieldDecl *FD : Decl->fields())
-    if (std::optional<unsigned> O = ContainsHyperobject(FD->getType()))
-      return O;
-  return std::optional<unsigned>();
+    return -1;
+  for (const FieldDecl *FD : Decl->fields()) {
+    int status =
+      TypeContainsHyperobject(FD->getType(), Bad, Where);
+    if (status != -1) {
+      if (Where.isInvalid())
+        Where = FD->getBeginLoc();
+      return status;
+    }
+  }
+  return -1;
 }
 
 /// Convert the specified declspec to the appropriate type
@@ -2014,138 +2037,158 @@ QualType Sema::BuildReferenceType(QualType T, bool SpelledAsLValue,
   return Context.getRValueReferenceType(T);
 }
 
-// Return value is always non-null.
-Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
-                                    SourceLocation Loc) {
-  if (!E)
-    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy, Loc);
+ExprResult
+Sema::ConvertForHyperobject(Builtin::ID Builtin, unsigned Argument,
+                            SourceLocation Loc, Expr *Value,
+                            bool Perform, bool Warn) {
+  QualType In = Value->getType();
+  if (In->isDependentType())
+    return ExprResult(false);
+  auto GetCilkType =
+    [this,Loc](Builtin::ID Id, unsigned Arg) -> QualType {
+      std::string Name = Context.BuiltinInfo.getName(Id);
+      LookupResult R(*this, &Context.Idents.get(Name), Loc,
+                     Sema::LookupOrdinaryName);
+      LookupName(R, TUScope, /*AllowBuiltinCreation=*/true);
 
-  QualType T = E->getType();
+      FunctionDecl *BuiltInDecl = R.getAsSingle<FunctionDecl>();
+      if (!BuiltInDecl) {
+        Diag(Loc, diag::warn_implicit_decl_requires_sysheader)
+          << Context.BuiltinInfo.getHeaderName(Id)
+          << "cilk_reducer";
+        return QualType();
+      }
+      const FunctionProtoType *Type =
+        cast<FunctionProtoType>(BuiltInDecl->getFunctionType());
+      return Type->getParamType(Arg);
+    };
 
-  // If the type is dependent it will be checked again later, if necessary.
-  if (T->isDependentType() || T == Context.VoidPtrTy)
-    return E;
-
-  if (T->isNullPtrType())
-    return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
-                                    CK_NullToPointer, E, nullptr, VK_PRValue,
-                                    FPOptionsOverride());
-
-  if (T->isFunctionType()) {
-    E = ImplicitCastExpr::Create(Context, Context.getPointerType(T),
-                                 CK_FunctionToPointerDecay, E, nullptr,
-                                 VK_PRValue, FPOptionsOverride());
-    T = E->getType(); // Context.getDecayedType(T);
+  QualType Expected = GetCilkType(Builtin, Argument);
+  if (Expected.isNull()) {
+    Expected = Context.VoidPtrTy;
   }
 
-  CastKind Cast = CK_BitCast;
-
-  if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(E)) {
-    if (L->getValue().isZero())
-      return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
-                                      CK_NullToPointer, E, nullptr, VK_PRValue,
-                                      FPOptionsOverride());
-    Cast = CK_IntegralToPointer;
+  InitializationKind Kind =
+    InitializationKind::CreateDirect(Loc, Value->getBeginLoc(),
+                                     Value->getEndLoc());
+  InitializedEntity To =
+    InitializedEntity::InitializeParameter(Context, Expected, false);
+  InitializationSequence Seq(*this, To, Kind, { Value }, true, true);
+  if (!Perform)
+    PushExpressionEvaluationContext
+      (ExpressionEvaluationContext::Unevaluated,
+       nullptr,
+       ExpressionEvaluationContextRecord::EK_Other);
+  ExprResult Result = Seq.Perform(*this, To, Kind, { Value });
+  if (!Perform)
+    PopExpressionEvaluationContext();
+  if (Expr *R = Result.get()) {
+    if (Warn && !isUnevaluatedContext() && !Seq.Failed() &&
+        R->getDependence() == ExprDependence::None &&
+        R->HasSideEffects(Context))
+      Diag(Value->getBeginLoc(), diag::warn_reducer_callback_side_effects);
   }
-
-  // TODO: The compiler should allow
-  // Ptr = Context.getPointerType(Element)
-  // and generate a thunk that accepts void *.
-
-  QualType Ptr = Context.VoidPtrTy;
-  llvm::SmallVector<QualType, 2> ArgTy;
-  ArgTy.push_back(Ptr);
-  if (NumArgs > 1) {
-    ArgTy.push_back(Ptr);
-    assert(NumArgs == 2);
-  }
-  // FIXME: This code should be dead
-  // TODO: Give these types names for better error messages.
-  QualType FnTy =
-      BuildFunctionType(Context.VoidTy, ArgTy, E->getExprLoc(),
-                        DeclarationName(), FunctionProtoType::ExtProtoInfo());
-  FnTy = BuildPointerType(FnTy, E->getExprLoc(), DeclarationName());
-
-  // Get the ToType from the prototype of the __hyper_lookup builtin.
-  FunctionDecl *HyperLookupDecl;
-  QualType HyperLookupParam;
-  unsigned ParamDeclNum = (NumArgs > 1) ? 3 : 2;
-  {
-    StringRef Name = Context.BuiltinInfo.getName(Builtin::BI__hyper_lookup);
-    LookupResult R(*this, &Context.Idents.get(Name), Loc,
-                   Sema::LookupOrdinaryName);
-    LookupName(R, TUScope, /*AllowBuiltinCreation=*/true);
-
-    HyperLookupDecl = R.getAsSingle<FunctionDecl>();
-    assert(HyperLookupDecl && "failed to find builtin declaration");
-
-    HyperLookupParam = HyperLookupDecl->getParamDecl(ParamDeclNum)->getType();
-  }
-
-  FnTy = HyperLookupParam;
-
-  if (T == Context.OverloadTy) {
-    DeclAccessPair What;
-    bool Multiple = false;
-    if (FunctionDecl *F = ResolveAddressOfOverloadedFunction(E, FnTy, true,
-                                                             What, &Multiple)) {
-      T = F->getType();
-      E = BuildDeclRefExpr(F, T, VK_LValue, E->getExprLoc());
-      T = Context.getPointerType(T);
-      E = ImplicitCastExpr::Create(Context, T, CK_FunctionToPointerDecay, E,
-                                   nullptr, VK_PRValue, FPOptionsOverride());
-    }
-  }
-
-  AssignConvertType Mismatch =
-      CheckAssignmentConstraints(E->getExprLoc(), FnTy, T);
-
-  if (DiagnoseAssignmentResult(Mismatch, E->getExprLoc(), FnTy, T, E,
-                               AssignmentAction::Passing)) {
-    E = new (Context) CXXNullPtrLiteralExpr(Context.NullPtrTy, E->getExprLoc());
-    Cast = CK_NullToPointer;
-  } else if (Mismatch == AssignConvertType::IntToPointer) {
-    Cast = CK_IntegralToPointer;
-  } else {
-    // Handle std::function parameter
-    ParmVarDecl *Param = HyperLookupDecl->getParamDecl(ParamDeclNum);
-    InitializedEntity Entity = InitializedEntity::InitializeParameter(
-        Context, Param, HyperLookupParam);
-    ExprResult ArgE = PerformCopyInitialization(Entity, SourceLocation(), E);
-    return ArgE.get();
-  }
-
-  return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, Cast, E, nullptr,
-                                  VK_PRValue, FPOptionsOverride());
+  return Result;
 }
 
-QualType Sema::BuildHyperobjectType(QualType Element, Expr *Identity,
-                                    Expr *Reduce, SourceLocation Loc) {
+QualType Sema::BuildHyperobjectType(QualType Element,
+                                    std::optional<Expr *> Callbacks,
+                                    std::optional<Expr *> Identity,
+                                    std::optional<Expr *> Reduce,
+                                    SourceLocation Loc) {
   // This function must return a HyperobjectType with the given
   // element type, otherwise the rest of the front end will get angry.
   // Template instantiation is quite strict about preserving structure.
   // The compiler will also get angry if the element type is incomplete
   // and the HyperobjectType is not marked as containing an error.
-  if (!RequireCompleteType(Loc, Element, CompleteTypeKind::Normal,
-                           diag::incomplete_hyperobject)) {
-    if (std::optional<unsigned> Code = ContainsHyperobject(Element))
-      Diag(Loc, *Code) << Element;
+  if (!RequireCompleteSizedType(Loc, Element, diag::incomplete_hyperobject)) {
+    QualType Bad;
+    SourceLocation WhereBad;
+    int status = TypeContainsHyperobject(Element, Bad, WhereBad);
+    switch (status) {
+    case -1:
+      break;
+    case -2:
+      Diag(Loc, diag::nested_hyperobject) << Element <<
+        Element->isHyperobjectType();
+      break;
+    default:
+      Diag(Loc, diag::unsupported_hyperobject) << status << Element;
+      break;
+    }
+    if (WhereBad.isValid())
+      Diag(WhereBad, diag::unsupported_hyperobject_note) << Bad;
+
+    if (!Element->isObjectType()) {
+      // This can happen with references.  The view type may
+      // contain a reference.  The view type may not be a reference.
+      if (status == -1)
+        Diag(Loc, diag::unsupported_hyperobject) << 5 << Element;
+    } if (Callbacks) {
+      Expr *C = Callbacks.value();
+      QualType Actual = C->getType();
+      if (!Actual->isDependentType()) {
+        ExprResult Converted =
+          ConvertForHyperobject(Builtin::BI__hyper_lookup_internal_1, 1, Loc,
+                                C, false, true);
+        if (Converted.isInvalid())
+          Callbacks =
+            RecoveryExpr::Create(Context, Actual, C->getBeginLoc(),
+                                 C->getEndLoc(), { C });
+        // TODO: Make S.checkInitializerLifetime do the right thing
+        // in the case of non-lvalue callbacks.
+      }
+    } else if (!Identity) {
+      if (!Element->isRecordType() && !Element->isDependentType() &&
+          !Element->containsErrors()) {
+        Diag(Loc, diag::err_view_must_be_class) << Element;
+      } else {
+        Expr *Fake =
+          new (Context) OpaqueValueExpr(Loc, Context.getPointerType(Element),
+                                        VK_LValue);
+        ConvertForHyperobject(Builtin::BI__hyper_lookup_class, 0, Loc, Fake,
+                              false, false);
+        // TODO: To avoid cascading errors if ConvertForHyperobject fails
+        // the hyperobject should be marked as containing an error.
+      }
+    } else {
+      // In the C case, the conversion must always be performed so
+      // functions are properly uniqued and converted to pointers.
+      Expr *I = *Identity, *R = *Reduce;
+      Expr *I2 = nullptr, *R2 = nullptr;
+
+      ExprResult Converted1 =
+        ConvertForHyperobject(Builtin::BI__hyper_lookup_internal_2, 2,
+                              Loc, I, true, true);
+      if (Converted1.isInvalid()) {
+        Identity = RecoveryExpr::Create(Context, Context.VoidPtrTy,
+                                        I->getBeginLoc(), I->getEndLoc(),
+                                        { I });
+      } else if ((I2 = Converted1.get())) {
+        Identity = I2;
+      }
+
+      ExprResult Converted2 =
+        ConvertForHyperobject(Builtin::BI__hyper_lookup_internal_2, 3,
+                              Loc, R, true, true);
+      if (Converted2.isInvalid()) {
+        Reduce = RecoveryExpr::Create(Context, Context.VoidPtrTy,
+                                      R->getBeginLoc(), R->getEndLoc(),
+                                      { R });
+      } else if ((R2 = Converted2.get())) {
+        Reduce = R2;
+      }
+    }
+
+    if (Element.isConstQualified() || Element.isVolatileQualified()) {
+      Diag(Loc, diag::unsupported_hyperobject) << 1 << Element;
+      // Volatile reducers generate confusing diagnostics when used.
+      Element.removeLocalVolatile();
+    }
   }
-
-  if (!Element->isObjectType())
-    Diag(Loc, diag::confusing_hyperobject) << Element;
-
-  if (Element.isConstQualified() || Element.isVolatileQualified()) {
-    Diag(Loc, diag::qualified_hyperobject) << Element;
-    // Volatile reducers generate confusing diagnostics when used.
-    Element.removeLocalVolatile();
-  }
-
-  Identity = ValidateReducerCallback(Identity, 1, Loc);
-  Reduce = ValidateReducerCallback(Reduce, 2, Loc);
 
   // The result will be marked erroneous if Element is incomplete.
-  return Context.getHyperobjectType(Element, Identity, Reduce);
+  return Context.getHyperobjectType(Element, Callbacks, Identity, Reduce);
 }
 
 QualType Sema::BuildReadPipeType(QualType T, SourceLocation Loc) {
@@ -2749,6 +2792,11 @@ bool Sema::CheckFunctionReturnType(QualType T, SourceLocation Loc) {
       T->isFunctionType()) {
     Diag(Loc, diag::err_func_returning_array_function)
       << T->isFunctionType() << T;
+    return true;
+  } else if (T->isHyperobjectType()) {
+    // TODO: Look for embedded hyperobjects.  TypeContainsHyperobject
+    // is not quite right because it checks for invalid view types.
+    Diag(Loc, diag::err_func_returning_hyperobject) << T;
     return true;
   }
 
@@ -5188,6 +5236,13 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         AreDeclaratorChunksValid = false;
       }
 
+      if (!D.isInvalidType() && T->isHyperobjectType()) {
+        S.Diag(DeclType.Loc, diag::err_func_returning_hyperobject) << T;
+        T = Context.IntTy;
+        D.setInvalidType(true);
+        AreDeclaratorChunksValid = false;
+      }        
+
       // Do not allow returning half FP value.
       // FIXME: This really should be in BuildFunctionType.
       if (T->isHalfType()) {
@@ -5611,8 +5666,15 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     }
 
     case DeclaratorChunk::Hyperobject: {
-      T = S.BuildHyperobjectType(T, DeclType.Hyper.Arg[0],
-                                 DeclType.Hyper.Arg[1], DeclType.Loc);
+      std::optional<Expr *> None;
+      if (DeclType.Hyper.Arg[1])
+        T = S.BuildHyperobjectType(T, None, DeclType.Hyper.Arg[0],
+                                   DeclType.Hyper.Arg[1], DeclType.Loc);
+      else if (DeclType.Hyper.Arg[0])
+        T = S.BuildHyperobjectType(T, DeclType.Hyper.Arg[0], None, None,
+                                   DeclType.Loc);
+      else
+        T = S.BuildHyperobjectType(T, None, None, None, DeclType.Loc);
       break;
     }
     }

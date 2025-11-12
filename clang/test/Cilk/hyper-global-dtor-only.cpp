@@ -7,7 +7,7 @@ void identity_S(void *v);
 void reduce_S(void *l, void *r);
 
 // CHECK-LABEL: __cxx_global_var_init
-// CHECK: call void @llvm.reducer.register.i64
+// CHECK: call void @llvm.reducer.register
 S _Hyperobject(identity_S, reduce_S) global;
 
 // CHECK: call void @llvm.reducer.unregister

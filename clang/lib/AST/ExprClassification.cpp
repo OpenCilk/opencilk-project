@@ -352,6 +352,13 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
     return Cl::CL_PRValue;
 
   case Expr::CallExprClass:
+    // In Cilk, some builtin function calls are lvalues.
+    if (Ctx.getLangOpts().getCilk() == LangOptions::Cilk_opencilk) {
+      // TODO: Only allow this for the one builtin it applies to.
+      if (E->isLValue())
+        return Cl::CL_LValue;
+    }
+    [[fallthrough]];
   case Expr::CXXOperatorCallExprClass:
   case Expr::CXXMemberCallExprClass:
   case Expr::UserDefinedLiteralClass:

@@ -3881,7 +3881,9 @@ bool CilkSanitizerImpl::instrumentIntrinsicCall(
   // Special-case intrinsics.
   IntrinsicInst *II = dyn_cast<IntrinsicInst>(I);
   switch (II->getIntrinsicID()) {
-  case Intrinsic::hyper_lookup: {
+  case Intrinsic::hyper_lookup_0:
+  case Intrinsic::hyper_lookup_1:
+  case Intrinsic::hyper_lookup_2: {
     FunctionType *AfterHookTy =
         FunctionType::get(IRB.getPtrTy(), AfterHookParamTys, Called->isVarArg());
     FunctionCallee AfterIntrinCallHook = getOrInsertSynthesizedHook(

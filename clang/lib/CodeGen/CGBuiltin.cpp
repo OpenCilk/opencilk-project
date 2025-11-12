@@ -6445,26 +6445,23 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     auto Str = CGM.GetAddrOfConstantCString(Name, "");
     return RValue::get(Str.getPointer());
   }
-  case Builtin::BI__hyper_lookup: {
-    llvm::Value *Size = EmitScalarExpr(E->getArg(1));
-    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup, Size->getType());
+  case Builtin::BI__hyper_lookup_class: {
+    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup_0);
     llvm::Value *Ptr = EmitScalarExpr(E->getArg(0));
-    // llvm::Value *Identity = EmitScalarExpr(E->getArg(2));
-    // llvm::Value *Reduce = EmitScalarExpr(E->getArg(3));
-
-    // RValue IdentityV = EmitAnyExpr(E->getArg(2));
-    // RValue ReduceV = EmitAnyExpr(E->getArg(3));
-    // llvm::Value *Identity =
-    //     IdentityV.isScalar() ? IdentityV.getScalarVal()
-    //                          : IdentityV.getAggregateAddress().getBasePointer();
-    // llvm::Value *Reduce = ReduceV.isScalar()
-    //                           ? ReduceV.getScalarVal()
-    //                           : ReduceV.getAggregateAddress().getBasePointer();
-    llvm::Value *Identity = EmitLValue(E->getArg(2)).getPointer(*this);
-    llvm::Value *Reduce = EmitLValue(E->getArg(3)).getPointer(*this);
-    // return RValue::get(Builder.CreateCall(
-    //     F, {Ptr, Size, Builder.CreateBitCast(Identity, VoidPtrTy),
-    //         Builder.CreateBitCast(Reduce, VoidPtrTy)}));
+    return RValue::get(Builder.CreateCall(F, {Ptr}));
+  }
+  case Builtin::BI__hyper_lookup_internal_1: {
+    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup_1);
+    llvm::Value *Ptr = EmitLValue(E->getArg(0)).getPointer(*this);
+    llvm::Value *Callbacks = EmitLValue(E->getArg(1)).getPointer(*this);
+    return RValue::get(Builder.CreateCall(F, {Ptr, Callbacks}));
+  }
+  case Builtin::BI__hyper_lookup_internal_2: {
+    llvm::Value *Size = EmitScalarExpr(E->getArg(1));
+    Function *F = CGM.getIntrinsic(Intrinsic::hyper_lookup_2, Size->getType());
+    llvm::Value *Ptr = EmitLValue(E->getArg(0)).getPointer(*this);
+    llvm::Value *Identity = EmitScalarExpr(E->getArg(2));
+    llvm::Value *Reduce = EmitScalarExpr(E->getArg(3));
     return RValue::get(Builder.CreateCall(F, {Ptr, Size, Identity, Reduce}));
   }
   }

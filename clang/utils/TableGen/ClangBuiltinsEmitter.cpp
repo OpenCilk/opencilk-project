@@ -358,6 +358,8 @@ private:
                                .Case("uint64_t", "UWi")
                                .Case("void", "v")
                                .Case("wchar_t", "w")
+                               .Case("1", "1")
+                               .Case("2", "2")
                                .Case("...", ".")
                                .Default("error");
       if (ReturnTypeVal == "error")

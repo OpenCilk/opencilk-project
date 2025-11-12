@@ -52,6 +52,20 @@ bool llvm::isTapirIntrinsic(Intrinsic::ID ID, BasicBlock::const_iterator It,
   return isTapirIntrinsic(ID, &*It, V);
 }
 
+bool llvm::isTapirHyperobjectIntrinsic(const Instruction *I) {
+  if (const CallBase *CB = dyn_cast<CallBase>(I))
+    if (const Function *Called = CB->getCalledFunction())
+      switch (Called->getIntrinsicID()) {
+      case Intrinsic::hyper_lookup_0:
+      case Intrinsic::hyper_lookup_1:
+      case Intrinsic::hyper_lookup_2:
+        return true;
+      default:
+        return false;
+      }
+  return false;
+}
+
 /// Returns true if the given instruction performs a detached.rethrow, false
 /// otherwise.  If \p SyncRegion is specified, then additionally checks that the
 /// detached.rethrow uses \p SyncRegion.

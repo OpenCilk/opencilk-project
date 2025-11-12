@@ -3385,11 +3385,17 @@ static void encodeTypeForFunctionPointerAuth(const ASTContext &Ctx,
   const auto *HT = cast<HyperobjectType>(T);
     OS << "<hyperobject>";
     encodeTypeForFunctionPointerAuth(Ctx, OS, HT->getElementType());
-    if (HT->hasCallbacks()) {
+    if (auto C = HT->getCallbacks()) {
+      OS << "<callbacks>";
+      encodeTypeForFunctionPointerAuth(Ctx, OS, C.value()->getType());
+    }
+    if (auto I = HT->getIdentity()) {
       OS << "<identity>";
-      encodeTypeForFunctionPointerAuth(Ctx, OS, HT->getIdentity()->getType());
+      encodeTypeForFunctionPointerAuth(Ctx, OS, I.value()->getType());
+    }
+    if (auto R = HT->getReduce()) {
       OS << "<reduce>";
-      encodeTypeForFunctionPointerAuth(Ctx, OS, HT->getReduce()->getType());
+      encodeTypeForFunctionPointerAuth(Ctx, OS, R.value()->getType());
     }
     return;
   }
@@ -3957,43 +3963,74 @@ static const FunctionDecl *getFunction(Expr *E) {
   return F->getFirstDecl();
 }
 
-QualType ASTContext::getHyperobjectType(QualType T, Expr *I, Expr *R) const {
-  assert(I && R);
-  bool IN = HyperobjectType::isNullish(I);
-  bool RN = HyperobjectType::isNullish(R);
-
-  const FunctionDecl *IF = getFunction(I);
-  const FunctionDecl *RF = getFunction(R);
-  bool Varies = (!IN && !IF) || (!RN && !RF);
+QualType ASTContext::getHyperobjectType(QualType T,
+                                        std::optional<Expr *> Callbacks,
+                                        std::optional<Expr *> Identity,
+                                        std::optional<Expr *> Reduce) {
 
   QualType Canonical;
   if (!T.isCanonical())
-    Canonical = getHyperobjectType(getCanonicalType(T), I, R);
+    Canonical = getHyperobjectType(getCanonicalType(T), Callbacks,
+                                   Identity, Reduce);
 
-  // Do not unique hyperobject types with variable expressions.
-  if (Varies) {
-    auto *New =
-      new (*this, TypeAlignment)
-      HyperobjectType(T, Canonical, I, IF, R, RF);
-    Types.push_back(New);
-    return QualType(New, 0);
-  }
-
-  // Unique pointers, to guarantee there is only one pointer of a particular
-  // structure.
-  // TODO: 0 and nullptr are not properly treated as equivalent here.
-  llvm::FoldingSetNodeID ID;
-  HyperobjectType::Profile(ID, T, IF, RF);
-
+  HyperobjectType *New = nullptr;
   void *InsertPos = nullptr;
-  if (HyperobjectType *HT = HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
-    return QualType(HT, 0);
 
-  auto *New =
-    new (*this, TypeAlignment)
-    HyperobjectType(T, Canonical, I, IF, R, RF);
+  if (Callbacks) {
+    // Merge hyperobject types that use the same view type and
+    // callback ValueDecl.
+    Expr *C = Callbacks.value();
+    if (const UnaryOperator *U = dyn_cast<UnaryOperator>(C)) {
+      if (U->getOpcode() == UO_AddrOf) {
+        if (const DeclRefExpr *D = dyn_cast<DeclRefExpr>(U->getSubExpr())) {
+          llvm::FoldingSetNodeID ID;
+          HyperobjectType::Profile(ID, T, D->getDecl());
+          if (HyperobjectType *HT =
+              HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
+            return QualType(HT, 0);
+          New = new (*this, TypeAlignment) HyperobjectType(T, Canonical, C);
+        }
+      }
+    }
+    if (!New)
+      New = new (*this, TypeAlignment) HyperobjectType(T, Canonical, C);
+  } else if (Identity) {
+    assert(Reduce && "identity and reduce both required");
+    Expr *IE = Identity.value(), *RE = Reduce.value();
+    const FunctionDecl *IF = getFunction(IE);
+    const FunctionDecl *RF = getFunction(RE);
+    if (IF && RF) {
+      // Unique pointers, to guarantee there is only one pointer of a particular
+      // structure.
+      llvm::FoldingSetNodeID ID;
+      HyperobjectType::Profile(ID, T, IF, RF);
+
+      if (HyperobjectType *HT =
+          HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
+        return QualType(HT, 0);
+
+      New = new (*this, TypeAlignment)
+        HyperobjectType(T, Canonical, IE, IF, RE, RF);
+    } else {
+      // Do not merge hyperobjects with non-constant callbacks.
+      New =
+        new (*this, TypeAlignment)
+        HyperobjectType(T, Canonical, IE, nullptr, RE, nullptr);
+    }
+  } else {
+    // No callbacks.  Type depends only on view type.
+    llvm::FoldingSetNodeID ID;
+    HyperobjectType::Profile(ID, T);
+    if (HyperobjectType * HT =
+        HyperobjectTypes.FindNodeOrInsertPos(ID, InsertPos))
+      return QualType(HT, 0);
+    New = new (*this, TypeAlignment) HyperobjectType(T, Canonical);
+  }
+  // As FoldingSetBase::FindNodeOrInsertPos is currently implemented
+  // InsertPos is non-null if and only if FindNodeOrInsertPos returned null.
+  if (InsertPos)
+    HyperobjectTypes.InsertNode(New, InsertPos);
   Types.push_back(New);
-  HyperobjectTypes.InsertNode(New, InsertPos);
   return QualType(New, 0);
 }
 
@@ -10553,14 +10590,9 @@ static QualType mergeHyperobjectTypes(QualType LQ, QualType RQ) {
   const HyperobjectType *RH = RQ->castAs<HyperobjectType>();
   if (LH->getElementType() != RH->getElementType())
     return {};
-  bool LeftCallbacks = LH->hasCallbacks(), RightCallbacks = RH->hasCallbacks();
-  if (LeftCallbacks && RightCallbacks)
-    return {};
-  if (LeftCallbacks && !RightCallbacks)
-    return LQ;
-  if (RightCallbacks)
-    return RQ;
-  llvm_unreachable("hyperobjects not uniqued");
+  // An older version of this code allowed a hyperobject without callbacks
+  // to be compatible with a hyperobject with callbacks.
+  return {};
 }
 
 /// areCompatVectorTypes - Return true if the two specified vector types are
@@ -12684,6 +12716,21 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
     break;
   case 'm':
     Type = Context.MFloat8Ty;
+    // The next two are for use with hyperobjects.  They should be
+    // generalized if additional builtins take function pointers.
+    break;
+  case '1':
+    Type =
+      Context.getPointerType
+      (Context.getFunctionType(Context.VoidTy, { Context.VoidPtrTy },
+                               FunctionProtoType::ExtProtoInfo()));
+    break;
+  case '2':
+    Type =
+      Context.getPointerType
+      (Context.getFunctionType(Context.VoidTy,
+                               { Context.VoidPtrTy, Context.VoidPtrTy },
+                               FunctionProtoType::ExtProtoInfo()));
     break;
   }
 
@@ -14390,11 +14437,19 @@ static QualType getCommonNonSugarTypeNode(ASTContext &Ctx, const Type *X,
   }
   case Type::Hyperobject: {
     const auto *HX = cast<HyperobjectType>(X), *HY = cast<HyperobjectType>(Y);
-    assert(Ctx.hasSameExpr(HX->getIdentity(), HY->getIdentity()));
-    assert(Ctx.hasSameExpr(HX->getReduce(), HY->getReduce()));
+    if (HX->getCallbacks())
+      assert(Ctx.hasSameExpr(HX->getCallbacks().value(),
+                             HY->getCallbacks().value()));
+    if (HX->getIdentity())
+      assert(Ctx.hasSameExpr(HX->getIdentity().value(),
+                             HY->getIdentity().value()));
+    if (HX->getReduce())
+      assert(Ctx.hasSameExpr(HX->getReduce().value(),
+                             HY->getReduce().value()));
+
     return Ctx.getHyperobjectType(
         Ctx.getCommonSugaredType(HX->getElementType(), HY->getElementType()),
-        HX->getIdentity(), HX->getReduce());
+        HX->getCallbacks(), HX->getIdentity(), HX->getReduce());
   }
   }
   llvm_unreachable("Unknown Type Class");
