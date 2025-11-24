@@ -11693,7 +11693,7 @@ def err_jump_out_of_cilk_for : Error<
 
 def attribute_requires_cilk : Warning<
   "%0 ignored when OpenCilk not in use">,
-  InGroup<DiagGroup<"required-cilk">>;
+  InGroup<CilkRequired>;
 
 def incomplete_hyperobject : Error<
    "hyperobject has %select{incomplete|sizeless}0 view type %1"
@@ -11728,8 +11728,8 @@ def err_non_lvalue_reducer_callback : Error<
 >;
 
 def warn_reducer_callback_side_effects : Warning<
-  "reducer callback has side effects"
->;
+  "reducer callback has side effects">,
+  InGroup<CilkMisc>;
 
 def err_view_must_be_class : Error<
   "view type must be a class when hyperobject has no callbacks"
