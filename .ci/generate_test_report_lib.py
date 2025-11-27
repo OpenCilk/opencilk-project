@@ -9,7 +9,7 @@ SEE_BUILD_FILE_STR = "Download the build's log file to see the details."
 UNRELATED_FAILURES_STR = (
     "If these failures are unrelated to your changes (for example "
     "tests are broken or flaky at HEAD), please open an issue at "
-    "https://github.com/llvm/llvm-project/issues and add the "
+    "https://github.com/OpenCilk/opencilk-project/issues and add the "
     "`infrastructure` label."
 )
 

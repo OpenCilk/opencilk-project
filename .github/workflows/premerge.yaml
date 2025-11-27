@@ -17,6 +17,7 @@ on:
   push:
     branches:
       - 'release/**'
+      - 'dev/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -26,59 +27,98 @@ jobs:
   premerge-checks-linux:
     name: Build and Test Linux
     if: >-
-        github.repository_owner == 'llvm' &&
         (github.event_name != 'pull_request' || github.event.action != 'closed')
-    runs-on: llvm-premerge-linux-runners
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          # The Linux x64 runners on GitHub don't have enough disk space to build LLVM and its tests.
+          # We need another runner to automate these tests.
+          # This may be an issue with the arm and macos runners in the future.
+          # - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - name: Checkout LLVM
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Compute projects to build
+        run: |
+          git config --global --add safe.directory '*'
+          git diff --name-only HEAD~1...HEAD | python3 .ci/compute_projects.py >> $GITHUB_ENV
       - name: Build and Test
+        env:
+          SCCACHE_GHA_ENABLED: "true"
         # Mark the job as a success even if the step fails so that people do
         # not get notified while the new premerge pipeline is in an
         # experimental state.
         run: |
           git config --global --add safe.directory '*'
 
-          source <(git diff --name-only HEAD~1...HEAD | python3 .ci/compute_projects.py)
+          # source <(git diff --name-only HEAD~1...HEAD | python3 .ci/compute_projects.py)
 
           if [[ "${projects_to_build}" == "" ]]; then
             echo "No projects to build"
             exit 0
           fi
 
+          df -h
+
           echo "Building projects: ${projects_to_build}"
           echo "Running project checks targets: ${project_check_targets}"
-          echo "Building runtimes: ${runtimes_to_build}"
-          echo "Running runtimes checks targets: ${runtimes_check_targets}"
-          echo "Running runtimes checks requiring reconfiguring targets: ${runtimes_check_targets_needs_reconfig}"
+          # echo "Building runtimes: ${runtimes_to_build}"
+          # echo "Running runtimes checks targets: ${runtimes_check_targets}"
+          # echo "Running runtimes checks requiring reconfiguring targets: ${runtimes_check_targets_needs_reconfig}"
 
-          export CC=/opt/llvm/bin/clang
-          export CXX=/opt/llvm/bin/clang++
+          export CC=clang
+          export CXX=clang++
 
-          # This environment variable is passes into the container through the
-          # runner pod definition. This differs between our two clusters which
-          # why we do not hardcode it.
-          export SCCACHE_GCS_BUCKET=$CACHE_GCS_BUCKET
-          export SCCACHE_GCS_RW_MODE=READ_WRITE
+          # The linux-premerge runners are hosted on GCP and have a different
+          # cache setup than the depot runners.
+          if [[ "${{ matrix.runs-on }}" = "llvm-premerge-linux-runners" ]]; then
+            # This environment variable is passes into the container through the
+            # runner pod definition. This differs between our two clusters which
+            # why we do not hardcode it.
+            export SCCACHE_GCS_BUCKET=$CACHE_GCS_BUCKET
+            export SCCACHE_GCS_RW_MODE=READ_WRITE
+          fi
+          env
 
           # Set the idle timeout to zero to ensure sccache runs for the
           # entire duration of the job. Otherwise it might stop if we run
           # several test suites in a row and discard statistics that we want
           # to save in the end.
           export SCCACHE_IDLE_TIMEOUT=0
-          sccache --start-server
+          export SCCACHE_CACHE_SIZE="2G"
+          mkdir artifacts
+          SCCACHE_LOG=info SCCACHE_ERROR_LOG=$(pwd)/artifacts/sccache.log sccache --start-server
 
-          ./.ci/monolithic-linux.sh "${projects_to_build}" "${project_check_targets}" "${runtimes_to_build}" "${runtimes_check_targets}" "${runtimes_check_targets_needs_reconfig}" "${enable_cir}"
+          # ./.ci/monolithic-linux.sh "${projects_to_build}" "${project_check_targets}" "${runtimes_to_build}" "${runtimes_check_targets}" "${runtimes_check_targets_needs_reconfig}" "${enable_cir}"
+          ./.ci/monolithic-linux.sh "${projects_to_build}" "${project_check_targets}" "" "" "" "${enable_cir}"
       - name: Upload Artifacts
+        # In some cases, Github will fail to upload the artifact. We want to
+        # continue anyways as a failed artifact upload is an infra failure, not
+        # a checks failure.
+        # https://github.com/actions/upload-artifact/issues/569
+        continue-on-error: true
         if: '!cancelled()'
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: Premerge Artifacts (Linux)
+          name: Premerge Artifacts (Linux ${{ runner.arch }})
           path: artifacts/
           retention-days: 5
           include-hidden-files: 'true'
+      - name: Upload Comment
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ always() && !startsWith(matrix.runs-on, 'ubuntu-24.04-arm') }}
+        continue-on-error: true
+        with:
+          name: workflow-args
+          path: |
+            comments
 
   premerge-checks-windows:
     name: Build and Test Windows
@@ -133,11 +173,13 @@ jobs:
     runs-on: macos-14
     if: >-
       github.repository_owner == 'llvm' &&
-      (startswith(github.ref_name, 'release/') ||
-       startswith(github.base_ref, 'release/')) &&
+      ((startswith(github.ref_name, 'release/') ||
+        startswith(github.base_ref, 'release/')) ||
+       (startswith(github.ref_name, 'dev/') ||
+        startswith(github.base_ref, 'dev/'))) &&
       (github.event_name != 'pull_request' || github.event.action != 'closed')
     steps:
-      - name: Checkout LLVM
+      - name: Checkout OpenCilk
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
@@ -146,15 +188,19 @@ jobs:
         with:
           max-size: "2000M"
       - name: Install Ninja
-        uses: llvm/actions/install-ninja@main
+        run: |
+          brew install ninja
+      - name: Compute projects to build
+        run: |
+          git diff --name-only HEAD~1...HEAD | python3 .ci/compute_projects.py >> $GITHUB_ENV
       - name: Build and Test
         run: |
-          source <(git diff --name-only HEAD~2..HEAD | python3 .ci/compute_projects.py)
-
           if [[ "${projects_to_build}" == "" ]]; then
             echo "No projects to build"
             exit 0
           fi
+
+          df -h
 
           echo "Building projects: ${projects_to_build}"
           echo "Running project checks targets: ${project_check_targets}"

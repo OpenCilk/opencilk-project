@@ -3,10 +3,10 @@ name: Release Asset Audit
 on:
   workflow_dispatch:
   release:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    # Run once an hour
-    - cron:  '5 * * * *'
+  # schedule:
+  #   # * is a special character in YAML so you have to quote this string
+  #   # Run once an hour
+  #   - cron:  '5 * * * *'
 
   pull_request:
     paths:

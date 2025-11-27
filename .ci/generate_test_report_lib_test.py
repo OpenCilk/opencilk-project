@@ -41,7 +41,7 @@ class TestReports(unittest.TestCase):
 
             Download the build's log file to see the details.
 
-            If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+            If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
             ),
         )
 
@@ -71,7 +71,7 @@ class TestReports(unittest.TestCase):
 
                 Download the build's log file to see the details.
 
-                If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+                If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
             ),
         )
 
@@ -134,7 +134,7 @@ class TestReports(unittest.TestCase):
 
               Download the build's log file to see the details.
               
-              If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+              If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
                 )
             ),
         )
@@ -195,7 +195,7 @@ class TestReports(unittest.TestCase):
           ```
           </details>
           
-          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
                 )
             ),
         )
@@ -229,7 +229,7 @@ class TestReports(unittest.TestCase):
         ```
         </details>
         
-        If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+        If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
     )
 
     def test_report_single_file_multiple_testsuites(self):
@@ -337,7 +337,7 @@ class TestReports(unittest.TestCase):
 
           Failed tests and their output was too large to report. Download the build's log file to see the details.
           
-          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
                 )
             ),
         )
@@ -373,7 +373,7 @@ class TestReports(unittest.TestCase):
 
           Failed tests and their output was too large to report. Download the build's log file to see the details.
           
-          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
                 )
             ),
         )
@@ -412,7 +412,7 @@ class TestReports(unittest.TestCase):
 
           Failed tests and their output was too large to report. Download the build's log file to see the details.
           
-          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/llvm/llvm-project/issues and add the `infrastructure` label."""
+          If these failures are unrelated to your changes (for example tests are broken or flaky at HEAD), please open an issue at https://github.com/OpenCilk/opencilk-project/issues and add the `infrastructure` label."""
                 )
             ),
         )

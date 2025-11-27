@@ -91,6 +91,13 @@ DEPENDENT_RUNTIMES_TO_TEST_NEEDS_RECONFIG = {
 EXCLUDE_LINUX = {
     "cross-project-tests",  # TODO(issues/132796): Tests are failing.
     "openmp",  # https://github.com/google/llvm-premerge-checks/issues/410
+    # Tests to exclude for OpenCilk, to save CI resources.
+    "bolt",
+    "flang",
+    "libclc",
+    "lldb",
+    "mlir",
+    "polly",
 }
 
 EXCLUDE_WINDOWS = {
@@ -329,4 +336,4 @@ if __name__ == "__main__":
         current_platform = sys.argv[1]
     env_variables = get_env_variables(sys.stdin.readlines(), current_platform)
     for env_variable in env_variables:
-        print(f"{env_variable}='{env_variables[env_variable]}'")
+        print(f"{env_variable}={env_variables[env_variable]}")

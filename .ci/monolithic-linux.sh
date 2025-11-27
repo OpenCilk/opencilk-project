@@ -38,7 +38,7 @@ function at-exit {
   # If building fails there will be no results files.
   shopt -s nullglob
   
-  python3 "${MONOREPO_ROOT}"/.ci/generate_test_report_github.py ":penguin: Linux x64 Test Results" \
+  python3 "${MONOREPO_ROOT}"/.ci/generate_test_report_github.py ":penguin: Linux Test Results" \
     $retcode "${BUILD_DIR}"/test-results.*.xml >> $GITHUB_STEP_SUMMARY
 }
 trap at-exit EXIT
@@ -74,6 +74,7 @@ cmake -S "${MONOREPO_ROOT}"/llvm -B "${BUILD_DIR}" \
       -D COMPILER_RT_BUILD_LIBFUZZER=OFF \
       -D LLVM_LIT_ARGS="${lit_args}" \
       -D LLVM_ENABLE_LLD=ON \
+      -D LLVM_TARGETS_TO_BUILD=host \
       -D CMAKE_CXX_FLAGS=-gmlt \
       -D CMAKE_C_COMPILER_LAUNCHER=sccache \
       -D CMAKE_CXX_COMPILER_LAUNCHER=sccache \
