@@ -893,10 +893,11 @@ TSTToUnaryTransformType(DeclSpec::TST SwitchTST) {
   }
 }
 
+namespace {
 // -1 if OK, -2 for nested hyperobject, or index for unsupported_hyperobject
 // diagnostic
-static int DeclContainsHyperobject(const RecordDecl *Decl, QualType &Bad,
-                                   SourceLocation &Where);
+int DeclContainsHyperobject(const RecordDecl *Decl, QualType &Bad,
+                            SourceLocation &Where);
 
 // It is forbidden to add new bits to the Type class so there is no
 // room for a cached or precomputed flag.  Do a deep search on every
@@ -974,8 +975,8 @@ int TypeContainsHyperobject(QualType Contained, QualType &Bad,
   }
 }
 
-static int DeclContainsHyperobject(const RecordDecl *Decl, QualType &Bad,
-                                   SourceLocation &Where) {
+int DeclContainsHyperobject(const RecordDecl *Decl, QualType &Bad,
+                            SourceLocation &Where) {
   if (Decl->isInvalidDecl())
     return -1;
   for (const FieldDecl *FD : Decl->fields()) {
@@ -989,6 +990,7 @@ static int DeclContainsHyperobject(const RecordDecl *Decl, QualType &Bad,
   }
   return -1;
 }
+} // namespace
 
 /// Convert the specified declspec to the appropriate type
 /// object.
