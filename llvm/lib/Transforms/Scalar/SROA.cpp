@@ -3778,12 +3778,14 @@ class AggLoadStoreRewriter : public InstVisitor<AggLoadStoreRewriter, bool> {
 
   /// Used to calculate offsets, and hence alignment, of subobjects.
   const DataLayout &DL;
-
+  // Used to calculate instruction insertion points.
+  const TaskInfo *TI;
   IRBuilderTy &IRB;
 
 public:
-  AggLoadStoreRewriter(const DataLayout &DL, IRBuilderTy &IRB)
-      : DL(DL), IRB(IRB) {}
+  AggLoadStoreRewriter(const DataLayout &DL, IRBuilderTy &IRB,
+                       const TaskInfo *TI)
+      : DL(DL), TI(TI), IRB(IRB) {}
 
   /// Rewrite loads and stores through a pointer and all pointers derived from
   /// it.
@@ -4220,7 +4222,8 @@ private:
     Type *SourceTy = GEPI.getSourceElementType();
     // We only handle arguments, constants, and static allocas here, so we can
     // insert GEPs at the end of the entry block.
-    IRB.SetInsertPoint(GEPI.getFunction()->getEntryBlock().getTerminator());
+    IRB.SetInsertPoint(
+        TI->getTaskFor(GEPI.getParent())->getEntry()->getTerminator());
     for (unsigned I = 0, E = Phi->getNumIncomingValues(); I != E; ++I) {
       Value *Op = Phi->getIncomingValue(I);
       BasicBlock *BB = Phi->getIncomingBlock(I);
@@ -5711,7 +5714,7 @@ SROA::runOnAlloca(AllocaInst &AI) {
   // First, split any FCA loads and stores touching this alloca to promote
   // better splitting and promotion opportunities.
   IRBuilderTy IRB(&AI);
-  AggLoadStoreRewriter AggRewriter(DL, IRB);
+  AggLoadStoreRewriter AggRewriter(DL, IRB, TI);
   Changed |= AggRewriter.rewrite(AI);
 
   // Build the slices using a recursive instruction-visiting builder.
