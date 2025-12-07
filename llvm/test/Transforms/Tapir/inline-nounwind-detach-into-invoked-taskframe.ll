@@ -1,5 +1,5 @@
 ; Check that inlining a simple detach with no unwind into a taskframe with
-; an unwind destimation works as intended.
+; an unwind destination works as intended.
 ;
 ; RUN: opt < %s -passes="cgscc(devirt<4>(inline,function<eager-inv>(sroa<modify-cfg>)))" -S | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -22,12 +22,12 @@ for.cond86:                                       ; preds = %for.cond86, %entry
 
 ; CHECK: [[IF_ELSE_I]]:
 ; CHECK-NEXT: %[[TF_I:.+]] = call token @llvm.taskframe.create()
-; CHECK: %syncreg19.i.i5 = call token @llvm.syncregion.start()
-; CHECK-NEXT: detach within %syncreg19.i.i5, label %det.achd.i.i, label
+; CHECK: %syncreg19.i.i7 = call token @llvm.syncregion.start()
+; CHECK-NEXT: detach within %syncreg19.i.i7, label %det.achd.i.i, label
 ; CHECK-NOT: unwind label
 
 ; CHECK: det.achd.i.i:
-; CHECK-NEXT: reattach within %syncreg19.i.i5, label
+; CHECK-NEXT: reattach within %syncreg19.i.i7, label
 
 lpad90:                                           ; preds = %for.cond86
   %0 = landingpad { ptr, i32 }
@@ -37,6 +37,14 @@ lpad90:                                           ; preds = %for.cond86
 
 define linkonce_odr void @_ZN4gbbs9vertexMapINS_16vertexSubsetDataINS_5emptyEEENS_2bc37SSBetweennessCentrality_Back_Vertex_FIN6parlay8sequenceIbSaIbELb0EEENS7_IdSaIdELb0EEEEELi0EEEvRT_T0_m(ptr %V, ptr %f, i64 %granularity) {
 entry:
+  %syncreg = call token @llvm.syncregion.start()
+  detach within %syncreg, label %det.achd, label %cont
+
+det.achd:
+  call void null()
+  reattach within %syncreg, label %cont
+
+cont:
   br i1 poison, label %if.then, label %if.else
 
 common.ret:                                       ; preds = %if.else, %if.then
@@ -78,6 +86,7 @@ pfor.body.entry:                                  ; preds = %pfor.cond
   reattach within %syncreg, label %pfor.cond
 
 if.else:                                          ; preds = %entry
+  ; call void @_ZZN4gbbs9vertexMapINS_16vertexSubsetDataINS_5emptyEEENS_2bc37SSBetweennessCentrality_Back_Vertex_FIN6parlay8sequenceIbSaIbELb0EEENS7_IdSaIdELb0EEEEELi0EEEvRT_T0_mENKUlmE0_clEm()
   detach within %syncreg19, label %det.achd, label %det.cont
 
 det.achd:                                         ; preds = %if.else

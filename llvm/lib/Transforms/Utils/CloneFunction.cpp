@@ -19,6 +19,7 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/AttributeMask.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfo.h"
@@ -27,6 +28,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
@@ -34,6 +36,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <map>
 #include <optional>
@@ -417,6 +420,14 @@ struct PruningFunctionCloner {
   ClonedCodeInfo *CodeInfo;
   bool HostFuncIsStrictFP;
 
+  const BasicBlock *DetachContinue = nullptr;
+  const BasicBlock *DetachUnwind = nullptr;
+  const Value *TaskFrame = nullptr;
+
+  bool currentlyCloningTaskBlocks() const {
+    return DetachContinue != nullptr || TaskFrame != nullptr;
+  }
+
   Instruction *cloneInstruction(BasicBlock::const_iterator II);
 
 public:
@@ -519,6 +530,16 @@ void PruningFunctionCloner::CloneBlock(
   if (BBEntry)
     return;
 
+  // If BB is the saved detach-continue or detach-unwind, then we're no longer
+  // cloning blocks inside a detached task.
+  if (BB == DetachContinue || BB == DetachUnwind) {
+    DetachContinue = nullptr;
+    DetachUnwind = nullptr;
+  }
+
+  // Determine if this block is in a task.
+  bool BBInTask = currentlyCloningTaskBlocks();
+
   // Nope, clone it now.
   BasicBlock *NewBB;
   Twine NewName(BB->hasName() ? Twine(BB->getName()) + NameSuffix : "");
@@ -565,6 +586,21 @@ void PruningFunctionCloner::CloneBlock(
     if (auto *IntrInst = dyn_cast<IntrinsicInst>(II))
       if (IntrInst->getIntrinsicID() == Intrinsic::fake_use)
         continue;
+
+    if (!BBInTask && !TaskFrame &&
+        isTapirIntrinsic(Intrinsic::taskframe_create, II)) {
+      TaskFrame = &*II;
+      BBInTask = true;
+    } else if (TaskFrame &&
+               (isTapirIntrinsic(Intrinsic::taskframe_use, II, TaskFrame) ||
+                isTapirIntrinsic(Intrinsic::taskframe_end, II, TaskFrame))) {
+      // Clearing the TaskFrame may lead to mistakes deducing that a block is
+      // not within a task when it actually is.  This is OK, because we're only
+      // using this information heuristically, to refine CodeInfo's analysis of
+      // whether the cloned blocks contain static or dynamic allocas.
+      TaskFrame = nullptr;
+      BBInTask = currentlyCloningTaskBlocks();
+    }
 
     Instruction *NewInst = cloneInstruction(II);
     NewInst->insertInto(NewBB, NewBB->end());
@@ -615,6 +651,9 @@ void PruningFunctionCloner::CloneBlock(
           CodeInfo->OperandBundleCallSites.push_back(NewInst);
     }
 
+    if (BBInTask)
+      // No need to check allocas.
+      continue;
     if (const AllocaInst *AI = dyn_cast<AllocaInst>(II)) {
       if (isa<ConstantInt>(AI->getArraySize()))
         hasStaticAllocas = true;
@@ -625,6 +664,14 @@ void PruningFunctionCloner::CloneBlock(
 
   // Finally, clone over the terminator.
   const Instruction *OldTI = BB->getTerminator();
+  if (TaskFrame && isTaskFrameResume(OldTI, TaskFrame))
+    // Clearing the TaskFrame may lead to mistakes deducing that a block is
+    // not within a task when it actually is.  This is OK, because we're only
+    // using this information heuristically, to refine CodeInfo's analysis of
+    // whether the cloned blocks contain static or dynamic allocas.
+    TaskFrame = nullptr;
+  // Don't update BBInTask here, so that the later updates to CodeInfo reflect
+  // the contents of this block.
   bool TerminatorDone = false;
   if (const BranchInst *BI = dyn_cast<BranchInst>(OldTI)) {
     if (BI->isConditional()) {
@@ -682,7 +729,37 @@ void PruningFunctionCloner::CloneBlock(
     }
 
     // Recursively clone any reachable successor blocks.
-    append_range(ToClone, successors(BB->getTerminator()));
+    if (const DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      if (DetachContinue) {
+        // Currently handling a spawned task, so this subtask needs no extra
+        // handling.  Add all successors.
+        append_range(ToClone, successors(BB->getTerminator()));
+      } else {
+        assert(!DetachUnwind &&
+               "Found a saved detach unwind but no saved detach-continue.");
+        // About to start cloning blocks in a spawned task.  Record the continue
+        // and unwind destinations, then push them onto the stack before the
+        // detached block.  With the successor filter below, this order
+        // partially ensures that the DFS traverses the task blocks first.
+        DetachContinue = DI->getContinue();
+        ToClone.push_back(DetachContinue);
+        if (DI->hasUnwindDest()) {
+          DetachUnwind = DI->getUnwindDest();
+          ToClone.push_back(DetachUnwind);
+        }
+        ToClone.push_back(DI->getDetached());
+      }
+    } else if (DetachContinue) {
+      // Currently handling a spawned task.  Filter any successors that match
+      // the detach-continue or detach-unwind, so the DFS does not traverse
+      // these blocks before traversing the whole spawned task.
+      for (const BasicBlock *Successor : successors(BB->getTerminator()))
+        if (Successor != DetachContinue && Successor != DetachUnwind)
+          ToClone.push_back(Successor);
+    } else {
+      // No spawned tasks to worry about.  Add all successors.
+      append_range(ToClone, successors(BB->getTerminator()));
+    }
   } else {
     // If we didn't create a new terminator, clone DbgVariableRecords from the
     // old terminator onto the new terminator.
