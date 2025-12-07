@@ -621,7 +621,8 @@ static bool isTaskFrameUnwind(const BasicBlock *UnwindEdge) {
   return isTaskFrameResume(UnwindEdge->getTerminator());
 }
 
-static void splitTaskFrameEnds(Instruction *TFCreate) {
+static void splitTaskFrameEnds(Instruction *TFCreate,
+                               SmallPtrSetImpl<BasicBlock *> &ToProcess) {
   // Split taskframe.end that use TFCreate.
   SmallVector<Instruction *, 8> TFEndToSplit;
   for (User *U : TFCreate->users())
@@ -632,7 +633,8 @@ static void splitTaskFrameEnds(Instruction *TFCreate) {
   for (Instruction *TFEnd : TFEndToSplit) {
     if (TFEnd != TFEnd->getParent()->getTerminator()->getPrevNode()) {
       BasicBlock::iterator Iter = ++TFEnd->getIterator();
-      SplitBlock(TFEnd->getParent(), &*Iter);
+      BasicBlock *NewBB = SplitBlock(TFEnd->getParent(), &*Iter);
+      ToProcess.insert(NewBB);
       // Try to attach debug info to the new terminator after the taskframe.end
       // call.
       Instruction *SplitTerminator = TFEnd->getParent()->getTerminator();
@@ -666,6 +668,7 @@ static void HandleInlinedTasksHelper(
     if (!BlocksToProcess.count(BB))
       continue;
 
+    // If we find a nested taskframe, handle it recursively.
     if (Instruction *TFCreate =
             FindTaskFrameCreateInBlock(BB, CurrentTaskFrame)) {
       // Split the block at the taskframe.create, if necessary.
@@ -678,7 +681,7 @@ static void HandleInlinedTasksHelper(
 
       // Split any blocks containing taskframe.end intrinsics that use
       // TFCreate.
-      splitTaskFrameEnds(TFCreate);
+      splitTaskFrameEnds(TFCreate, BlocksToProcess);
 
       // Create an unwind edge for the taskframe.
       BasicBlock *TaskFrameUnwindEdge =
@@ -823,23 +826,19 @@ static void HandleInlinedTasks(
 
   // Either finish the unreachable block or remove it, depending on whether it
   // is used.
-  if (!pred_empty(UnreachableBlk)) {
-    IRBuilder<> Builder(UnreachableBlk);
-    Builder.CreateUnreachable();
-  } else {
+  if (!pred_empty(UnreachableBlk))
+    IRBuilder<>(UnreachableBlk).CreateUnreachable();
+  else
     UnreachableBlk->eraseFromParent();
-  }
 }
 
 static void GetInlinedLPads(SmallPtrSetImpl<BasicBlock *> &BlocksToProcess,
                             SmallPtrSetImpl<LandingPadInst *> &InlinedLPads) {
   SmallVector<BasicBlock *, 32> Worklist;
   SmallPtrSet<BasicBlock *, 32> Visited;
-
-  // Push all blocks to process that are terminated by a resume onto the
-  // worklist.
+  // Find all resumes among the blocks to process
   for (BasicBlock *BB : BlocksToProcess)
-    if (isa<ResumeInst>(BB->getTerminator()))
+    if (succ_empty(BB))
       Worklist.push_back(BB);
 
   // Traverse the blocks to process from the resumes going backwards (through
@@ -856,7 +855,8 @@ static void GetInlinedLPads(SmallPtrSetImpl<BasicBlock *> &BlocksToProcess,
     // If BB is a landingpad...
     if (BB->isLandingPad()) {
       // Record BB's landingpad instruction.
-      InlinedLPads.insert(BB->getLandingPadInst());
+      if (!InlinedLPads.insert(BB->getLandingPadInst()).second)
+        continue;
 
       // Add predecessors of BB to the worklist, skipping predecessors via a
       // detached.rethrow or taskframe.resume.
@@ -871,7 +871,7 @@ static void GetInlinedLPads(SmallPtrSetImpl<BasicBlock *> &BlocksToProcess,
     // In the normal case, add predecessors of BB to the worklist, excluding
     // predecessors via reattach, detached.rethrow, or taskframe.resume
     for (BasicBlock *Predecessor : predecessors(BB))
-      if (!isa<ResumeInst>(Predecessor->getTerminator()) &&
+      if (!isa<ReattachInst>(Predecessor->getTerminator()) &&
           !isDetachedRethrow(Predecessor->getTerminator()) &&
           !isTaskFrameResume(Predecessor->getTerminator()))
         Worklist.push_back(Predecessor);
@@ -896,47 +896,15 @@ static void HandleInlinedLandingPad(InvokeInst *II, BasicBlock *FirstNewBlock,
   // rewrite.
   LandingPadInliningInfo Invoke(II);
 
-  // Special processing is needed to inline a function that contains a task.
-  if (InlinedCodeInfo.ContainsDetach) {
-    // Get the set of blocks for the inlined function.
-    SmallPtrSet<BasicBlock *, 32> BlocksToProcess;
-    for (Function::iterator BB = FirstNewBlock->getIterator(),
-                                 E = Caller->end(); BB != E; ++BB)
-      BlocksToProcess.insert(&*BB);
-
-    // Get all of the inlined landing pad instructions.
-    SmallPtrSet<LandingPadInst*, 16> InlinedLPads;
-    GetInlinedLPads(BlocksToProcess, InlinedLPads);
-
-    // Append the clauses from the outer landing pad instruction into the
-    // inlined landing pad instructions.
-    LandingPadInst *OuterLPad = Invoke.getLandingPadInst();
-    for (LandingPadInst *InlinedLPad : InlinedLPads) {
-      unsigned OuterNum = OuterLPad->getNumClauses();
-      InlinedLPad->reserveClauses(OuterNum);
-      for (unsigned OuterIdx = 0; OuterIdx != OuterNum; ++OuterIdx)
-        InlinedLPad->addClause(OuterLPad->getClause(OuterIdx));
-      if (OuterLPad->isCleanup())
-        InlinedLPad->setCleanup(true);
-    }
-
-    // Process inlined subtasks.
-    HandleInlinedTasks(BlocksToProcess, FirstNewBlock, TFCreate,
-                       Invoke.getOuterResumeDest(), Invoke, InlinedLPads);
-    // Now that everything is happy, we have one final detail.  The PHI nodes in
-    // the exception destination block still have entries due to the original
-    // invoke instruction. Eliminate these entries (which might even delete the
-    // PHI node) now.
-    InvokeDest->removePredecessor(II->getParent());
-    return;
-  }
+  // Get the set of blocks for the inlined function.
+  SmallPtrSet<BasicBlock *, 32> BlocksToProcess;
+  for (Function::iterator BB = FirstNewBlock->getIterator(), E = Caller->end();
+       BB != E; ++BB)
+    BlocksToProcess.insert(&*BB);
 
   // Get all of the inlined landing pad instructions.
-  SmallPtrSet<LandingPadInst*, 16> InlinedLPads;
-  for (Function::iterator I = FirstNewBlock->getIterator(), E = Caller->end();
-       I != E; ++I)
-    if (InvokeInst *II = dyn_cast<InvokeInst>(I->getTerminator()))
-      InlinedLPads.insert(II->getLandingPadInst());
+  SmallPtrSet<LandingPadInst *, 16> InlinedLPads;
+  GetInlinedLPads(BlocksToProcess, InlinedLPads);
 
   // Append the clauses from the outer landing pad instruction into the inlined
   // landing pad instructions.
@@ -950,19 +918,9 @@ static void HandleInlinedLandingPad(InvokeInst *II, BasicBlock *FirstNewBlock,
       InlinedLPad->setCleanup(true);
   }
 
-  for (Function::iterator BB = FirstNewBlock->getIterator(), E = Caller->end();
-       BB != E; ++BB) {
-    if (InlinedCodeInfo.ContainsCalls)
-      if (BasicBlock *NewBB = HandleCallsInBlockInlinedThroughInvoke(
-              &*BB, Invoke.getOuterResumeDest()))
-        // Update any PHI nodes in the exceptional block to indicate that there
-        // is now a new entry in them.
-        Invoke.addIncomingPHIValuesFor(NewBB);
-
-    // Forward any resumes that are remaining here.
-    if (ResumeInst *RI = dyn_cast<ResumeInst>(BB->getTerminator()))
-      Invoke.forwardResume(RI, InlinedLPads);
-  }
+  // Process inlined class and subtasks.
+  HandleInlinedTasks(BlocksToProcess, FirstNewBlock, TFCreate,
+                     Invoke.getOuterResumeDest(), Invoke, InlinedLPads);
 
   // Now that everything is happy, we have one final detail.  The PHI nodes in
   // the exception destination block still have entries due to the original
@@ -3550,10 +3508,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
       // Create the normal return for the detached rethrow.
       BasicBlock *UnreachableBlk = BasicBlock::Create(
           Caller->getContext(), UnwindEdge->getName()+".unreachable", Caller);
-      { // Add an unreachable instruction to the end of UnreachableBlk.
-        IRBuilder<> Builder(UnreachableBlk);
-        Builder.CreateUnreachable();
-      }
+      // Add an unreachable instruction to the end of UnreachableBlk.
+      IRBuilder<>(UnreachableBlk).CreateUnreachable();
 
       // Create an unwind edge for the taskframe.
       BasicBlock *TaskFrameUnwindEdge =
