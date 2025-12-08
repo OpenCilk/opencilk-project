@@ -1,7 +1,6 @@
 #include "KaleidoscopeJIT.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Analysis/AliasAnalysisEvaluator.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
@@ -9,6 +8,7 @@
 #include "llvm/Analysis/BranchProbabilityInfo.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/DependenceAnalysis.h"
+#include "llvm/Analysis/LastRunTrackingAnalysis.h"
 #include "llvm/Analysis/MemoryDependenceAnalysis.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
@@ -56,8 +56,6 @@
 #include "llvm/Transforms/Tapir.h"
 #include "llvm/Transforms/Tapir/LoopSpawningTI.h"
 #include "llvm/Transforms/Tapir/TapirToTarget.h"
-#include "llvm/Transforms/Utils.h"
-#include <algorithm>
 #include <cassert>
 #include <cctype>
 #include <cstdint>
@@ -1387,7 +1385,7 @@ static Value *CreateSyncRegion(Module &M) {
     return LogErrorV("No local task scope.");
   IRBuilder<> TmpB(TaskEntry, TaskEntry->begin());
   return TmpB.CreateCall(
-      Intrinsic::getDeclaration(&M, Intrinsic::syncregion_start), {});
+      Intrinsic::getOrInsertDeclaration(&M, Intrinsic::syncregion_start), {});
 }
 
 // Output spawn spawned_expr as:
@@ -1626,7 +1624,7 @@ Value *ParForExprAST::codegen() {
   // loop.
   std::vector<Metadata *> LoopMetadata = GetTapirLoopMetadata();
   if (!LoopMetadata.empty()) {
-    auto TempNode = MDNode::getTemporary(*TheContext, std::nullopt);
+    auto TempNode = MDNode::getTemporary(*TheContext, {});
     LoopMetadata.insert(LoopMetadata.begin(), TempNode.get());
     auto LoopID = MDNode::get(*TheContext, LoopMetadata);
     LoopID->replaceOperandWith(0, LoopID);
@@ -1722,6 +1720,8 @@ static void RunOptimizations() {
   MAM.registerPass([&] { return CallGraphAnalysis(); });
   MAM.registerPass([&] { return PassInstrumentationAnalysis(); });
   MAM.registerPass([&] { return ProfileSummaryAnalysis(); });
+  FAM.registerPass([&] { return LastRunTrackingAnalysis(); });
+  MAM.registerPass([&] { return LastRunTrackingAnalysis(); });
   // Cross-register analysis proxies.
   MAM.registerPass([&] { return FunctionAnalysisManagerModuleProxy(FAM); });
   FAM.registerPass([&] { return ModuleAnalysisManagerFunctionProxy(MAM); });
@@ -1923,7 +1923,7 @@ static void InitializeModule() {
 
   // Set the target triple to match the system.
   auto SysTargetTriple = sys::getDefaultTargetTriple();
-  TheModule->setTargetTriple(SysTargetTriple);
+  TheModule->setTargetTriple(Triple(SysTargetTriple));
   // Set an appropriate data layout
   TheModule->setDataLayout(TheJIT->getDataLayout());
 

@@ -184,6 +184,7 @@ if(LLVM_BUILD_EXAMPLES)
     Kaleidoscope-Ch5
     Kaleidoscope-Ch6
     Kaleidoscope-Ch7
+    Kaleidoscope-Tapir
     LLJITWithThinLTOSummaries
     OrcV2CBindingsBasicUsage
     OrcV2CBindingsAddObjectFile

@@ -16,5 +16,3 @@ set(LLVM_LINK_COMPONENTS
 add_kaleidoscope_chapter(Kaleidoscope-Tapir
   toy.cpp
   )
-
-export_executable_symbols(Kaleidoscope-Tapir)
