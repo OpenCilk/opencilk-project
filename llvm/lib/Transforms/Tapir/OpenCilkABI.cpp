@@ -1,4 +1,4 @@
-//===- OpenCilkABI.cpp - Interface to the OpenCilk runtime system------------===//
+//===- OpenCilkABI.cpp - Interface to the OpenCilk runtime system ---------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -70,7 +70,8 @@ OpenCilkABI::OpenCilkABI(Module &M) : TapirTarget(M) {}
 static void fixCilkSyncFn(Module &M, Function *Fn) {
   Fn->removeFnAttr(Attribute::NoUnwind);
   Function *ExceptionRaiseFn = M.getFunction("__cilkrts_check_exception_raise");
-  Function *ExceptionResumeFn = M.getFunction("__cilkrts_check_exception_resume");
+  Function *ExceptionResumeFn =
+      M.getFunction("__cilkrts_check_exception_resume");
   for (Instruction &I : instructions(Fn))
     if (CallBase *CB = dyn_cast<CallBase>(&I))
       if (CB->getCalledFunction() == ExceptionRaiseFn ||
@@ -161,7 +162,7 @@ void OpenCilkABI::prepareModule() {
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
     if (std::unique_ptr<Module> ExternalModule =
-        parseIRFile(RuntimeBCPath, SMD, C)) {
+            parseIRFile(RuntimeBCPath, SMD, C)) {
       // Get the original DiagnosticHandler for this context.
       std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
           C.getDiagnosticHandler();
@@ -186,8 +187,8 @@ void OpenCilkABI::prepareModule() {
                 if (!Fn->isDeclaration())
                   // We set the function's linkage as available_externally, so
                   // that subsequent optimizations can remove these definitions
-                  // from the module.  We don't want this module redefining any of
-                  // these symbols, even if they aren't inlined, because the
+                  // from the module.  We don't want this module redefining any
+                  // of these symbols, even if they aren't inlined, because the
                   // OpenCilk runtime library will provide those definitions
                   // later.
                   Fn->setLinkage(Function::AvailableExternallyLinkage);
@@ -219,26 +220,24 @@ void OpenCilkABI::prepareModule() {
   Type *BoolTy = Type::getInt1Ty(C);
 
   // Define the types of the CilkRTS functions.
-  FunctionType *V_P_Ty =
-      FunctionType::get(VoidTy, {PtrTy}, false);
-  FunctionType *V_P_P_Ty =
-      FunctionType::get(VoidTy, {PtrTy, PtrTy}, false);
-  FunctionType *V_P_P_B_Ty = FunctionType::get(
-      VoidTy, {PtrTy, PtrTy, BoolTy}, false);
+  FunctionType *V_P_Ty = FunctionType::get(VoidTy, {PtrTy}, false);
+  FunctionType *V_P_P_Ty = FunctionType::get(VoidTy, {PtrTy, PtrTy}, false);
+  FunctionType *V_P_P_B_Ty =
+      FunctionType::get(VoidTy, {PtrTy, PtrTy, BoolTy}, false);
   FunctionType *CilkPrepareSpawnFnTy =
       FunctionType::get(Int32Ty, {PtrTy}, false);
   FunctionType *CilkRTSEnterLandingpadFnTy =
       FunctionType::get(VoidTy, {PtrTy, Int32Ty}, false);
-  FunctionType *CilkRTSPauseFrameFnTy = FunctionType::get(
-      VoidTy, {PtrTy, PtrTy, PtrTy, BoolTy}, false);
+  FunctionType *CilkRTSPauseFrameFnTy =
+      FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, BoolTy}, false);
   FunctionType *Grainsize8FnTy = FunctionType::get(Int8Ty, {Int8Ty}, false);
   FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
   FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
   FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
   FunctionType *Lookup0Ty = FunctionType::get(PtrTy, {PtrTy}, false);
   FunctionType *Lookup1Ty = FunctionType::get(PtrTy, {PtrTy, PtrTy}, false);
-  FunctionType *Lookup2Ty = FunctionType::get(
-      PtrTy, {PtrTy, Int64Ty, PtrTy, PtrTy}, false);
+  FunctionType *Lookup2Ty =
+      FunctionType::get(PtrTy, {PtrTy, Int64Ty, PtrTy, PtrTy}, false);
   FunctionType *UnregTy = FunctionType::get(VoidTy, {PtrTy}, false);
   FunctionType *Reg1Ty = FunctionType::get(VoidTy, {PtrTy}, false);
   FunctionType *Reg2Ty = FunctionType::get(VoidTy, {PtrTy, PtrTy}, false);
@@ -304,7 +303,7 @@ void OpenCilkABI::prepareModule() {
         Fn->removeFnAttr(Attribute::AlwaysInline);
     }
     if (GlobalVariable *AlignVar =
-        M.getGlobalVariable("__cilkrts_stack_frame_align", true)) {
+            M.getGlobalVariable("__cilkrts_stack_frame_align", true)) {
       // StackFrameAlign is undefined here.
       StackFrameAlign = AlignVar->getAlign();
       // Mark this variable with private linkage, to avoid linker failures when
@@ -412,7 +411,7 @@ static bool skipInstruction(const Instruction &I) {
 
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
     // Skip simple intrinsics
-    switch(II->getIntrinsicID()) {
+    switch (II->getIntrinsicID()) {
     case Intrinsic::annotation:
     case Intrinsic::assume:
     case Intrinsic::sideeffect:
@@ -473,7 +472,7 @@ Value *OpenCilkABI::CreateStackFrame(Function &F) {
   return SF;
 }
 
-Value* OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
+Value *OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
   Value *SF = DetachCtxToStackFrame.lookup(&F);
   if (SF)
     return SF;
@@ -483,9 +482,7 @@ Value* OpenCilkABI::GetOrCreateCilkStackFrame(Function &F) {
   return SF;
 }
 
-static unsigned getParentSFArgNum(Function &H) {
-  return H.arg_size() - 1;
-}
+static unsigned getParentSFArgNum(Function &H) { return H.arg_size() - 1; }
 
 // Helper function to add a debug location to an IRBuilder if it otherwise lacks
 // a debug location.
@@ -582,8 +579,7 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
         RI->setDebugLoc(DILocation::getMergedLocations(Locs));
       }
       Resumes.insert(RI);
-    }
-    else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint()))
+    } else if (ReturnInst *RI = dyn_cast<ReturnInst>(Builder->GetInsertPoint()))
       Returns.insert(RI);
   }
 
@@ -721,7 +717,7 @@ void OpenCilkABI::lowerSync(SyncInst &SI) {
     return;
 
   Value *SF = GetOrCreateCilkStackFrame(Fn);
-  Value *Args[] = { SF };
+  Value *Args[] = {SF};
   assert(Args[0] && "sync used in function without frame!");
 
   Instruction *SyncUnwind = nullptr;
@@ -885,7 +881,7 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Argument *ParentSFArg = TOI.Outline->getArg(ParentSFArgNum);
   if (StackFrameAlign)
     ParentSFArg->addAttr(
-      Attribute::getWithAlignment(C, StackFrameAlign.value()));
+        Attribute::getWithAlignment(C, StackFrameAlign.value()));
   // Split the basic block containing the detach replacement just before the
   // start of the detach-replacement instructions.
   BasicBlock *DetBlock = ReplStart->getParent();
@@ -921,8 +917,8 @@ void OpenCilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 // Helper function to inline calls to compiler-generated Cilk runtime functions
 // when possible.  This inlining is necessary to properly implement some Cilk
 // runtime "calls," such as __cilk_sync().
-static inline void inlineCilkFunctions(
-    Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
+static inline void
+inlineCilkFunctions(Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
   for (CallBase *CB : CallsToInline) {
     InlineFunctionInfo IFI;
     InlineFunction(*CB, IFI);
@@ -1189,7 +1185,6 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
   FunctionCallee Fn = nullptr;
   const Function *Called = CI->getCalledFunction();
   assert(Called);
-  unsigned NumArgs = Called->getFunctionType()->getNumParams();
   Intrinsic::ID ID = Called->getIntrinsicID();
   switch (ID) {
   default:
@@ -1219,16 +1214,16 @@ void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
       Fn = Get__cilkrts_reducer_register_1();
       if (Fn) {
         assert(Fn.getFunctionType()->getNumParams() == 2);
-        CI->replaceAllUsesWith(Builder.CreateCall(Fn, { CI->getArgOperand(1),
-                                                        CI->getArgOperand(2)}));
+        CI->replaceAllUsesWith(Builder.CreateCall(
+            Fn, {CI->getArgOperand(1), CI->getArgOperand(2)}));
       }
       return;
     case 2:
       Fn = Get__cilkrts_reducer_register_2();
       if (Fn) {
         assert(Fn.getFunctionType()->getNumParams() == 2);
-        CI->replaceAllUsesWith(Builder.CreateCall(Fn, { CI->getArgOperand(1),
-                                                        CI->getArgOperand(2)}));
+        CI->replaceAllUsesWith(Builder.CreateCall(
+            Fn, {CI->getArgOperand(1), CI->getArgOperand(2)}));
       }
       return;
     default:

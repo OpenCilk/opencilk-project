@@ -5,7 +5,7 @@
 ; case.
 ;
 ; RUN: opt < %s -passes='lcssa,loop-simplify' -S | opt -passes='function(require<target-ir>,require<scalar-evolution>,require<domtree>,require<tasks>,loop(indvars)),loop-spawning,function(simplifycfg)' -S | FileCheck %s --check-prefix=LS
-; RUN: opt < %s -passes='tapir2target,function(simplifycfg)' -tapir-target=cilk -S | FileCheck %s --check-prefix=TT
+; RUN: opt < %s -passes='tapir2target,function(simplifycfg)' -tapir-target=opencilk -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s --check-prefix=TT
 
 ; ModuleID = 'sret-test.cpp'
 source_filename = "sret-test.cpp"

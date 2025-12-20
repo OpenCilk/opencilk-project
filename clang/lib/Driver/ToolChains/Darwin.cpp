@@ -4008,7 +4008,7 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
                            !StaticOpenCilk);
     break;
   }
-  case TapirTargetID::Cilk:
+  case TapirTargetID::CilkPlus:
     CmdArgs.push_back("-lcilkrts");
     break;
   case TapirTargetID::Qthreads:

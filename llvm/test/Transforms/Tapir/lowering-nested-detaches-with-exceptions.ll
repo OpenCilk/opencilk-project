@@ -1,6 +1,6 @@
 ; Thanks to Brian Wheatman for providing the original test case for this bug.
 ;
-; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
+; RUN: opt < %s -passes=tapir2target -tapir-target=opencilk -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -375,13 +375,13 @@ eh.resume:                                        ; preds = %sync.continue93
 
 ; CHECK: define void @_ZN3OFM7convertEP5Graph(ptr %this, ptr %g)
 ; CHECK: {{^pfor.detach.split:}}
-; CHECK: invoke fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry.otd1(ptr %g.addr, ptr %this1, ptr %n, i32 %add45)
+; CHECK: invoke fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry.otd1(ptr %g.addr, ptr %this1, ptr %n, i32 %add45
 ; CHECK-NEXT: to label %pfor.inc80 unwind label %lpad82
 
-; CHECK: define internal fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry62.otd2(ptr align 8 %g.addr.otd2, ptr align 4 %i46.otd2, ptr align 1 %this1.otd2, i32 %add61.otd2)
+; CHECK: define internal fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry62.otd2(ptr align 8 %g.addr.otd2, ptr align 4 %i46.otd2, ptr align 1 %this1.otd2, i32 %add61.otd2
 
-; CHECK: define internal fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry.otd1(ptr align 8 %g.addr.otd1, ptr align 1 %this1.otd1, ptr align 4 %n.otd1, i32 %add45.otd1)
-; CHECK: invoke fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry62.otd2(ptr %g.addr.otd1, ptr %i46.otd1, ptr %this1.otd1, i32 %add61.otd1)
+; CHECK: define internal fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry.otd1(ptr align 8 %g.addr.otd1, ptr align 1 %this1.otd1, ptr align 4 %n.otd1, i32 %add45.otd1
+; CHECK: invoke fastcc void @_ZN3OFM7convertEP5Graph.outline_pfor.body.entry62.otd2(ptr %g.addr.otd1, ptr %i46.otd1, ptr %this1.otd1, i32 %add61.otd1
 ; CHECK-NEXT: to label %pfor.inc.otd1 unwind label %lpad73.otd1
 
 ; Function Attrs: noinline nounwind optnone uwtable

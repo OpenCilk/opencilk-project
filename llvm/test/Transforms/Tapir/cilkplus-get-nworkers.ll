@@ -1,7 +1,7 @@
 ; Check that the Intel Cilk Plus function __cilkrts_get_nworkers()
 ; is properly declared in the IR.
 ;
-; RUN: opt < %s -passes="tapir2target" -tapir-target=cilk -S | FileCheck %s
+; RUN: opt < %s -passes="tapir2target" -tapir-target=cilkplus -S | FileCheck %s
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-macosx15.0.0"
 

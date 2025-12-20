@@ -1,4 +1,4 @@
-; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -cilk-use-arg-struct -S | FileCheck %s
+; RUN: opt < %s -passes=tapir2target -tapir-target=cilkplus -debug-abi-calls -cilk-use-arg-struct -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -493,9 +493,8 @@ cleanup:                                          ; preds = %sync.continue22, %i
 ; CHECK: define {{.*}}void @cilksort.outline_det.achd16.otd1({{.*}}) {{.*}}#[[DETACHD16ATTR:[0-9]+]] {
 
 ; CHECK: attributes #[[DETACHD16ATTR]] = {
-; CHECK-NOT: argmemonly
-; CHECK-NOT: inaccessiblememonly
-; CHECK-NOT: inaccessiblemem_or_argmemonly
+; CHECK: argmem: none
+; CHECK: inaccessiblemem: none
 ; CHECK: }
 
 ; Function Attrs: norecurse nounwind uwtable

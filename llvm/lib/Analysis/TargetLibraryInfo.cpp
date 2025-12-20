@@ -46,20 +46,13 @@ static cl::opt<TargetLibraryInfoImpl::VectorLibrary> ClVectorLibrary(
 static cl::opt<TapirTargetID> ClTapirTarget(
     "tapir-target", cl::Hidden, cl::desc("Target runtime for Tapir"),
     cl::init(TapirTargetID::OpenCilk),
-    cl::values(clEnumValN(TapirTargetID::None,
-                          "none", "None"),
-               clEnumValN(TapirTargetID::Serial,
-                          "serial", "Serial code"),
-               clEnumValN(TapirTargetID::Cilk,
-                          "cilk", "Cilk Plus"),
-               clEnumValN(TapirTargetID::Cheetah,
-                          "cheetah", "Cheetah"),
-               clEnumValN(TapirTargetID::OpenCilk,
-                          "opencilk", "OpenCilk"),
-               clEnumValN(TapirTargetID::Lambda,
-                          "lambda", "Lambda"),
-               clEnumValN(TapirTargetID::OMPTask,
-                          "omptask", "OMPTask")));
+    cl::values(clEnumValN(TapirTargetID::None, "none", "None"),
+               clEnumValN(TapirTargetID::Serial, "serial", "Serial code"),
+               clEnumValN(TapirTargetID::CilkPlus, "cilkplus", "Cilk Plus"),
+               clEnumValN(TapirTargetID::Cheetah, "cheetah", "Cheetah"),
+               clEnumValN(TapirTargetID::OpenCilk, "opencilk", "OpenCilk"),
+               clEnumValN(TapirTargetID::Lambda, "lambda", "Lambda"),
+               clEnumValN(TapirTargetID::OMPTask, "omptask", "OMPTask")));
 
 StringLiteral const TargetLibraryInfoImpl::StandardNames[LibFunc::NumLibFuncs] =
     {
@@ -1476,7 +1469,7 @@ void TargetLibraryInfoImpl::addVectorizableFunctionsFromVecLib(
 void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
     TapirTargetID TargetID) {
   switch (TargetID) {
-  case TapirTargetID::Cilk:
+  case TapirTargetID::CilkPlus:
   case TapirTargetID::OpenCilk: {
     const StringLiteral TTFuncs[] = {
     #define TLI_DEFINE_CILK_LIBS

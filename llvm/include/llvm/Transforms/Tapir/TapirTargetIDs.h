@@ -22,7 +22,7 @@ enum class TapirTargetID {
   None,     // Perform no lowering
   Serial,   // Lower to serial projection
   Cheetah,  // Lower to the Cheetah ABI
-  Cilk,     // Lower to the Cilk Plus ABI
+  CilkPlus, // Lower to the Cilk Plus ABI
   Lambda,   // Lower to generic Lambda ABI
   OMPTask,  // Lower to OpenMP task ABI
   OpenCilk, // Lower to OpenCilk ABI

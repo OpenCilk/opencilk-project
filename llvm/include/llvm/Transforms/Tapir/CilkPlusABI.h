@@ -1,4 +1,4 @@
-//===- CilkABI.h - Interface to the Intel Cilk Plus runtime ----*- C++ -*--===//
+//===- CilkPlusABI.h - Interface to the Intel Cilk Plus runtime -*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,14 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the Cilk ABI to converts Tapir instructions to calls
-// into the Cilk runtime system.
+// This file implements the Cilk Plus ABI to converts Tapir instructions to
+// calls into the Intel Cilk Plus runtime system.
 //
 //===----------------------------------------------------------------------===//
-#ifndef CILK_ABI_H_
-#define CILK_ABI_H_
+#ifndef CILKPLUS_ABI_H_
+#define CILKPLUS_ABI_H_
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
 
@@ -21,7 +20,7 @@ namespace llvm {
 class Value;
 class TapirLoopInfo;
 
-class CilkABI : public TapirTarget {
+class CilkPlusABI : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
   SmallPtrSet<CallBase *, 8> CallsToInline;
 
@@ -29,36 +28,34 @@ class CilkABI : public TapirTarget {
   StructType *PedigreeTy = nullptr;
   enum PedigreeFields { rank = 0, next };
   StructType *StackFrameTy = nullptr;
-  enum StackFrameFields
-    {
-     flags = 0,
-     size,
-     call_parent,
-     worker,
-     except_data,
-     ctx,
-     mxcsr,
-     fpcsr,
-     reserved,
-     parent_pedigree
-    };
+  enum StackFrameFields {
+    flags = 0,
+    size,
+    call_parent,
+    worker,
+    except_data,
+    ctx,
+    mxcsr,
+    fpcsr,
+    reserved,
+    parent_pedigree
+  };
   StructType *WorkerTy = nullptr;
-  enum WorkerFields
-    {
-     tail = 0,
-     head,
-     exc,
-     protected_tail,
-     ltq_limit,
-     self,
-     g,
-     l,
-     reducer_map,
-     current_stack_frame,
-     saved_protected_tail,
-     sysdep,
-     pedigree
-    };
+  enum WorkerFields {
+    tail = 0,
+    head,
+    exc,
+    protected_tail,
+    ltq_limit,
+    self,
+    g,
+    l,
+    reducer_map,
+    current_stack_frame,
+    saved_protected_tail,
+    sysdep,
+    pedigree
+  };
 
   // Opaque Cilk RTS functions
   FunctionCallee CilkRTSInit = nullptr;
@@ -100,8 +97,8 @@ class CilkABI : public TapirTarget {
                               bool instrument = false);
 
 public:
-  CilkABI(Module &M);
-  ~CilkABI() { DetachCtxToStackFrame.clear(); }
+  CilkPlusABI(Module &M);
+  ~CilkPlusABI() { DetachCtxToStackFrame.clear(); }
   void prepareModule() override final;
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;

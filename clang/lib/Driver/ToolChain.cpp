@@ -2155,7 +2155,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     }
     break;
   }
-  case TapirTargetID::Cilk:
+  case TapirTargetID::CilkPlus:
     CmdArgs.push_back("-lcilkrts");
     break;
   case TapirTargetID::Qthreads:

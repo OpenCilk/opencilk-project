@@ -275,7 +275,7 @@ static bool tryToStripMineLoop(
   // synchronized.
   bool NeedNestedSync = IncludeNestedSync;
   if (!NeedNestedSync && TLI)
-    NeedNestedSync = (TLI->getTapirTarget() == TapirTargetID::Cilk ||
+    NeedNestedSync = (TLI->getTapirTarget() == TapirTargetID::CilkPlus ||
                       TLI->getTapirTarget() == TapirTargetID::OpenCilk);
 
   // Save loop properties before it is transformed.

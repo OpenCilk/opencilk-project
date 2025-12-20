@@ -18,7 +18,7 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
-#include "llvm/Transforms/Tapir/CilkABI.h"
+#include "llvm/Transforms/Tapir/CilkPlusABI.h"
 #include "llvm/Transforms/Tapir/LambdaABI.h"
 #include "llvm/Transforms/Tapir/OMPTaskABI.h"
 #include "llvm/Transforms/Tapir/OpenCilkABI.h"
@@ -44,8 +44,8 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return nullptr;
   case TapirTargetID::Serial:
     return new SerialABI(M);
-  case TapirTargetID::Cilk:
-    return new CilkABI(M);
+  case TapirTargetID::CilkPlus:
+    return new CilkPlusABI(M);
   case TapirTargetID::Cheetah:
   case TapirTargetID::OpenCilk:
     return new OpenCilkABI(M);

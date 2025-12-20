@@ -1,4 +1,4 @@
-; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s
+; RUN: opt < %s -passes=tapir2target -tapir-target=cilkplus -debug-abi-calls -S | FileCheck %s
 
 %struct.vertex = type { %class._point2d, %struct.tri*, %struct.tri*, i32, i32 }
 %class._point2d = type { double, double }

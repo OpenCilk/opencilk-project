@@ -1,4 +1,4 @@
-//===- CilkABI.cpp - Lower Tapir into Cilk runtime system calls -----------===//
+//===- CilkPlusABI.h - Interface to the Intel Cilk Plus runtime -*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the Cilk ABI to converts Tapir instructions to calls
-// into the Cilk runtime system.
+// This file implements the Cilk Plus ABI to converts Tapir instructions to
+// calls into the Intel Cilk Plus runtime system.
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Transforms/Tapir/CilkABI.h"
+#include "llvm/Transforms/Tapir/CilkPlusABI.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -34,61 +34,55 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "cilkabi"
+#define DEBUG_TYPE "cilkplusabi"
 
 extern cl::opt<bool> DebugABICalls;
 
-static cl::opt<bool> fastCilk(
-    "fast-cilk", cl::init(false), cl::Hidden,
-    cl::desc("Attempt faster Cilk call implementation"));
+static cl::opt<bool>
+    fastCilk("fast-cilk", cl::init(false), cl::Hidden,
+             cl::desc("Attempt faster Cilk call implementation"));
 
-static cl::opt<bool> ArgStruct(
-    "cilk-use-arg-struct", cl::init(false), cl::Hidden,
-    cl::desc("Use a struct to store arguments for detached tasks"));
+static cl::opt<bool>
+    ArgStruct("cilk-use-arg-struct", cl::init(false), cl::Hidden,
+              cl::desc("Use a struct to store arguments for detached tasks"));
 
 static const char TimerGroupName[] = DEBUG_TYPE;
-static const char TimerGroupDescription[] = "CilkABI";
+static const char TimerGroupDescription[] = "CilkPlusABI";
+
+enum { __CILKRTS_ABI_VERSION = 1 };
 
 enum {
-  __CILKRTS_ABI_VERSION = 1
-};
-
-enum {
-  CILK_FRAME_STOLEN           =    0x01,
-  CILK_FRAME_UNSYNCHED        =    0x02,
-  CILK_FRAME_DETACHED         =    0x04,
-  CILK_FRAME_EXCEPTION_PROBED =    0x08,
-  CILK_FRAME_EXCEPTING        =    0x10,
-  CILK_FRAME_LAST             =    0x80,
-  CILK_FRAME_EXITING          =  0x0100,
-  CILK_FRAME_SUSPENDED        =  0x8000,
-  CILK_FRAME_UNWINDING        = 0x10000
+  CILK_FRAME_STOLEN = 0x01,
+  CILK_FRAME_UNSYNCHED = 0x02,
+  CILK_FRAME_DETACHED = 0x04,
+  CILK_FRAME_EXCEPTION_PROBED = 0x08,
+  CILK_FRAME_EXCEPTING = 0x10,
+  CILK_FRAME_LAST = 0x80,
+  CILK_FRAME_EXITING = 0x0100,
+  CILK_FRAME_SUSPENDED = 0x8000,
+  CILK_FRAME_UNWINDING = 0x10000
 };
 
 #define CILK_FRAME_VERSION (__CILKRTS_ABI_VERSION << 24)
-#define CILK_FRAME_VERSION_MASK  0xFF000000
-#define CILK_FRAME_FLAGS_MASK    0x00FFFFFF
-#define CILK_FRAME_VERSION_VALUE(_flags) (((_flags) & CILK_FRAME_VERSION_MASK) >> 24)
-#define CILK_FRAME_MBZ  (~ (CILK_FRAME_STOLEN           |       \
-                            CILK_FRAME_UNSYNCHED        |       \
-                            CILK_FRAME_DETACHED         |       \
-                            CILK_FRAME_EXCEPTION_PROBED |       \
-                            CILK_FRAME_EXCEPTING        |       \
-                            CILK_FRAME_LAST             |       \
-                            CILK_FRAME_EXITING          |       \
-                            CILK_FRAME_SUSPENDED        |       \
-                            CILK_FRAME_UNWINDING        |       \
-                            CILK_FRAME_VERSION_MASK))
+#define CILK_FRAME_VERSION_MASK 0xFF000000
+#define CILK_FRAME_FLAGS_MASK 0x00FFFFFF
+#define CILK_FRAME_VERSION_VALUE(_flags)                                       \
+  (((_flags) & CILK_FRAME_VERSION_MASK) >> 24)
+#define CILK_FRAME_MBZ                                                         \
+  (~(CILK_FRAME_STOLEN | CILK_FRAME_UNSYNCHED | CILK_FRAME_DETACHED |          \
+     CILK_FRAME_EXCEPTION_PROBED | CILK_FRAME_EXCEPTING | CILK_FRAME_LAST |    \
+     CILK_FRAME_EXITING | CILK_FRAME_SUSPENDED | CILK_FRAME_UNWINDING |        \
+     CILK_FRAME_VERSION_MASK))
 
 #define CILKRTS_FUNC(name) Get__cilkrts_##name()
 
-TapirTarget::ArgStructMode CilkABI::getArgStructMode() const {
+TapirTarget::ArgStructMode CilkPlusABI::getArgStructMode() const {
   if (ArgStruct)
     return ArgStructMode::Dynamic;
   return ArgStructMode::None;
 }
 
-void CilkABI::addHelperAttributes(Function &Helper) {
+void CilkPlusABI::addHelperAttributes(Function &Helper) {
   // Use a fast calling convention for the helper.
   Helper.setCallingConv(CallingConv::Fast);
   // Inlining the helper function is not legal.
@@ -107,9 +101,9 @@ void CilkABI::addHelperAttributes(Function &Helper) {
   Helper.setLinkage(GlobalValue::InternalLinkage);
 }
 
-CilkABI::CilkABI(Module &M) : TapirTarget(M) {}
+CilkPlusABI::CilkPlusABI(Module &M) : TapirTarget(M) {}
 
-void CilkABI::prepareModule() {
+void CilkPlusABI::prepareModule() {
   LLVMContext &C = M.getContext();
   Type *VoidPtrTy = PointerType::getUnqual(C);
   Type *Int64Ty = Type::getInt64Ty(C);
@@ -157,7 +151,7 @@ void CilkABI::prepareModule() {
 }
 
 // Accessors for opaque Cilk RTS functions
-FunctionCallee CilkABI::Get__cilkrts_get_nworkers() {
+FunctionCallee CilkPlusABI::Get__cilkrts_get_nworkers() {
   if (CilkRTSGetNworkers)
     return CilkRTSGetNworkers;
 
@@ -167,13 +161,13 @@ FunctionCallee CilkABI::Get__cilkrts_get_nworkers() {
   FunctionType *FTy = FunctionType::get(Type::getInt32Ty(C), {}, false);
   CilkRTSGetNworkers = M.getOrInsertFunction("__cilkrts_get_nworkers", FTy, AL);
   if (Function *Fn = dyn_cast<Function>(CilkRTSGetNworkers.getCallee())) {
-      MemoryEffects ME = MemoryEffects::inaccessibleMemOnly(ModRefInfo::Ref);
-      Fn->setMemoryEffects(ME);
+    MemoryEffects ME = MemoryEffects::inaccessibleMemOnly(ModRefInfo::Ref);
+    Fn->setMemoryEffects(ME);
   }
   return CilkRTSGetNworkers;
 }
 
-FunctionCallee CilkABI::Get__cilkrts_init() {
+FunctionCallee CilkPlusABI::Get__cilkrts_init() {
   if (CilkRTSInit)
     return CilkRTSInit;
 
@@ -184,7 +178,7 @@ FunctionCallee CilkABI::Get__cilkrts_init() {
   return CilkRTSInit;
 }
 
-FunctionCallee CilkABI::Get__cilkrts_leave_frame() {
+FunctionCallee CilkPlusABI::Get__cilkrts_leave_frame() {
   if (CilkRTSLeaveFrame)
     return CilkRTSLeaveFrame;
 
@@ -199,7 +193,7 @@ FunctionCallee CilkABI::Get__cilkrts_leave_frame() {
   return CilkRTSLeaveFrame;
 }
 
-FunctionCallee CilkABI::Get__cilkrts_rethrow() {
+FunctionCallee CilkPlusABI::Get__cilkrts_rethrow() {
   if (CilkRTSRethrow)
     return CilkRTSRethrow;
 
@@ -212,7 +206,7 @@ FunctionCallee CilkABI::Get__cilkrts_rethrow() {
   return CilkRTSRethrow;
 }
 
-FunctionCallee CilkABI::Get__cilkrts_sync() {
+FunctionCallee CilkPlusABI::Get__cilkrts_sync() {
   if (CilkRTSSync)
     return CilkRTSSync;
 
@@ -225,7 +219,7 @@ FunctionCallee CilkABI::Get__cilkrts_sync() {
   return CilkRTSSync;
 }
 
-FunctionCallee CilkABI::Get__cilkrts_get_tls_worker() {
+FunctionCallee CilkPlusABI::Get__cilkrts_get_tls_worker() {
   if (CilkRTSGetTLSWorker)
     return CilkRTSGetTLSWorker;
 
@@ -239,7 +233,7 @@ FunctionCallee CilkABI::Get__cilkrts_get_tls_worker() {
   return CilkRTSGetTLSWorker;
 }
 
-FunctionCallee CilkABI::Get__cilkrts_get_tls_worker_fast() {
+FunctionCallee CilkPlusABI::Get__cilkrts_get_tls_worker_fast() {
   if (CilkRTSGetTLSWorkerFast)
     return CilkRTSGetTLSWorkerFast;
 
@@ -253,7 +247,7 @@ FunctionCallee CilkABI::Get__cilkrts_get_tls_worker_fast() {
   return CilkRTSGetTLSWorkerFast;
 }
 
-FunctionCallee CilkABI::Get__cilkrts_bind_thread_1() {
+FunctionCallee CilkPlusABI::Get__cilkrts_bind_thread_1() {
   if (CilkRTSBindThread1)
     return CilkRTSBindThread1;
 
@@ -285,20 +279,19 @@ static void StoreSTyField(IRBuilder<> &B, const DataLayout &DL, StructType *STy,
   S->setOrdering(Ordering);
 }
 
-static Value *LoadSTyField(
-    IRBuilder<> &B, const DataLayout &DL, StructType *STy, Value *Src,
-    int Field, bool isVolatile = false,
-    AtomicOrdering Ordering = AtomicOrdering::NotAtomic) {
+static Value *
+LoadSTyField(IRBuilder<> &B, const DataLayout &DL, StructType *STy, Value *Src,
+             int Field, bool isVolatile = false,
+             AtomicOrdering Ordering = AtomicOrdering::NotAtomic) {
   Value *GetElPtr = GEP(B, Src, STy, Field);
-  LoadInst *L =
-      B.CreateAlignedLoad(STy->getElementType(Field),
-                          GetElPtr, GetAlignment(DL, STy, Field), isVolatile);
+  LoadInst *L = B.CreateAlignedLoad(STy->getElementType(Field), GetElPtr,
+                                    GetAlignment(DL, STy, Field), isVolatile);
   L->setOrdering(Ordering);
   return L;
 }
 
 /// Emit inline assembly code to save the floating point state, for x86 only.
-void CilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
+void CilkPlusABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
   LLVMContext &C = B.getContext();
   FunctionType *FTy = FunctionType::get(
       Type::getVoidTy(C),
@@ -310,10 +303,8 @@ void CilkABI::EmitSaveFloatingPointState(IRBuilder<> &B, Value *SF) {
                                   "*m,*m,~{dirflag},~{fpsr},~{flags}",
                                   /*sideeffects*/ true);
 
-  Value *Args[2] = {
-    GEP(B, SF, StackFrameTy, StackFrameFields::mxcsr),
-    GEP(B, SF, StackFrameTy, StackFrameFields::fpcsr)
-  };
+  Value *Args[2] = {GEP(B, SF, StackFrameTy, StackFrameFields::mxcsr),
+                    GEP(B, SF, StackFrameTy, StackFrameFields::fpcsr)};
 
   CallInst *CI = B.CreateCall(Asm, Args);
   CI->addParamAttr(
@@ -340,7 +331,7 @@ static bool GetOrCreateFunction(Module &M, const StringRef FnName,
 }
 
 /// Emit a call to the CILK_SETJMP function.
-CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
+CallInst *CilkPlusABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   LLVMContext &Ctx = M.getContext();
 
   // We always want to save the floating point state too
@@ -355,7 +346,7 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
   // Buffer is a void**.
   Value *Buf = GEP(B, SF, StackFrameTy, StackFrameFields::ctx);
   Type *BufTy = StackFrameTy->getElementType(StackFrameFields::ctx);
-                    // ->getArrayElementType();
+  // ->getArrayElementType();
 
   // Store the frame pointer in the 0th slot
   Value *FrameAddr = B.CreateCall(
@@ -390,7 +381,7 @@ CallInst *CilkABI::EmitCilkSetJmp(IRBuilder<> &B, Value *SF) {
 ///   sf->worker->current_stack_frame = sf->call_parent;
 ///   sf->call_parent = nullptr;
 /// }
-Function *CilkABI::Get__cilkrts_pop_frame() {
+Function *CilkPlusABI::Get__cilkrts_pop_frame() {
   // Get or create the __cilkrts_pop_frame function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -414,15 +405,11 @@ Function *CilkABI::Get__cilkrts_pop_frame() {
   StoreSTyField(B, DL, WorkerTy,
                 LoadSTyField(B, DL, StackFrameTy, SF,
                              StackFrameFields::call_parent,
-                             /*isVolatile=*/false,
-                             AtomicOrdering::NotAtomic),
-                LoadSTyField(B, DL, StackFrameTy, SF,
-                             StackFrameFields::worker,
-                             /*isVolatile=*/false,
-                             AtomicOrdering::Acquire),
+                             /*isVolatile=*/false, AtomicOrdering::NotAtomic),
+                LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::worker,
+                             /*isVolatile=*/false, AtomicOrdering::Acquire),
                 WorkerFields::current_stack_frame,
-                /*isVolatile=*/false,
-                AtomicOrdering::Release);
+                /*isVolatile=*/false, AtomicOrdering::Release);
 
   // sf->call_parent = nullptr;
   StoreSTyField(B, DL, StackFrameTy,
@@ -461,7 +448,7 @@ Function *CilkABI::Get__cilkrts_pop_frame() {
 ///
 ///   sf->flags |= CILK_FRAME_DETACHED;
 /// }
-Function *CilkABI::Get__cilkrts_detach() {
+Function *CilkPlusABI::Get__cilkrts_detach() {
   // Get or create the __cilkrts_detach function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -482,33 +469,31 @@ Function *CilkABI::Get__cilkrts_detach() {
   IRBuilder<> B(Entry);
 
   // struct __cilkrts_worker *w = sf->worker;
-  Value *W = LoadSTyField(B, DL, StackFrameTy, SF,
-                          StackFrameFields::worker, /*isVolatile=*/false,
-                          AtomicOrdering::NotAtomic);
+  Value *W = LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::worker,
+                          /*isVolatile=*/false, AtomicOrdering::NotAtomic);
 
   // __cilkrts_stack_frame *parent = sf->call_parent;
-  Value *Parent = LoadSTyField(B, DL, StackFrameTy, SF,
-                               StackFrameFields::call_parent,
-                               /*isVolatile=*/false,
-                               AtomicOrdering::NotAtomic);
+  Value *Parent =
+      LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::call_parent,
+                   /*isVolatile=*/false, AtomicOrdering::NotAtomic);
 
   // __cilkrts_stack_frame *volatile *tail = w->tail;
-  Value *Tail = LoadSTyField(B, DL, WorkerTy, W,
-                             WorkerFields::tail, /*isVolatile=*/false,
-                             AtomicOrdering::Acquire);
+  Value *Tail = LoadSTyField(B, DL, WorkerTy, W, WorkerFields::tail,
+                             /*isVolatile=*/false, AtomicOrdering::Acquire);
 
   // sf->spawn_helper_pedigree = w->pedigree;
-  Value *WorkerPedigree = LoadSTyField(B, DL, WorkerTy, W,
-                                       WorkerFields::pedigree);
+  Value *WorkerPedigree =
+      LoadSTyField(B, DL, WorkerTy, W, WorkerFields::pedigree);
   Value *NewHelperPedigree = B.CreateInsertValue(
-      LoadSTyField(B, DL, StackFrameTy, SF,
-                   StackFrameFields::parent_pedigree), WorkerPedigree, { 0 });
+      LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::parent_pedigree),
+      WorkerPedigree, {0});
   StoreSTyField(B, DL, StackFrameTy, NewHelperPedigree, SF,
                 StackFrameFields::parent_pedigree);
   // parent->parent_pedigree = w->pedigree;
-  Value *NewParentPedigree = B.CreateInsertValue(
-      LoadSTyField(B, DL, StackFrameTy, Parent,
-                   StackFrameFields::parent_pedigree), WorkerPedigree, { 0 });
+  Value *NewParentPedigree =
+      B.CreateInsertValue(LoadSTyField(B, DL, StackFrameTy, Parent,
+                                       StackFrameFields::parent_pedigree),
+                          WorkerPedigree, {0});
   StoreSTyField(B, DL, StackFrameTy, NewParentPedigree, Parent,
                 StackFrameFields::parent_pedigree);
 
@@ -543,13 +528,11 @@ Function *CilkABI::Get__cilkrts_detach() {
 
   // sf->flags |= CILK_FRAME_DETACHED;
   {
-    Value *F = LoadSTyField(B, DL, StackFrameTy, SF,
-                            StackFrameFields::flags, /*isVolatile=*/false,
-                            AtomicOrdering::Acquire);
+    Value *F = LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                            /*isVolatile=*/false, AtomicOrdering::Acquire);
     F = B.CreateOr(F, ConstantInt::get(F->getType(), CILK_FRAME_DETACHED));
-    StoreSTyField(B, DL, StackFrameTy, F, SF,
-                  StackFrameFields::flags, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+    StoreSTyField(B, DL, StackFrameTy, F, SF, StackFrameFields::flags,
+                  /*isVolatile=*/false, AtomicOrdering::Release);
   }
 
   B.CreateRetVoid();
@@ -583,7 +566,7 @@ Function *CilkABI::Get__cilkrts_detach() {
 ///
 /// With exceptions disabled in the compiler, the function
 /// does not call __cilkrts_rethrow()
-Function *CilkABI::GetCilkSyncFn(bool instrument) {
+Function *CilkPlusABI::GetCilkSyncFn(bool instrument) {
   // Get or create the __cilk_sync function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -616,12 +599,11 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
     //   B.CreateCall(CILK_CSI_FUNC(sync_begin, M), SF);
 
     // if (sf->flags & CILK_FRAME_UNSYNCHED)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
-    Flags = B.CreateAnd(Flags,
-                        ConstantInt::get(Flags->getType(),
-                                         CILK_FRAME_UNSYNCHED));
+    Value *Flags =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
+    Flags = B.CreateAnd(
+        Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_UNSYNCHED));
     Value *Zero = ConstantInt::get(Flags->getType(), 0);
     Value *Unsynced = B.CreateICmpEQ(Flags, Zero);
     B.CreateCondBr(Unsynced, Exit, SaveState);
@@ -635,12 +617,12 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
     Value *NewParentPedigree = B.CreateInsertValue(
         LoadSTyField(B, DL, StackFrameTy, SF,
                      StackFrameFields::parent_pedigree),
-        LoadSTyField(B, DL, WorkerTy,
-                     LoadSTyField(B, DL, StackFrameTy, SF,
-                                  StackFrameFields::worker,
-                                  /*isVolatile=*/false,
-                                  AtomicOrdering::Acquire),
-                     WorkerFields::pedigree), { 0 });
+        LoadSTyField(
+            B, DL, WorkerTy,
+            LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::worker,
+                         /*isVolatile=*/false, AtomicOrdering::Acquire),
+            WorkerFields::pedigree),
+        {0});
     StoreSTyField(B, DL, StackFrameTy, NewParentPedigree, SF,
                   StackFrameFields::parent_pedigree);
 
@@ -664,13 +646,11 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
     IRBuilder<> B(Excepting);
     if (Rethrow) {
       // if (sf->flags & CILK_FRAME_EXCEPTING)
-      Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                  StackFrameFields::flags,
-                                  /*isVolatile=*/false,
-                                  AtomicOrdering::Acquire);
-      Flags = B.CreateAnd(Flags,
-                          ConstantInt::get(Flags->getType(),
-                                           CILK_FRAME_EXCEPTING));
+      Value *Flags =
+          LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                       /*isVolatile=*/false, AtomicOrdering::Acquire);
+      Flags = B.CreateAnd(
+          Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_EXCEPTING));
       Value *Zero = ConstantInt::get(Flags->getType(), 0);
       Value *CanExcept = B.CreateICmpEQ(Flags, Zero);
       B.CreateCondBr(CanExcept, Exit, Rethrow);
@@ -692,10 +672,9 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
     IRBuilder<> B(Exit);
 
     // ++sf.worker->pedigree.rank;
-    Value *Worker = LoadSTyField(B, DL, StackFrameTy, SF,
-                                 StackFrameFields::worker,
-                                 /*isVolatile=*/false,
-                                 AtomicOrdering::Acquire);
+    Value *Worker =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::worker,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerTy, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeTy, PedigreeFields::rank);
     Type *RankTy = PedigreeTy->getElementType(PedigreeFields::rank);
@@ -738,7 +717,7 @@ Function *CilkABI::GetCilkSyncFn(bool instrument) {
 ///
 /// With exceptions disabled in the compiler, the function
 /// does not call __cilkrts_rethrow()
-Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
+Function *CilkPlusABI::GetCilkSyncNothrowFn(bool instrument) {
   // Get or create the __cilk_sync_nothrow function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -769,12 +748,11 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
     //   B.CreateCall(CILK_CSI_FUNC(sync_begin, M), SF);
 
     // if (sf->flags & CILK_FRAME_UNSYNCHED)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
-    Flags = B.CreateAnd(Flags,
-                        ConstantInt::get(Flags->getType(),
-                                         CILK_FRAME_UNSYNCHED));
+    Value *Flags =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
+    Flags = B.CreateAnd(
+        Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_UNSYNCHED));
     Value *Zero = ConstantInt::get(Flags->getType(), 0);
     Value *Unsynced = B.CreateICmpEQ(Flags, Zero);
     B.CreateCondBr(Unsynced, Exit, SaveState);
@@ -788,12 +766,12 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
     Value *NewParentPedigree = B.CreateInsertValue(
         LoadSTyField(B, DL, StackFrameTy, SF,
                      StackFrameFields::parent_pedigree),
-        LoadSTyField(B, DL, WorkerTy,
-                     LoadSTyField(B, DL, StackFrameTy, SF,
-                                  StackFrameFields::worker,
-                                  /*isVolatile=*/false,
-                                  AtomicOrdering::Acquire),
-                     WorkerFields::pedigree), { 0 });
+        LoadSTyField(
+            B, DL, WorkerTy,
+            LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::worker,
+                         /*isVolatile=*/false, AtomicOrdering::Acquire),
+            WorkerFields::pedigree),
+        {0});
     StoreSTyField(B, DL, StackFrameTy, NewParentPedigree, SF,
                   StackFrameFields::parent_pedigree);
 
@@ -817,10 +795,9 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
     IRBuilder<> B(Exit);
 
     // ++sf.worker->pedigree.rank;
-    Value *Worker = LoadSTyField(B, DL, StackFrameTy, SF,
-                                 StackFrameFields::worker,
-                                 /*isVolatile=*/false,
-                                 AtomicOrdering::Acquire);
+    Value *Worker =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::worker,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerTy, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeTy, PedigreeFields::rank);
     Type *RankTy = PedigreeTy->getElementType(PedigreeFields::rank);
@@ -868,16 +845,15 @@ Function *CilkABI::GetCilkSyncNothrowFn(bool instrument) {
 ///
 /// With exceptions disabled in the compiler, the function
 /// does not call __cilkrts_rethrow()
-Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
+Function *CilkPlusABI::GetCilkCatchExceptionFn(Type *ExnTy) {
   // Get or create the __cilk_catch_exception function.
   LLVMContext &Ctx = M.getContext();
 
   PointerType *StackFramePtrTy = PointerType::getUnqual(Ctx);
   Function *Fn = nullptr;
-  if (GetOrCreateFunction(M, "__cilk_catch_exception",
-                          FunctionType::get(ExnTy,
-                                            {StackFramePtrTy, ExnTy},
-                                            false), Fn))
+  if (GetOrCreateFunction(
+          M, "__cilk_catch_exception",
+          FunctionType::get(ExnTy, {StackFramePtrTy, ExnTy}, false), Fn))
     return Fn;
 
   // Create the body of __cilk_catch_exeption
@@ -900,12 +876,11 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
     IRBuilder<> B(Entry);
 
     // if (sf->flags & CILK_FRAME_UNSYNCHED)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
-    Flags = B.CreateAnd(Flags,
-                        ConstantInt::get(Flags->getType(),
-                                         CILK_FRAME_UNSYNCHED));
+    Value *Flags =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
+    Flags = B.CreateAnd(
+        Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_UNSYNCHED));
     Value *Zero = ConstantInt::get(Flags->getType(), 0);
     Value *Unsynced = B.CreateICmpEQ(Flags, Zero);
     B.CreateCondBr(Unsynced, Exit, SetJmp);
@@ -927,18 +902,15 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
 
     // sf->except_data = Exn;
     // sf->flags = sf->flags | CILK_FRAME_EXCEPTING;
-    StoreSTyField(B, DL, StackFrameTy, Exn, SF,
-                  StackFrameFields::except_data, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags,
-                                /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
-    Flags = B.CreateOr(Flags, ConstantInt::get(Flags->getType(),
-                                               CILK_FRAME_EXCEPTING));
-    StoreSTyField(B, DL, StackFrameTy, Flags, SF,
-                  StackFrameFields::flags, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+    StoreSTyField(B, DL, StackFrameTy, Exn, SF, StackFrameFields::except_data,
+                  /*isVolatile=*/false, AtomicOrdering::Release);
+    Value *Flags =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
+    Flags = B.CreateOr(
+        Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_EXCEPTING));
+    StoreSTyField(B, DL, StackFrameTy, Flags, SF, StackFrameFields::flags,
+                  /*isVolatile=*/false, AtomicOrdering::Release);
 
     // __cilkrts_sync(sf);
     B.CreateCall(CILKRTS_FUNC(sync), SF);
@@ -949,20 +921,18 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
   {
     IRBuilder<> B(Catch);
     // sf->flags = sf->flags & ~CILK_FRAME_EXCEPTING;
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags,
-                                /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
-    Flags = B.CreateAnd(Flags, ConstantInt::get(Flags->getType(),
-                                                ~CILK_FRAME_EXCEPTING));
-    StoreSTyField(B, DL, StackFrameTy, Flags, SF,
-                  StackFrameFields::flags, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+    Value *Flags =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
+    Flags = B.CreateAnd(
+        Flags, ConstantInt::get(Flags->getType(), ~CILK_FRAME_EXCEPTING));
+    StoreSTyField(B, DL, StackFrameTy, Flags, SF, StackFrameFields::flags,
+                  /*isVolatile=*/false, AtomicOrdering::Release);
 
     // Exn = sf->except_data;
-    NewExn = LoadSTyField(B, DL, StackFrameTy, SF,
-                          StackFrameFields::except_data, /*isVolatile=*/false,
-                          AtomicOrdering::Acquire);
+    NewExn =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::except_data,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
     B.CreateBr(Exit);
   }
 
@@ -975,10 +945,9 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
     ExnPN->addIncoming(NewExn, Catch);
 
     // ++sf.worker->pedigree.rank;
-    Value *Worker = LoadSTyField(B, DL, StackFrameTy, SF,
-                                 StackFrameFields::worker,
-                                 /*isVolatile=*/false,
-                                 AtomicOrdering::Acquire);
+    Value *Worker =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::worker,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
     Value *Pedigree = GEP(B, Worker, WorkerTy, WorkerFields::pedigree);
     Value *Rank = GEP(B, Pedigree, PedigreeTy, PedigreeFields::rank);
     Type *RankTy = PedigreeTy->getElementType(PedigreeFields::rank);
@@ -1016,7 +985,7 @@ Function *CilkABI::GetCilkCatchExceptionFn(Type *ExnTy) {
 ///     /* sf->except_data is only valid when CILK_FRAME_EXCEPTING is set */
 ///     w->current_stack_frame = sf;
 /// }
-Function *CilkABI::Get__cilkrts_enter_frame_1() {
+Function *CilkPlusABI::Get__cilkrts_enter_frame_1() {
   // Get or create the __cilkrts_enter_frame_1 function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -1074,8 +1043,7 @@ Function *CilkABI::Get__cilkrts_enter_frame_1() {
     IRBuilder<> B(FastPath);
     // sf->flags = CILK_FRAME_VERSION;
     Type *Ty = SFTy->getElementType(StackFrameFields::flags);
-    StoreSTyField(B, DL, StackFrameTy,
-                  ConstantInt::get(Ty, CILK_FRAME_VERSION),
+    StoreSTyField(B, DL, StackFrameTy, ConstantInt::get(Ty, CILK_FRAME_VERSION),
                   SF, StackFrameFields::flags, /*isVolatile=*/false,
                   AtomicOrdering::Release);
     B.CreateBr(Cont);
@@ -1084,7 +1052,7 @@ Function *CilkABI::Get__cilkrts_enter_frame_1() {
   {
     IRBuilder<> B(Cont);
     Value *Wfast = W;
-    PHINode *W  = B.CreatePHI(WorkerPtrTy, 2);
+    PHINode *W = B.CreatePHI(WorkerPtrTy, 2);
     W->addIncoming(Wslow, SlowPath);
     W->addIncoming(Wfast, FastPath);
 
@@ -1092,18 +1060,15 @@ Function *CilkABI::Get__cilkrts_enter_frame_1() {
     StoreSTyField(B, DL, StackFrameTy,
                   LoadSTyField(B, DL, WorkerTy, W,
                                WorkerFields::current_stack_frame,
-                               /*isVolatile=*/false,
-                               AtomicOrdering::Acquire),
+                               /*isVolatile=*/false, AtomicOrdering::Acquire),
                   SF, StackFrameFields::call_parent, /*isVolatile=*/false,
                   AtomicOrdering::Release);
     // sf->worker = w;
-    StoreSTyField(B, DL, StackFrameTy, W, SF,
-                  StackFrameFields::worker, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+    StoreSTyField(B, DL, StackFrameTy, W, SF, StackFrameFields::worker,
+                  /*isVolatile=*/false, AtomicOrdering::Release);
     // w->current_stack_frame = sf;
-    StoreSTyField(B, DL, WorkerTy, SF, W,
-                  WorkerFields::current_stack_frame, /*isVolatile=*/false,
-                  AtomicOrdering::Release);
+    StoreSTyField(B, DL, WorkerTy, SF, W, WorkerFields::current_stack_frame,
+                  /*isVolatile=*/false, AtomicOrdering::Release);
 
     B.CreateRetVoid();
   }
@@ -1128,7 +1093,7 @@ Function *CilkABI::Get__cilkrts_enter_frame_1() {
 ///     /* sf->except_data is only valid when CILK_FRAME_EXCEPTING is set */
 ///     w->current_stack_frame = sf;
 /// }
-Function *CilkABI::Get__cilkrts_enter_frame_fast_1() {
+Function *CilkPlusABI::Get__cilkrts_enter_frame_fast_1() {
   // Get or create the __cilkrts_enter_frame_fast_1 function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -1152,7 +1117,7 @@ Function *CilkABI::Get__cilkrts_enter_frame_fast_1() {
 
   // struct __cilkrts_worker *w = __cilkrts_get_tls_worker();
   // if (fastCilk)
-    W = B.CreateCall(CILKRTS_FUNC(get_tls_worker_fast));
+  W = B.CreateCall(CILKRTS_FUNC(get_tls_worker_fast));
   // else
   //   W = B.CreateCall(CILKRTS_FUNC(get_tls_worker));
 
@@ -1160,26 +1125,22 @@ Function *CilkABI::Get__cilkrts_enter_frame_fast_1() {
   Type *Ty = SFTy->getElementType(StackFrameFields::flags);
 
   // sf->flags = CILK_FRAME_VERSION;
-  StoreSTyField(B, DL, StackFrameTy,
-                ConstantInt::get(Ty, CILK_FRAME_VERSION),
+  StoreSTyField(B, DL, StackFrameTy, ConstantInt::get(Ty, CILK_FRAME_VERSION),
                 SF, StackFrameFields::flags, /*isVolatile=*/false,
                 AtomicOrdering::Release);
   // sf->call_parent = w->current_stack_frame;
   StoreSTyField(B, DL, StackFrameTy,
                 LoadSTyField(B, DL, WorkerTy, W,
                              WorkerFields::current_stack_frame,
-                             /*isVolatile=*/false,
-                             AtomicOrdering::Acquire),
+                             /*isVolatile=*/false, AtomicOrdering::Acquire),
                 SF, StackFrameFields::call_parent, /*isVolatile=*/false,
                 AtomicOrdering::Release);
   // sf->worker = w;
-  StoreSTyField(B, DL, StackFrameTy, W, SF,
-                StackFrameFields::worker, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+  StoreSTyField(B, DL, StackFrameTy, W, SF, StackFrameFields::worker,
+                /*isVolatile=*/false, AtomicOrdering::Release);
   // w->current_stack_frame = sf;
-  StoreSTyField(B, DL, WorkerTy, SF, W,
-                WorkerFields::current_stack_frame, /*isVolatile=*/false,
-                AtomicOrdering::Release);
+  StoreSTyField(B, DL, WorkerTy, SF, W, WorkerFields::current_stack_frame,
+                /*isVolatile=*/false, AtomicOrdering::Release);
 
   B.CreateRetVoid();
 
@@ -1199,7 +1160,7 @@ Function *CilkABI::Get__cilkrts_enter_frame_fast_1() {
 ///   if (sf->flags != CILK_FRAME_VERSION)
 ///     __cilkrts_leave_frame(sf);
 /// }
-Function *CilkABI::GetCilkParentEpilogueFn(bool instrument) {
+Function *CilkPlusABI::GetCilkParentEpilogueFn(bool instrument) {
   // Get or create the __cilk_parent_epilogue function.
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
@@ -1217,8 +1178,8 @@ Function *CilkABI::GetCilkParentEpilogueFn(bool instrument) {
   Value *SF = &*args;
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", Fn),
-    *B1 = BasicBlock::Create(Ctx, "body", Fn),
-    *Exit  = BasicBlock::Create(Ctx, "exit", Fn);
+             *B1 = BasicBlock::Create(Ctx, "body", Fn),
+             *Exit = BasicBlock::Create(Ctx, "exit", Fn);
   CallInst *PopFrame;
 
   // Entry
@@ -1229,9 +1190,9 @@ Function *CilkABI::GetCilkParentEpilogueFn(bool instrument) {
     PopFrame = B.CreateCall(CILKRTS_FUNC(pop_frame), SF);
 
     // if (sf->flags != CILK_FRAME_VERSION)
-    Value *Flags = LoadSTyField(B, DL, StackFrameTy, SF,
-                                StackFrameFields::flags, /*isVolatile=*/false,
-                                AtomicOrdering::Acquire);
+    Value *Flags =
+        LoadSTyField(B, DL, StackFrameTy, SF, StackFrameFields::flags,
+                     /*isVolatile=*/false, AtomicOrdering::Acquire);
     Value *Cond = B.CreateICmpNE(
         Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_VERSION));
     B.CreateCondBr(Cond, B1, Exit);
@@ -1266,21 +1227,21 @@ Function *CilkABI::GetCilkParentEpilogueFn(bool instrument) {
 static const StringRef stack_frame_name = "__cilkrts_sf";
 
 /// Create the __cilkrts_stack_frame for the spawning function.
-AllocaInst *CilkABI::CreateStackFrame(Function &F) {
+AllocaInst *CilkPlusABI::CreateStackFrame(Function &F) {
   const DataLayout &DL = M.getDataLayout();
   Type *SFTy = StackFrameTy;
 
   IRBuilder<> B(&*F.getEntryBlock().getFirstInsertionPt());
   AllocaInst *SF = B.CreateAlloca(SFTy, DL.getAllocaAddrSpace(),
-                                  /*ArraySize*/nullptr,
-                                  /*Name*/stack_frame_name);
+                                  /*ArraySize*/ nullptr,
+                                  /*Name*/ stack_frame_name);
   SF->setAlignment(Align(8));
 
   return SF;
 }
 
-Value *CilkABI::GetOrInitCilkStackFrame(Function &F, bool Helper,
-                                        bool instrument) {
+Value *CilkPlusABI::GetOrInitCilkStackFrame(Function &F, bool Helper,
+                                            bool instrument) {
   if (DetachCtxToStackFrame.count(&F))
     return DetachCtxToStackFrame[&F];
 
@@ -1289,13 +1250,13 @@ Value *CilkABI::GetOrInitCilkStackFrame(Function &F, bool Helper,
   BasicBlock::iterator InsertPt = ++SF->getIterator();
   IRBuilder<> IRB(&(F.getEntryBlock()), InsertPt);
 
-  Value *Args[1] = { SF };
+  Value *Args[1] = {SF};
   if (Helper || fastCilk)
     IRB.CreateCall(CILKRTS_FUNC(enter_frame_fast_1), Args);
   else
     IRB.CreateCall(CILKRTS_FUNC(enter_frame_1), Args);
 
-  EscapeEnumerator EE(F, "cilkabi_epilogue", false);
+  EscapeEnumerator EE(F, "cilkplusabi_epilogue", false);
   while (IRBuilder<> *AtExit = EE.Next()) {
     if (isa<ReturnInst>(AtExit->GetInsertPoint()))
       AtExit->CreateCall(GetCilkParentEpilogueFn(instrument), Args, "");
@@ -1332,9 +1293,10 @@ Value *CilkABI::GetOrInitCilkStackFrame(Function &F, bool Helper,
   return SF;
 }
 
-bool CilkABI::makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
-                                     Instruction *TaskFrameCreate,
-                                     bool instrument) {
+bool CilkPlusABI::makeFunctionDetachable(Function &Extracted,
+                                         Instruction *DetachPt,
+                                         Instruction *TaskFrameCreate,
+                                         bool instrument) {
   /*
     __cilkrts_stack_frame sf;
     __cilkrts_enter_frame_fast_1(&sf);
@@ -1342,18 +1304,18 @@ bool CilkABI::makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
     *x = f(y);
   */
 
-  const DataLayout& DL = M.getDataLayout();
+  const DataLayout &DL = M.getDataLayout();
   AllocaInst *SF = CreateStackFrame(Extracted);
   DetachCtxToStackFrame[&Extracted] = SF;
   assert(SF && "Error creating Cilk stack frame in helper.");
-  Value *Args[1] = { SF };
+  Value *Args[1] = {SF};
 
   // Scan function to see if it detaches.
   LLVM_DEBUG({
-      bool SimpleHelper = !canDetach(&Extracted);
-      if (!SimpleHelper)
-        dbgs() << "NOTE: Detachable helper function itself detaches.\n";
-    });
+    bool SimpleHelper = !canDetach(&Extracted);
+    if (!SimpleHelper)
+      dbgs() << "NOTE: Detachable helper function itself detaches.\n";
+  });
 
   BasicBlock::iterator InsertPt = ++SF->getIterator();
   IRBuilder<> IRB(&(Extracted.getEntryBlock()), InsertPt);
@@ -1369,7 +1331,7 @@ bool CilkABI::makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
     IRB.CreateCall(CILKRTS_FUNC(detach), Args);
   }
 
-  EscapeEnumerator EE(Extracted, "cilkabi_epilogue", false);
+  EscapeEnumerator EE(Extracted, "cilkplusabi_epilogue", false);
   while (IRBuilder<> *AtExit = EE.Next()) {
     if (isa<ReturnInst>(AtExit->GetInsertPoint()))
       AtExit->CreateCall(GetCilkParentEpilogueFn(instrument), Args, "");
@@ -1379,14 +1341,12 @@ bool CilkABI::makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
         sf.except_data = Exn;
       */
       IRBuilder<> B(RI);
-      Value *Exn = AtExit->CreateExtractValue(RI->getValue(), { 0 });
-      Value *Flags = LoadSTyField(*AtExit, DL, StackFrameTy, SF,
-                                  StackFrameFields::flags,
-                                  /*isVolatile=*/false,
-                                  AtomicOrdering::Acquire);
-      Flags = AtExit->CreateOr(Flags,
-                               ConstantInt::get(Flags->getType(),
-                                                CILK_FRAME_EXCEPTING));
+      Value *Exn = AtExit->CreateExtractValue(RI->getValue(), {0});
+      Value *Flags =
+          LoadSTyField(*AtExit, DL, StackFrameTy, SF, StackFrameFields::flags,
+                       /*isVolatile=*/false, AtomicOrdering::Acquire);
+      Flags = AtExit->CreateOr(
+          Flags, ConstantInt::get(Flags->getType(), CILK_FRAME_EXCEPTING));
       StoreSTyField(*AtExit, DL, StackFrameTy, Flags, SF,
                     StackFrameFields::flags, /*isVolatile=*/false,
                     AtomicOrdering::Release);
@@ -1412,7 +1372,7 @@ bool CilkABI::makeFunctionDetachable(Function &Extracted, Instruction *DetachPt,
 ///     Grainsize = min(2048, ceil(Limit / (8 * workers)))
 ///
 /// This computation is inserted into the preheader of the loop.
-Value *CilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
+Value *CilkPlusABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Limit = GrainsizeCall->getArgOperand(0);
   IRBuilder<> Builder(GrainsizeCall);
 
@@ -1423,10 +1383,10 @@ Value *CilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
       Limit->getType(), false);
   // Compute ceil(limit / 8 * workers) =
   //           (limit + 8 * workers - 1) / (8 * workers)
-  Value *SmallLoopVal =
-    Builder.CreateUDiv(Builder.CreateSub(Builder.CreateAdd(Limit, WorkersX8),
-                                         ConstantInt::get(Limit->getType(), 1)),
-                       WorkersX8);
+  Value *SmallLoopVal = Builder.CreateUDiv(
+      Builder.CreateSub(Builder.CreateAdd(Limit, WorkersX8),
+                        ConstantInt::get(Limit->getType(), 1)),
+      WorkersX8);
   // Compute min
   Value *LargeLoopVal = ConstantInt::get(Limit->getType(), 2048);
   Value *Cmp = Builder.CreateICmpULT(LargeLoopVal, SmallLoopVal);
@@ -1437,18 +1397,18 @@ Value *CilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   return Grainsize;
 }
 
-void CilkABI::lowerSync(SyncInst &SI) {
+void CilkPlusABI::lowerSync(SyncInst &SI) {
   Function &Fn = *SI.getFunction();
 
-  Value *SF = GetOrInitCilkStackFrame(Fn, /*Helper*/false, false);
-  Value *args[] = { SF };
+  Value *SF = GetOrInitCilkStackFrame(Fn, /*Helper*/ false, false);
+  Value *args[] = {SF};
   assert(args[0] && "sync used in function without frame!");
 
   Instruction *SyncUnwind = nullptr;
   BasicBlock *SyncCont = SI.getSuccessor(0);
   BasicBlock *SyncUnwindDest = nullptr;
   if (InvokeInst *II =
-      dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
+          dyn_cast<InvokeInst>(SyncCont->getFirstNonPHIOrDbgOrLifetime())) {
     if (const Function *Called = II->getCalledFunction()) {
       if (Intrinsic::sync_unwind == Called->getIntrinsicID()) {
         SyncUnwind = II;
@@ -1487,9 +1447,9 @@ void CilkABI::lowerSync(SyncInst &SI) {
   Fn.addFnAttr(Attribute::Stealable);
 }
 
-void CilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                                     Instruction *TaskFrameCreate,
-                                     bool IsSpawner, BasicBlock *TFEntry) {
+void CilkPlusABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                         Instruction *TaskFrameCreate,
+                                         bool IsSpawner, BasicBlock *TFEntry) {
   NamedRegionTimer NRT("processOutlinedTask", "Process outlined task",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -1498,23 +1458,23 @@ void CilkABI::preProcessOutlinedTask(Function &F, Instruction *DetachPt,
     preProcessRootSpawner(F, TFEntry);
 }
 
-void CilkABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                                      Instruction *TaskFrameCreate,
-                                      bool IsSpawner, BasicBlock *TFEntry) {}
+void CilkPlusABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                          Instruction *TaskFrameCreate,
+                                          bool IsSpawner, BasicBlock *TFEntry) {
+}
 
-void CilkABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
-  NamedRegionTimer NRT("processSpawner", "Process spawner",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
+void CilkPlusABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
+  NamedRegionTimer NRT("processSpawner", "Process spawner", TimerGroupName,
+                       TimerGroupDescription, TimePassesIsEnabled);
   GetOrInitCilkStackFrame(F, /*Helper=*/false, false);
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
 }
 
-void CilkABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {}
+void CilkPlusABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {}
 
-void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
+void CilkPlusABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   NamedRegionTimer NRT("processSubTaskCall", "Process subtask call",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -1523,7 +1483,8 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   BasicBlock *UnwindDest = TOI.ReplUnwind;
   Function *Parent = ReplCall->getFunction();
 
-  LLVM_DEBUG(dbgs() << "CilkABI::processSubTaskCall: " << *ReplCall << "\n");
+  LLVM_DEBUG(dbgs() << "CilkPlusABI::processSubTaskCall: " << *ReplCall
+                    << "\n");
 
   Function &F = *ReplCall->getFunction();
   assert(DetachCtxToStackFrame.count(&F) &&
@@ -1533,10 +1494,10 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   if (InvokeInst *II = dyn_cast<InvokeInst>(ReplCall)) {
     LandingPadInst *LPI = II->getLandingPadInst();
     IRBuilder<> B(&*II->getUnwindDest()->getFirstInsertionPt());
-    Value *Exn = B.CreateExtractValue(LPI, { 0 });
-    Value *NewExn = B.CreateCall(GetCilkCatchExceptionFn(Exn->getType()),
-                                 { SF, Exn });
-    B.CreateInsertValue(LPI, NewExn, { 0 });
+    Value *Exn = B.CreateExtractValue(LPI, {0});
+    Value *NewExn =
+        B.CreateCall(GetCilkCatchExceptionFn(Exn->getType()), {SF, Exn});
+    B.CreateInsertValue(LPI, NewExn, {0});
   }
 
   // Split the basic block containing the detach replacement just before the
@@ -1559,8 +1520,8 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
   // Insert a conditional branch, based on the result of the setjmp, to either
   // the detach replacement or the continuation.
-  SetJmpRes = B.CreateICmpEQ(SetJmpRes,
-                             ConstantInt::get(SetJmpRes->getType(), 0));
+  SetJmpRes =
+      B.CreateICmpEQ(SetJmpRes, ConstantInt::get(SetJmpRes->getType(), 0));
   B.CreateCondBr(SetJmpRes, CallBlock, CallCont);
   // Add DetBlock as a predecessor for all Phi nodes in CallCont.  These Phi
   // nodes receive the same value from DetBlock as from CallBlock.
@@ -1581,25 +1542,24 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   ValueSet SHInputs;
   fixupInputSet(*Parent, SHInputSet, SHInputs);
   LLVM_DEBUG({
-      dbgs() << "SHInputSet:\n";
-      for (Value *V : SHInputSet)
-        dbgs() << "\t" << *V << "\n";
-      dbgs() << "SHInputs:\n";
-      for (Value *V : SHInputs)
-        dbgs() << "\t" << *V << "\n";
-    });
-  ValueSet Outputs;  // Should be empty.
+    dbgs() << "SHInputSet:\n";
+    for (Value *V : SHInputSet)
+      dbgs() << "\t" << *V << "\n";
+    dbgs() << "SHInputs:\n";
+    for (Value *V : SHInputs)
+      dbgs() << "\t" << *V << "\n";
+  });
+  ValueSet Outputs; // Should be empty.
   // Only one block needs to be cloned into the spawn helper
   std::vector<BasicBlock *> BlocksToClone;
   BlocksToClone.push_back(CallBlock);
-  SmallVector<ReturnInst *, 1> Returns;  // Ignore returns cloned.
+  SmallVector<ReturnInst *, 1> Returns; // Ignore returns cloned.
   ValueToValueMapTy VMap;
   Twine NameSuffix = ".shelper";
-  Function *SpawnHelper =
-      CreateHelper(SHInputs, Outputs, BlocksToClone, CallBlock, DetBlock,
-                   CallCont, VMap, &M, CloneFunctionChangeType::LocalChangesOnly,
-                   Returns, NameSuffix.str(), nullptr, nullptr, nullptr,
-                   UnwindDest);
+  Function *SpawnHelper = CreateHelper(
+      SHInputs, Outputs, BlocksToClone, CallBlock, DetBlock, CallCont, VMap, &M,
+      CloneFunctionChangeType::LocalChangesOnly, Returns, NameSuffix.str(),
+      nullptr, nullptr, nullptr, UnwindDest);
 
   assert(Returns.empty() && "Returns cloned when creating SpawnHelper.");
 
@@ -1645,8 +1605,8 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   SplitEdge(DetBlock, CallBlock);
   B.SetInsertPoint(CallBlock->getTerminator());
   if (isa<InvokeInst>(ReplCall)) {
-    InvokeInst *SpawnHelperCall = InvokeInst::Create(SpawnHelper, CallCont,
-                                                     UnwindDest, SHInputVec);
+    InvokeInst *SpawnHelperCall =
+        InvokeInst::Create(SpawnHelper, CallCont, UnwindDest, SHInputVec);
     SpawnHelperCall->setDebugLoc(ReplCall->getDebugLoc());
     SpawnHelperCall->setCallingConv(SpawnHelper->getCallingConv());
     // The invoke of the spawn helper can replace the terminator in CallBlock.
@@ -1665,8 +1625,8 @@ void CilkABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 // Helper function to inline calls to compiler-generated Cilk Plus runtime
 // functions when possible.  This inlining is necessary to properly implement
 // some Cilk runtime "calls," such as __cilk_sync().
-static inline void inlineCilkFunctions(
-    Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
+static inline void
+inlineCilkFunctions(Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
   for (CallBase *CB : CallsToInline) {
     InlineFunctionInfo IFI;
     InlineFunction(*CB, IFI);
@@ -1674,13 +1634,14 @@ static inline void inlineCilkFunctions(
   CallsToInline.clear();
 }
 
-bool CilkABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                 bool ProcessingTapirLoops) {
+bool CilkPlusABI::preProcessFunction(Function &F, TaskInfo &TI,
+                                     bool ProcessingTapirLoops) {
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return false;
 
-  LLVM_DEBUG(dbgs() << "CilkABI processing function " << F.getName() << "\n");
+  LLVM_DEBUG(dbgs() << "CilkPlusABI processing function " << F.getName()
+                    << "\n");
   if (fastCilk && F.getName() == "main") {
     IRBuilder<> B(F.getEntryBlock().getTerminator());
     B.CreateCall(CILKRTS_FUNC(init));
@@ -1688,7 +1649,7 @@ bool CilkABI::preProcessFunction(Function &F, TaskInfo &TI,
   return false;
 }
 
-void CilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
+void CilkPlusABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
   if (ProcessingTapirLoops)
     // Don't do any preprocessing when outlining Tapir loops.
     return;
@@ -1700,10 +1661,10 @@ void CilkABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
     inlineCilkFunctions(F, CallsToInline);
 }
 
-void CilkABI::postProcessHelper(Function &F) {}
+void CilkPlusABI::postProcessHelper(Function &F) {}
 
 LoopOutlineProcessor *
-CilkABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
+CilkPlusABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
   if (UseRuntimeCilkFor)
     return new RuntimeCilkFor(M);
   return nullptr;

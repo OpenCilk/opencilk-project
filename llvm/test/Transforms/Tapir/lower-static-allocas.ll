@@ -1,4 +1,4 @@
-; RUN: opt < %s -passes=tapir2target -tapir-target=cilk -debug-abi-calls -S | FileCheck %s --check-prefix=TT
+; RUN: opt < %s -passes=tapir2target -tapir-target=opencilk -use-opencilk-runtime-bc=false -debug-abi-calls -S | FileCheck %s --check-prefix=TT
 ; RUN: opt < %s -passes=loop-spawning -S | FileCheck %s --check-prefix=LS
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
