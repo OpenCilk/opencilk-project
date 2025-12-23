@@ -11679,7 +11679,7 @@ def note_cilk_for_grainsize_conversion : Note<
   "grainsize must evaluate to a type convertible to %0">;
 
 def warn_cilk_for_wraparound: Warning<
-  "%0 stride causes %1 wraparound">, InGroup<SourceUsesCilkPlus>, DefaultWarn;
+  "%0 stride causes %1 wraparound">, InGroup<SourceUsesCilk>, DefaultWarn;
 
 def note_cilk_for_wraparound_undefined: Note<
   "wraparounds cause undefined behavior in 'cilk_for'">;

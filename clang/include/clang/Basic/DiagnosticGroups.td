@@ -1214,7 +1214,7 @@ def Move : DiagGroup<"move", [
   ]>;
 
 // Cilk Plus and OpenCilk warnings.
-def SourceUsesCilkPlus : DiagGroup<"source-uses-cilk-plus">;
+def SourceUsesCilk : DiagGroup<"source-uses-cilk">;
 def CilkPlusLoopControlVarModification : DiagGroup<"cilk-loop-control-var-modification">;
 def ReturnCilkSpawn : DiagGroup<"return-cilk-spawn">;
 def CilkIgnored : DiagGroup<"cilk-ignored">;

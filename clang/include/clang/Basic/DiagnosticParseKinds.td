@@ -1478,7 +1478,7 @@ def err_acc_modifier
     : Error<"%enum_select<ACCModifier>{%Unknown{unknown}|%Duplicate{duplicate}}"
             "0 modifier %1 in OpenACC modifier-list on '%2' clause">;
 
-// Cilk Plus
+// Cilk
 def err_cilkplus_disable: Error<
   "Cilk Plus support disabled - compile with -fcilkplus">;
 def err_cilk_for_missing_control_variable: Error<
@@ -1497,13 +1497,13 @@ def err_pragma_cilk_grainsize_missing_argument : Error<
   "missing argument; expected an integer value">;
 def warn_cilk_for_following_grainsize: Warning<
   "'#pragma cilk' ignored, because it is not followed by a 'cilk_for' loop">,
-  InGroup<SourceUsesCilkPlus>;
+  InGroup<SourceUsesCilk>;
 def warn_pragma_cilk_grainsize_equals: Warning<
   "'#pragma cilk grainsize' no longer requires '='">,
-  InGroup<SourceUsesCilkPlus>;
+  InGroup<SourceUsesCilk>;
 def warn_cilk_for_forrange_loop_experimental: Warning<
   "'cilk_for' support for for-range loops is currently experimental">,
-  InGroup<SourceUsesCilkPlus>;
+  InGroup<SourceUsesCilk>;
 def error_hyperobject_arguments: Error<
   "extra hyperobject callbacks ignored">;
 
