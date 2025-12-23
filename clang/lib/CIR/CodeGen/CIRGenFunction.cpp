@@ -65,6 +65,7 @@ cir::TypeEvaluationKind CIRGenFunction::getEvaluationKind(QualType type) {
     case Type::BitInt:
     case Type::HLSLAttributedResource:
     case Type::HLSLInlineSpirv:
+    case Type::Hyperobject:
       return cir::TEK_Scalar;
 
     // Complexes.

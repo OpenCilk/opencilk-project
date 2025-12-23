@@ -228,6 +228,11 @@ mlir::LogicalResult CIRGenFunction::emitStmt(const Stmt *s,
   case Stmt::OMPStripeDirectiveClass:
   case Stmt::ObjCAtCatchStmtClass:
   case Stmt::ObjCAtFinallyStmtClass:
+  case Stmt::CilkForRangeStmtClass:
+  case Stmt::CilkForStmtClass:
+  case Stmt::CilkScopeStmtClass:
+  case Stmt::CilkSpawnStmtClass:
+  case Stmt::CilkSyncStmtClass:
     cgm.errorNYI(s->getSourceRange(),
                  std::string("emitStmt: ") + s->getStmtClassName());
     return mlir::failure();
