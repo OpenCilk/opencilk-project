@@ -23,6 +23,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/WorkSpanAnalysis.h"
+#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
@@ -79,7 +80,7 @@ static OptimizationRemarkAnalysis createMissedAnalysis(StringRef RemarkName,
     DL = TheLoop->getStartLoc();
 
   return OptimizationRemarkAnalysis(DEBUG_TYPE, RemarkName, DL, CodeRegion)
-         << "loop not stripmined: ";
+         << "Loop not stripmined: ";
 }
 
 /// Approximate the work of the body of the loop L.  Returns several relevant
@@ -123,9 +124,8 @@ static bool tryToStripMineLoop(
                     << L->getHeader()->getName() << "\n");
 
   if (!L->isLoopSimplifyForm()) {
-    LLVM_DEBUG(
-        dbgs() << "  Not stripmining loop which is not in loop-simplify "
-                  "form.\n");
+    LLVM_DEBUG(dbgs() << "  Not stripmining loop which is not in loop-simplify "
+                         "form.\n");
     return false;
   }
   bool StripMiningRequested =
@@ -147,6 +147,46 @@ static bool tryToStripMineLoop(
                           UnknownSize, TTI, LI, SE, EphValues, TLI);
   // Determine the iteration count of the eventual stripmined the loop.
   bool ExplicitCount = computeStripMineCount(L, TTI, LoopCost, SMP);
+  ORE.emit([&]() {
+    return OptimizationRemarkAnalysis(DEBUG_TYPE, "StripmineCount",
+                                      L->getStartLoc(), L->getHeader())
+           << "Found stripmine count " << ore::NV("StripmineCount", SMP.Count)
+           << (ExplicitCount ? " (from annotation or command-line option)."
+                             : ".");
+  });
+
+  // If the work in the loop body is big, then use a stripmine count of 1 for
+  // it.
+  LLVM_DEBUG(dbgs() << "  Loop cost = " << LoopCost
+                    << ", Stripmine count = " << SMP.Count
+                    << (ExplicitCount ? " (explicit count)\n" : "\n"));
+  if (SMP.Count <= 1) {
+    LLVM_DEBUG(dbgs() << "  Using grainsize 1 for big loop.\n");
+    if (Hints.getGrainsize() == 1)
+      return false;
+    ORE.emit([&]() {
+      return OptimizationRemark(DEBUG_TYPE, "BigLoop", L->getStartLoc(),
+                                L->getHeader())
+             << "using grainsize 1 for big loop";
+    });
+    Hints.setAlreadyStripMined();
+    return true;
+  }
+
+  // If the loop is recursive, set the stripmine count to be 1.
+  if (!ExplicitCount && IsRecursive) {
+    LLVM_DEBUG(dbgs() << "  Not stripmining loop that recursively calls the "
+                      << "containing function.\n");
+    if (Hints.getGrainsize() == 1)
+      return false;
+    ORE.emit([&]() {
+      return OptimizationRemark(DEBUG_TYPE, "RecursiveCalls", L->getStartLoc(),
+                                L->getHeader())
+             << "Using grainsize 1 for loop with recursive calls";
+    });
+    Hints.setAlreadyStripMined();
+    return true;
+  }
 
   // If the loop size is unknown, then we cannot compute a stripmining count for
   // it.
@@ -157,44 +197,14 @@ static bool tryToStripMineLoop(
     return false;
   }
 
-  // If the loop size is enormous, then we might want to use a stripmining count
-  // of 1 for it.
-  LLVM_DEBUG(dbgs() << "  Loop Cost = " << LoopCost << "\n");
-  if (!ExplicitCount && InstructionCost::getMax() == LoopCost) {
-    LLVM_DEBUG(dbgs() << "  Not stripmining loop with very large size.\n");
-    if (Hints.getGrainsize() == 1)
-      return false;
-    ORE.emit([&]() {
-               return OptimizationRemark(DEBUG_TYPE, "HugeLoop",
-                                         L->getStartLoc(), L->getHeader())
-                 << "using grainsize 1 for huge loop";
-             });
-    Hints.setAlreadyStripMined();
-    return true;
-  }
-
-  // If the loop is recursive, set the stripmine factor to be 1.
-  if (!ExplicitCount && IsRecursive) {
-    LLVM_DEBUG(dbgs() << "  Not stripmining loop that recursively calls the "
-                      << "containing function.\n");
-    if (Hints.getGrainsize() == 1)
-      return false;
-    ORE.emit([&]() {
-               return OptimizationRemark(DEBUG_TYPE, "RecursiveCalls",
-                                         L->getStartLoc(), L->getHeader())
-                 << "using grainsize 1 for loop with recursive calls";
-             });
-    Hints.setAlreadyStripMined();
-    return true;
-  }
-
   // TODO: We can stripmine loops if the stripmined version does not require a
   // prolog or epilog.
   if (NotDuplicatable) {
     LLVM_DEBUG(dbgs() << "  Not stripmining loop which contains "
                       << "non-duplicatable instructions.\n");
     ORE.emit(createMissedAnalysis("NotDuplicatable", L)
-             << "Cannot stripmine loop with non-duplicatable instructions.");
+             << "Cannot stripmine loop containing instructions that cannot be "
+                "duplicated.");
     return false;
   }
 
@@ -204,46 +214,57 @@ static bool tryToStripMineLoop(
   if (Convergent) {
     LLVM_DEBUG(dbgs() << "  Skipping loop with convergent operations.\n");
     ORE.emit(createMissedAnalysis("Convergent", L)
-             << "Cannot stripmine loop with convergent instructions.");
+             << "Cannot stripmine loop containing convergent instructions.");
     return false;
   }
 
-  // If the loop contains potentially expensive function calls, then we don't
-  // want to stripmine it.
+  // If the loop contains potentially expensive function calls, then the
+  // stripmine count might be an underestimate.  Avoid stripmining these loops
+  // unless we would use grainsize 1 or stripmining is explicitly requested.
   if (NumCalls > 0 && !ExplicitCount && !StripMiningRequested) {
     LLVM_DEBUG(dbgs() << "  Skipping loop with expensive function calls.\n");
     ORE.emit(createMissedAnalysis("ExpensiveCalls", L)
-             << "Not stripmining loop with potentially expensive calls.");
+             << "Loop contains function calls with unknown cost.");
     return false;
   }
 
   // Make sure the count is a power of 2.
+  // TODO: Support stripmining by not a power of 2.
   if (!isPowerOf2_32(SMP.Count))
     SMP.Count = NextPowerOf2(SMP.Count);
-  if (SMP.Count < 2) {
-    if (Hints.getGrainsize() == 1)
-      return false;
-    ORE.emit([&]() {
-               return OptimizationRemark(DEBUG_TYPE, "LargeLoop",
-                                         L->getStartLoc(), L->getHeader())
-                 << "using grainsize 1 for large loop";
-             });
-    Hints.setAlreadyStripMined();
-    return true;
-  }
 
   // Find a constant trip count if available
   unsigned ConstTripCount = getConstTripCount(L, SE);
 
-  // Stripmining factor (Count) must be less or equal to TripCount.
+  // Stripmining factor (Count) must be less or equal to TripCount, or else it's
+  // better to just execute this loop serially.
   if (ConstTripCount && SMP.Count >= ConstTripCount) {
-    ORE.emit(createMissedAnalysis("FullStripMine", L)
-             << "Stripmining count larger than loop trip count.");
-    ORE.emit(DiagnosticInfoOptimizationFailure(
-                 DEBUG_TYPE, "UnprofitableParallelLoop",
-                 L->getStartLoc(), L->getHeader())
-             << "Parallel loop does not appear profitable to parallelize.");
-    return false;
+    ORE.emit([&]() {
+      return OptimizationRemarkAnalysis(DEBUG_TYPE, "FullStripMine",
+                                        L->getStartLoc(), L->getHeader())
+             << "stripmine count (" << ore::NV("StripmineCount", SMP.Count)
+             << ") exceeds loop trip count ("
+             << ore::NV("ConstTripCount", ConstTripCount) << ").";
+    });
+
+    // Serialize the loop's detach, since it appears to be too small to be worth
+    // parallelizing.
+    ORE.emit([&]() {
+      return OptimizationRemark(DEBUG_TYPE, "SerializingSmallLoop",
+                                L->getStartLoc(), L->getHeader())
+             << "Serializing parallel loop that appears not to be profitable "
+                "to parallelize.";
+    });
+    SerializeDetach(cast<DetachInst>(L->getHeader()->getTerminator()), T,
+                    /*ReplaceWithTaskFrame=*/taskContainsSync(T), &DT);
+    Hints.clearHintsMetadata();
+    L->setDerivedFromTapirLoop();
+    // Update TaskInfo manually using the updated DT.
+    if (TI)
+      // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+      // Optimize this routine in the future.
+      TI->recalculate(*L->getHeader()->getParent(), DT);
+    return true;
   }
 
   // When is it worthwhile to allow the epilog to run in parallel with the
@@ -292,8 +313,6 @@ static bool tryToStripMineLoop(
 
   // Copy metadata to remainder loop
   if (RemainderLoop && OrigLoopID) {
-    // Optional<MDNode *> RemainderLoopID = makeFollowupLoopID(
-    //     OrigLoopID, {}, "tapir.loop");
     MDNode *NewRemainderLoopID =
         CopyNonTapirLoopMetadata(RemainderLoop->getLoopID(), OrigLoopID);
     RemainderLoop->setLoopID(NewRemainderLoopID);
@@ -388,11 +407,6 @@ PreservedAnalyses LoopStripMinePass::run(Function &F,
   LoopAnalysisManager *LAM = nullptr;
   if (auto *LAMProxy = AM.getCachedResult<LoopAnalysisManagerFunctionProxy>(F))
     LAM = &LAMProxy->getManager();
-
-  // const ModuleAnalysisManager &MAM =
-  //     AM.getResult<ModuleAnalysisManagerFunctionProxy>(F).getManager();
-  // ProfileSummaryInfo *PSI =
-  //     MAM.getCachedResult<ProfileSummaryAnalysis>(*F.getParent());
 
   bool Changed = false;
 

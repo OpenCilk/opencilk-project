@@ -217,7 +217,8 @@ bool llvm::computeStripMineCount(
                                       TargetTransformInfo::TCK_SizeAndLatency) /
                LoopCost)
                   .getValue();
-
+  // Make sure the stripmine count is at least 1.
+  SMP.Count |= (SMP.Count == 0);
   return false;
 }
 
@@ -880,11 +881,11 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   LLVM_DEBUG(dbgs() << "Stripmining loop using grainsize " << Count << "\n");
   using namespace ore;
   ORE->emit([&]() {
-              return OptimizationRemark(LSM_NAME, "Stripmined",
-                                        L->getStartLoc(), L->getHeader())
-                << "stripmined loop using count "
-                << NV("StripMineCount", Count);
-            });
+    return OptimizationRemark(LSM_NAME, "Stripmined", L->getStartLoc(),
+                              L->getHeader())
+           << "stripmined loop using grainsize " << NV("StripMineCount", Count)
+           << ".";
+  });
 
   // Loop structure is the following:
   //
