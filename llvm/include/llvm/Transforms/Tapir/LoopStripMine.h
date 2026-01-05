@@ -10,7 +10,6 @@
 #define LLVM_TRANSFORMS_TAPIR_LOOPSTRIPMINE_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/InstructionCost.h"
 
@@ -33,9 +32,10 @@ void simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
                                 const TargetTransformInfo &TTI,
                                 AssumptionCache *AC);
 
-TargetTransformInfo::StripMiningPreferences gatherStripMiningPreferences(
-    Loop *L, ScalarEvolution &SE, const TargetTransformInfo &TTI,
-    std::optional<unsigned> UserCount);
+TargetTransformInfo::StripMiningPreferences
+gatherStripMiningPreferences(Loop *L, ScalarEvolution &SE,
+                             const TargetTransformInfo &TTI,
+                             std::optional<unsigned> UserCount);
 
 bool computeStripMineCount(Loop *L, const TargetTransformInfo &TTI,
                            InstructionCost LoopCost,

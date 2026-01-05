@@ -30,8 +30,10 @@
 // Tapir.
 
 namespace llvm {
+class BlockFrequencyInfo;
 class Loop;
 class LoopInfo;
+class OptimizationRemarkEmitter;
 class ScalarEvolution;
 class TargetLibraryInfo;
 class TargetTransformInfo;
@@ -50,8 +52,9 @@ unsigned getConstTripCount(const Loop *L, ScalarEvolution &SE);
 
 void estimateLoopCost(WSCost &LoopCost, const Loop *L, LoopInfo *LI,
                       ScalarEvolution *SE, const TargetTransformInfo &TTI,
-                      TargetLibraryInfo *TLI,
-                      const SmallPtrSetImpl<const Value *> &EphValues);
-}
+                      TargetLibraryInfo *TLI, BlockFrequencyInfo *BFI,
+                      const SmallPtrSetImpl<const Value *> &EphValues,
+                      OptimizationRemarkEmitter *ORE);
+} // namespace llvm
 
 #endif // LLVM_ANALYSIS_WORKSPANANALYSIS_H_

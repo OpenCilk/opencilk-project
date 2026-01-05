@@ -54,8 +54,8 @@ static cl::opt<unsigned> StripMineCoarseningFactor(
     cl::desc("Use this coarsening factor for stripmining"));
 
 static cl::opt<bool> StripMineUnrollRemainder(
-  "stripmine-unroll-remainder", cl::Hidden,
-  cl::desc("Allow the loop remainder after stripmining to be unrolled."));
+    "stripmine-unroll-remainder", cl::Hidden,
+    cl::desc("Allow the loop remainder after stripmining to be unrolled."));
 
 /// Constants for stripmining cost analysis.
 namespace StripMineConstants {
@@ -144,17 +144,19 @@ void llvm::simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
 
 /// Gather the various unrolling parameters based on the defaults, compiler
 /// flags, TTI overrides and user specified parameters.
-TargetTransformInfo::StripMiningPreferences llvm::gatherStripMiningPreferences(
-    Loop *L, ScalarEvolution &SE, const TargetTransformInfo &TTI,
-    std::optional<unsigned> UserCount) {
+TargetTransformInfo::StripMiningPreferences
+llvm::gatherStripMiningPreferences(Loop *L, ScalarEvolution &SE,
+                                   const TargetTransformInfo &TTI,
+                                   std::optional<unsigned> UserCount) {
   TargetTransformInfo::StripMiningPreferences SMP;
 
   // Set up the defaults
   SMP.Count = 0;
   SMP.AllowExpensiveTripCount = false;
   SMP.DefaultCoarseningFactor =
-    (StripMineCoarseningFactor.getNumOccurrences() > 0) ?
-    StripMineCoarseningFactor : StripMineConstants::DefaultCoarseningFactor;
+      (StripMineCoarseningFactor.getNumOccurrences() > 0)
+          ? StripMineCoarseningFactor
+          : StripMineConstants::DefaultCoarseningFactor;
   SMP.UnrollRemainder = false;
 
   // Override with any target specific settings
@@ -232,8 +234,8 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
 
   BasicBlock *Preheader = L->getLoopPreheader();
   if (!Preheader) {
-    LLVM_DEBUG(dbgs()
-               << "  Can't stripmine: loop preheader-insertion failed.\n");
+    LLVM_DEBUG(
+        dbgs() << "  Can't stripmine: loop preheader-insertion failed.\n");
     if (ORE)
       ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoPreheader", L)
                 << "loop lacks a preheader");
@@ -244,8 +246,8 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
 
   BasicBlock *LatchBlock = L->getLoopLatch();
   if (!LatchBlock) {
-    LLVM_DEBUG(dbgs()
-               << "  Can't stripmine: loop exit-block-insertion failed.\n");
+    LLVM_DEBUG(
+        dbgs() << "  Can't stripmine: loop exit-block-insertion failed.\n");
     if (ORE)
       ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoLatch", L)
                 << "loop lacks a latch");
@@ -256,9 +258,9 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
   if (!L->isSafeToClone()) {
     LLVM_DEBUG(dbgs() << "  Can't stripmine: loop body cannot be cloned.\n");
     if (ORE)
-      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "UnsafeToClone",
-                                                    L)
-                << "loop is not safe to clone");
+      ORE->emit(
+          TapirLoopInfo::createMissedAnalysis(LSM_NAME, "UnsafeToClone", L)
+          << "loop is not safe to clone");
     return nullptr;
   }
 
@@ -285,9 +287,9 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
         dbgs()
         << "  Can't stripmine: loop not terminated by a conditional branch.\n");
     if (ORE)
-      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoLatchBranch",
-                                                    L)
-                << "loop latch is not terminated by a conditional branch");
+      ORE->emit(
+          TapirLoopInfo::createMissedAnalysis(LSM_NAME, "NoLatchBranch", L)
+          << "loop latch is not terminated by a conditional branch");
     return nullptr;
   }
 
@@ -300,21 +302,20 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
     LLVM_DEBUG(dbgs() << "  Can't stripmine: only loops with one conditional"
                          " latch exiting the loop can be stripmined.\n");
     if (ORE)
-      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME,
-                                                    "ComplexLatchBranch", L)
-                << "loop has multiple exiting conditional latches");
+      ORE->emit(
+          TapirLoopInfo::createMissedAnalysis(LSM_NAME, "ComplexLatchBranch", L)
+          << "loop has multiple exiting conditional latches");
     return nullptr;
   }
 
   if (Header->hasAddressTaken()) {
     // The loop-rotate pass can be helpful to avoid this in many cases.
-    LLVM_DEBUG(
-        dbgs() << "  Won't stripmine loop: address of header block is "
-        "taken.\n");
+    LLVM_DEBUG(dbgs() << "  Won't stripmine loop: address of header block is "
+                         "taken.\n");
     if (ORE)
-      ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME,
-                                                    "HeaderAddressTaken", L)
-                << "loop header block has address taken");
+      ORE->emit(
+          TapirLoopInfo::createMissedAnalysis(LSM_NAME, "HeaderAddressTaken", L)
+          << "loop header block has address taken");
     return nullptr;
   }
 
@@ -323,9 +324,8 @@ static Task *getTapirLoopForStripMining(const Loop *L, TaskInfo &TI,
     for (auto &I : *BB)
       if (CallBase *CB = dyn_cast<CallBase>(&I))
         if (CB->isConvergent()) {
-          LLVM_DEBUG(
-              dbgs() << "  Won't stripmine loop: contains convergent "
-              "attribute.\n");
+          LLVM_DEBUG(dbgs() << "  Won't stripmine loop: contains convergent "
+                               "attribute.\n");
           if (ORE)
             ORE->emit(TapirLoopInfo::createMissedAnalysis(LSM_NAME,
                                                           "ConvergentLoop", L)
@@ -377,10 +377,11 @@ static void connectEpilog(TapirLoopInfo &TL, Value *EpilStartIter,
     // Compute the value of this induction at NewExit.
     const InductionDescriptor &II = InductionEntry.second;
     // Get the new step value for this Phi.
-    Value *PhiIter = !II.getStep()->getType()->isIntegerTy()
-      ? B.CreateCast(Instruction::SIToFP, EpilStartIter,
-                     II.getStep()->getType())
-      : B.CreateSExtOrTrunc(EpilStartIter, II.getStep()->getType());
+    Value *PhiIter =
+        !II.getStep()->getType()->isIntegerTy()
+            ? B.CreateCast(Instruction::SIToFP, EpilStartIter,
+                           II.getStep()->getType())
+            : B.CreateSExtOrTrunc(EpilStartIter, II.getStep()->getType());
     Value *NewPhiStart = emitTransformedIndex(B, PhiIter, SE, DL, II);
 
     // Update the PHI node in the epilog loop.
@@ -393,7 +394,7 @@ static void connectEpilog(TapirLoopInfo &TL, Value *EpilStartIter,
   Value *BrLoopExit = B.CreateIsNotNull(ModVal, "lcmp.mod");
   assert(Exit && "Loop must have a single exit block only");
   // Split the epilogue exit to maintain loop canonicalization guarantees
-  SmallVector<BasicBlock*, 4> Preds(predecessors(Exit));
+  SmallVector<BasicBlock *, 4> Preds(predecessors(Exit));
   SplitBlockPredecessors(Exit, Preds, ".epilog-lcssa", DT, LI, nullptr,
                          PreserveLCSSA);
   // Add the branch to the exit block (around the stripmining loop)
@@ -403,7 +404,7 @@ static void connectEpilog(TapirLoopInfo &TL, Value *EpilStartIter,
     DT->changeImmediateDominator(Exit, NewExit);
 
   // Split the main loop exit to maintain canonicalization guarantees.
-  SmallVector<BasicBlock*, 4> NewExitPreds{LoopDet};
+  SmallVector<BasicBlock *, 4> NewExitPreds{LoopDet};
   if (LoopEnd != NewExit)
     NewExitPreds.push_back(LoopEnd);
   SplitBlockPredecessors(NewExit, NewExitPreds, ".loopexit", DT, LI, nullptr,
@@ -828,7 +829,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // We will use the increment of the primary induction variable to derive
   // wrapping flags.
   Instruction *PrimaryInc =
-    cast<Instruction>(PrimaryInduction->getIncomingValueForBlock(Latch));
+      cast<Instruction>(PrimaryInduction->getIncomingValueForBlock(Latch));
 
   // Get all uses of the primary induction variable in the task.
   SmallVector<Use *, 4> PrimaryInductionUsesInTask;
@@ -851,7 +852,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   }
 
   unsigned BEWidth =
-    cast<IntegerType>(TL.getWidestInductionType())->getBitWidth();
+      cast<IntegerType>(TL.getWidestInductionType())->getBitWidth();
 
   // Add 1 since the backedge count doesn't include the first loop iteration.
   const SCEV *TripCountSC = TL.getExitCount(BECountSC, PSE);
@@ -904,9 +905,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     NewPreheader = SplitBlock(Preheader, Preheader->getTerminator(), DT, LI);
     NewPreheader->setName(Preheader->getName() + ".new");
     // Split LatchExit to create phi nodes from branch above.
-    SmallVector<BasicBlock*, 4> Preds(predecessors(LatchExit));
-    NewExit = SplitBlockPredecessors(LatchExit, Preds, ".strpm-lcssa",
-                                     DT, LI, nullptr, PreserveLCSSA);
+    SmallVector<BasicBlock *, 4> Preds(predecessors(LatchExit));
+    NewExit = SplitBlockPredecessors(LatchExit, Preds, ".strpm-lcssa", DT, LI,
+                                     nullptr, PreserveLCSSA);
     // NewExit gets its DebugLoc from LatchExit, which is not part of the
     // original Loop.
     // Fix this by setting Loop's DebugLoc to NewExit.
@@ -922,8 +923,8 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // Compute the number of extra iterations required, which is:
   //  extra iterations = run-time trip count % loop stripmine factor
   PreheaderBR = cast<BranchInst>(Preheader->getTerminator());
-  Value *BECount = Expander.expandCodeFor(BECountSC, BECountSC->getType(),
-                                          PreheaderBR);
+  Value *BECount =
+      Expander.expandCodeFor(BECountSC, BECountSC->getType(), PreheaderBR);
 
   // Loop structure should be the following:
   //  Epilog
@@ -958,16 +959,14 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   } else {
     // As (BECount + 1) can potentially unsigned overflow we count
     // (BECount % Count) + 1 which is overflow safe as BECount % Count < Count.
-    Value *ModValTmp = B.CreateURem(BECount,
-                                    ConstantInt::get(BECount->getType(),
-                                                     Count));
-    Value *ModValAdd = B.CreateAdd(ModValTmp,
-                                   ConstantInt::get(ModValTmp->getType(), 1));
+    Value *ModValTmp =
+        B.CreateURem(BECount, ConstantInt::get(BECount->getType(), Count));
+    Value *ModValAdd =
+        B.CreateAdd(ModValTmp, ConstantInt::get(ModValTmp->getType(), 1));
     // At that point (BECount % Count) + 1 could be equal to Count.
     // To handle this case we need to take mod by Count one more time.
-    ModVal = B.CreateURem(ModValAdd,
-                          ConstantInt::get(BECount->getType(), Count),
-                          "xtraiter");
+    ModVal = B.CreateURem(
+        ModValAdd, ConstantInt::get(BECount->getType(), Count), "xtraiter");
   }
   Value *BranchVal = B.CreateICmpSLT(
       BECount, ConstantInt::get(BECount->getType(),
@@ -1129,22 +1128,22 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   Module *M = F->getParent();
   if (ParallelEpilog) {
     ORE->emit([&]() {
-                return OptimizationRemark(LSM_NAME, "ParallelEpil",
-                                          L->getStartLoc(), L->getHeader())
-                  << "allowing epilog to execute in parallel with stripmined "
-                  << "loop";
-              });
-    BasicBlock *LoopDetach = SplitBlock(NewPreheader,
-                                        NewPreheader->getTerminator(), DT, LI);
+      return OptimizationRemark(LSM_NAME, "ParallelEpil", L->getStartLoc(),
+                                L->getHeader())
+             << "allowing epilog to execute in parallel with stripmined "
+             << "loop";
+    });
+    BasicBlock *LoopDetach =
+        SplitBlock(NewPreheader, NewPreheader->getTerminator(), DT, LI);
     LoopDetach->setName(NewPreheader->getName() + ".strpm.detachloop");
     {
-      SmallVector<BasicBlock*, 4> HeaderPreds;
+      SmallVector<BasicBlock *, 4> HeaderPreds;
       for (BasicBlock *Pred : predecessors(Header))
         if (Pred != Latch)
           HeaderPreds.push_back(Pred);
       LoopDetEntry =
-        SplitBlockPredecessors(Header, HeaderPreds, ".strpm.detachloop.entry",
-                               DT, LI, nullptr, PreserveLCSSA);
+          SplitBlockPredecessors(Header, HeaderPreds, ".strpm.detachloop.entry",
+                                 DT, LI, nullptr, PreserveLCSSA);
       NewSyncReg = CallInst::Create(
           Intrinsic::getOrInsertDeclaration(M, Intrinsic::syncregion_start), {},
           LoopDetEntry->getFirstInsertionPt());
@@ -1164,9 +1163,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
       // Insert a detach instruction to detach the stripmined loop.  We do this
       // early to simplify the operation of nesting the exception-handling code
       // in the task.
-      ReplaceInstWithInst(LoopDetach->getTerminator(),
-                          DetachInst::Create(LoopDetEntry, NewExit,
-                                             EHCont, SyncReg));
+      ReplaceInstWithInst(
+          LoopDetach->getTerminator(),
+          DetachInst::Create(LoopDetEntry, NewExit, EHCont, SyncReg));
       // Update the dominator tree to reflect LoopDetach as a new predecessor of
       // EHCont.
       BasicBlock *OldIDom = DT->getNode(EHCont)->getIDom()->getBlock();
@@ -1229,24 +1228,22 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // Move the detach/reattach instructions to surround the stripmined loop.
   BasicBlock *NewHeader;
   {
-    SmallVector<BasicBlock*, 4> HeaderPreds;
+    SmallVector<BasicBlock *, 4> HeaderPreds;
     for (BasicBlock *Pred : predecessors(Header))
       if (Pred != Latch)
         HeaderPreds.push_back(Pred);
-    NewHeader =
-      SplitBlockPredecessors(Header, HeaderPreds, ".strpm.outer",
-                             DT, LI, nullptr, PreserveLCSSA);
+    NewHeader = SplitBlockPredecessors(Header, HeaderPreds, ".strpm.outer", DT,
+                                       LI, nullptr, PreserveLCSSA);
   }
   BasicBlock *NewEntry =
-    SplitBlock(NewHeader, NewHeader->getTerminator(), DT, LI);
+      SplitBlock(NewHeader, NewHeader->getTerminator(), DT, LI);
   NewEntry->setName(TaskEntry->getName() + ".strpm.outer");
   SmallVector<BasicBlock *, 1> LoopReattachPreds{Latch};
-  BasicBlock *NewReattB =
-    SplitBlockPredecessors(LoopReattach, LoopReattachPreds, "", DT, LI,
-                           nullptr, PreserveLCSSA);
+  BasicBlock *NewReattB = SplitBlockPredecessors(
+      LoopReattach, LoopReattachPreds, "", DT, LI, nullptr, PreserveLCSSA);
   NewReattB->setName(Latch->getName() + ".reattach");
   BasicBlock *NewLatch =
-    SplitBlock(NewReattB, NewReattB->getTerminator(), DT, LI);
+      SplitBlock(NewReattB, NewReattB->getTerminator(), DT, LI);
   NewLatch->setName(Latch->getName() + ".strpm.outer");
 
   // Move static allocas from TaskEntry into NewEntry.
@@ -1255,9 +1252,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // Insert a new detach instruction
   BasicBlock *OrigUnwindDest = DI->getUnwindDest();
   if (OrigUnwindDest) {
-    ReplaceInstWithInst(NewHeader->getTerminator(),
-                        DetachInst::Create(NewEntry, NewLatch,
-                                           OrigUnwindDest, NewSyncReg));
+    ReplaceInstWithInst(
+        NewHeader->getTerminator(),
+        DetachInst::Create(NewEntry, NewLatch, OrigUnwindDest, NewSyncReg));
     // Update the PHI nodes in the unwind destination of the detach.
     for (PHINode &PN : OrigUnwindDest->phis())
       PN.setIncomingBlock(PN.getBasicBlockIndex(Header), NewHeader);
@@ -1271,11 +1268,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     if (ParallelEpilog && NeedNestedSync)
       // We will insert a sync.unwind to OrigUnwindDest, which changes the
       // dominator.
-      NewDomCandidate =
-          DT->findNearestCommonDominator(NewHeader, LoopReattach);
+      NewDomCandidate = DT->findNearestCommonDominator(NewHeader, LoopReattach);
     while (OrigDUBB && (OrigDUBB != EHCont)) {
-      BasicBlock *OldIDom =
-        DT->getNode(OrigDUBB)->getIDom()->getBlock();
+      BasicBlock *OldIDom = DT->getNode(OrigDUBB)->getIDom()->getBlock();
       DT->changeImmediateDominator(
           OrigDUBB, DT->findNearestCommonDominator(OldIDom, NewDomCandidate));
       // Get the next block along the path.  If we reach the end of the path at
@@ -1339,9 +1334,8 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   //
   // TODO: Generalize to handle non-power-of-2 counts.
   assert(isPowerOf2_32(Count) && "Count is not a power of 2.");
-  Value *TestVal = B2.CreateUDiv(TripCount,
-                                 ConstantInt::get(TripCount->getType(), Count),
-                                 "stripiter");
+  Value *TestVal = B2.CreateUDiv(
+      TripCount, ConstantInt::get(TripCount->getType(), Count), "stripiter");
   // Value *TestVal = B2.CreateSub(TripCount, ModVal, "stripiter", true, true);
 
   // Value *TestCmp = B2.CreateICmpUGT(TestVal,
@@ -1377,8 +1371,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // Value *IdxCmp = B2.CreateIsNull(IdxSub, NewIdx->getName() + ".ncmp");
   NewIdx->addIncoming(ConstantInt::get(TestVal->getType(), 0), LoopDetEntry);
   NewIdx->addIncoming(IdxAdd, NewLatch);
-  Value *IdxCmp = B2.CreateICmpEQ(IdxAdd, TestVal,
-                                  NewIdx->getName() + ".ncmp");
+  Value *IdxCmp = B2.CreateICmpEQ(IdxAdd, TestVal, NewIdx->getName() + ".ncmp");
   ReplaceInstWithInst(NewLatch->getTerminator(),
                       BranchInst::Create(LoopReattach, NewHeader, IdxCmp));
   DT->changeImmediateDominator(NewLatch, NewHeader);
@@ -1398,7 +1391,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // If necessary, add the nested sync right before LoopReattach.
   if (ParallelEpilog && NeedNestedSync) {
     BasicBlock *NewLoopReattach =
-      SplitBlock(LoopReattach, LoopReattach->getTerminator(), DT, LI);
+        SplitBlock(LoopReattach, LoopReattach->getTerminator(), DT, LI);
     BasicBlock *NestedSyncBlock = LoopReattach;
     LoopReattach = NewLoopReattach;
     NestedSyncBlock->setName(Header->getName() + ".strpm.detachloop.sync");
@@ -1407,8 +1400,8 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     if (!OrigUnwindDest && F->doesNotThrow()) {
       // Insert a call to sync.unwind.
       CallInst *SyncUnwind = CallInst::Create(
-          Intrinsic::getOrInsertDeclaration(M, Intrinsic::sync_unwind), { NewSyncReg },
-          "", LoopReattach->getFirstNonPHIOrDbg());
+          Intrinsic::getOrInsertDeclaration(M, Intrinsic::sync_unwind),
+          {NewSyncReg}, "", LoopReattach->getFirstNonPHIOrDbg());
       // If the Tapir loop has an unwind destination, change the sync.unwind to
       // an invoke that unwinds to the cloned unwind destination.
       if (OrigUnwindDest) {
@@ -1461,8 +1454,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // Update all of the old PHI nodes
   B2.SetInsertPoint(NewEntry->getTerminator());
   Instruction *CountVal = cast<Instruction>(
-      B2.CreateMul(ConstantInt::get(NewIdx->getType(), Count),
-                   NewIdx));
+      B2.CreateMul(ConstantInt::get(NewIdx->getType(), Count), NewIdx));
   CountVal->copyIRFlags(PrimaryInduction);
   for (auto &InductionEntry : *TL.getInductionVars()) {
     PHINode *OrigPhi = InductionEntry.first;
@@ -1471,10 +1463,11 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
       // Nothing to do for this Phi
       continue;
     // Get the new step value for this Phi.
-    Value *PhiCount = !II.getStep()->getType()->isIntegerTy()
-      ? B2.CreateCast(Instruction::SIToFP, CountVal,
-                      II.getStep()->getType())
-      : B2.CreateSExtOrTrunc(CountVal, II.getStep()->getType());
+    Value *PhiCount =
+        !II.getStep()->getType()->isIntegerTy()
+            ? B2.CreateCast(Instruction::SIToFP, CountVal,
+                            II.getStep()->getType())
+            : B2.CreateSExtOrTrunc(CountVal, II.getStep()->getType());
     Value *NewStart = emitTransformedIndex(B2, PhiCount, SE, DL, II);
 
     // Get the old increment instruction for this Phi
@@ -1520,10 +1513,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // by the power-of-2 count to simplify the SCEV's of the induction variables
   // for later analysis passes.
   // Value *EpilStartIter = B2.CreateSub(TripCount, ModVal);
-  Value *EpilStartIter =
-    B2.CreateMul(B2.CreateUDiv(TripCount,
-                               ConstantInt::get(TripCount->getType(), Count)),
-                 ConstantInt::get(TripCount->getType(), Count));
+  Value *EpilStartIter = B2.CreateMul(
+      B2.CreateUDiv(TripCount, ConstantInt::get(TripCount->getType(), Count)),
+      ConstantInt::get(TripCount->getType(), Count));
   if (Instruction *ESIInst = dyn_cast<Instruction>(EpilStartIter))
     ESIInst->copyIRFlags(PrimaryInc);
   connectEpilog(TL, EpilStartIter, ModVal, EpilogPred, LoopReattach, NewExit,

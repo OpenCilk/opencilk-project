@@ -13,6 +13,7 @@
 #include "llvm/Transforms/Tapir/LoopStripMinePass.h"
 #include "llvm/ADT/PriorityWorklist.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -86,14 +87,14 @@ static OptimizationRemarkAnalysis createMissedAnalysis(StringRef RemarkName,
 /// Approximate the work of the body of the loop L.  Returns several relevant
 /// properties of loop L via by-reference arguments.
 static InstructionCost approximateLoopCost(
-    const Loop *L, unsigned &NumCalls, bool &NotDuplicatable,
-    bool &Convergent, bool &IsRecursive, bool &UnknownSize,
-    const TargetTransformInfo &TTI, LoopInfo *LI, ScalarEvolution &SE,
-    const SmallPtrSetImpl<const Value *> &EphValues,
-    TargetLibraryInfo *TLI) {
+    const Loop *L, unsigned &NumCalls, bool &NotDuplicatable, bool &Convergent,
+    bool &IsRecursive, bool &UnknownSize, const TargetTransformInfo &TTI,
+    LoopInfo *LI, ScalarEvolution &SE,
+    const SmallPtrSetImpl<const Value *> &EphValues, TargetLibraryInfo *TLI,
+    BlockFrequencyInfo *BFI, OptimizationRemarkEmitter *ORE) {
 
   WSCost LoopCost;
-  estimateLoopCost(LoopCost, L, LI, &SE, TTI, TLI, EphValues);
+  estimateLoopCost(LoopCost, L, LI, &SE, TTI, TLI, BFI, EphValues, ORE);
 
   // Exclude calls to builtins when counting the calls.  This assumes that all
   // builtin functions are cheap.
@@ -106,11 +107,14 @@ static InstructionCost approximateLoopCost(
   return LoopCost.Work;
 }
 
-static bool tryToStripMineLoop(
-    Loop *L, DominatorTree &DT, LoopInfo *LI, ScalarEvolution &SE,
-    const TargetTransformInfo &TTI, AssumptionCache &AC, TaskInfo *TI,
-    OptimizationRemarkEmitter &ORE, TargetLibraryInfo *TLI, bool PreserveLCSSA,
-    std::optional<unsigned> ProvidedCount) {
+static bool tryToStripMineLoop(Loop *L, DominatorTree &DT, LoopInfo *LI,
+                               ScalarEvolution &SE,
+                               const TargetTransformInfo &TTI,
+                               AssumptionCache &AC, TaskInfo *TI,
+                               OptimizationRemarkEmitter &ORE,
+                               TargetLibraryInfo *TLI, BlockFrequencyInfo *BFI,
+                               bool PreserveLCSSA,
+                               std::optional<unsigned> ProvidedCount) {
   Task *T = getTaskIfTapirLoopStructure(L, TI);
   if (!T)
     return false;
@@ -119,8 +123,8 @@ static bool tryToStripMineLoop(
   if (TM_Disable == hasLoopStripmineTransformation(L))
     return false;
 
-  LLVM_DEBUG(dbgs() << "Loop Strip Mine: F["
-                    << L->getHeader()->getParent()->getName() << "] Loop %"
+  Function *F = L->getHeader()->getParent();
+  LLVM_DEBUG(dbgs() << "Loop Strip Mine: F[" << F->getName() << "] Loop %"
                     << L->getHeader()->getName() << "\n");
 
   if (!L->isLoopSimplifyForm()) {
@@ -144,7 +148,7 @@ static bool tryToStripMineLoop(
 
   InstructionCost LoopCost =
       approximateLoopCost(L, NumCalls, NotDuplicatable, Convergent, IsRecursive,
-                          UnknownSize, TTI, LI, SE, EphValues, TLI);
+                          UnknownSize, TTI, LI, SE, EphValues, TLI, BFI, &ORE);
   // Determine the iteration count of the eventual stripmined the loop.
   bool ExplicitCount = computeStripMineCount(L, TTI, LoopCost, SMP);
   ORE.emit([&]() {
@@ -358,7 +362,7 @@ public:
     OptimizationRemarkEmitter ORE(&F);
     bool PreserveLCSSA = mustPreserveAnalysisID(LCSSAID);
 
-    return tryToStripMineLoop(L, DT, LI, SE, TTI, AC, TI, ORE, &TLI,
+    return tryToStripMineLoop(L, DT, LI, SE, TTI, AC, TI, ORE, &TLI, nullptr,
                               PreserveLCSSA, ProvidedCount);
   }
 
@@ -403,6 +407,7 @@ PreservedAnalyses LoopStripMinePass::run(Function &F,
   auto &AC = AM.getResult<AssumptionAnalysis>(F);
   auto &TI = AM.getResult<TaskAnalysis>(F);
   auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(F);
+  auto &BFI = AM.getResult<BlockFrequencyAnalysis>(F);
 
   LoopAnalysisManager *LAM = nullptr;
   if (auto *LAMProxy = AM.getCachedResult<LoopAnalysisManagerFunctionProxy>(F))
@@ -441,7 +446,7 @@ PreservedAnalyses LoopStripMinePass::run(Function &F,
     //   AllowPeeling = false;
     std::string LoopName = std::string(L.getName());
     bool LoopChanged =
-        tryToStripMineLoop(&L, DT, &LI, SE, TTI, AC, &TI, ORE, &TLI,
+        tryToStripMineLoop(&L, DT, &LI, SE, TTI, AC, &TI, ORE, &TLI, &BFI,
                            /*PreserveLCSSA*/ true, /*Count*/ std::nullopt);
     Changed |= LoopChanged;
 

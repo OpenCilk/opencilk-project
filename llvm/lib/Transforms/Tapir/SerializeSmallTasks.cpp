@@ -12,6 +12,7 @@
 
 #include "llvm/Transforms/Tapir/SerializeSmallTasks.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -35,13 +36,17 @@ static cl::opt<bool> SerializeUnprofitableLoops(
   "serialize-unprofitable-loops", cl::Hidden, cl::init(true),
   cl::desc("Serialize any Tapir tasks found to be unprofitable."));
 
-static bool trySerializeSmallLoop(
-    Loop *L, DominatorTree &DT, LoopInfo *LI, ScalarEvolution &SE,
-    const TargetTransformInfo &TTI, AssumptionCache &AC, TaskInfo *TI,
-    OptimizationRemarkEmitter &ORE, TargetLibraryInfo *TLI) {
+static bool trySerializeSmallLoop(Loop *L, DominatorTree &DT, LoopInfo *LI,
+                                  ScalarEvolution &SE,
+                                  const TargetTransformInfo &TTI,
+                                  AssumptionCache &AC, TaskInfo *TI,
+                                  OptimizationRemarkEmitter &ORE,
+                                  TargetLibraryInfo *TLI,
+                                  BlockFrequencyInfo *BFI) {
   bool Changed = false;
   for (Loop *SubL : *L)
-    Changed |= trySerializeSmallLoop(SubL, DT, LI, SE, TTI, AC, TI, ORE, TLI);
+    Changed |=
+        trySerializeSmallLoop(SubL, DT, LI, SE, TTI, AC, TI, ORE, TLI, BFI);
 
   Task *T = getTaskIfTapirLoopStructure(L, TI);
   if (!T)
@@ -60,7 +65,7 @@ static bool trySerializeSmallLoop(
   CodeMetrics::collectEphemeralValues(L, &AC, EphValues);
 
   WSCost LoopCost;
-  estimateLoopCost(LoopCost, L, LI, &SE, TTI, TLI, EphValues);
+  estimateLoopCost(LoopCost, L, LI, &SE, TTI, TLI, BFI, EphValues, &ORE);
 
   // If the work in the loop is larger than the maximum value we can deal with,
   // then it's not small.
@@ -165,7 +170,8 @@ bool SerializeSmallTasks::runOnFunction(Function &F) {
   bool Changed = false;
   if (SerializeUnprofitableLoops)
     for (Loop *L : *LI)
-      Changed |= trySerializeSmallLoop(L, DT, LI, SE, TTI, AC, &TI, ORE, &TLI);
+      Changed |= trySerializeSmallLoop(L, DT, LI, SE, TTI, AC, &TI, ORE, &TLI,
+                                       nullptr);
 
   if (Changed)
     // Recalculate TaskInfo
@@ -190,7 +196,7 @@ PreservedAnalyses SerializeSmallTasksPass::run(Function &F,
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &AC = AM.getResult<AssumptionAnalysis>(F);
   auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(F);
-
+  auto &BFI = AM.getResult<BlockFrequencyAnalysis>(F);
 
   LLVM_DEBUG(dbgs() << "SerializeSmallTasks running on function " << F.getName()
              << "\n");
@@ -198,7 +204,8 @@ PreservedAnalyses SerializeSmallTasksPass::run(Function &F,
   bool Changed = false;
   if (SerializeUnprofitableLoops)
     for (Loop *L : LI)
-      Changed |= trySerializeSmallLoop(L, DT, &LI, SE, TTI, AC, &TI, ORE, &TLI);
+      Changed |=
+          trySerializeSmallLoop(L, DT, &LI, SE, TTI, AC, &TI, ORE, &TLI, &BFI);
 
   if (!Changed)
     return PreservedAnalyses::all();

@@ -14,12 +14,15 @@
 
 #include "llvm/Analysis/WorkSpanAnalysis.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ProfileSummaryInfo.h"
+#include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/Support/BlockFrequency.h"
 #include "llvm/Support/InstructionCost.h"
 
 using namespace llvm;
@@ -43,64 +46,130 @@ unsigned llvm::getConstTripCount(const Loop *L, ScalarEvolution &SE) {
 /// Recursive helper routine to estimate the amount of work in a loop.
 static void estimateLoopCostHelper(const Loop *L, CodeMetrics &Metrics,
                                    WSCost &LoopCost, LoopInfo *LI,
-                                   ScalarEvolution *SE) {
+                                   ScalarEvolution *SE, BlockFrequencyInfo *BFI,
+                                   OptimizationRemarkEmitter *ORE) {
   if (LoopCost.UnknownCost)
     return;
 
-  // TODO: Handle control flow within the loop intelligently, using
-  // BlockFrequencyInfo.
+  BlockFrequency LoopEntryFreq =
+      BFI ? BFI->getBlockFreq(L->getHeader()) : BlockFrequency();
   for (Loop *SubL : *L) {
     WSCost SubLoopCost;
-    estimateLoopCostHelper(SubL, Metrics, SubLoopCost, LI, SE);
+    BlockFrequency SubLoopEntryFreq =
+        BFI ? BFI->getBlockFreq(SubL->getHeader()) : BlockFrequency();
+    // Recursively evaluate the cost of the subloop.
+    estimateLoopCostHelper(SubL, Metrics, SubLoopCost, LI, SE, BFI, ORE);
+    int64_t TripCount = 1;
+
+    if (LoopEntryFreq.getFrequency() && SubLoopEntryFreq.getFrequency()) {
+      // Use block frequencies to scale the cost of the subloop.
+      if (ORE)
+        ORE->emit([&]() {
+          return OptimizationRemarkAnalysis(
+                     "work-span-analysis", "BFISubloopCost",
+                     SubL->getStartLoc(), SubL->getHeader())
+                 << "Using block-frequency analysis to estimate contribution "
+                    "of subloop.  Subloop-entry frequency in loop is "
+                 << ore::NV("SubloopFreq", SubLoopEntryFreq.getFrequency() /
+                                               LoopEntryFreq.getFrequency())
+                 << ".";
+        });
+      if (SubLoopEntryFreq < LoopEntryFreq) {
+        // Scale down the work of the subloop to lower its contribution to this
+        // loop's work.
+        SubLoopCost.Work /=
+            (LoopEntryFreq.getFrequency() / SubLoopEntryFreq.getFrequency());
+      } else if (SubLoopEntryFreq > LoopEntryFreq) {
+        // Scale up the subloop trip count to raise its contribution to this
+        // loop's work.
+        TripCount =
+            SubLoopEntryFreq.getFrequency() / LoopEntryFreq.getFrequency();
+      }
+    } else {
+      // Try to find a constant trip count for this loop.
+      TripCount = SE ? getConstTripCount(SubL, *SE) : 0;
+      if (!TripCount) {
+        if (ORE)
+          ORE->emit([&]() {
+            return OptimizationRemarkAnalysis(
+                       "work-span-analysis", "NoConstTripCount",
+                       SubL->getStartLoc(), SubL->getHeader())
+                   << "Could not determine constant trip count for subloop.";
+          });
+        // Could not compute a constant trip count.  Assume this subloop
+        // executes once.
+        LoopCost.UnknownCost = true;
+        TripCount = 1;
+      }
+    }
+
+    if (LoopEntryFreq.getFrequency() && SubLoopEntryFreq.getFrequency() &&
+        SubLoopEntryFreq < LoopEntryFreq)
+      SubLoopCost.Work /=
+          (LoopEntryFreq.getFrequency() / SubLoopEntryFreq.getFrequency());
     // Quit early if the size of this subloop is already too big.
     if (InstructionCost::getMax() == SubLoopCost.Work)
       LoopCost.Work = InstructionCost::getMax();
 
-    // Find a constant trip count if available
-    int64_t ConstTripCount = SE ? getConstTripCount(SubL, *SE) : 0;
-    // TODO: Use a more precise analysis to account for non-constant trip
-    // counts.
-    if (!ConstTripCount) {
-      LoopCost.UnknownCost = true;
-      // If we cannot compute a constant trip count, assume this subloop
-      // executes at least once.
-      ConstTripCount = 1;
+    // Check if this subloop suffices to make this loop huge.
+    if (InstructionCost::getMax() - LoopCost.Work <
+        (SubLoopCost.Work * TripCount)) {
+      if (ORE)
+        ORE->emit([&]() {
+          return OptimizationRemarkAnalysis("work-span-analysis",
+                                            "LargeSubloop", SubL->getStartLoc(),
+                                            SubL->getHeader())
+                 << "Subloop work makes this loop large.";
+        });
+      LoopCost.Work = InstructionCost::getMax();
+      return;
     }
 
-    // Check if the total size of this subloop is huge.
-    if (InstructionCost::getMax() / ConstTripCount < SubLoopCost.Work)
-      LoopCost.Work = InstructionCost::getMax();
-
-    // Check if this subloop suffices to make loop L huge.
-    if (InstructionCost::getMax() - LoopCost.Work <
-        (SubLoopCost.Work * ConstTripCount))
-      LoopCost.Work = InstructionCost::getMax();
-
-    // Add in the size of this subloop.
-    LoopCost.Work += (SubLoopCost.Work * ConstTripCount);
+    if (LoopCost.Work < InstructionCost::getMax())
+      // Add in the work of this subloop scaled by its trip count.
+      LoopCost.Work += (SubLoopCost.Work * TripCount);
   }
 
-  // After looking at all subloops, if we've concluded we have a huge loop size,
-  // return early.
-  if (InstructionCost::getMax() == LoopCost.Work)
-    return;
-
-  for (BasicBlock *BB : L->blocks())
+  // Add in the work of all other blocks in this loop that are not in some
+  // subloop.
+  for (BasicBlock *BB : L->blocks()) {
     if (LI->getLoopFor(BB) == L) {
+      InstructionCost BBCost = Metrics.NumBBInsts[BB];
+      BlockFrequency BBFreq = BFI ? BFI->getBlockFreq(BB) : BlockFrequency();
+      if (LoopEntryFreq.getFrequency() && BBFreq.getFrequency() &&
+          BBFreq < LoopEntryFreq) {
+        // Scale this basic-block cost by its relative frequency.
+        BBCost /= (LoopEntryFreq.getFrequency() / BBFreq.getFrequency());
+      }
       // Check if this BB suffices to make loop L huge.
-      if (InstructionCost::getMax() - LoopCost.Work < Metrics.NumBBInsts[BB]) {
+      if (InstructionCost::getMax() - LoopCost.Work < BBCost) {
+        if (ORE)
+          ORE->emit([&]() {
+            return OptimizationRemarkAnalysis("work-span-analysis", "LargeLoop",
+                                              L->getStartLoc(), BB)
+                   << "Loop contains a lot of work.";
+          });
         LoopCost.Work = InstructionCost::getMax();
         return;
       }
-      LoopCost.Work += Metrics.NumBBInsts[BB];
+      LoopCost.Work += BBCost;
     }
+  }
+
+  if (ORE)
+    ORE->emit([&]() {
+      return OptimizationRemarkAnalysis("work-span-analysis", "LargeSubloop",
+                                        L->getStartLoc(), L->getHeader())
+             << "Estimated loop work: " << ore::NV("LoopWork", LoopCost.Work)
+             << ".";
+    });
 }
 
 void llvm::estimateLoopCost(WSCost &LoopCost, const Loop *L, LoopInfo *LI,
                             ScalarEvolution *SE, const TargetTransformInfo &TTI,
-                            TargetLibraryInfo *TLI,
-                            const SmallPtrSetImpl<const Value *> &EphValues) {
-  // TODO: Use more precise analysis to estimate the work in each call.
+                            TargetLibraryInfo *TLI, BlockFrequencyInfo *BFI,
+                            const SmallPtrSetImpl<const Value *> &EphValues,
+                            OptimizationRemarkEmitter *ORE) {
   // TODO: Use vectorizability to enhance cost analysis.
 
   // Gather code metrics for all basic blocks in the loop.
@@ -108,5 +177,5 @@ void llvm::estimateLoopCost(WSCost &LoopCost, const Loop *L, LoopInfo *LI,
     LoopCost.Metrics.analyzeBasicBlock(BB, TTI, EphValues,
                                        /*PrepareForLTO*/ false, L, TLI);
 
-  estimateLoopCostHelper(L, LoopCost.Metrics, LoopCost, LI, SE);
+  estimateLoopCostHelper(L, LoopCost.Metrics, LoopCost, LI, SE, BFI, ORE);
 }
