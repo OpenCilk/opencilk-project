@@ -613,9 +613,6 @@ unreachable:                                      ; preds = %lpad30, %lpad21, %l
 ; Function Attrs: nounwind
 declare void @llvm.assume(i1) #6
 
-; Function Attrs: nounwind readnone speculatable
-declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
-
 ; CHECK-LABEL: define internal fastcc void @_Z15parfor_trycatchi.outline_pfor.cond48.ls1(
 ; CHECK: %[[DACSYNCREG:.+]] = tail call token @llvm.syncregion.start()
 

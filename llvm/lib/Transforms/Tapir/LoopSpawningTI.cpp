@@ -1147,9 +1147,16 @@ static Value *computeGrainsize(TapirLoopInfo *TL) {
   Module *M = Preheader->getModule();
   IRBuilder<> B(Preheader->getTerminator());
   B.SetCurrentDebugLocation(TL->getDebugLoc());
+  // Determine the grainsize runtime bound
+  unsigned GrainsizeBound = TL->getGrainsizeBound();
+  // Make sure the grainsize bound fits in the available bit width.
+  if (IdxTy->getIntegerBitWidth() < 8 * sizeof(unsigned))
+    if (GrainsizeBound > (1 << IdxTy->getIntegerBitWidth()) - 1)
+      GrainsizeBound = (1 << IdxTy->getIntegerBitWidth()) - 1;
+  Value *GrainBoundVal = ConstantInt::get(IdxTy, GrainsizeBound);
   return B.CreateCall(Intrinsic::getOrInsertDeclaration(
                           M, Intrinsic::tapir_loop_grainsize, {IdxTy}),
-                      {TripCount});
+                      {TripCount, GrainBoundVal});
 }
 
 /// Get the grainsize of this loop either from metadata or by computing the

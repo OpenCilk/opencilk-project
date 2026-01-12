@@ -1895,9 +1895,11 @@ def int_detached_rethrow : Intrinsic<[], [llvm_token_ty, llvm_any_ty],
 def int_sync_unwind
     : Intrinsic<[], [llvm_token_ty], [IntrArgMemOnly, IntrWillReturn, Throws]>;
 
-// Intrinsic to get the grainsize of a Tapir loop.
+// Intrinsic to get the grainsize of a Tapir loop.  The first argument is the
+// loop trip count.  The second argument is an upper bound on the grainsize or
+// 0 if no upper bound is statically known.
 def int_tapir_loop_grainsize
-    : Intrinsic<[llvm_anyint_ty], [LLVMMatchType<0>],
+    : Intrinsic<[llvm_anyint_ty], [LLVMMatchType<0>, LLVMMatchType<0>],
                 [IntrNoMem, IntrWillReturn, IntrSpeculatable]>;
 
 // Intrinsic to get the frame address of a spawned task.  Tapir

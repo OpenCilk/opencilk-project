@@ -229,6 +229,13 @@ static bool tryToStripMineLoop(Loop *L, DominatorTree &DT, LoopInfo *LI,
     LLVM_DEBUG(dbgs() << "  Skipping loop with expensive function calls.\n");
     ORE.emit(createMissedAnalysis("ExpensiveCalls", L)
              << "Loop contains function calls with unknown cost.");
+    ORE.emit([&]() {
+      return OptimizationRemarkAnalysis(DEBUG_TYPE, "BoundRuntimeGrainsize",
+                                        L->getStartLoc(), L->getHeader())
+             << "Applying runtime grainsize bound: "
+             << ore::NV("GrainsizeBound", SMP.Count) << ".";
+    });
+    Hints.setGrainsizeBound(SMP.Count);
     return false;
   }
 

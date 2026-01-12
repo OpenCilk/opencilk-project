@@ -274,7 +274,7 @@ public:
   };
 
 private:
-  enum HintKind { HK_STRATEGY, HK_GRAINSIZE };
+  enum HintKind { HK_STRATEGY, HK_GRAINSIZE, HK_GRAINSIZE_BOUND };
 
   /// Hint - associates name and validation with the hint value.
   struct Hint {
@@ -290,6 +290,7 @@ private:
       case HK_STRATEGY:
         return (Val < ST_END);
       case HK_GRAINSIZE:
+      case HK_GRAINSIZE_BOUND:
         return true;
       }
       return false;
@@ -300,13 +301,15 @@ private:
   Hint Strategy;
   /// Grainsize
   Hint Grainsize;
+  /// Grainsize bound
+  Hint GrainsizeBound;
 
   /// Return the loop metadata prefix.
   static StringRef Prefix() { return "tapir.loop."; }
 
 public:
   static std::string printStrategy(enum SpawningStrategy Strat) {
-    switch(Strat) {
+    switch (Strat) {
     case TapirLoopHints::ST_SEQ:
       return "Spawn iterations sequentially";
     case TapirLoopHints::ST_DAC:
@@ -319,26 +322,18 @@ public:
   TapirLoopHints(const Loop *L)
       : Strategy("spawn.strategy", ST_SEQ, HK_STRATEGY),
         Grainsize("grainsize", 0, HK_GRAINSIZE),
-        TheLoop(L) {
+        GrainsizeBound("grainsize.bound", 0, HK_GRAINSIZE_BOUND), TheLoop(L) {
     // Populate values with existing loop metadata.
     getHintsFromMetadata();
   }
-
-  // /// Dumps all the hint information.
-  // std::string emitRemark() const {
-  //   TapirLoopReport R;
-  //   R << "Strategy = " << printStrategy(getStrategy());
-
-  //   return R.str();
-  // }
 
   enum SpawningStrategy getStrategy() const {
     return (SpawningStrategy)Strategy.Value;
   }
 
-  unsigned getGrainsize() const {
-    return Grainsize.Value;
-  }
+  unsigned getGrainsize() const { return Grainsize.Value; }
+
+  unsigned getGrainsizeBound() const { return GrainsizeBound.Value; }
 
   /// Clear Tapir Hints metadata.
   void clearHintsMetadata();
@@ -360,6 +355,12 @@ public:
   void setAlreadyStripMined() {
     Grainsize.Value = 1;
     Hint Hints[] = {Grainsize};
+    writeHintsToMetadata(Hints);
+  }
+
+  void setGrainsizeBound(unsigned V) {
+    GrainsizeBound.Value = V;
+    Hint Hints[] = {GrainsizeBound};
     writeHintsToMetadata(Hints);
   }
 
@@ -398,6 +399,6 @@ MDNode *CopyNonTapirLoopMetadata(MDNode *LoopID, MDNode *OrigLoopID);
 /// if not.
 Task *getTaskIfTapirLoop(const Loop *L, TaskInfo *TI);
 
-} // End llvm namespace
+} // namespace llvm
 
 #endif

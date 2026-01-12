@@ -45,7 +45,7 @@ entry:
 
 pfor.cond.preheader:                              ; preds = %entry
   %wide.trip.count = zext nneg i32 %n to i64
-  %0 = call i64 @llvm.tapir.loop.grainsize.i64(i64 %wide.trip.count)
+  %0 = call i64 @llvm.tapir.loop.grainsize.i64(i64 %wide.trip.count, i64 0)
   invoke fastcc void @_Z4loopiPc.outline_pfor.cond.ls1(i64 0, i64 %wide.trip.count, i64 %0, ptr %array)
           to label %pfor.cond.cleanup unwind label %lpad2.loopexit
 
@@ -269,7 +269,7 @@ declare i64 @__isoc23_strtol(ptr noundef, ptr noundef, i32 noundef) local_unname
 declare i32 @llvm.smax.i32(i32, i32) #9
 
 ; Function Attrs: nounwind speculatable willreturn memory(none)
-declare i64 @llvm.tapir.loop.grainsize.i64(i64) #10
+declare i64 @llvm.tapir.loop.grainsize.i64(i64, i64) #10
 
 ; Function Attrs: mustprogress uwtable
 define internal fastcc void @_Z4loopiPc.outline_pfor.cond.ls1(i64 %indvars.iv.start.ls1, i64 %end.ls1, i64 %grainsize.ls1, ptr nocapture noundef writeonly align 1 %array.ls1) unnamed_addr #0 personality ptr @__gxx_personality_v0 {

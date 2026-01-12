@@ -350,13 +350,13 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK:  %[[STRPLOOPITER:.+]] = add nsw i64 %[[TRIPCOUNT:.+]], -1
 ; CHECK:  %[[XTRAITER:.+]] = and i64 %[[TRIPCOUNT]], 31
 ; CHECK:  %[[ICMP:.+]] = icmp slt i64 %[[STRPLOOPITER]], 31
-; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !51
+; CHECK:  br i1 %[[ICMP]], label %[[EPILCHECK:.+]], label %[[STRPLOOPPH:.+]], !dbg !52
 
 ; CHECK: [[STRPLOOPPH]]:
-; CHECK-NEXT: br label %[[STRPLOOPDETACH:.+]], !dbg !51
+; CHECK-NEXT: br label %[[STRPLOOPDETACH:.+]], !dbg !52
 
 ; CHECK: [[STRPLOOPDETACH]]:
-; CHECK-NEXT: detach within %syncreg, label %[[STRPLOOPDETACHENTRY:.+]], label %[[STRPLOOPDETACHCONT:.+]], !dbg !51
+; CHECK-NEXT: detach within %syncreg, label %[[STRPLOOPDETACHENTRY:.+]], label %[[STRPLOOPDETACHCONT:.+]], !dbg !52
 
 ; CHECK: [[STRPLOOPDETACHCONT]]:
 ; CHECK-NEXT: br label %[[EPILCHECK]]
@@ -365,10 +365,10 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 ; CHECK: br i1 {{.+}}, label %[[EPILPH:.+]], label
 
 ; CHECK: [[EPILPH]]:
-; CHECK: br label %[[EPILHEADER:.+]], !dbg !51
+; CHECK: br label %[[EPILHEADER:.+]], !dbg !52
 
 ; CHECK: [[EPILHEADER]]:
-; CHECK: br label %[[EPILBODY:.+]], !dbg !51
+; CHECK: br label %[[EPILBODY:.+]], !dbg !52
 
 ; CHECK: [[EPILBODY]]:
 ; CHECK-NEXT: call ptr @llvm.stacksave.p0()
@@ -379,17 +379,17 @@ declare dso_local i32 @foo(double*, i32) local_unnamed_addr #5
 
 ; CHECK: [[STRPLOOPDETACHENTRY]]:
 ; CHECK: %[[NEWSYNCREG:.+]] = call token @llvm.syncregion.start()
-; CHECK: br label %[[STRPLOOPOUTERHEAD:.+]], !dbg !51
+; CHECK: br label %[[STRPLOOPOUTERHEAD:.+]], !dbg !52
 
 ; CHECK: [[STRPLOOPOUTERHEAD]]:
-; CHECK: detach within %[[NEWSYNCREG]], label %[[STRPLOOPINNERENTRY:.+]], label %{{.+}}, !dbg !51
+; CHECK: detach within %[[NEWSYNCREG]], label %[[STRPLOOPINNERENTRY:.+]], label %{{.+}}, !dbg !52
 
 ; CHECK: [[STRPLOOPINNERENTRY]]:
 ; CHECK: alloca [7 x double]
-; CHECK: br label %[[STRPLOOPINNERHEAD:.+]], !dbg !51
+; CHECK: br label %[[STRPLOOPINNERHEAD:.+]], !dbg !52
 
 ; CHECK: [[STRPLOOPINNERHEAD]]:
-; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !51
+; CHECK: br label %[[STRPLOOPINNERBODY:.+]], !dbg !52
 
 ; CHECK: [[STRPLOOPINNERBODY]]:
 ; CHECK: call ptr @llvm.stacksave.p0()

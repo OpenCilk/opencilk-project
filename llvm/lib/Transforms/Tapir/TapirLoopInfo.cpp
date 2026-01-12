@@ -57,6 +57,10 @@ void TapirLoopInfo::readTapirLoopMetadata(OptimizationRemarkEmitter &ORE) {
   // Get a grainsize for this Tapir loop from the metadata, if the metadata
   // gives a grainsize.
   Grainsize = Hints.getGrainsize();
+
+  // Get a grainsize bound for this Tapir loop from the metadata, if the
+  // metadata gives a grainsize bound.
+  GrainsizeBound = Hints.getGrainsizeBound();
 }
 
 static Type *convertPointerToIntegerType(const DataLayout &DL, Type *Ty) {
@@ -120,7 +124,7 @@ void TapirLoopInfo::addInductionPhi(PHINode *Phi,
   // }
 
   LLVM_DEBUG(dbgs() << "TapirLoop: Found an induction variable: " << *Phi
-             << "\n");
+                    << "\n");
 }
 
 /// Gather all induction variables in this loop that need special handling
@@ -173,8 +177,8 @@ bool TapirLoopInfo::collectIVs(PredicatedScalarEvolution &PSE,
   }
 
   if (!PrimaryInduction) {
-    LLVM_DEBUG(dbgs()
-               << "TapirLoop: Did not find a primary integer induction var.\n");
+    LLVM_DEBUG(
+        dbgs() << "TapirLoop: Did not find a primary integer induction var.\n");
     if (ORE)
       ORE->emit(createMissedAnalysis(PassName, "NoInductionVariable", L)
                 << "canonical loop induction variable could not be identified");
@@ -204,13 +208,14 @@ void TapirLoopInfo::replaceNonPrimaryIVs(PredicatedScalarEvolution &PSE) {
   for (auto &InductionEntry : Inductions) {
     PHINode *OrigPhi = InductionEntry.first;
     InductionDescriptor II = InductionEntry.second;
-    if (OrigPhi == PrimaryInduction) continue;
+    if (OrigPhi == PrimaryInduction)
+      continue;
     LLVM_DEBUG(dbgs() << "Replacing Phi " << *OrigPhi << "\n");
     // If Induction is not canonical, replace it with some computation based on
     // PrimaryInduction.
     Type *StepType = II.getStep()->getType();
     Instruction::CastOps CastOp =
-      CastInst::getCastOpcode(PrimaryInduction, true, StepType, true);
+        CastInst::getCastOpcode(PrimaryInduction, true, StepType, true);
     Value *CRD = B.CreateCast(CastOp, PrimaryInduction, StepType, "cast.crd");
     Value *PhiRepl = emitTransformedIndex(B, CRD, PSE.getSE(), DL, II);
     PhiRepl->setName(OrigPhi->getName() + ".tl.repl");
@@ -232,15 +237,14 @@ bool TapirLoopInfo::getLoopCondition(const char *PassName,
 
   // Check that the latch is terminated by a branch instruction.  The
   // LoopRotate pass can be helpful to ensure this property.
-  BranchInst *BI =
-    dyn_cast<BranchInst>(L->getLoopLatch()->getTerminator());
+  BranchInst *BI = dyn_cast<BranchInst>(L->getLoopLatch()->getTerminator());
   if (!BI || BI->isUnconditional()) {
-    LLVM_DEBUG(dbgs()
-               << "Loop-latch terminator is not a conditional branch.\n");
+    LLVM_DEBUG(
+        dbgs() << "Loop-latch terminator is not a conditional branch.\n");
     if (ORE)
-      ORE->emit(TapirLoopInfo::createMissedAnalysis(PassName, "NoLatchBranch",
-                                                    L)
-                << "loop latch is not terminated by a conditional branch");
+      ORE->emit(
+          TapirLoopInfo::createMissedAnalysis(PassName, "NoLatchBranch", L)
+          << "loop latch is not terminated by a conditional branch");
     return false;
   }
   // Check that the condition is an integer-equality comparison.  The
@@ -249,16 +253,16 @@ bool TapirLoopInfo::getLoopCondition(const char *PassName,
   {
     const ICmpInst *Cond = dyn_cast<ICmpInst>(BI->getCondition());
     if (!Cond) {
-      LLVM_DEBUG(dbgs() <<
-                 "Loop-latch condition is not an integer comparison.\n");
+      LLVM_DEBUG(
+          dbgs() << "Loop-latch condition is not an integer comparison.\n");
       if (ORE)
         ORE->emit(TapirLoopInfo::createMissedAnalysis(PassName, "NotIntCmp", L)
                   << "loop-latch condition is not an integer comparison");
       return false;
     }
     if (!Cond->isEquality()) {
-      LLVM_DEBUG(dbgs() <<
-                 "Loop-latch condition is not an equality comparison.\n");
+      LLVM_DEBUG(
+          dbgs() << "Loop-latch condition is not an equality comparison.\n");
       // TODO: Find a reasonable analysis message to give to users.
       // if (ORE)
       //   ORE->emit(TapirLoopInfo::createMissedAnalysis(PassName,
@@ -293,13 +297,14 @@ static Value *getEscapeValue(Instruction *UI, const InductionDescriptor &II,
   IRBuilder<> B(&*UI->getParent()->getFirstInsertionPt());
   Value *EffTripCount = TripCount;
   if (!PostInc)
-    EffTripCount = B.CreateSub(
-        TripCount, ConstantInt::get(TripCount->getType(), 1));
+    EffTripCount =
+        B.CreateSub(TripCount, ConstantInt::get(TripCount->getType(), 1));
 
-  Value *Count = !II.getStep()->getType()->isIntegerTy()
-    ? B.CreateCast(Instruction::SIToFP, EffTripCount,
-                   II.getStep()->getType())
-    : B.CreateSExtOrTrunc(EffTripCount, II.getStep()->getType());
+  Value *Count =
+      !II.getStep()->getType()->isIntegerTy()
+          ? B.CreateCast(Instruction::SIToFP, EffTripCount,
+                         II.getStep()->getType())
+          : B.CreateSExtOrTrunc(EffTripCount, II.getStep()->getType());
   if (PostInc)
     Count->setName("cast.count");
   else
@@ -314,7 +319,8 @@ static Value *getEscapeValue(Instruction *UI, const InductionDescriptor &II,
 /// form, with all external PHIs that use the IV having one input value, coming
 /// from the remainder loop.  We need those PHIs to also have a correct value
 /// for the IV when arriving directly from the middle block.
-void TapirLoopInfo::fixupIVUsers(PHINode *OrigPhi, const InductionDescriptor &II,
+void TapirLoopInfo::fixupIVUsers(PHINode *OrigPhi,
+                                 const InductionDescriptor &II,
                                  PredicatedScalarEvolution &PSE) {
   // There are two kinds of external IV usages - those that use the value
   // computed in the last iteration (the PHI) and those that use the penultimate
@@ -352,15 +358,15 @@ void TapirLoopInfo::fixupIVUsers(PHINode *OrigPhi, const InductionDescriptor &II
 
   for (auto &I : MissingVals) {
     LLVM_DEBUG(dbgs() << "Replacing external IV use:" << *I.first << " with "
-               << *I.second << "\n");
+                      << *I.second << "\n");
     PHINode *PHI = cast<PHINode>(I.first);
     PHI->replaceAllUsesWith(I.second);
     PHI->eraseFromParent();
   }
 }
 
-const SCEV *TapirLoopInfo::getBackedgeTakenCount(
-    PredicatedScalarEvolution &PSE) const {
+const SCEV *
+TapirLoopInfo::getBackedgeTakenCount(PredicatedScalarEvolution &PSE) const {
   Loop *L = getLoop();
   ScalarEvolution *SE = PSE.getSE();
   const SCEV *BackedgeTakenCount = PSE.getBackedgeTakenCount();
@@ -393,8 +399,8 @@ const SCEV *TapirLoopInfo::getExitCount(const SCEV *BackedgeTakenCount,
     ExitCount = BackedgeTakenCount;
   else
     // Get the total trip count from the count by adding 1.
-    ExitCount = SE->getAddExpr(
-        BackedgeTakenCount, SE->getOne(BackedgeTakenCount->getType()));
+    ExitCount = SE->getAddExpr(BackedgeTakenCount,
+                               SE->getOne(BackedgeTakenCount->getType()));
   return ExitCount;
 }
 
@@ -554,9 +560,9 @@ bool TapirLoopInfo::prepareForOutlining(
 /// Index.
 ///
 /// Copied from lib/Transforms/Vectorize/LoopVectorize.cpp
-Value *llvm::emitTransformedIndex(
-    IRBuilder<> &B, Value *Index, ScalarEvolution *SE, const DataLayout &DL,
-    const InductionDescriptor &ID) {
+Value *llvm::emitTransformedIndex(IRBuilder<> &B, Value *Index,
+                                  ScalarEvolution *SE, const DataLayout &DL,
+                                  const InductionDescriptor &ID) {
 
   SCEVExpander Exp(*SE, DL, "induction");
   const auto *Step = ID.getStep();

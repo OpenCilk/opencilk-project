@@ -65,7 +65,7 @@ pfor.cond.preheader:                              ; preds = %while.body
 
 ; CHECK: pfor.cond.preheader:
 ; CHECK-NOT: br label
-; CHECK: %[[GRAINSIZE:.+]] = call i32 @llvm.tapir.loop.grainsize.i32(i32 %0)
+; CHECK: %[[GRAINSIZE:.+]] = call i32 @llvm.tapir.loop.grainsize.i32(i32 %0, i32 0)
 ; CHECK: call {{.*}}void @doTimeStep.outline_pfor.cond.ls2(
 ; CHECK: i32 0,
 ; CHECK: i32 %0,

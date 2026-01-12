@@ -13,7 +13,7 @@ entry:
 
 pfor.cond.preheader:                              ; preds = %entry
   %wide.trip.count = zext nneg i32 %n to i64
-  %0 = call i64 @llvm.tapir.loop.grainsize.i64(i64 %wide.trip.count)
+  %0 = call i64 @llvm.tapir.loop.grainsize.i64(i64 %wide.trip.count, i64 0)
   call fastcc void @normalize.outline_pfor.cond.ls1(i64 0, i64 %wide.trip.count, i64 %0, ptr %in, ptr %out, i32 %n) #4
   br label %cleanup
 
@@ -33,7 +33,7 @@ declare token @llvm.syncregion.start() #1
 declare double @norm(ptr noundef, i32 noundef) local_unnamed_addr #2
 
 ; Function Attrs: nounwind speculatable willreturn memory(none)
-declare i64 @llvm.tapir.loop.grainsize.i64(i64) #3
+declare i64 @llvm.tapir.loop.grainsize.i64(i64, i64) #3
 
 ; Function Attrs: nounwind ssp uwtable(sync)
 define internal fastcc void @normalize.outline_pfor.cond.ls1(i64 %indvars.iv.start.ls1, i64 %end.ls1, i64 %grainsize.ls1, ptr noalias noundef align 1 %in.ls1, ptr noalias nocapture noundef writeonly align 1 %out.ls1, i32 noundef %n.ls1) unnamed_addr #0 {

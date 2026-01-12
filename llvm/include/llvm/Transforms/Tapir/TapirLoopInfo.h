@@ -13,10 +13,9 @@
 #ifndef TAPIR_LOOP_INFO_H_
 #define TAPIR_LOOP_INFO_H_
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
@@ -83,10 +82,10 @@ public:
   Task *getTask() const { return TheTask; }
 
   /// Top-level call to prepare a Tapir loop for outlining.
-  bool prepareForOutlining(
-    DominatorTree &DT, LoopInfo &LI, TaskInfo &TI,
-    PredicatedScalarEvolution &PSE, AssumptionCache &AC, const char *PassName,
-    OptimizationRemarkEmitter &ORE, const TargetTransformInfo &TTI);
+  bool prepareForOutlining(DominatorTree &DT, LoopInfo &LI, TaskInfo &TI,
+                           PredicatedScalarEvolution &PSE, AssumptionCache &AC,
+                           const char *PassName, OptimizationRemarkEmitter &ORE,
+                           const TargetTransformInfo &TTI);
 
   /// Gather all induction variables in this loop that need special handling
   /// during outlining.
@@ -146,9 +145,7 @@ public:
   Type *getWidestInductionType() const { return WidestIndTy; }
 
   /// Returns true if there is a primary induction variable for this Tapir loop.
-  bool hasPrimaryInduction() const {
-    return (nullptr != PrimaryInduction);
-  }
+  bool hasPrimaryInduction() const { return (nullptr != PrimaryInduction); }
 
   /// Get the primary induction variable for this Tapir loop.
   const std::pair<PHINode *, InductionDescriptor> &getPrimaryInduction() const {
@@ -162,6 +159,10 @@ public:
   /// Get the grainsize associated with this Tapir Loop.  A return value of 0
   /// indicates the absence of a specified grainsize.
   unsigned getGrainsize() const { return Grainsize; }
+
+  /// Get the grainsize bound associated with this Tapir Loop.  A return value
+  /// of 0 indicates the absence of a specified grainsize bound.
+  unsigned getGrainsizeBound() const { return GrainsizeBound; }
 
   /// Get the exit block assoicated with this Tapir loop.
   BasicBlock *getExitBlock() const { return ExitBlock; }
@@ -235,6 +236,11 @@ private:
   /// Tapir's grainsize intrinsic should be used.
   unsigned Grainsize = 0;
 
+  /// Grainsize bound to use for loop, if no exact grainsize is available.  A
+  /// value of 0 indicates that the runtime system's default grainsize bound
+  /// should be used.
+  unsigned GrainsizeBound = 0;
+
 public:
   /// Placeholder argument values.
   Argument *StartIterArg = nullptr;
@@ -244,10 +250,10 @@ public:
 
 /// Transforms an induction descriptor into a direct computation of its value at
 /// Index.
-Value *emitTransformedIndex(
-    IRBuilder<> &B, Value *Index, ScalarEvolution *SE, const DataLayout &DL,
-    const InductionDescriptor &ID);
+Value *emitTransformedIndex(IRBuilder<> &B, Value *Index, ScalarEvolution *SE,
+                            const DataLayout &DL,
+                            const InductionDescriptor &ID);
 
-}  // end namepsace llvm
+} // namespace llvm
 
 #endif
