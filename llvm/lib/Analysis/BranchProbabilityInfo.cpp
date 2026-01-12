@@ -1051,6 +1051,24 @@ bool BranchProbabilityInfo::calcFloatingPointHeuristics(const BasicBlock *BB) {
   return true;
 }
 
+bool BranchProbabilityInfo::calcTapirHeuristics(const BasicBlock *BB) {
+  const DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator());
+  if (!DI)
+    return false;
+
+  uint32_t Denominator = (1 << 14);
+  ProbabilityList ProbList;
+  if (DI->hasUnwindDest())
+    ProbList = ProbabilityList({BranchProbability(Denominator - 2, Denominator),
+                                BranchProbability(1, Denominator),
+                                BranchProbability(1, Denominator)});
+  else
+    ProbList = ProbabilityList({BranchProbability(Denominator - 1, Denominator),
+                                BranchProbability(1, Denominator)});
+  setEdgeProbability(BB, ProbList);
+  return true;
+}
+
 void BranchProbabilityInfo::releaseMemory() {
   Probs.clear();
   Handles.clear();
@@ -1256,6 +1274,8 @@ void BranchProbabilityInfo::calculate(const Function &F, const LoopInfo &LoopI,
     if (BB->getTerminator()->getNumSuccessors() < 2)
       continue;
     if (calcMetadataWeights(BB))
+      continue;
+    if (calcTapirHeuristics(BB))
       continue;
     if (calcEstimatedHeuristics(BB))
       continue;

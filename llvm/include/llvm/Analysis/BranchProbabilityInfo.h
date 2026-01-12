@@ -421,6 +421,7 @@ private:
   bool calcPointerHeuristics(const BasicBlock *BB);
   bool calcZeroHeuristics(const BasicBlock *BB, const TargetLibraryInfo *TLI);
   bool calcFloatingPointHeuristics(const BasicBlock *BB);
+  bool calcTapirHeuristics(const BasicBlock *BB);
 };
 
 /// Analysis pass which computes \c BranchProbabilityInfo.
