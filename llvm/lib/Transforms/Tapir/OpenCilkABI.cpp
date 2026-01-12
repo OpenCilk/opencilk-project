@@ -230,10 +230,14 @@ void OpenCilkABI::prepareModule() {
       FunctionType::get(VoidTy, {PtrTy, Int32Ty}, false);
   FunctionType *CilkRTSPauseFrameFnTy =
       FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, BoolTy}, false);
-  FunctionType *Grainsize8FnTy = FunctionType::get(Int8Ty, {Int8Ty}, false);
-  FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
-  FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
-  FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
+  FunctionType *Grainsize8FnTy =
+      FunctionType::get(Int8Ty, {Int8Ty, Int8Ty}, false);
+  FunctionType *Grainsize16FnTy =
+      FunctionType::get(Int16Ty, {Int16Ty, Int16Ty}, false);
+  FunctionType *Grainsize32FnTy =
+      FunctionType::get(Int32Ty, {Int32Ty, Int32Ty}, false);
+  FunctionType *Grainsize64FnTy =
+      FunctionType::get(Int64Ty, {Int64Ty, Int64Ty}, false);
   FunctionType *Lookup0Ty = FunctionType::get(PtrTy, {PtrTy}, false);
   FunctionType *Lookup1Ty = FunctionType::get(PtrTy, {PtrTy, PtrTy}, false);
   FunctionType *Lookup2Ty =
@@ -658,6 +662,7 @@ void OpenCilkABI::MarkSpawner(Function &F) {
 /// Lower a call to get the grainsize of a Tapir loop.
 Value *OpenCilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Limit = GrainsizeCall->getArgOperand(0);
+  Value *Bound = GrainsizeCall->getArgOperand(1);
   IRBuilder<> Builder(GrainsizeCall);
 
   // Select the appropriate __cilkrts_grainsize function, based on the type.
@@ -673,7 +678,7 @@ Value *OpenCilkABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   else
     llvm_unreachable("No CilkRTSGrainsize call matches type for Tapir loop.");
 
-  Value *Grainsize = Builder.CreateCall(CilkRTSGrainsizeCall, Limit);
+  Value *Grainsize = Builder.CreateCall(CilkRTSGrainsizeCall, {Limit, Bound});
 
   // Replace uses of grainsize intrinsic call with this grainsize value.
   GrainsizeCall->replaceAllUsesWith(Grainsize);
