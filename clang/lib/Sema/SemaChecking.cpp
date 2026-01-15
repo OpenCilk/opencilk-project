@@ -5982,15 +5982,19 @@ bool Sema::BuiltinHyperLookupSimple(CallExpr *TheCall, unsigned NumArgs) {
     // Must handle function to pointer decay here because the function
     // does not have a type signature.
     Expr *Arg2 = TheCall->getArg(2);
-    if (Arg2->getType()->isFunctionType())
+    if (Arg2->getType()->isFunctionType()) {
       Arg2 = ImpCastExprToType(Arg2, Context.getDecayedType(Arg2->getType()),
                                CK_FunctionToPointerDecay).get();
+      TheCall->setArg(2, Arg2);
+    }
     else if (!Arg2->getType()->isPointerType())
       return Diag(Arg2->getBeginLoc(), diag::err_hyper_lookup_internal) << 4;
     Expr *Arg3 = TheCall->getArg(3);
-    if (Arg3->getType()->isFunctionType())
+    if (Arg3->getType()->isFunctionType()) {
       Arg3 = ImpCastExprToType(Arg3, Context.getDecayedType(Arg3->getType()),
                                CK_FunctionToPointerDecay).get();
+      TheCall->setArg(3, Arg3);
+    }
     else if (!Arg3->getType()->isPointerType())
       return Diag(Arg3->getBeginLoc(), diag::err_hyper_lookup_internal) << 4;
   }
