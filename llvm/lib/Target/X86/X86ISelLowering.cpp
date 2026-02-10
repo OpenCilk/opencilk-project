@@ -36973,11 +36973,7 @@ void X86TargetLowering::emitSetJmpShadowStackFix(MachineInstr &MI,
   MVT PVT = getPointerTy(MF->getDataLayout());
   const TargetRegisterClass *PtrRC = getRegClassFor(PVT);
   Register ZReg = MRI.createVirtualRegister(PtrRC);
-  unsigned XorRROpc = (PVT == MVT::i64) ? X86::XOR64rr : X86::XOR32rr;
-  BuildMI(*MBB, MI, MIMD, TII->get(XorRROpc))
-      .addDef(ZReg)
-      .addReg(ZReg, RegState::Undef)
-      .addReg(ZReg, RegState::Undef);
+  BuildMI(*MBB, MI, MIMD, TII->get(X86::MOV32r0)).addDef(ZReg);
 
   // Read the current SSP Register value to the zeroed register.
   Register SSPCopyReg = MRI.createVirtualRegister(PtrRC);
