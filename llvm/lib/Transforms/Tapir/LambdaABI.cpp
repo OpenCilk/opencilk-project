@@ -413,7 +413,7 @@ void LambdaABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
     if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
       if (!RI->getDebugLoc())
         // Attempt to set the debug location of this resume to match one of the
-        // preceeding terminators.
+        // preceding terminators.
         for (const BasicBlock *Pred : predecessors(RI->getParent()))
           if (const DebugLoc &Loc = Pred->getTerminator()->getDebugLoc()) {
             RI->setDebugLoc(Loc);

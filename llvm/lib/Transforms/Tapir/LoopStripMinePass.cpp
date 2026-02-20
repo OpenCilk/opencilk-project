@@ -422,10 +422,10 @@ PreservedAnalyses LoopStripMinePass::run(Function &F,
 
   bool Changed = false;
 
-  // The stripminer requires loops to be in simplified form, and also needs
+  // Loop stripmine requires loops to be in simplified form, and also needs
   // LCSSA.  Since simplification may add new inner loops, it has to run before
-  // the legality and profitability checks. This means running the loop
-  // stripminer will simplify all loops, regardless of whether anything end up
+  // the legality and profitability checks. This means running loop
+  // stripmine will simplify all loops, regardless of whether anything end up
   // being stripmined.
   for (auto &L : LI) {
     Changed |= simplifyLoop(L, &DT, &LI, &SE, &AC, nullptr,

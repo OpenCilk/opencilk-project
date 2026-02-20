@@ -723,7 +723,7 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
               getSpindleFor(SPEntry)->isPhi()) &&
              "Discovered early a non-sync, non-phi spindle after sync");
     }
-    // Create new spindles based on taskframe instrinsics.  We need only work
+    // Create new spindles based on taskframe intrinsics.  We need only work
     // about taskframe.create and taskframe.resume.
     if (isTaskFrameCreateSpindleEntry(&B)) {
       // This block starts with a taskframe.create.  Mark is as a spindle entry.
@@ -818,7 +818,7 @@ void TaskInfo::analyze(Function &F, DominatorTree &DomTree) {
   // and added to the spindle according to a DFS CFG traversal starting at the
   // spindle's entry.
   //
-  // -) Similarly, the post-order travesal of the dominator tree finds the set
+  // -) Similarly, the post-order traversal of the dominator tree finds the set
   // of spindles that make up each task.  These spindles are collected and added
   // to their enclosing task using the same algorithm as above.
   //
@@ -1581,7 +1581,7 @@ void TaskInfo::print(raw_ostream &OS) const {
       else
         OS << "    not used.\n";
 
-      // Print the subtaskframess under this taskframe.create.
+      // Print the subtaskframes under this taskframe.create.
       for (const Spindle *SubTF : S->subtaskframes())
         OS << "    contains subtaskframe@"
            << SubTF->getEntry()->getName() << "\n";
@@ -1616,7 +1616,7 @@ void TaskInfo::print(raw_ostream &OS) const {
       if (T->isSerial()) continue;
 
       for (const Spindle *S : T->spindles()) {
-        // Only conider spindles that might have tasks in parallel.
+        // Only consider spindles that might have tasks in parallel.
         if (MPTasks.TaskList[S].empty()) continue;
 
         OS << "spindle@" << S->getEntry()->getName();

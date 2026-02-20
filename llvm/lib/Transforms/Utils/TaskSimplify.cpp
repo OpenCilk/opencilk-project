@@ -91,7 +91,7 @@ static bool removeRedundantSyncs(MaybeParallelTasks &MPTasks, Task *T) {
           RedundantSyncs.insert(Y);
         }
 
-  // Replace all unnecesary syncs with unconditional branches.
+  // Replace all unnecessary syncs with unconditional branches.
   SmallPtrSet<CallBase *, 1> MaybeDeadSyncUnwinds;
   for (SyncInst *Y : RedundantSyncs) {
     // Check for any sync.unwinds that might now be dead.

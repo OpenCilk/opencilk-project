@@ -72,7 +72,7 @@ InvokeInst *getTaskFrameResume(Value *TaskFrame);
 /// taskframe, or nullptr if no such unwind destination exists.
 BasicBlock *getTaskFrameResumeDest(Value *TaskFrame);
 
-/// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
+/// Returns true if the given instruction is a sync.unwind, false otherwise.  If
 /// \p SyncRegion is specified, then additionally checks that the sync.unwind
 /// uses \p SyncRegion.
 bool isSyncUnwind(const Instruction *I, const Value *SyncRegion = nullptr,

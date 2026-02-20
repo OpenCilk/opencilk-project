@@ -557,7 +557,7 @@ static void copyDebugLocation(Instruction *CI, const Instruction *RI,
 //   - A call to __cilk_helper_epilogue() is inserted at a return from a
 //   spawn-helper function.
 //
-//   - A call to __cilk_helper_epiluge_exn() is inserted at a resume from a
+//   - A call to __cilk_helper_epilogue_exn() is inserted at a resume from a
 //   spawn-helper function.
 //
 // PromoteCallsToInvokes dictates whether call instructions that can throw are
@@ -576,7 +576,7 @@ void OpenCilkABI::InsertStackFramePop(Function &F, bool PromoteCallsToInvokes,
     if (ResumeInst *RI = dyn_cast<ResumeInst>(Builder->GetInsertPoint())) {
       if (!RI->getDebugLoc()) {
         // Attempt to set the debug location of this resume to match one of the
-        // preceeding terminators.
+        // preceding terminators.
         SmallVector<DILocation *, 4> Locs;
         for (const BasicBlock *Pred : predecessors(RI->getParent()))
           Locs.push_back(Pred->getTerminator()->getDebugLoc());
@@ -933,7 +933,7 @@ inlineCilkFunctions(Function &F, SmallPtrSetImpl<CallBase *> &CallsToInline) {
 
 // For the taskframe at \p TFEntry containing blocks \p TFBlocks, find all
 // outermost tapir.runtime.{start,end} intrinsics, which are not enclosed
-// between other tapir.runtime.{start,end} intrinsics in this traksframe.
+// between other tapir.runtime.{start,end} intrinsics in this taskframe.
 // Furthermore, record and successor taskframes in \p SuccessorTFs that are not
 // enclosed between tapir.runtime.{start,end} intrinsics.
 static bool findOutermostTapirRTCallsForTaskFrame(

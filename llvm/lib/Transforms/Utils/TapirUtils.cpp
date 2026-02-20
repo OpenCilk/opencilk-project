@@ -144,7 +144,7 @@ BasicBlock *llvm::getTaskFrameResumeDest(Value *TaskFrame) {
   return nullptr;
 }
 
-/// Returns true if the given instruction is a sync.uwnind, false otherwise.  If
+/// Returns true if the given instruction is a sync.unwind, false otherwise.  If
 /// \p SyncRegion is specified, then additionally checks that the sync.unwind
 /// uses \p SyncRegion.
 bool llvm::isSyncUnwind(const Instruction *I, const Value *SyncRegion,
@@ -226,7 +226,7 @@ bool llvm::removeDeadSyncUnwind(CallBase *SyncUnwind, DomTreeUpdater *DTU) {
 /// task.
 bool llvm::ReattachMatchesDetach(const ReattachInst *RI, const DetachInst *DI,
                                  DominatorTree *DT) {
-  // Check that the reattach instruction belonds to the same sync region as the
+  // Check that the reattach instruction belongs to the same sync region as the
   // detach instruction.
   if (RI->getSyncRegion() != DI->getSyncRegion())
     return false;
@@ -504,7 +504,7 @@ BasicBlock *LandingPadInliningInfo::getInnerResumeDest() {
   if (InnerResumeDest)
     return InnerResumeDest;
 
-  // Split the outer resume destionation.
+  // Split the outer resume destination.
   BasicBlock::iterator SplitPoint;
   if (isa<LandingPadInst>(SpawnerLPad))
     SplitPoint = ++cast<Instruction>(SpawnerLPad)->getIterator();
@@ -1300,7 +1300,7 @@ bool llvm::mayBeUnsynced(const BasicBlock *BB) {
 
     for (const BasicBlock *PredBB : predecessors(CurrBB)) {
       // If we find a predecessor via reattach instructions, then
-      // wconservatively return that we may not be synced.
+      // conservatively return that we may not be synced.
       if (isa<ReattachInst>(PredBB->getTerminator()))
         return true;
 

@@ -323,7 +323,7 @@ public:
     }
   }
 
-  // Returns true if the basic block B predeces this spindle.
+  // Returns true if the basic block B precedes this spindle.
   bool blockPrecedesSpindle(const BasicBlock *B) const {
     for (const BasicBlock *SB : successors(B))
       if (SB == getEntry())
@@ -1280,13 +1280,13 @@ public:
     return getSpindleFor(TaskFrame->getParent());
   }
 
-  /// Return the innermost task that encompases both basic blocks BB1 and BB2.
+  /// Return the innermost task that encompasses both basic blocks BB1 and BB2.
   Task *getEnclosingTask(const BasicBlock *BB1, const BasicBlock *BB2) const {
     return getTaskFor(
         getRootTask()->DomTree.findNearestCommonDominator(BB1, BB2));
   }
 
-  /// Return the innermost task that encompases both spindles S1 and S2.
+  /// Return the innermost task that encompasses both spindles S1 and S2.
   Task *getEnclosingTask(const Spindle *S1, const Spindle *S2) const {
     return getEnclosingTask(S1->getEntry(), S2->getEntry());
   }

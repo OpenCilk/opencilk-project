@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TapirRaceDetect is an LLVM pass that analyses Tapir tasks and dependences
+// TapirRaceDetect is an LLVM pass that analyses Tapir tasks and dependencies
 // between memory accesses to find accesses that might race.
 //
 //===----------------------------------------------------------------------===//

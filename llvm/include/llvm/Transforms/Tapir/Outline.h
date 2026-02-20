@@ -84,6 +84,6 @@ void AddAlignmentAssumptions(const Function *Caller, const ValueSet &Args,
                              const Instruction *CallSite,
                              AssumptionCache *AC, DominatorTree *DT);
 
-} // End llvm namespace
+} // namespace llvm
 
 #endif

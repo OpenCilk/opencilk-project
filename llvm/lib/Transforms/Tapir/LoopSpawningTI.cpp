@@ -1281,7 +1281,7 @@ static void updateClonedIVs(
          "updateClonedIVs to process multiple inductions.");
 
   // Get the next argument that provides an input to an IV, which is typically 3
-  // after the input for the primary induction variable, after the end-teration
+  // after the input for the primary induction variable, after the end-iteration
   // and grainsize arguments.
   unsigned ArgIdx = IVArgIndex + NextIVArgOffset;
   for (auto &InductionEntry : *TL->getInductionVars()) {
@@ -1424,7 +1424,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   ClonedCond->setOperand(TripCountIdx, VMap[Args[LimitArgIndex]]);
 
   // If the trip count is variable and we're not passing the trip count as an
-  // argument, undo the eariler temporarily mapping.
+  // argument, undo the earlier temporarily mapping.
   if (!isa<Constant>(TL->getTripCount()) && !Args.count(TL->getTripCount())) {
     VMap.erase(TL->getTripCount());
   }

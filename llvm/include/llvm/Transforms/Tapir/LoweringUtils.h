@@ -378,7 +378,7 @@ public:
 ///   inputs produced in step 2b and whose return type is void.  This outlining
 ///   step uses OutlineProcessor::getIVArgIndex() and
 ///   OutlineProcessor::getLimitArgIndex() to identify the helper input
-///   parameters that specify the strating and ending iterations, respectively.
+///   parameters that specify the starting and ending iterations, respectively.
 ///
 ///   d) Call OutlineProcessor::postProcessOutline(Helper).
 ///

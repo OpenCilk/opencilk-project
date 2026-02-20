@@ -164,7 +164,7 @@ public:
   /// of 0 indicates the absence of a specified grainsize bound.
   unsigned getGrainsizeBound() const { return GrainsizeBound; }
 
-  /// Get the exit block assoicated with this Tapir loop.
+  /// Get the exit block associated with this Tapir loop.
   BasicBlock *getExitBlock() const { return ExitBlock; }
 
   /// Get the unwind destination for this Tapir loop.

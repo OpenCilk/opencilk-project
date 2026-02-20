@@ -928,7 +928,7 @@ bool CSIImpl::isFreeFn(const Instruction *I, const TargetLibraryInfo *TLI) {
     return true;
 
   // Ideally we would just use getFreedOperand to determine whether I is a call
-  // to a libfree funtion.  But if -fno-builtin is used, then getFreedOperand
+  // to a libfree function.  But if -fno-builtin is used, then getFreedOperand
   // won't recognize any libfree functions.  For instrumentation purposes,
   // it's sufficient to recognize the function name.
   const StringRef FreeFnNames[] = {
@@ -1158,7 +1158,7 @@ void CSIImpl::instrumentBasicBlock(BasicBlock &BB, const TaskInfo &TI) {
   uint64_t BBSizeId = BBSize.add(BB, GetTTI ?
                                  &(*GetTTI)(*BB.getParent()) : nullptr);
   assert(LocalId == BBSizeId &&
-         "BB recieved different ID's in FED and sizeinfo tables.");
+         "BB received different ID's in FED and sizeinfo tables.");
   Value *CsiId = BasicBlockFED.localToGlobalId(LocalId, IRB);
   CsiBBProperty Prop;
   Prop.setIsLandingPad(BB.isLandingPad());
@@ -2187,7 +2187,7 @@ void CSIImpl::finalizeCsi() {
   BasicBlock *CtorBB = BasicBlock::Create(M.getContext(), "", Ctor);
   IRBuilder<> IRB(ReturnInst::Create(M.getContext(), CtorBB));
   CallInst *Call = createRTUnitInitCall(IRB);
-  // TODO: Add version-check to the cunstructor?  See
+  // TODO: Add version-check to the constructor?  See
   // ModuleUtils::createSanitizerCtorAndInitFunctions for example.
 
   // Add the ctor to llvm.global_ctors via appendToGlobalCtors() if either

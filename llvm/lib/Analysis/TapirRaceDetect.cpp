@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TapirRaceDetect is an LLVM pass that analyses Tapir tasks and dependences
+// TapirRaceDetect is an LLVM pass that analyses Tapir tasks and dependencies
 // between memory accesses to find accesses that might race.
 //
 //===----------------------------------------------------------------------===//
@@ -386,7 +386,7 @@ static bool isFreeFn(const Instruction *I, const TargetLibraryInfo *TLI) {
     return true;
 
   // Ideally we would just use getFreedOperand to determine whether I is a call
-  // to a libfree funtion.  But if -fno-builtin is used, then getFreedOperand
+  // to a libfree function.  But if -fno-builtin is used, then getFreedOperand
   // won't recognize any libfree functions.  For instrumentation purposes,
   // it's sufficient to recognize the function name.
   const StringRef FreeFnNames[] = {
@@ -1314,9 +1314,9 @@ static void recordOpaqueRace(const GeneralAccess &GA, const Value *Ptr,
   setObjectMRForRace(ObjectMRForRace, Ptr, ModRefInfo::Mod);
 }
 
-// Returns NoAlias/MayAliass/MustAlias for two memory locations based upon their
-// underlaying objects. If LocA and LocB are known to not alias (for any reason:
-// tbaa, non-overlapping regions etc), then it is known there is no dependecy.
+// Returns NoAlias/MayAlias/MustAlias for two memory locations based upon their
+// underlying objects. If LocA and LocB are known to not alias (for any reason:
+// tbaa, non-overlapping regions etc), then it is known there is no dependency.
 // Otherwise the underlying objects are checked to see if they point to
 // different identifiable objects.
 AliasResult
@@ -1631,7 +1631,7 @@ void AccessPtrAnalysis::checkForRacesHelper(
 //   SmallPtrSet<Value*, 16> ReadOnlyPtr;
 
 //   // Sets of potentially dependent accesses - members of one set share an
-//   // underlying pointer. The set "CheckDeps" identfies which sets really need a
+//   // underlying pointer. The set "CheckDeps" identifies which sets really need a
 //   // dependence check.
 //   DepCandidates DepCands;
 
@@ -1686,7 +1686,7 @@ void AccessPtrAnalysis::checkForRacesHelper(
 //   // beneficial to apply stride versioning. It might make more sense that the
 //   // users of this analysis (such as the vectorizer) will trigger it, based on
 //   // their specific cost considerations; For example, in cases where stride
-//   // versioning does  not help resolving memory accesses/dependences, the
+//   // versioning does  not help resolving memory accesses/dependencies, the
 //   // vectorizer should evaluate the cost of the runtime test, and the benefit
 //   // of various possible stride specializations, considering the alternatives
 //   // of using gather/scatters (if available).
@@ -1696,7 +1696,7 @@ void AccessPtrAnalysis::checkForRacesHelper(
 
 //   // Match the types so we can compare the stride and the BETakenCount.
 //   // The Stride can be positive/negative, so we sign extend Stride;
-//   // The backdgeTakenCount is non-negative, so we zero extend BETakenCount.
+//   // The backedgeTakenCount is non-negative, so we zero extend BETakenCount.
 //   const DataLayout &DL = TheLoop->getHeader()->getModule()->getDataLayout();
 //   uint64_t StrideTypeSize = DL.getTypeAllocSize(StrideExpr->getType());
 //   uint64_t BETypeSize = DL.getTypeAllocSize(BETakenCount->getType());

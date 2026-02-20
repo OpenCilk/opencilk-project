@@ -59,7 +59,7 @@ static cl::opt<bool> StripMineUnrollRemainder(
 
 /// Constants for stripmining cost analysis.
 namespace StripMineConstants {
-/// Default coarsening factor for strpimined Tapir loops.
+/// Default coarsening factor for stripmined Tapir loops.
 const unsigned DefaultCoarseningFactor = 2048;
 } // namespace StripMineConstants
 
@@ -211,7 +211,7 @@ bool llvm::computeStripMineCount(
   //
   //   (n/G)(G*S + d) <= (1 + \eps)(n * S)
   //
-  // Solving for G yeilds G >= d/(\eps * S).  Substituting in \eps = 1/C for a
+  // Solving for G yields G >= d/(\eps * S).  Substituting in \eps = 1/C for a
   // given coarsening factor C gives the equation below.
   Instruction *DetachI = L->getHeader()->getTerminator();
   SMP.Count = (SMP.DefaultCoarseningFactor *
@@ -1522,7 +1522,7 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
                 LatchExit, Preheader, EpilogPreheader, VMap, DT, LI, SE, DL,
                 PreserveLCSSA);
 
-  // If this loop is nested, then the loop stripminer changes the code in the
+  // If this loop is nested, then loop stripmine changes the code in the
   // any of its parent loops, so the Scalar Evolution pass needs to be run
   // again.
   SE->forgetTopmostLoop(L);
