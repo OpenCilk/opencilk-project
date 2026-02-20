@@ -22,18 +22,6 @@ enum class TapirTargetID;
 
 //===----------------------------------------------------------------------===//
 //
-// LoopSpawningTI - Create a loop spawning pass that uses Task Info.
-//
-Pass *createLoopSpawningTIPass();
-
-//===----------------------------------------------------------------------===//
-//
-// LowerTapirToTarget - Lower Tapir constructs to a specified parallel runtime.
-//
-ModulePass *createLowerTapirToTargetPass();
-
-//===----------------------------------------------------------------------===//
-//
 // TaskCanonicalize - Canonicalize Tapir tasks
 //
 FunctionPass *createTaskCanonicalizePass();
@@ -62,6 +50,6 @@ Pass *createLoopStripMinePass(int Count = -1);
 //
 FunctionPass *createSerializeSmallTasksPass();
 
-} // End llvm namespace
+} // namespace llvm
 
 #endif
