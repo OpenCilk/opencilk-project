@@ -2178,7 +2178,8 @@ Value *CilkSanitizerImpl::Instrumentor::getMAAPValue(Instruction *I,
     bool FoundAliasingArg = false;
     for (const Value *Arg : CB->args()) {
       // Skip this operand and any operands that are not pointers.
-      if (OpIdx == OperandNum || !Arg->getType()->isPtrOrPtrVectorTy()) {
+      // TODO: Handle pointer-vector types.
+      if (OpIdx == OperandNum || !Arg->getType()->isPointerTy()) {
         ++OpIdx;
         continue;
       }
