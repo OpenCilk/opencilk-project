@@ -2126,6 +2126,8 @@ promoteCallsInTasksHelper(BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
                           SmallVectorImpl<BasicBlock *> *ParentWorklist,
                           SmallPtrSetImpl<BasicBlock *> &Processed,
                           std::function<bool(CallBase *)> IgnoreFunctionCheck) {
+  LLVM_DEBUG(dbgs() << "Promoting calls in task at " << EntryBlock->getName()
+                    << "\n");
   SmallVector<DetachInst *, 8> DetachesToReplace;
   SmallVector<BasicBlock *, 32> Worklist;
   // TODO: See if we need a global Visited set over all recursive calls, i.e.,
@@ -2140,11 +2142,17 @@ promoteCallsInTasksHelper(BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
 
     // Promote any calls in the block to invokes.
     while (BasicBlock *NewBB = maybePromoteCallInBlock(
-               BB, UnwindEdge, CurrentTaskFrame, IgnoreFunctionCheck))
+               BB, UnwindEdge, CurrentTaskFrame, IgnoreFunctionCheck)) {
+      // Mark BB as processed, to prevent it from being incorrectly processed in
+      // the future as a top-level taskframe.create or detaching block.
+      Processed.insert(BB);
       BB = cast<InvokeInst>(NewBB->getTerminator())->getNormalDest();
+    }
 
     Instruction *TFI = getTaskFrameInstructionInBlock(BB, CurrentTaskFrame);
     if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI)) {
+      // Mark BB as processed, so it won't be processed again in the future as a
+      // top-level block.
       Processed.insert(BB);
       Instruction *TFCreate = TFI;
       if (TFCreate != CurrentTaskFrame) {
@@ -2160,10 +2168,14 @@ promoteCallsInTasksHelper(BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
             CreateSubTaskUnwindEdge(Intrinsic::taskframe_resume, TFCreate,
                                     UnwindEdge, Unreachable, TFCreate);
 
+        LLVM_DEBUG(dbgs() << "Recursively promote calls in taskframe at "
+                          << NewBB->getName() << "\n");
         // Recursively check all blocks
         promoteCallsInTasksHelper(NewBB, TaskFrameUnwindEdge, Unreachable,
                                   TFCreate, &Worklist, Processed,
                                   IgnoreFunctionCheck);
+        LLVM_DEBUG(dbgs() << "Done recursively promoting calls in taskframe at "
+                          << NewBB->getName() << "\n");
 
         // Remove the unwind edge for the taskframe if it is not needed.
         if (pred_empty(TaskFrameUnwindEdge))
@@ -2180,6 +2192,9 @@ promoteCallsInTasksHelper(BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
         // This taskframe.end does not terminate the basic block.  To make sure
         // the rest of the block is processed properly, split the block.
         BasicBlock *NewBB = SplitBlock(BB, TFI->getNextNode());
+        // Mark BB as processed, to prevent it from being incorrectly processed
+        // in the future as a top-level taskframe.create or detaching block.
+        Processed.insert(BB);
         ParentWorklist->push_back(NewBB);
       } else {
         // Add all successors of BB to the worklist.
@@ -2206,9 +2221,11 @@ promoteCallsInTasksHelper(BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
       continue;
     }
 
-    // Process a detach instruction specially.  In particular, process th
+    // Process a detach instruction specially.  In particular, process the
     // spawned task recursively.
     if (DetachInst *DI = dyn_cast<DetachInst>(BB->getTerminator())) {
+      // Mark BB as processed, so it won't be processed again in the future as a
+      // top-level block.
       Processed.insert(BB);
 
       // Create an unwind edge for the subtask, which is terminated with a
@@ -2217,10 +2234,16 @@ promoteCallsInTasksHelper(BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
           Intrinsic::detached_rethrow, DI->getSyncRegion(),
           DI->hasUnwindDest() ? DI->getUnwindDest() : UnwindEdge, Unreachable,
           DI);
+
+      LLVM_DEBUG(dbgs() << "Recursively promote calls in detached task at "
+                        << DI->getDetached()->getName() << "\n");
       // Recursively check all blocks in the detached task.
       promoteCallsInTasksHelper(DI->getDetached(), SubTaskUnwindEdge,
                                 Unreachable, CurrentTaskFrame, &Worklist,
                                 Processed, IgnoreFunctionCheck);
+      LLVM_DEBUG(
+          dbgs() << "Done recursively promoting calls in detached task at "
+                 << DI->getDetached()->getName() << "\n");
 
       // If the new unwind edge is not used, remove it.
       if (pred_empty(SubTaskUnwindEdge))
@@ -2301,9 +2324,12 @@ void llvm::promoteCallsInTasksToInvokes(
   // Recursively handle inlined tasks.
   SmallPtrSet<BasicBlock *, 8> Processed;
   for (BasicBlock *BB : ToProcess) {
-    if (!Processed.contains(BB))
+    if (!Processed.contains(BB)) {
+      LLVM_DEBUG(dbgs() << "Promoting calls in tasks from top-level block "
+                        << BB->getName() << "\n");
       promoteCallsInTasksHelper(BB, CleanupBB, UnreachableBlk, nullptr, nullptr,
                                 Processed, IgnoreFunctionCheck);
+    }
   }
 
   // Either finish inserting the cleanup block (and associated data) or remove
