@@ -578,7 +578,8 @@ bool ThreadSanitizer::sanitizeFunction(Function &F,
     IRB.CreateCall(TsanFuncEntry, ReturnAddress);
 
     if (ClHandleCxxExceptions && !F.doesNotThrow())
-      promoteCallsInTasksToInvokes(F, "tsan_cleanup");
+      // TODO: Modify ThreadSanitizer to not instrument unreachable code.
+      promoteCallsInTasksToInvokes(F, "tsan_cleanup", false);
 
     EscapeEnumerator EE(F, "tsan_cleanup", ClHandleCxxExceptions);
     while (IRBuilder<> *AtExit = EE.Next()) {

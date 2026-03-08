@@ -2294,18 +2294,20 @@ static FunctionCallee getDefaultPersonalityFn(Module *M) {
 }
 
 void llvm::promoteCallsInTasksToInvokes(
-    Function &F, const Twine Name,
+    Function &F, const Twine Name, bool IgnoreUnreachableBlocks,
     std::function<bool(CallBase *)> IgnoreFunctionCheck) {
   // Collect blocks to process, in order to handle unreachable blocks.
   SmallVector<BasicBlock *, 8> ToProcess;
   ToProcess.push_back(&F.getEntryBlock());
-  for (BasicBlock &BB : F) {
-    Instruction *TFI = getTaskFrameInstructionInBlock(&BB, nullptr);
-    if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI))
-      ToProcess.push_back(&BB);
+  if (!IgnoreUnreachableBlocks) {
+    for (BasicBlock &BB : F) {
+      Instruction *TFI = getTaskFrameInstructionInBlock(&BB, nullptr);
+      if (TFI && isTapirIntrinsic(Intrinsic::taskframe_create, TFI))
+        ToProcess.push_back(&BB);
 
-    if (isa<DetachInst>(BB.getTerminator()))
-      ToProcess.push_back(&BB);
+      if (isa<DetachInst>(BB.getTerminator()))
+        ToProcess.push_back(&BB);
+    }
   }
 
   // Create a cleanup block.

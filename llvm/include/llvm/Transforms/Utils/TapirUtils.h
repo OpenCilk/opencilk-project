@@ -250,6 +250,7 @@ BasicBlock *CreateSubTaskUnwindEdge(Intrinsic::ID TermFunc, Value *Token,
 /// call sites in a custom manner.
 void promoteCallsInTasksToInvokes(
     Function &F, const Twine Name = "cleanup",
+    bool IgnoreUnreachableBlocks = true,
     std::function<bool(CallBase *)> IgnoreFunctionCheck = nullptr);
 
 /// eraseTaskFrame - Remove the specified taskframe and all uses of it.  The

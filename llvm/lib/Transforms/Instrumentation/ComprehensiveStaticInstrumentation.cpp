@@ -749,7 +749,7 @@ void CSIImpl::setupCalls(Function &F) {
   if (F.doesNotThrow())
     return;
 
-  promoteCallsInTasksToInvokes(F, "csi.cleanup", [](CallBase *CB) {
+  promoteCallsInTasksToInvokes(F, "csi.cleanup", true, [](CallBase *CB) {
     if (const Function *F = CB->getCalledFunction()) {
       if (F->getName().starts_with("__asan")) {
         CB->setDoesNotThrow();
@@ -880,15 +880,25 @@ static void setupBlock(BasicBlock *BB, const TargetLibraryInfo *TLI,
 void CSIImpl::setupBlocks(Function &F, const TargetLibraryInfo *TLI,
                           DominatorTree *DT, LoopInfo *LI) {
   SmallPtrSet<BasicBlock *, 8> BlocksToSetup;
-  for (BasicBlock &BB : F) {
-    if (BB.isLandingPad())
-      BlocksToSetup.insert(&BB);
+  SmallVector<BasicBlock *, 8> Worklist;
+  SmallPtrSet<BasicBlock *, 8> Visited;
+  Worklist.push_back(&F.getEntryBlock());
+  while (!Worklist.empty()) {
+    BasicBlock *BB = Worklist.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
 
-    if (InvokeInst *II = dyn_cast<InvokeInst>(BB.getTerminator())) {
+    if (BB->isLandingPad())
+      BlocksToSetup.insert(BB);
+
+    if (InvokeInst *II = dyn_cast<InvokeInst>(BB->getTerminator())) {
       if (!isTapirPlaceholderSuccessor(II->getNormalDest()))
         BlocksToSetup.insert(II->getNormalDest());
-    } else if (SyncInst *SI = dyn_cast<SyncInst>(BB.getTerminator()))
+    } else if (SyncInst *SI = dyn_cast<SyncInst>(BB->getTerminator()))
       BlocksToSetup.insert(SI->getSuccessor(0));
+
+    for (BasicBlock *Succ : successors(BB))
+      Worklist.push_back(Succ);
   }
 
   DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy);
@@ -900,8 +910,14 @@ void CSIImpl::setupBlocks(Function &F, const TargetLibraryInfo *TLI,
 void CSIImpl::splitBlocksAtCalls(Function &F, DominatorTree *DT, LoopInfo *LI) {
   // Split basic blocks after call instructions.
   SmallVector<Instruction *, 32> CallsToSplit;
-  for (BasicBlock &BB : F)
-    for (Instruction &I : BB)
+  SmallVector<BasicBlock *, 8> Worklist;
+  SmallPtrSet<BasicBlock *, 8> Visited;
+  Worklist.push_back(&F.getEntryBlock());
+  while (!Worklist.empty()) {
+    BasicBlock *BB = Worklist.pop_back_val();
+    if (!Visited.insert(BB).second)
+      continue;
+    for (Instruction &I : *BB)
       if (isa<CallInst>(I) &&
           // Skip placeholder call instructions
           !callsPlaceholderFunction(I) &&
@@ -911,6 +927,10 @@ void CSIImpl::splitBlocksAtCalls(Function &F, DominatorTree *DT, LoopInfo *LI) {
           // If the call does not return, don't bother splitting
           !cast<CallInst>(&I)->doesNotReturn())
         CallsToSplit.push_back(&I);
+
+    for (BasicBlock *Succ : successors(BB))
+      Worklist.push_back(Succ);
+  }
 
   for (Instruction *Call : CallsToSplit)
     SplitBlock(Call->getParent(), Call->getNextNode(), DT, LI);
