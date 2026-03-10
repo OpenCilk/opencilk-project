@@ -5204,7 +5204,7 @@ ExprResult Sema::ActOnArraySubscriptExpr(Scope *S, Expr *base,
   // ObjC pointers have their own subscripting logic that is not tied
   // to overload resolution and so should not take this path.
   if (getLangOpts().CPlusPlus && !base->getType()->isObjCObjectPointerType() &&
-      ((base->getType()->isRecordType() ||
+      ((base->getType().stripHyperobject()->isRecordType() ||
         (ArgExprs.size() != 1 || isa<PackExpansionExpr>(ArgExprs[0]) ||
          ArgExprs[0]->getType()->isRecordType())))) {
     return CreateOverloadedArraySubscriptExpr(lbLoc, rbLoc, base, ArgExprs);

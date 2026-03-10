@@ -15884,9 +15884,9 @@ ExprResult Sema::CreateOverloadedArraySubscriptExpr(SourceLocation LLoc,
                                                     Expr *Base,
                                                     MultiExprArg ArgExpr) {
   SmallVector<Expr *, 2> Args;
-  Args.push_back(Base);
+  Args.push_back(BuildHyperobjectLookup(Base));
   for (auto *e : ArgExpr) {
-    Args.push_back(e);
+    Args.push_back(BuildHyperobjectLookup(e));
   }
   DeclarationName OpName =
       Context.DeclarationNames.getCXXOperatorName(OO_Subscript);
