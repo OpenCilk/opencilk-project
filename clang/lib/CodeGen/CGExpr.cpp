@@ -6364,7 +6364,7 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType,
   assert(CalleeType->isFunctionPointerType() &&
          "Call must have function pointer type!");
 
-  if (IsSpawned) {
+  if (IsSpawned && (!CurDetachScope || !CurDetachScope->IsDetachStarted())) {
     PushDetachScope();
     CurDetachScope->EnsureTaskFrame();
   }
