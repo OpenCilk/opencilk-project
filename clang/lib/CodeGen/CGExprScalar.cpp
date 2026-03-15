@@ -25,6 +25,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprCilk.h"
 #include "clang/AST/ParentMapContext.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/StmtVisitor.h"
@@ -258,8 +259,8 @@ class ScalarExprEmitter
   CodeGenFunction &CGF;
   CGBuilderTy &Builder;
   bool IgnoreResultAssign;
-  bool DoSpawnedInit = false;
-  LValue LValueToSpawnInit;
+  bool DoSpawnedStore = false;
+  LValue LValueToSpawnStore;
   llvm::LLVMContext &VMContext;
 public:
 
@@ -268,10 +269,10 @@ public:
       VMContext(cgf.getLLVMContext()) {
   }
 
-  ScalarExprEmitter(CodeGenFunction &cgf, LValue LValueToSpawnInit,
+  ScalarExprEmitter(CodeGenFunction &cgf, LValue LValueToSpawnStore,
                     bool ira=false)
       : CGF(cgf), Builder(CGF.Builder), IgnoreResultAssign(ira),
-        DoSpawnedInit(true), LValueToSpawnInit(LValueToSpawnInit),
+        DoSpawnedStore(true), LValueToSpawnStore(LValueToSpawnStore),
         VMContext(cgf.getLLVMContext()) {
   }
 
@@ -505,8 +506,8 @@ public:
     Value *V = Visit(CSE->getSpawnedExpr());
     if (!(CGF.CurDetachScope && CGF.CurDetachScope->IsDetachStarted()))
       CGF.FailedSpawnWarning(CSE->getExprLoc());
-    if (DoSpawnedInit) {
-      LValue LV = LValueToSpawnInit;
+    if (DoSpawnedStore) {
+      LValue LV = LValueToSpawnStore;
       CGF.EmitNullabilityCheck(LV, V, CSE->getExprLoc());
       CGF.EmitStoreThroughLValue(RValue::get(V), LV, true);
 
@@ -5217,6 +5218,17 @@ Value *ScalarExprEmitter::VisitBinAssign(const BinaryOperator *E) {
 
       break;
     }
+
+    if (CGF.CanSpawnStore(E->getRHS())) {
+      // Compute the address to store into.
+      LHS = EmitCheckedLValue(E->getLHS(), CodeGenFunction::TCK_Store);
+
+      // Emit this expression to store into the computed address.
+      CGF.EmitScalarExprIntoLValue(E->getRHS(), LHS);
+
+      break;
+    }
+
     // __block variables need to have the rhs evaluated first, plus
     // this should improve codegen just a little.
     Value *Previous = nullptr;
@@ -5584,6 +5596,8 @@ VisitAbstractConditionalOperator(const AbstractConditionalOperator *E) {
   Expr *lhsExpr = E->getTrueExpr();
   Expr *rhsExpr = E->getFalseExpr();
 
+  bool OperatorCanSpawnStore =
+      CGF.CanSpawnStore(lhsExpr) || CGF.CanSpawnStore(rhsExpr);
   // If the condition constant folds and can be elided, try to avoid emitting
   // the condition and the dead arm.
   bool CondExprBool;
@@ -5609,6 +5623,13 @@ VisitAbstractConditionalOperator(const AbstractConditionalOperator *E) {
       if (!Result && !E->getType()->isVoidType())
         Result = llvm::UndefValue::get(CGF.ConvertType(E->getType()));
 
+      if (OperatorCanSpawnStore && !CGF.CanSpawnStore(live)) {
+        // Make sure to store the result into the LValue, which was deferred to
+        // here in case of a spawn.
+        LValue LV = LValueToSpawnStore;
+        CGF.EmitNullabilityCheck(LV, Result, live->getExprLoc());
+        CGF.EmitStoreThroughLValue(RValue::get(Result), LV, true);
+      }
       return Result;
     }
   }
@@ -5723,6 +5744,13 @@ VisitAbstractConditionalOperator(const AbstractConditionalOperator *E) {
 
   eval.begin(CGF);
   Value *LHS = Visit(lhsExpr);
+  if (OperatorCanSpawnStore && !CGF.CanSpawnStore(lhsExpr)) {
+    assert(DoSpawnedStore &&
+           "CilkSpawnExpr in conditional operator not set to spawn a store.");
+    LValue LV = LValueToSpawnStore;
+    CGF.EmitNullabilityCheck(LV, LHS, lhsExpr->getExprLoc());
+    CGF.EmitStoreThroughLValue(RValue::get(LHS), LV, true);
+  }
   eval.end(CGF);
 
   LHSBlock = Builder.GetInsertBlock();
@@ -5741,15 +5769,22 @@ VisitAbstractConditionalOperator(const AbstractConditionalOperator *E) {
 
   eval.begin(CGF);
   Value *RHS = Visit(rhsExpr);
+  if (OperatorCanSpawnStore && !CGF.CanSpawnStore(rhsExpr)) {
+    assert(DoSpawnedStore &&
+           "CilkSpawnExpr in conditional operator not set to spawn a store.");
+    LValue LV = LValueToSpawnStore;
+    CGF.EmitNullabilityCheck(LV, RHS, rhsExpr->getExprLoc());
+    CGF.EmitStoreThroughLValue(RValue::get(RHS), LV, true);
+  }
   eval.end(CGF);
 
   RHSBlock = Builder.GetInsertBlock();
   CGF.EmitBlock(ContBlock);
 
   // If the LHS or RHS is a throw expression, it will be legitimately null.
-  if (!LHS)
+  if (!LHS || CGF.CanSpawnStore(lhsExpr))
     return RHS;
-  if (!RHS)
+  if (!RHS || CGF.CanSpawnStore(rhsExpr))
     return LHS;
 
   // Create a PHI node for the real part.
@@ -5898,18 +5933,17 @@ Value *CodeGenFunction::EmitScalarExpr(const Expr *E, bool IgnoreResultAssign) {
       .Visit(const_cast<Expr *>(E));
 }
 
-void CodeGenFunction::EmitScalarExprIntoLValue(const Expr *E, LValue dest,
-                                               bool isInit) {
+void CodeGenFunction::EmitScalarExprIntoLValue(const Expr *E, LValue dest) {
   assert(E && hasScalarEvaluationKind(E->getType()) &&
          "Invalid scalar expression to emit");
 
-  if (isa<CilkSpawnExpr>(E) && isInit) {
+  if (CanSpawnStore(E)) {
     ScalarExprEmitter(*this, dest).Visit(const_cast<Expr *>(E));
     return;
   }
   Value *V = ScalarExprEmitter(*this).Visit(const_cast<Expr *>(E));
   EmitNullabilityCheck(dest, V, E->getExprLoc());
-  EmitStoreThroughLValue(RValue::get(V), dest, isInit);
+  EmitStoreThroughLValue(RValue::get(V), dest, /*isInit=*/true);
 }
 
 /// Emit a conversion from the specified type to the specified destination type,

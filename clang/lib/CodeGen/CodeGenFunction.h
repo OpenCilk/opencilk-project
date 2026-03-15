@@ -131,6 +131,9 @@ struct DominatingLLVMValue {
     if (!isa<llvm::Instruction>(value))
       return false;
 
+    if (value->getType()->isTokenTy())
+      return false;
+
     // If it's an instruction in the entry block, we don't need to save.
     llvm::BasicBlock *block = cast<llvm::Instruction>(value)->getParent();
     return (block != &block->getParent()->getEntryBlock());
@@ -1351,6 +1354,15 @@ public:
     bool OldScopeIsSpawned() const;
     void RestoreOldScope();
   };
+
+  static bool CanSpawnStore(const Expr *E) {
+    if (isa<CilkSpawnExpr>(E->IgnoreImplicit())) {
+      return true;
+    }
+    if (const ConditionalOperator *CO = dyn_cast<ConditionalOperator>(E))
+      return CanSpawnStore(CO->getLHS()) || CanSpawnStore(CO->getRHS());
+    return false;
+  }
 
   /// Cleanup to ensure a sync is inserted.  If no SyncRegion is specified, then
   /// this cleanup actually serves as a placeholder in EHStack, which ensures
@@ -5564,7 +5576,7 @@ public:
   /// scalar type, returning the result.
   llvm::Value *EmitScalarExpr(const Expr *E, bool IgnoreResultAssign = false);
 
-  void EmitScalarExprIntoLValue(const Expr *E, LValue dest, bool isInit);
+  void EmitScalarExprIntoLValue(const Expr *E, LValue dest);
 
   /// Emit a conversion from the specified type to the specified destination
   /// type, both of which are LLVM scalar types.

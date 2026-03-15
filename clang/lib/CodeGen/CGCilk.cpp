@@ -112,9 +112,27 @@ void CodeGenFunction::DetachScope::EnsureTaskFrame() {
 
     CreateTaskFrameEHState();
 
+    // Avoid inserting a conditional cleanup for the task end.
+    ConditionalEvaluation *OldConditional = nullptr;
+    CGBuilderTy::InsertPoint OldIP;
+    if (CGF.isInConditionalBranch()) {
+      OldConditional = CGF.OutermostConditional;
+      CGF.OutermostConditional = nullptr;
+
+      OldIP = CGF.Builder.saveIP();
+      llvm::BasicBlock *Block = OldConditional->getStartingBlock();
+      CGF.Builder.restoreIP(CGBuilderTy::InsertPoint(
+          Block, llvm::BasicBlock::iterator(Block->back())));
+    }
+
     CGF.pushFullExprCleanup<CallTaskEnd>(
         static_cast<CleanupKind>(EHCleanup | LifetimeMarker | TaskExit),
         TaskFrame);
+
+    if (OldConditional) {
+      CGF.OutermostConditional = OldConditional;
+      CGF.Builder.restoreIP(OldIP);
+    }
   }
 }
 
@@ -125,11 +143,29 @@ void CodeGenFunction::DetachScope::InitDetachScope() {
 }
 
 void CodeGenFunction::DetachScope::PushSpawnedTaskTerminate() {
+  // Avoid inserting a conditional cleanup for the detached rethrow.
+  ConditionalEvaluation *OldConditional = nullptr;
+  CGBuilderTy::InsertPoint OldIP;
+  if (CGF.isInConditionalBranch()) {
+    OldConditional = CGF.OutermostConditional;
+    CGF.OutermostConditional = nullptr;
+
+    OldIP = CGF.Builder.saveIP();
+    llvm::BasicBlock *Block = OldConditional->getStartingBlock();
+    CGF.Builder.restoreIP(CGBuilderTy::InsertPoint(
+        Block, llvm::BasicBlock::iterator(Block->back())));
+  }
+
   CGF.pushFullExprCleanupImpl<CallDetRethrow>(
       // This cleanup should not be a TaskExit, because we've pushed a TaskExit
       // cleanup onto EHStack already, corresponding with the taskframe.
       static_cast<CleanupKind>(EHCleanup | LifetimeMarker),
       CGF.CurSyncRegion->getSyncRegionStart());
+
+  if (OldConditional) {
+    CGF.OutermostConditional = OldConditional;
+    CGF.Builder.restoreIP(OldIP);
+  }
 }
 
 void CodeGenFunction::DetachScope::StartDetach() {

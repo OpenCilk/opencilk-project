@@ -781,8 +781,8 @@ void CodeGenFunction::EmitScalarInit(const Expr *init, const ValueDecl *D,
                                      LValue lvalue, bool capturedByInit) {
   Qualifiers::ObjCLifetime lifetime = lvalue.getObjCLifetime();
   if (!lifetime) {
-    if (isa<CilkSpawnExpr>(init)) {
-      EmitScalarExprIntoLValue(init, lvalue, /*isInit*/ true);
+    if (CanSpawnStore(init)) {
+      EmitScalarExprIntoLValue(init, lvalue);
       return;
     }
     llvm::Value *Value;
