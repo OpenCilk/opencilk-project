@@ -87,7 +87,10 @@ namespace {
       CurrentSourceLocExprScope::SourceLocExprScopeGuard;
 
   static QualType getType(APValue::LValueBase B) {
-    return B.getType();
+    QualType Ty = B.getType();
+    if (!Ty.isNull())
+      Ty = Ty.stripHyperobject();
+    return Ty;
   }
 
   /// Get an LValue path entry, which is known to not be an array index, as a
