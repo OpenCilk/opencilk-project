@@ -8748,7 +8748,7 @@ void Sema::AddMemberOperatorCandidates(OverloadedOperatorKind Op,
   //   three sets of candidate functions, designated member
   //   candidates, non-member candidates and built-in candidates, are
   //   constructed as follows:
-  QualType T1 = Args[0]->getType();
+  QualType T1 = Args[0]->getType().stripHyperobject();
 
   //     -- If T1 is a complete class type or a class currently being
   //        defined, the set of member candidates is the result of the
@@ -10255,7 +10255,8 @@ void Sema::AddBuiltinOperatorCandidates(OverloadedOperatorKind Op,
   SmallVector<BuiltinCandidateTypeSet, 2> CandidateTypes;
   for (unsigned ArgIdx = 0, N = Args.size(); ArgIdx != N; ++ArgIdx) {
     CandidateTypes.emplace_back(*this);
-    CandidateTypes[ArgIdx].AddTypesConvertedFrom(Args[ArgIdx]->getType(),
+    QualType ArgType = Args[ArgIdx]->getType().stripHyperobject();
+    CandidateTypes[ArgIdx].AddTypesConvertedFrom(ArgType,
                                                  OpLoc,
                                                  true,
                                                  (Op == OO_Exclaim ||
@@ -15192,11 +15193,6 @@ void Sema::LookupOverloadedBinOp(OverloadCandidateSet &CandidateSet,
                                  OverloadedOperatorKind Op,
                                  const UnresolvedSetImpl &Fns,
                                  ArrayRef<Expr *> Args, bool PerformADL) {
-  assert(Args[0]->getType()->getTypeClass() != Type::Hyperobject &&
-         "hyperobjects not allowed in overloading");
-  assert(Args[1]->getType()->getTypeClass() != Type::Hyperobject &&
-         "hyperobjects not allowed in overloading");
-
   SourceLocation OpLoc = CandidateSet.getLocation();
 
   OverloadedOperatorKind ExtraOp =
