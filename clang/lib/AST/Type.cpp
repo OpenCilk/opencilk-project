@@ -3612,7 +3612,8 @@ HyperobjectType::HyperobjectType(QualType Element, QualType CanonicalPtr)
   : Type(Hyperobject, CanonicalPtr, Element->getDependence()),
     ElementType(Element) {
   // these errors are diagnosed in the caller
-  if (Element->isIncompleteType() || !Element->isRecordType())
+  if (!Element->isDependentType() &&
+      (Element->isIncompleteType() || !Element->isRecordType()))
     addDependence(TypeDependence::Error);
   addDependence(Element->getDependence());
 }
