@@ -4255,6 +4255,14 @@ static bool AdjustFunctionParmAndArgTypesForDeduction(
   if (ParamRefType)
     ParamType = ParamRefType->getPointeeType();
 
+  // A hyperobject can never match a non-hyperobject, but it can match
+  // a TemplateTypeParmType.
+  if (!isa<HyperobjectType>(ParamType.getTypePtr()) &&
+      !isa<TemplateTypeParmType>(ParamType.getTypePtr())) {
+    if (const HyperobjectType *HT = ArgType->getAs<HyperobjectType>())
+      ArgType = HT->getElementType();
+  }
+
   // Overload sets usually make this parameter an undeduced context,
   // but there are sometimes special circumstances.  Typically
   // involving a template-id-expr.
