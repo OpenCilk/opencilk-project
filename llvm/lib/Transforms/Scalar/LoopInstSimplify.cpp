@@ -45,6 +45,11 @@ static bool simplifyLoopInst(Loop &L, DominatorTree &DT, LoopInfo &LI,
   const DataLayout &DL = L.getHeader()->getDataLayout();
   SimplifyQuery SQ(DL, &TLI, &DT, &AC);
 
+  // Get task exits for this loop.  Instructions in task-exit blocks will be
+  // considered part of the loop.
+  SmallPtrSet<BasicBlock *, 1> TaskExits;
+  L.getTaskExits(TaskExits);
+
   // On the first pass over the loop body we try to simplify every instruction.
   // On subsequent passes, we can restrict this to only simplifying instructions
   // where the inputs have been updated. We end up needing two sets: one
@@ -121,9 +126,11 @@ static bool simplifyLoopInst(Loop &L, DominatorTree &DT, LoopInfo &LI,
           // We also skip any uses outside of the loop being simplified. Those
           // should always be PHI nodes due to LCSSA form, and we don't want to
           // try to simplify those away.
-          assert((L.contains(UserI) || isa<PHINode>(UserI)) &&
+          assert((L.contains(UserI) || isa<PHINode>(UserI) ||
+                  TaskExits.contains(UserI->getParent())) &&
                  "Uses outside the loop should be PHI nodes due to LCSSA!");
-          if (!IsFirstIteration && L.contains(UserI))
+          if (!IsFirstIteration &&
+              (L.contains(UserI) || TaskExits.contains(UserI->getParent())))
             ToSimplify->insert(UserI);
         }
 
