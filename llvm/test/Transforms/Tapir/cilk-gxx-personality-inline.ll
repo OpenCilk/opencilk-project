@@ -4,7 +4,7 @@
 ; RUN: opt < %s -passes='always-inline' -S | FileCheck %s
 
 ; Function Attrs: alwaysinline
-define weak_odr void @_Z12conv2d_loopsIfEvPT_PKS0_S3_llllllllllllllllllll() #0 personality i32 (...)* @__cilk_personality_v0 {
+define weak_odr void @_Z12conv2d_loopsIfEvPT_PKS0_S3_llllllllllllllllllll() #0 personality i32 (...)* @__cilk_personality_cpp_v0 {
 pfor.end326:
   ret void
 }
@@ -39,11 +39,11 @@ lpad265:                                          ; preds = %invoke.cont266
 ; CHECK: define weak_odr void @_Z12conv2d_loopsIfEvPT_PKS0_S3_llllllllllllllllllll()
 
 ; CHECK: define void @conv2d_f32(
-; CHECK: personality ptr @__cilk_personality_v0 {
+; CHECK: personality ptr @__cilk_personality_cpp_v0 {
 ; CHECK: ret void
 
 ; CHECK: define void @_Z15conv2d_f32_wrapN5boost6python5numpy7ndarrayES2_NS0_5tupleES3_S3_NS0_4listES4_S4_()
-; CHECK: personality ptr @__cilk_personality_v0 {
+; CHECK: personality ptr @__cilk_personality_cpp_v0 {
 
 ; Function Attrs: nofree nosync nounwind willreturn
 declare i8* @llvm.stacksave() #3
@@ -57,7 +57,7 @@ declare i8* @llvm.frameaddress.p0i8(i32 immarg) #5
 ; Function Attrs: nounwind
 declare i32 @llvm.eh.sjlj.setjmp(i8*) #6
 
-declare i32 @__cilk_personality_v0(...)
+declare i32 @__cilk_personality_cpp_v0(...)
 
 declare i32 @__gxx_personality_v0(...)
 

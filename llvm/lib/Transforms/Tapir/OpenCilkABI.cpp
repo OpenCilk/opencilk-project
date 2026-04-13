@@ -24,6 +24,7 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/EHPersonalities.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstIterator.h"
@@ -642,11 +643,27 @@ void OpenCilkABI::MarkSpawner(Function &F) {
   // If the spawner F might throw, then we mark F with the Cilk personality
   // function, which ensures that the Cilk stack frame of F is properly unwound.
   if (!F.doesNotThrow()) {
+    EHPersonality P = EHPersonality::Cilk_C;
+    if (F.hasPersonalityFn()) {
+      switch (classifyEHPersonality(F.getPersonalityFn())) {
+      case EHPersonality::GNU_CXX:
+        P = EHPersonality::Cilk_CXX;
+        break;
+      case EHPersonality::GNU_C:
+      case EHPersonality::Unknown:
+        P = EHPersonality::Cilk_C;
+        break;
+      default:
+        llvm_unreachable("Unsupported exception handling in spawner");
+        break;
+      }
+    }
+
     LLVMContext &C = M.getContext();
     // Get the type of the Cilk personality function the same way that clang and
     // EscapeEnumerator get the type of a personality function.
     Function *Personality = cast<Function>(
-        M.getOrInsertFunction("__cilk_personality_v0",
+        M.getOrInsertFunction(getEHPersonalityName(P),
                               FunctionType::get(Type::getInt32Ty(C), true))
             .getCallee());
     F.setPersonalityFn(Personality);

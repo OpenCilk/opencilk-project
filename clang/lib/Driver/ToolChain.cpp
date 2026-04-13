@@ -2123,22 +2123,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
           Args, UseAsan ? "opencilk-pedigrees-asan" : "opencilk-pedigrees",
           StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));
 
-    // Link the correct Cilk personality fn
-    if (getDriver().CCCIsCXX())
-      CmdArgs.push_back(Args.MakeArgString(getOpenCilkRT(
-          Args,
-          UseAsan ? "opencilk-asan-personality-cpp"
-                  : "opencilk-personality-cpp",
-          StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));
-    else
-      CmdArgs.push_back(Args.MakeArgString(getOpenCilkRT(
-          Args,
-          UseAsan ? "opencilk-asan-personality-c" : "opencilk-personality-c",
-          StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));
-
-    // Link the opencilk runtime.  We do this after linking the personality
-    // function, to ensure that symbols are resolved correctly when using static
-    // linking.
+    // Link the opencilk runtime.
     CmdArgs.push_back(Args.MakeArgString(getOpenCilkRT(
         Args, UseAsan ? "opencilk-asan" : "opencilk",
         StaticOpenCilk ? ToolChain::FT_Static : ToolChain::FT_Shared)));

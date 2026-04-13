@@ -2851,6 +2851,18 @@ struct TaskFrameScope {
   }
 };
 
+static bool CilkSuperset(EHPersonality Caller, EHPersonality Callee)
+{
+  switch (Callee) {
+  case EHPersonality::Cilk_C:
+    return Caller == EHPersonality::GNU_C;
+  case EHPersonality::Cilk_CXX:
+    return Caller == EHPersonality::GNU_CXX;
+  default:
+    return false;
+  }
+}
+
 /// This function inlines the called function into the basic block of the
 /// caller. This returns false if it is not possible to inline this call.
 /// The program is still in a well defined state if this occurs though.
@@ -2966,10 +2978,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
         // CalledPersonality is a superset.
         Caller->setPersonalityFn(CalledPersonality);
 
-      else if (classifyEHPersonality(CalledPersonality) ==
-                   EHPersonality::Cilk_CXX &&
-               classifyEHPersonality(CallerPersonality) ==
-                   EHPersonality::GNU_CXX)
+      else if (CilkSuperset(classifyEHPersonality(CallerPersonality),
+                            classifyEHPersonality(CalledPersonality)))
         // The Cilk personality is a superset of the caller's.
         Caller->setPersonalityFn(CalledPersonality);
 
@@ -2986,9 +2996,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
         //   GNU_CXX.
         // Otherwise, declare that we can't inline.
         if (CalledEHPersonality != getDefaultEHPersonality(T) &&
-            (classifyEHPersonality(CallerPersonality) !=
-                 EHPersonality::Cilk_CXX ||
-             CalledEHPersonality != EHPersonality::GNU_CXX))
+            !CilkSuperset(classifyEHPersonality(CallerPersonality),
+                          CalledEHPersonality))
           return InlineResult::failure("incompatible personality");
       }
     }

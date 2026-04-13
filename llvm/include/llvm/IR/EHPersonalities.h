@@ -35,6 +35,7 @@ enum class EHPersonality {
   Wasm_CXX,
   XL_CXX,
   ZOS_CXX,
+  Cilk_C,
   Cilk_CXX
 };
 

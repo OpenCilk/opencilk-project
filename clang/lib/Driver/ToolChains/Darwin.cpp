@@ -3983,26 +3983,12 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
                                      : "opencilk-pedigrees",
                              RLO, !StaticOpenCilk);
 
-    // Link the correct Cilk personality fn
-    if (getDriver().CCCIsCXX())
-      AddLinkTapirRuntimeLib(Args, CmdArgs,
-                             UseAsan ? "opencilk-asan-personality-cpp"
-                                     : "opencilk-personality-cpp",
-                             RLO, !StaticOpenCilk);
-    else
-      AddLinkTapirRuntimeLib(Args, CmdArgs,
-                             UseAsan ? "opencilk-asan-personality-c"
-                                     : "opencilk-personality-c",
-                             RLO, !StaticOpenCilk);
-
     if (!StaticOpenCilk)
       // Add rpath flag for linking the final Tapir runtime library, to avoid
       // warnings about ignoring duplicate rpaths.
       RLO = RuntimeLinkOptions(RLO | RLO_AddRPath);
 
-    // Link the opencilk runtime.  We do this after linking the personality
-    // function, to ensure that symbols are resolved correctly when using static
-    // linking.
+    // Link the opencilk runtime.
     AddLinkTapirRuntimeLib(Args, CmdArgs,
                            UseAsan ? "opencilk-asan" : "opencilk", RLO,
                            !StaticOpenCilk);
