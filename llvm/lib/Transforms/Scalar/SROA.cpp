@@ -4221,9 +4221,11 @@ private:
 
     Type *SourceTy = GEPI.getSourceElementType();
     // We only handle arguments, constants, and static allocas here, so we can
-    // insert GEPs at the end of the entry block.
+    // insert GEPs at the end of the entry block of the task that contains both
+    // the GEP and the Phi.  Because the GEP uses the Phi, we use the Phi
+    // to determine which task contains both.
     IRB.SetInsertPoint(
-        TI->getTaskFor(GEPI.getParent())->getEntry()->getTerminator());
+        TI->getTaskFor(Phi->getParent())->getEntry()->getTerminator());
     for (unsigned I = 0, E = Phi->getNumIncomingValues(); I != E; ++I) {
       Value *Op = Phi->getIncomingValue(I);
       BasicBlock *BB = Phi->getIncomingBlock(I);
