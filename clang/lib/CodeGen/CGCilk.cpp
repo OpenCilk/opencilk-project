@@ -412,7 +412,7 @@ CodeGenFunction::TaskFrameScope::~TaskFrameScope() {
     return;
 
   // Pop the taskframe.
-  CGF.PopCleanupBlock(true);
+  CGF.PopCleanupBlock();
 
   // Restore the alloca insertion point.
   {
