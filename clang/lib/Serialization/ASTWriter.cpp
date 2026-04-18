@@ -368,7 +368,12 @@ void TypeLocWriter::VisitComplexTypeLoc(ComplexTypeLoc TL) {
 }
 
 void TypeLocWriter::VisitHyperobjectTypeLoc(HyperobjectTypeLoc TL) {
-  Record.AddSourceLocation(TL.getHyperLoc());
+  addSourceLocation(TL.getHyperLoc());
+  SourceRange range = TL.getOperandParensRange();
+  addSourceLocation(range.getBegin());
+  addSourceLocation(range.getEnd());
+  Record.AddStmt(TL.getFirstOperand());
+  Record.AddStmt(TL.getSecondOperand());
 }
 
 void TypeLocWriter::VisitPointerTypeLoc(PointerTypeLoc TL) {

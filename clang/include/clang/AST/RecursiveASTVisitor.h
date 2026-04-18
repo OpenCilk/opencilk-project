@@ -1277,14 +1277,9 @@ DEF_TRAVERSE_TYPELOC(ComplexType, {
 })
 
 DEF_TRAVERSE_TYPELOC(HyperobjectType, {
-  const HyperobjectType *H = TL.getTypePtr();
-  TRY_TO(TraverseType(H->getElementType()));
-  if (std::optional<Expr *> C = H->getCallbacks())
-    TRY_TO(TraverseStmt(static_cast<Stmt *>(C.value())));
-  if (std::optional<Expr *> I = H->getIdentity())
-    TRY_TO(TraverseStmt(static_cast<Stmt *>(I.value())));
-  if (std::optional<Expr *> R = H->getReduce())
-    TRY_TO(TraverseStmt(static_cast<Stmt *>(R.value())));
+  TRY_TO(TraverseTypeLoc(TL.getInnerLoc()));
+  TRY_TO(TraverseStmt(TL.getFirstOperand()));
+  TRY_TO(TraverseStmt(TL.getSecondOperand()));
 })
 
 DEF_TRAVERSE_TYPELOC(PointerType,

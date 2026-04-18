@@ -6525,6 +6525,10 @@ namespace {
     }
     void VisitHyperobjectTypeLoc(HyperobjectTypeLoc TL) {
       TL.setHyperLoc(Chunk.Loc);
+      const DeclaratorChunk::HyperobjectTypeInfo &HTI = Chunk.Hyper;
+      TL.setOperandParensRange(SourceRange(HTI.LParenLoc, HTI.RParenLoc));
+      TL.setFirstOperand(HTI.Arg[0]);
+      TL.setSecondOperand(HTI.Arg[1]);
     }
 
     void VisitTypeLoc(TypeLoc TL) {

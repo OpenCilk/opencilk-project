@@ -1,0 +1,96 @@
+# RUN: clangd -lit-test < %s | FileCheck %s
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":123,"rootPath":"clangd","capabilities":{},"trace":"off","initializationOptions":{"fallbackFlags":["-fopencilk"]}}}
+---
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"test:///hyper.cpp","languageId":"cpp","version":1,"text":"typedef long size_t;\nstruct reducer_base {\nprotected:\n  reducer_base() = default;\npublic:\n  virtual ~reducer_base() = default;\n  virtual size_t view_size() const = 0;\n  virtual reducer_base *identity(void *view) = 0;\n  virtual void reduce(reducer_base *l, reducer_base *r) = 0;\n};\ntemplate <typename T> struct opadd_hyper : public reducer_base {\nvirtual size_t view_size() const override;\n  virtual reducer_base *identity(void *v) override;\n  virtual void reduce(reducer_base *l, reducer_base *r) override;\n};\nusing long_hyper = opadd_hyper<long> cilk_reducer;\nlong_hyper sum;"}}}
+---
+{"jsonrpc":"2.0","id":1,"method":"textDocument/references","params":{
+  "textDocument":{"uri":"test:///hyper.cpp"},
+  "position":{"line":10,"character":29},
+  "context":{"includeDeclaration": false}
+}}
+#      CHECK:  "id": 1
+# CHECK-NEXT:  "jsonrpc": "2.0",
+# CHECK-NEXT:  "result": [
+# CHECK-NEXT:    {
+# CHECK-NEXT:      "range": {
+# CHECK-NEXT:        "end": {
+# CHECK-NEXT:          "character": 30,
+# CHECK-NEXT:          "line": 15
+# CHECK-NEXT:        },
+# CHECK-NEXT:        "start": {
+# CHECK-NEXT:          "character": 19,
+# CHECK-NEXT:          "line": 15
+# CHECK-NEXT:        }
+# CHECK-NEXT:      },
+# CHECK-NEXT:      "uri": "{{.*}}/hyper.cpp"
+# CHECK-NEXT:    }
+# CHECK-NEXT:  ]
+---
+{"jsonrpc":"2.0","id":1,"method":"textDocument/references","params":{
+  "textDocument":{"uri":"test:///hyper.cpp"},
+  "position":{"line":15,"character":6},
+  "context":{"includeDeclaration": false}
+}}
+#      CHECK:  "id": 1
+# CHECK-NEXT:  "jsonrpc": "2.0",
+# CHECK-NEXT:  "result": [
+# CHECK-NEXT:    {
+# CHECK-NEXT:      "range": {
+# CHECK-NEXT:        "end": {
+# CHECK-NEXT:          "character": 10,
+# CHECK-NEXT:          "line": 16
+# CHECK-NEXT:        },
+# CHECK-NEXT:        "start": {
+# CHECK-NEXT:          "character": 0,
+# CHECK-NEXT:          "line": 16
+# CHECK-NEXT:        }
+# CHECK-NEXT:      },
+# CHECK-NEXT:      "uri": "{{.*}}/hyper.cpp"
+# CHECK-NEXT:    }
+# CHECK-NEXT:  ]
+---
+{"jsonrpc":"2.0","id":1,"method":"textDocument/definition","params":{
+  "textDocument":{"uri":"test:///hyper.cpp"},
+  "position":{"line":15,"character":19}}}
+#      CHECK:  "id": 1,
+# CHECK-NEXT:  "jsonrpc": "2.0",
+# CHECK-NEXT:  "result": [
+# CHECK-NEXT:    {
+# CHECK-NEXT:      "range": {
+# CHECK-NEXT:        "end": {
+# CHECK-NEXT:          "character": 40,
+# CHECK-NEXT:          "line": 10
+# CHECK-NEXT:        },
+# CHECK-NEXT:        "start": {
+# CHECK-NEXT:          "character": 29,
+# CHECK-NEXT:          "line": 10
+# CHECK-NEXT:        }
+# CHECK-NEXT:      },
+# CHECK-NEXT:      "uri": "{{.*}}/hyper.cpp"
+# CHECK-NEXT:    }
+# CHECK-NEXT:  ]
+---
+{"jsonrpc":"2.0","id":1,"method":"textDocument/definition","params":{
+  "textDocument":{"uri":"test:///hyper.cpp"},
+  "position":{"line":16,"character":0}}}
+#      CHECK:  "id": 1,
+# CHECK-NEXT:  "jsonrpc": "2.0",
+# CHECK-NEXT:  "result": [
+# CHECK-NEXT:    {
+# CHECK-NEXT:      "range": {
+# CHECK-NEXT:        "end": {
+# CHECK-NEXT:          "character": 16,
+# CHECK-NEXT:          "line": 15
+# CHECK-NEXT:        },
+# CHECK-NEXT:        "start": {
+# CHECK-NEXT:          "character": 6,
+# CHECK-NEXT:          "line": 15
+# CHECK-NEXT:        }
+# CHECK-NEXT:      },
+# CHECK-NEXT:      "uri": "{{.*}}/hyper.cpp"
+# CHECK-NEXT:    }
+# CHECK-NEXT:  ]
+---
+{"jsonrpc":"2.0","id":2,"method":"shutdown"}
+---
+{"jsonrpc":"2.0","method":"exit"}

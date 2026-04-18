@@ -2028,24 +2028,62 @@ class ComplexTypeLoc : public InheritingConcreteTypeLoc<TypeSpecTypeLoc,
                                                         ComplexType> {
 };
 
-class HyperobjectTypeLoc :
-    public PointerLikeTypeLoc<HyperobjectTypeLoc, HyperobjectType> {
+struct HyperobjectTypeLocInfo {
+  SourceLocation HyperLoc;
+  SourceRange OperandParens;
+  Expr *FirstOperand;
+  Expr *SecondOperand;
+};
+
+class HyperobjectTypeLoc
+    : public ConcreteTypeLoc<UnqualTypeLoc, HyperobjectTypeLoc, HyperobjectType,
+                             HyperobjectTypeLocInfo> {
 public:
-  SourceLocation getHyperLoc() const {
-    return getSigilLoc();
+  /// The location of the Hyperobject keyword, i.e.
+  ///    long _Hyperobject(zero, add)
+  ///         ^~~~~~~~~~~~
+  SourceLocation getHyperLoc() const { return getLocalData()->HyperLoc; }
+  void setHyperLoc(SourceLocation Loc) { getLocalData()->HyperLoc = Loc; }
+
+  /// The location of the first operand, if there is one.
+  ///    long _Hyperobject(zero, add)
+  ///                      ^~~~
+  Expr *getFirstOperand() const { return getLocalData()->FirstOperand; }
+  void setFirstOperand(Expr *e) { getLocalData()->FirstOperand = e; }
+
+  /// The location of the second operand, if there is one.
+  ///    long _Hyperobject(zero, add)
+  ///                            ^~~
+  Expr *getSecondOperand() const { return getLocalData()->SecondOperand; }
+  void setSecondOperand(Expr *e) { getLocalData()->SecondOperand = e; }
+
+  /// The location of the parentheses around the operand, if there is
+  /// an operand.
+  ///    long _Hyperobject(zero, add)
+  ///                     ^         ^
+  SourceRange getOperandParensRange() const {
+    return getLocalData()->OperandParens;
+  }
+  void setOperandParensRange(SourceRange range) {
+    getLocalData()->OperandParens = range;
   }
 
-  void setHyperLoc(SourceLocation Loc) {
-    setSigilLoc(Loc);
+  SourceRange getLocalSourceRange() const {
+    SourceRange range(getHyperLoc());
+    range.setEnd(getOperandParensRange().getEnd());
+    return range;
   }
 
   void initializeLocal(ASTContext &Context, SourceLocation Loc) {
-    setSigilLoc(Loc);
+    setHyperLoc(Loc);
+    setOperandParensRange(Loc);
+    setFirstOperand(nullptr);
+    setSecondOperand(nullptr);
   }
 
-  QualType getInnerType() const {
-    return getTypePtr()->getElementType();
-  }
+  QualType getInnerType() const { return this->getTypePtr()->getElementType(); }
+
+  TypeLoc getInnerLoc() const { return getInnerTypeLoc(); }
 };
 
 struct TypeofLocInfo {

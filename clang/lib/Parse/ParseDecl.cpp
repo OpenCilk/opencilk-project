@@ -18,6 +18,7 @@
 #include "clang/Basic/Attributes.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/DiagnosticParse.h"
+#include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/TokenKinds.h"
 #include "clang/Parse/Parser.h"
@@ -6447,16 +6448,16 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
                               !D.mayOmitIdentifier());
 
     Expr *Arg1 = nullptr, *Arg2 = nullptr;
+    SourceLocation LParen = Loc, RParen = Loc;
     bool Invalid = false;
     if (Tok.is(tok::l_paren)) {
-      (void) ConsumeParen(); // Eat the parenthesis
+      LParen = ConsumeParen(); // Eat the parenthesis
       SmallVector<Expr *, 3> Args;
-      SourceLocation Close = Tok.getLocation();
 
       if (!Tok.is(tok::r_paren))
         Invalid = ParseSimpleExpressionList(Args);
       if (Tok.is(tok::r_paren))
-        Close = ConsumeParen(); // Eat the parenthesis
+        RParen = ConsumeParen(); // Eat the parenthesis
       else
         SkipUntil(tok::r_paren, StopAtSemi);
 
@@ -6494,9 +6495,8 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
     else if (Invalid)
       ;
     else if (getLangOpts().getCilk() == LangOptions::Cilk_opencilk)
-      D.AddTypeInfo(DeclaratorChunk::getHyperobject(
-                        DS.getTypeQualifiers(), Loc, SourceLocation(),
-                        SourceLocation(), Arg1, Arg2),
+      D.AddTypeInfo(DeclaratorChunk::getHyperobject(DS.getTypeQualifiers(), Loc,
+                                                    LParen, RParen, Arg1, Arg2),
                     std::move(DS.getAttributes()), SourceLocation());
   } else if (Kind == tok::star || Kind == tok::caret) {
     // Is a pointer.

@@ -5581,7 +5581,7 @@ TreeTransform<Derived>::TransformHyperobjectType(TypeLocBuilder &TLB,
     }
   }
 
-  QualType ElementType = getDerived().TransformType(TLB, TL.getPointeeLoc());
+  QualType ElementType = getDerived().TransformType(TLB, TL.getInnerLoc());
   if (ElementType.isNull())
     return QualType();
 
@@ -5593,6 +5593,9 @@ TreeTransform<Derived>::TransformHyperobjectType(TypeLocBuilder &TLB,
 
   HyperobjectTypeLoc NewT = TLB.push<HyperobjectTypeLoc>(Result);
   NewT.setHyperLoc(TL.getHyperLoc());
+  NewT.setOperandParensRange(TL.getOperandParensRange());
+  NewT.setFirstOperand(TL.getFirstOperand());
+  NewT.setSecondOperand(TL.getSecondOperand());
   return Result;
 }
 

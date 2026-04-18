@@ -408,7 +408,7 @@ void TypePrinter::printComplexAfter(const ComplexType *T, raw_ostream &OS) {
 
 void TypePrinter::printHyperobjectBefore(const HyperobjectType *T,
                                          raw_ostream &OS) {
-  SaveAndRestore<bool> NonEmptyPH(HasEmptyPlaceHolder, false);
+  SaveAndRestore NonEmptyPH(HasEmptyPlaceHolder, false);
   printBefore(T->getElementType(), OS);
   OS << "_Hyperobject";
   if (T->getCallbacks()) {
@@ -422,7 +422,7 @@ void TypePrinter::printHyperobjectBefore(const HyperobjectType *T,
     I->printPretty(OS, nullptr, Policy);
     OS << ", ";
     R->printPretty(OS, nullptr, Policy);
-    OS << ")";
+    OS << ')';
   }
 }
 
