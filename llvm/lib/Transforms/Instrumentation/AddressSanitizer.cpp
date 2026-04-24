@@ -909,6 +909,8 @@ private:
   const StackSafetyGlobalInfo *SSGI;
   DenseMap<const AllocaInst *, bool> ProcessedAllocas;
   SmallPtrSet<const AllocaInst *, 16> InterestingParallelAllocas;
+  DenseMap<const BasicBlock *, SmallVector<Instruction *, 8>>
+      ParallelAllocaTaskExits;
 
   FunctionCallee AMDGPUAddressShared;
   FunctionCallee AMDGPUAddressPrivate;
@@ -1054,6 +1056,9 @@ struct FunctionStackPoisoner : public InstVisitor<FunctionStackPoisoner> {
   SmallVector<AllocaInst *, 16> StaticAllocasToMoveUp;
   SmallVector<Instruction *, 8> RetVec;
 
+  SmallPtrSet<BasicBlock *, 1> TasksToProcess;
+  DenseMap<BasicBlock *, SmallVector<AllocaInst *, 16>> TaskAllocaVec;
+
   FunctionCallee AsanStackMallocFunc[kMaxAsanStackMallocSizeClass + 1],
       AsanStackFreeFunc[kMaxAsanStackMallocSizeClass + 1];
   FunctionCallee AsanSetShadowFunc[0x100] = {};
@@ -1071,10 +1076,19 @@ struct FunctionStackPoisoner : public InstVisitor<FunctionStackPoisoner> {
   SmallVector<AllocaPoisonCall, 8> StaticAllocaPoisonCallVec;
   bool HasUntracedLifetimeIntrinsic = false;
 
+  DenseMap<BasicBlock *, SmallVector<AllocaPoisonCall, 8>>
+      TaskDynamicAllocaPoisonCallVec;
+  DenseMap<BasicBlock *, SmallVector<AllocaPoisonCall, 8>>
+      TaskStaticAllocaPoisonCallVec;
+
   SmallVector<AllocaInst *, 1> DynamicAllocaVec;
   SmallVector<IntrinsicInst *, 1> StackRestoreVec;
   AllocaInst *DynamicAllocaLayout = nullptr;
   IntrinsicInst *LocalEscapeCall = nullptr;
+
+  DenseMap<BasicBlock *, SmallVector<AllocaInst *, 1>> TaskDynamicAllocaVec;
+  DenseMap<BasicBlock *, SmallVector<IntrinsicInst *, 1>> TaskStackRestoreVec;
+  DenseMap<BasicBlock *, IntrinsicInst *> TaskLocalEscapeCall;
 
   bool HasInlineAsm = false;
   bool HasReturnsTwiceCall = false;
@@ -1099,9 +1113,60 @@ struct FunctionStackPoisoner : public InstVisitor<FunctionStackPoisoner> {
     // Collect alloca, ret, lifetime instructions etc.
     for (BasicBlock *BB : depth_first(&F.getEntryBlock())) visit(*BB);
 
-    if (AllocaVec.empty() && DynamicAllocaVec.empty()) return false;
+    if (AllocaVec.empty() && DynamicAllocaVec.empty() && TasksToProcess.empty())
+      return false;
 
     initializeCallbacks(*F.getParent());
+
+    // If there are tasks to process, handle each task like a nested function.
+    if (!TasksToProcess.empty()) {
+      // Save the top-level-function state of FunctionStackPoisoner for
+      // processing dynamic and static allocas.
+      auto RootAllocaVec(AllocaVec);
+      auto RootDynamicAllocaVec(DynamicAllocaVec);
+      auto RootRetVec(RetVec);
+      auto RootStaticAllocaPoisonCallVec(StaticAllocaPoisonCallVec);
+      auto RootDynamicAllocaPoisonCallVec(DynamicAllocaPoisonCallVec);
+      auto RootStackRestoreVec(StackRestoreVec);
+      auto *RootLocalEscapeCall = LocalEscapeCall;
+
+      for (BasicBlock *TaskEntry : TasksToProcess) {
+        // Set the FunctionStackPoisoner state for processing dynamic and static
+        // allocas within this task.
+        AllocaVec = TaskAllocaVec[TaskEntry];
+        DynamicAllocaVec = TaskDynamicAllocaVec[TaskEntry];
+        RetVec = ASan.ParallelAllocaTaskExits[TaskEntry];
+        StaticAllocaPoisonCallVec = TaskStaticAllocaPoisonCallVec[TaskEntry];
+        DynamicAllocaPoisonCallVec = TaskDynamicAllocaPoisonCallVec[TaskEntry];
+        DynamicAllocaLayout = nullptr;
+        StackRestoreVec = TaskStackRestoreVec[TaskEntry];
+        LocalEscapeCall = TaskLocalEscapeCall.contains(TaskEntry)
+                              ? TaskLocalEscapeCall[TaskEntry]
+                              : nullptr;
+
+        if (HasUntracedLifetimeIntrinsic) {
+          // If there are lifetime intrinsics which couldn't be traced back to
+          // an alloca, we may not know exactly when a variable enters scope,
+          // and therefore should "fail safe" by not poisoning them.
+          StaticAllocaPoisonCallVec.clear();
+          DynamicAllocaPoisonCallVec.clear();
+        }
+
+        processDynamicAllocas();
+        processStaticAllocas();
+      }
+
+      // Restore the top-level-function state of FunctionStackPoisoner for
+      // processing dynamic and static allocas.
+      AllocaVec = RootAllocaVec;
+      DynamicAllocaVec = RootDynamicAllocaVec;
+      RetVec = RootRetVec;
+      StaticAllocaPoisonCallVec = RootStaticAllocaPoisonCallVec;
+      DynamicAllocaPoisonCallVec = RootDynamicAllocaPoisonCallVec;
+      DynamicAllocaLayout = nullptr;
+      StackRestoreVec = RootStackRestoreVec;
+      LocalEscapeCall = RootLocalEscapeCall;
+    }
 
     if (HasUntracedLifetimeIntrinsic) {
       // If there are lifetime intrinsics which couldn't be traced back to an
@@ -1210,9 +1275,22 @@ struct FunctionStackPoisoner : public InstVisitor<FunctionStackPoisoner> {
       return;
     }
 
+    if (!ASan.TI->isSerial()) {
+      Task *AllocaTask = ASan.TI->getTaskFor(AI.getParent());
+      if (!AllocaTask->isRootTask()) {
+        BasicBlock *TaskEntry = AllocaTask->getEntry();
+        TasksToProcess.insert(TaskEntry);
+        if (!AI.isStaticAlloca())
+          TaskDynamicAllocaVec[TaskEntry].push_back(&AI);
+        else
+          TaskAllocaVec[TaskEntry].push_back(&AI);
+        return;
+      }
+    }
+
     if (!AI.isStaticAlloca())
       DynamicAllocaVec.push_back(&AI);
-    else
+    else if (AI.getParent() == &F.getEntryBlock())
       AllocaVec.push_back(&AI);
   }
 
@@ -1220,8 +1298,18 @@ struct FunctionStackPoisoner : public InstVisitor<FunctionStackPoisoner> {
   /// errors.
   void visitIntrinsicInst(IntrinsicInst &II) {
     Intrinsic::ID ID = II.getIntrinsicID();
-    if (ID == Intrinsic::stackrestore) StackRestoreVec.push_back(&II);
-    if (ID == Intrinsic::localescape) LocalEscapeCall = &II;
+    if (!ASan.TI->isSerial() && ASan.TI->getTaskFor(II.getParent()) &&
+        !ASan.TI->getTaskFor(II.getParent())->isRootTask()) {
+      Task *Task = ASan.TI->getTaskFor(II.getParent());
+      BasicBlock *TaskEntry = Task->getEntry();
+      if (ID == Intrinsic::stackrestore)
+        TaskStackRestoreVec[TaskEntry].push_back(&II);
+      if (ID == Intrinsic::localescape)
+        TaskLocalEscapeCall[TaskEntry] = &II;
+    } else {
+      if (ID == Intrinsic::stackrestore) StackRestoreVec.push_back(&II);
+      if (ID == Intrinsic::localescape) LocalEscapeCall = &II;
+    }
     if (!ASan.UseAfterScope)
       return;
     if (!II.isLifetimeStartOrEnd())
@@ -1249,6 +1337,18 @@ struct FunctionStackPoisoner : public InstVisitor<FunctionStackPoisoner> {
       return;
     bool DoPoison = (ID == Intrinsic::lifetime_end);
     AllocaPoisonCall APC = {&II, AI, SizeValue, DoPoison};
+    if (!ASan.TI->isSerial()) {
+      Task *AllocaTask = ASan.TI->getTaskFor(AI->getParent());
+      if (!AllocaTask->isRootTask()) {
+        BasicBlock *TaskEntry = AllocaTask->getEntry();
+        TasksToProcess.insert(TaskEntry);
+        if (AI->isStaticAlloca())
+          TaskStaticAllocaPoisonCallVec[TaskEntry].push_back(APC);
+        else
+          TaskDynamicAllocaPoisonCallVec[TaskEntry].push_back(APC);
+        return;
+      }
+    }
     if (AI->isStaticAlloca())
       StaticAllocaPoisonCallVec.push_back(APC);
     else if (ClInstrumentDynamicAllocas)
@@ -3013,8 +3113,18 @@ void AddressSanitizer::recordInterestingParallelAllocas(const Function &F) {
             ((!AI->isStaticAlloca()) || getAllocaSizeInBytes(*AI) > 0) &&
             // We are only interested in allocas not promotable to registers.
             // Promotable allocas are common under -O0.
-            !isAllocaPromotable(AI) && !TI->isAllocaParallelPromotable(AI))
+            !isAllocaPromotable(AI) && !TI->isAllocaParallelPromotable(AI)) {
           InterestingParallelAllocas.insert(AI);
+          // Collect task exits associated with this parallel alloca, so they
+          // can be instrumented later without querying TaskInfo.
+          Task *ContainingTask = TI->getTaskFor(AI->getParent());
+          for (const Spindle *S : ContainingTask->spindles())
+            for (const BasicBlock *TaskBB : S->getBlocks())
+              if (ContainingTask->isTaskExiting(TaskBB) &&
+                  !isa<UnreachableInst>(TaskBB->getFirstNonPHIOrDbg()))
+                ParallelAllocaTaskExits[AI->getParent()].push_back(
+                    const_cast<Instruction *>(TaskBB->getTerminator()));
+        }
 }
 
 bool AddressSanitizer::suppressInstrumentationSiteForDebug(int &Instrumented) {
@@ -3512,7 +3622,9 @@ void FunctionStackPoisoner::processStaticAllocas() {
   // debug info is broken, because only entry-block allocas are treated as
   // regular stack slots.
   auto InsBeforeB = InsBefore->getParent();
-  assert(InsBeforeB == &F.getEntryBlock());
+  // The following assertion can be false with Tapir, because InsBeforeB can be
+  // a task entry, not just the function entry.
+  // assert(InsBeforeB == &F.getEntryBlock());
   for (auto *AI : StaticAllocasToMoveUp)
     if (AI->getParent() == InsBeforeB)
       AI->moveBefore(InsBefore->getIterator());
