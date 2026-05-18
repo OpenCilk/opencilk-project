@@ -791,7 +791,7 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
-  getMachOToolChain().AddLinkTapirRuntime(Args, CmdArgs);
+  getMachOToolChain().AddLinkTapirRuntime(Args, CmdArgs, LinkerIsLLD);
 
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nostartfiles)) {
     // endfile_spec is empty.
@@ -3960,7 +3960,8 @@ void DarwinClang::AddLinkTapirRuntimeLib(const ArgList &Args,
 }
 
 void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
-                                      ArgStringList &CmdArgs) const {
+                                      ArgStringList &CmdArgs,
+                                      bool LinkerIsLLD) const {
   TapirTargetID TapirTarget = parseTapirTarget(Args);
   if (TapirTarget == TapirTargetID::Last_TapirTargetID)
     if (const Arg *A = Args.getLastArg(options::OPT_ftapir_EQ))
@@ -3992,6 +3993,10 @@ void DarwinClang::AddLinkTapirRuntime(const ArgList &Args,
     AddLinkTapirRuntimeLib(Args, CmdArgs,
                            UseAsan ? "opencilk-asan" : "opencilk", RLO,
                            !StaticOpenCilk);
+
+    // Avoid link error combining C, C++, Cilk/C, and Cilk/C++ personalities.
+    if (!LinkerIsLLD)
+      CmdArgs.push_back("-no_compact_unwind");
     break;
   }
   case TapirTargetID::CilkPlus:

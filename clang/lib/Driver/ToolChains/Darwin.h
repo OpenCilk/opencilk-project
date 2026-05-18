@@ -180,7 +180,8 @@ public:
 
   /// Add the linker arguments to link a Tapir runtime library.
   virtual void AddLinkTapirRuntime(const llvm::opt::ArgList &Args,
-                                   llvm::opt::ArgStringList &CmdArgs) const {}
+                                   llvm::opt::ArgStringList &CmdArgs,
+                                   bool LinkerIsLLD) const {}
 
   /// Add the linker arguments to link the compiler runtime library.
   ///
@@ -682,7 +683,8 @@ public:
                              bool IsLTO = false) const override;
 
   void AddLinkTapirRuntime(const llvm::opt::ArgList &Args,
-                           llvm::opt::ArgStringList &CmdArgs) const override;
+                           llvm::opt::ArgStringList &CmdArgs,
+                           bool LinkerIsLLD) const override;
 
   unsigned GetDefaultDwarfVersion() const override;
   // Until dtrace (via CTF) and LLDB can deal with distributed debug info,
