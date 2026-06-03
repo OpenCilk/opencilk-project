@@ -38,7 +38,7 @@ jobs:
       LLVM_VERSION_PATCH: ${{ steps.version.outputs.patch }}
     steps:
       - name: Checkout source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 250
 
@@ -131,7 +131,7 @@ jobs:
             sed -i 's/LLVM_[0-9]\+/LLVM_NOVERSION/' $lib-${{ matrix.ref }}.abi
           done
       - name: Upload ABI file
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # 4.6.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
         with:
           name: ${{ matrix.name }}
           path: '*${{ matrix.ref }}.abi'
@@ -144,12 +144,12 @@ jobs:
       - abi-dump
     steps:
       - name: Download baseline
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # 4.1.8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # 8.0.1
         with:
           name: build-baseline
           path: build-baseline
       - name: Download latest
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # 4.1.8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # 8.0.1
         with:
           name: build-latest
           path: build-latest
@@ -165,7 +165,7 @@ jobs:
           done
       - name: Upload ABI Comparison
         if: always()
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # 4.6.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
         with:
           name: compat-report-${{ github.sha }}
           path: compat_reports/
