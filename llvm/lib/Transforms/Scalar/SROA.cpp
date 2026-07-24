@@ -5725,7 +5725,9 @@ SROA::runOnAlloca(AllocaInst &AI) {
   if (AS.isEscaped())
     return {Changed, CFGChanged};
 
-  if (AS.isEscapedReadOnly()) {
+  // For escaped-read-only slices, verify that the alloca is promotable with
+  // respect to Tapir tasks before propagating stored values to loads.
+  if (AS.isEscapedReadOnly() && TI->isAllocaParallelPromotable(&AI)) {
     Changed |= propagateStoredValuesToLoads(AI, AS);
     return {Changed, CFGChanged};
   }
