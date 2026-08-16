@@ -21,6 +21,7 @@
 #include "llvm/IR/EHPersonalities.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
@@ -2162,6 +2163,39 @@ promoteCallsInTasksHelper(BasicBlock *EntryBlock, BasicBlock *UnwindEdge,
           NewBB = SplitBlock(BB, TFCreate);
         else
           NewBB = BB;
+
+        // Check if this taskframe has an unwind destination.  If so, then
+        // potentially throwing calls within the taskframe should already be
+        // invokes, so no need to process this taskframe.
+        if (llvm::any_of(TFCreate->users(), [&](User *U) {
+              if (Instruction *I = dyn_cast<Instruction>(U))
+                return isTaskFrameResume(I, TFCreate);
+              return false;
+            })) {
+          // Split any blocks containing taskframe.end for this taskframe, to
+          // make sure successors in that block are processed correctly.
+          for (User *U : TFCreate->users()) {
+            if (Instruction *I = dyn_cast<Instruction>(U)) {
+              if (!isTapirIntrinsic(Intrinsic::taskframe_end, I, TFCreate))
+                // Not a taskframe.end; nothing to do.
+                continue;
+
+              BasicBlock *TFEndBB = I->getParent();
+              if (TFEndBB->getTerminator()->getPrevNode() != I ||
+                  !isa<BranchInst>(TFEndBB->getTerminator())) {
+                // Split at the taskframe.end, and enqueue the successor.
+                BasicBlock *TFEndSuccessor =
+                    SplitBlock(TFEndBB, I->getNextNode());
+                Worklist.push_back(TFEndSuccessor);
+              } else {
+                // Enqueue the successors of this taskframe.end block.
+                for (BasicBlock *Successor : successors(TFEndBB))
+                  Worklist.push_back(Successor);
+              }
+            }
+          }
+          continue;
+        }
 
         // Create an unwind edge for the taskframe.
         BasicBlock *TaskFrameUnwindEdge =
