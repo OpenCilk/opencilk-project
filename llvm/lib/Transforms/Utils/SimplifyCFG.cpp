@@ -8590,12 +8590,12 @@ static bool serializeDetachToImmediateSync(BasicBlock *BB,
       if (Value *TaskFrame = getTaskFrameUsed(Detached)) {
         // If this detach uses a taskframe, record that taskframe.use.
         for (User *U : TaskFrame->users()) {
-          if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(U)) {
-            if (Intrinsic::taskframe_use == II->getIntrinsicID())
-              ToErase.push_back(II);
+          if (Instruction *I = dyn_cast<Instruction>(U)) {
+            if (isTapirIntrinsic(Intrinsic::taskframe_use, I, TaskFrame))
+              ToErase.push_back(I);
             else
-              // We need more complicated logic to effectively inline this
-              // taskframe, so abort.
+              // Effectively inlining this taskframe needs more complicated
+              // logic, so abort.
               return false;
           }
         }
