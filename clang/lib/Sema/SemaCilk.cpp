@@ -13,6 +13,7 @@
 #include "clang/AST/ExprCilk.h"
 #include "clang/AST/StmtCilk.h"
 #include "clang/Sema/SemaInternal.h"
+#include "clang/Sema/ScopeInfo.h"
 using namespace clang;
 using namespace sema;
 
@@ -50,6 +51,15 @@ static FunctionScopeInfo *checkCilkContext(Sema &S, SourceLocation Loc,
   assert(isa<FunctionDecl>(S.CurContext) && "not in a function scope");
   FunctionScopeInfo *ScopeInfo = S.getCurFunction();
   assert(ScopeInfo && "missing function scope for function");
+
+  // Cilk keywords inside statement expressions cause problems
+  // generating IR.
+  for (CompoundScopeInfo &Scope : ScopeInfo->CompoundScopes) {
+    if (Scope.IsStmtExpr) {
+      S.Diag(Loc, diag::err_cilk_in_statement_expression) << Keyword;
+      return nullptr;
+    }
+  }
 
   return ScopeInfo;
 }

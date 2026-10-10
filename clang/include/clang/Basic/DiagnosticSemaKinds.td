@@ -11565,6 +11565,8 @@ def err_cilk_spawn_invalid_func_context : Error<
   "|a varargs function}0">;
 def err_pragma_cilk_precedes_noncilk : Error<
   "expected a Cilk keyword to follow '%0'">;
+def err_cilk_in_statement_expression : Error<
+  "'%0' cannot be used inside a statement expression">;
 
 // cilk_scope
 def note_protected_by_cilk_scope: Note<
